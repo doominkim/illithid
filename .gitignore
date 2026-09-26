@@ -5,3 +5,6 @@ out
 .eslintcache
 *.log*
 *.tsbuildinfo
+
+# design drafts belong in the Illithid library, not the repo
+/artifacts/

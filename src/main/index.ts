@@ -104,6 +104,8 @@ function createWindow(): void {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.illithid.app')
+  // Dev builds run inside the stock Electron bundle; show the app icon in the Dock anyway
+  if (process.platform === 'darwin' && is.dev && !TEST_MODE) app.dock?.setIcon(icon)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
