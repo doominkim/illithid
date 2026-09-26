@@ -31,6 +31,7 @@ export const BACKUP_INCLUDES = [
 /** Entries excluded via .gitignore */
 export const BACKUP_EXCLUDES = [
   '.trash/',
+  'artifacts/',
   '.DS_Store',
   'Thumbs.db',
   `*${TMP_TAG}*.tmp`,
