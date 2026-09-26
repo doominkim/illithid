@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react'
-import { ActionIcon, Alert, Badge, Code, Group, Image, Select, Stack, Text, Title } from '@mantine/core'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ActionIcon, Alert, Badge, Box, Code, Group, Image, SegmentedControl, Select, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { ExternalLink, FolderOpen, HelpCircle, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Artifact, ArtifactTool } from '../../../shared/api'
+import type { Artifact, ArtifactTool, DocSearchResponse, DocSearchResult } from '../../../shared/api'
 import { Initial } from '../components/ListRow'
 import { ErrorAlert, FillStack, Loading, NoSelection, SplitPane } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
 import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
+import { Snippet } from '../components/Snippet'
 import { ToolIcon } from '../components/ToolIcon'
 import { VirtualList } from '../components/VirtualList'
 import { fmtSize, fmtTime, includesCI } from '../lib/format'
+import { useTextHighlight } from '../lib/highlight'
 import { runWrite } from '../lib/mutate'
 import { useApi } from '../lib/useApi'
 
@@ -32,9 +35,41 @@ function toolFilterIcon(v: string): React.JSX.Element {
   return <ToolIcon tool={v as Exclude<ArtifactTool, 'unknown'>} size={13} />
 }
 
-function Preview({ a }: { a: Artifact }): React.JSX.Element {
+/** Content search results (title + snippet, virtual scroll) */
+function ResultList({ rows, selected, onSelect }: { rows: { a: Artifact; hit: DocSearchResult }[]; selected: string | null; onSelect: (id: string) => void }): React.JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const v = useVirtualizer({ count: rows.length, getScrollElement: () => ref.current, estimateSize: () => 72, overscan: 8 })
+  return (
+    <div ref={ref} style={{ flex: 1, minHeight: 0, overflow: 'auto' }} data-testid="artifact-content-results">
+      <div style={{ height: v.getTotalSize(), position: 'relative' }}>
+        {v.getVirtualItems().map((vr) => {
+          const { a, hit } = rows[vr.index]
+          return (
+            <div key={a.id} data-index={vr.index} ref={v.measureElement} className="mantine-NavLink-root" style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }}>
+              <UnstyledButton className="ac-row" data-active={a.id === selected || undefined} onClick={() => onSelect(a.id)} style={{ alignItems: 'flex-start' }} data-testid="artifact-content-hit">
+                {a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />}
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="sm" fw={600} lineClamp={1}>
+                    {a.title}
+                  </Text>
+                  <Text size="xs" c="dimmed" lineClamp={2} style={{ lineHeight: 1.45, wordBreak: 'break-all' }}>
+                    <Snippet text={hit.snippet} marks={hit.marks} />
+                  </Text>
+                </Box>
+              </UnstyledButton>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JSX.Element {
   const { t } = useTranslation()
   const { data, error } = useApi(`preview:${a.id}`, () => window.api.artifactPreview(a.id))
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useTextHighlight(bodyRef, highlight, [data])
   const head = (
     <Group justify="space-between" wrap="nowrap" align="flex-start">
       <Title order={3} style={{ minWidth: 0, wordBreak: 'break-word' }}>
@@ -97,7 +132,7 @@ function Preview({ a }: { a: Artifact }): React.JSX.Element {
           {t('artifacts.truncated')}
         </Alert>
       )}
-      {body}
+      <div ref={bodyRef}>{body}</div>
     </Stack>
   )
 }
@@ -109,10 +144,33 @@ function Artifacts(): React.JSX.Element {
   const [source, setSource] = useState<string>(ALL)
   const [tool, setTool] = useState<string>(ALL)
   const [selected, setSelected] = useState<string | null>(null)
+  const [mode, setMode] = useState<'title' | 'content'>('title')
+  /** Content search response tagged with its query (results for an older query are not shown) */
+  const [found, setFound] = useState<{ q: string; tool: string; r: DocSearchResponse } | null>(null)
+  const [indexRunning, setIndexRunning] = useState(false)
+  const contentQ = mode === 'content' ? query.trim() : ''
+  useEffect(() => window.api.onSearchIndexEvent((x) => setIndexRunning(x.running)), [])
+  // Content search: 300ms after input, and again when indexing finishes
+  useEffect(() => {
+    if (!contentQ) return
+    let alive = true
+    const done = (r: DocSearchResponse): void => {
+      if (alive) setFound({ q: contentQ, tool, r })
+    }
+    const timer = setTimeout(() => {
+      void window.api.docSearch(contentQ, { kind: 'artifact', ...(tool === ALL ? {} : { tool: tool as ArtifactTool }) }).then(done, () =>
+        done({ results: [], mode: 'fts', limited: false, ms: 0 })
+      )
+    }, 300)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [contentQ, tool, indexRunning])
 
   const sources = useMemo(() => [...new Set((data ?? []).map((a) => a.source))], [data])
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = mode === 'title' ? query.trim().toLowerCase() : ''
     return (data ?? []).filter(
       (a) =>
         (source === ALL || a.source === source) &&
@@ -123,7 +181,17 @@ function Artifacts(): React.JSX.Element {
           includesCI(a.project, q) ||
           (a.tool !== 'unknown' && (includesCI(a.tool, q) || includesCI(ARTIFACT_TOOL_NAME[a.tool], q))))
     )
-  }, [data, query, source, tool])
+  }, [data, query, source, tool, mode])
+  /** Content hits mapped to the latest scan (hits no longer in the scan are dropped) */
+  const resultRows = useMemo(() => {
+    if (!found || found.q !== contentQ || found.tool !== tool) return null
+    const byId = new Map((data ?? []).map((a) => [a.id, a]))
+    return found.r.results.flatMap((hit) => {
+      const a = byId.get(hit.key)
+      return a && (source === ALL || a.source === source) ? [{ a, hit }] : []
+    })
+  }, [found, contentQ, tool, data, source])
+  const showResults = mode === 'content' && !!contentQ
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -135,7 +203,17 @@ function Artifacts(): React.JSX.Element {
       <Toolbar
         left={
           <>
-            <SearchInput value={query} onChange={setQuery} placeholder={t('artifacts.search')} />
+            <SearchInput value={query} onChange={setQuery} placeholder={mode === 'content' ? t('artifacts.searchContent') : t('artifacts.search')} />
+            <SegmentedControl
+              size="xs"
+              value={mode}
+              onChange={(v) => setMode(v as 'title' | 'content')}
+              data={[
+                { value: 'title', label: t('artifacts.modeTitle') },
+                { value: 'content', label: t('artifacts.modeContent') }
+              ]}
+              data-testid="artifact-search-mode"
+            />
             <Select
               w={260}
               allowDeselect={false}
@@ -166,7 +244,7 @@ function Artifacts(): React.JSX.Element {
         }
         right={
           <Text size="sm" c="dimmed" data-testid="artifact-count">
-            {t('common.shown', { shown: filtered.length, total: data.length })}
+            {t('common.shown', { shown: showResults ? (resultRows?.length ?? 0) : filtered.length, total: data.length })}
           </Text>
         }
       />
@@ -174,23 +252,35 @@ function Artifacts(): React.JSX.Element {
         listScroll={false}
         detailWidth="55%"
         list={
-          <VirtualList
-            items={filtered.map((a) => ({
-              id: a.id,
-              label: a.title,
-              avatar: a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />,
-              description: [a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · '),
-              tag: (
-                <Badge variant="default" size="xs" fw={500} c="dimmed">
-                  {a.source}
-                </Badge>
-              )
-            }))}
-            selected={selected}
-            onSelect={setSelected}
-          />
+          showResults ? (
+            !resultRows ? (
+              <Loading />
+            ) : resultRows.length ? (
+              <ResultList rows={resultRows} selected={selected} onSelect={setSelected} />
+            ) : (
+              <Text size="xs" c="dimmed" p="md">
+                {t('common.noResults')}
+              </Text>
+            )
+          ) : (
+            <VirtualList
+              items={filtered.map((a) => ({
+                id: a.id,
+                label: a.title,
+                avatar: a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />,
+                description: [a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · '),
+                tag: (
+                  <Badge variant="default" size="xs" fw={500} c="dimmed">
+                    {a.source}
+                  </Badge>
+                )
+              }))}
+              selected={selected}
+              onSelect={setSelected}
+            />
+          )
         }
-        detail={current ? <Preview key={current.id} a={current} /> : <NoSelection />}
+        detail={current ? <Preview key={current.id} a={current} highlight={showResults ? contentQ : ''} /> : <NoSelection />}
       />
     </FillStack>
   )

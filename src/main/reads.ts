@@ -23,6 +23,13 @@ import {
   indexSessions,
   indexStatus,
   searchSessions,
+  indexAllDocs,
+  searchDocs,
+  searchAll,
+  DOC_KINDS,
+  type DocIndexResult,
+  type DocKind,
+  planBackupCleanup,
   type IndexResult,
   scanClaudeMemory,
   scanCodexMemory,
@@ -43,6 +50,7 @@ import type {
   McpServerView,
   McpToolState,
   RulesData,
+  DocSearchFilters,
   SessionSearchFilters,
   SkillsData,
   SyncState
@@ -332,15 +340,25 @@ export type Op =
   | 'searchIndex'
   | 'searchSessions'
   | 'searchStatus'
+  | 'searchDocs'
+  | 'searchAll'
+  | 'backupCleanupPlan'
 
-/** Session scan -> incremental index. Index entries for tools whose scan failed are kept */
-async function searchIndex(home: string, onProgress?: (p: unknown) => void): Promise<IndexResult> {
+/**
+ * Session scan -> incremental index, then documents (artifacts + library). Index entries for tools whose scan failed are kept.
+ * Progress events count sessions only (documents are quick)
+ */
+async function searchIndex(
+  home: string,
+  onProgress?: (p: unknown) => void
+): Promise<{ sessions: IndexResult; docs: DocIndexResult }> {
   const { sessions, errors } = scanSessions(home)
   const failed = new Set(errors.map((e) => e.tool))
-  return indexSessions(home, sessions, {
+  const s = await indexSessions(home, sessions, {
     completeTools: (['claude', 'codex', 'opencode'] as const).filter((t) => !failed.has(t)),
     onProgress
   })
+  return { sessions: s, docs: indexAllDocs(home) }
 }
 
 export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onProgress?: (p: unknown) => void): unknown {
@@ -358,6 +376,18 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     }
     case 'searchStatus':
       return indexStatus(home)
+    case 'searchDocs': {
+      const [q, filters] = args as [unknown, DocSearchFilters | undefined]
+      const f = filters ?? {}
+      return searchDocs(home, typeof q === 'string' ? q : '', {
+        ...(DOC_KINDS.includes(f.kind as DocKind) ? { kind: f.kind } : {}),
+        ...(typeof f.tool === 'string' && f.tool ? { tool: f.tool } : {})
+      })
+    }
+    case 'searchAll':
+      return searchAll(home, typeof args[0] === 'string' ? args[0] : '')
+    case 'backupCleanupPlan':
+      return planBackupCleanup(home)
     case 'status':
       return statusReport(home, env)
     case 'rules':

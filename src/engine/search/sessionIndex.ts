@@ -99,6 +99,8 @@ export interface IndexStatus {
   exists: boolean
   sessions: number
   messages: number
+  /** Indexed documents (docIndex.ts) */
+  docs?: number
   lastIndexedAt?: string
 }
 
@@ -118,7 +120,8 @@ function sqlite(): SqliteModule {
   return m
 }
 
-function openDb(path: string): DatabaseSync {
+/** Open (and create or migrate) the search index. The document tables (docIndex.ts) live in the same file */
+export function openDb(path: string): DatabaseSync {
   mkdirSync(dirname(path), { recursive: true })
   const db = new (sqlite().DatabaseSync)(path, { timeout: 5000 })
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;')
@@ -159,19 +162,19 @@ function openDb(path: string): DatabaseSync {
   return db
 }
 
-function tableExists(db: DatabaseSync, name: string): boolean {
+export function tableExists(db: DatabaseSync, name: string): boolean {
   return !!db.prepare(`select 1 from sqlite_master where type = 'table' and name = ?`).get(name)
 }
 
-function metaGet(db: DatabaseSync, key: string): string | undefined {
+export function metaGet(db: DatabaseSync, key: string): string | undefined {
   return (db.prepare('select value from meta where key = ?').get(key) as { value?: string } | undefined)?.value
 }
 
-function metaSet(db: DatabaseSync, key: string, value: string): void {
+export function metaSet(db: DatabaseSync, key: string, value: string): void {
   db.prepare('insert into meta(key, value) values (?, ?) on conflict(key) do update set value = excluded.value').run(key, value)
 }
 
-function totalChanges(db: DatabaseSync): number {
+export function totalChanges(db: DatabaseSync): number {
   return Number((db.prepare('select total_changes() as n').get() as { n: number }).n)
 }
 
@@ -353,7 +356,8 @@ export function indexStatus(home: string, opts: IndexOptions = {}): IndexStatus 
   try {
     const sessions = Number((db.prepare('select count(*) as n from sessions').get() as { n: number }).n)
     const messages = Number((db.prepare('select count(*) as n from msg').get() as { n: number }).n)
-    return { exists: true, sessions, messages, lastIndexedAt: metaGet(db, 'lastIndexedAt') }
+    const docs = tableExists(db, 'docs') ? Number((db.prepare('select count(*) as n from docs').get() as { n: number }).n) : 0
+    return { exists: true, sessions, messages, docs, lastIndexedAt: metaGet(db, 'lastIndexedAt') }
   } finally {
     db.close()
   }

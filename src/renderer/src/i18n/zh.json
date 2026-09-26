@@ -27,7 +27,18 @@
     "fixtureBody": "此应用实例读写 {{home}} 而非真实主目录。",
     "applyOn": "已启用写入",
     "allowApplyConfirm": "启用",
-    "allowApplyBody": "应用将修改工具配置文件及工具的技能/规则文件夹。"
+    "allowApplyBody": "应用将修改工具配置文件及工具的技能/规则文件夹。",
+    "cleanup": "备份自动清理",
+    "cleanupEnabled": "自动清理",
+    "cleanupDays": "保留天数",
+    "cleanupKeepRollback": "回滚快照保留数",
+    "cleanupNow": "立即清理",
+    "cleanupConfirmTitle": "清理备份",
+    "cleanupConfirmBody": "{{count}} 项 · {{size}} → 废纸篓",
+    "cleanupConfirm": "移到废纸篓",
+    "cleanupNothing": "没有可清理的备份",
+    "cleanupDone": "已将 {{count}} 项 ({{size}}) 移到废纸篓",
+    "cleanupFailed": "备份清理失败: {{count}} 项"
   },
   "common": {
     "loading": "加载中…",
@@ -131,7 +142,10 @@
     "truncated": "仅显示前 200KB。",
     "htmlSource": "HTML 以源码显示,不渲染。",
     "unknownId": "不在最新扫描结果中,请重新读取列表。",
-    "readFailed": "无法读取文件({{code}})。"
+    "readFailed": "无法读取文件({{code}})。",
+    "modeTitle": "标题",
+    "modeContent": "内容",
+    "searchContent": "搜索文档内容"
   },
   "sessions": {
     "search": "搜索标题、项目",

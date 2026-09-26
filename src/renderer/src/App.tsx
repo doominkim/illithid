@@ -106,6 +106,14 @@ function App(): React.JSX.Element {
     })
     return off
   }, [t])
+  useEffect(
+    () =>
+      // Automatic backup cleanup only reports failures
+      window.api.onBackupCleanupEvent((r) =>
+        notifications.show({ color: 'red', title: t('settings.cleanupFailed', { count: r.failed.length }), message: r.failed.map((f) => `${f.path} (${f.reason})`).join(' · ') })
+      ),
+    [t]
+  )
   useEffect(() => {
     refreshSync()
     let last = 0

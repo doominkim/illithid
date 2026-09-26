@@ -128,6 +128,11 @@ import {
 import { deleteCandidates, mcpRead, mcpSave } from '../src/main/writes'
 import {
   indexSessions,
+  indexStatus,
+  indexAllDocs,
+  searchDocs,
+  searchAll,
+  htmlToText,
   readSessionTranscript,
   scanSessions,
   searchIndexPath,
@@ -150,6 +155,14 @@ import { MASK } from '../src/shared/api'
 import { TARGETS } from '../src/engine/targets'
 import { skills as readsSkills } from '../src/main/reads'
 import {
+  applyBackupCleanup,
+  backupRetention as retentionOf,
+  isCleanupTarget,
+  planBackupCleanup,
+  type CleanupPlan
+} from '../src/engine/backupRetention'
+import {
+  validateConfig,
   APP_CONFIG_DIR,
   DEFAULT_LIBRARY_DIR,
   LEGACY_APP_CONFIG_DIRS,
@@ -1202,9 +1215,12 @@ async function run(): Promise<void> {
     if (!c1.ok || !c1.initialized || c1.remoteUrl !== remote)
       bad.push(`connect ${c1.ok ? '' : c1.reason}`)
     const gi = read(join(lib, '.gitignore'))
-    if (!gi.includes('.trash/') || !gi.includes('.DS_Store')) bad.push('.gitignore ensured')
+    if (!gi.includes('.trash/') || !gi.includes('artifacts/') || !gi.includes('.DS_Store'))
+      bad.push('.gitignore ensured')
     mkdirSync(join(lib, '.trash/keep'), { recursive: true })
     writeFileSync(join(lib, '.trash/keep/x.md'), 'trash\n')
+    mkdirSync(join(lib, 'artifacts/keep'), { recursive: true })
+    writeFileSync(join(lib, 'artifacts/keep/a.md'), 'artifact\n')
     const sn1 = await snapshot(F, 'first snapshot')
     if (!sn1.ok || !sn1.committed || !sn1.pushed) bad.push(`snapshot1 ${sn1.ok ? '' : sn1.reason}`)
     const firstHash = sn1.ok ? sn1.hash : ''
@@ -1218,6 +1234,7 @@ async function run(): Promise<void> {
       bad.push('history 1')
     const tracked = execFileSync('git', ['-C', lib, 'ls-files'], { encoding: 'utf8' })
     if (tracked.includes('.trash/')) bad.push('.trash committed')
+    if (tracked.includes('artifacts/')) bad.push('artifacts committed')
     if (
       !tracked.includes(`rules/${ruleA}`) ||
       !tracked.includes('permissions.json') ||
@@ -4033,6 +4050,233 @@ async function run(): Promise<void> {
       bad.length
         ? bad.join('; ')
         : `sessions 3, messages ${r1.inserted}, ${hitN} verified hits with idx and highlight match, 7 tool strings 0 hits, re-run changes 0 and file hash identical, edit 1, OpenCode 1, delete 1 applied`
+    )
+  }
+
+  // ---- ad. backup retention — targets by age/count, newest kept, nothing outside backups/ and rollback/, injected mover
+  {
+    const bad: string[] = []
+    const B = makeFixture('illithid-m7-B-')
+    const cfg = join(B, APP_CONFIG_DIR)
+    const now = Date.parse('2026-09-27T12:00:00Z')
+    const iso = (daysAgo: number): string => new Date(now - daysAgo * 86_400_000).toISOString().replace(/[:.]/g, '-')
+    const put = (p: string, bytes = 10): void => {
+      mkdirSync(join(p, '..'), { recursive: true })
+      writeFileSync(p, 'x'.repeat(bytes))
+    }
+    const outside = join(B, 'outside')
+    put(join(outside, 'keep.txt'))
+    put(join(outside, iso(90), 'keep.txt'))
+    // aged folders: old (target) / recent (kept) / non-timestamp name (kept)
+    put(join(cfg, 'backups/deleted', iso(40), 'a/file.md'), 100)
+    put(join(cfg, 'backups/deleted', iso(31), 'b.md'), 50)
+    put(join(cfg, 'backups/deleted', iso(5), 'c.md'))
+    put(join(cfg, 'backups/deleted/notes/old.md'))
+    symlinkSync(join(outside, iso(90)), join(cfg, 'backups/deleted', iso(60))) // stamped symlink → only the link is a target
+    put(join(cfg, 'backups/imported', iso(45), 'x.md'), 20)
+    put(join(cfg, 'backups/imported', iso(1), 'y.md'))
+    put(join(cfg, 'backups/workspaces', iso(100), 'w/rules/r.md'), 30)
+    // skills: 5 stamped entries → oldest 2 are targets; single-copy layout (no timestamps) → kept
+    for (let i = 0; i < 5; i++) put(join(cfg, 'backups/skills/claude/foo', iso(i * 10 + 1), 'SKILL.md'), 7)
+    put(join(cfg, 'backups/skills/codex/bar/SKILL.md'))
+    // agents backups are outside the rules → never targets
+    put(join(cfg, 'backups/agents/claude', iso(200)))
+    // rollback: 5 tars by mtime → oldest 2 are targets; non-tar kept
+    const tars = ['g1-20260901-000000.tar', 'pre-dev-20260902-000000.tar', 'pre-x-20260903-000000.tar', 'pre-y-20260904-000000.tar', 'pre-z-20260905-000000.tar']
+    tars.forEach((n, i) => {
+      put(join(cfg, 'rollback', n), 1000)
+      const t = new Date(now - (10 - i) * 86_400_000)
+      utimesSync(join(cfg, 'rollback', n), t, t)
+    })
+    put(join(cfg, 'rollback/notes.txt'))
+
+    const plan = planBackupCleanup(B, { now })
+    const rel = (p: string): string => p.slice(cfg.length + 1)
+    const got = plan.items.map((i) => rel(i.path)).sort()
+    const want = [
+      `backups/deleted/${iso(40)}`,
+      `backups/deleted/${iso(31)}`,
+      `backups/deleted/${iso(60)}`,
+      `backups/imported/${iso(45)}`,
+      `backups/workspaces/${iso(100)}`,
+      `backups/skills/claude/foo/${iso(31)}`,
+      `backups/skills/claude/foo/${iso(41)}`,
+      `rollback/${tars[0]}`,
+      `rollback/${tars[1]}`
+    ].sort()
+    if (got.join() !== want.join()) bad.push(`targets [${got.join(', ')}]`)
+    if (plan.items.some((i) => !i.path.startsWith(join(cfg, 'backups') + '/') && !i.path.startsWith(join(cfg, 'rollback') + '/')))
+      bad.push('target outside backups/rollback')
+    const sizeOf = (r: string): number => plan.items.find((i) => rel(i.path) === r)?.size ?? -1
+    if (sizeOf(`backups/deleted/${iso(40)}`) !== 100 || sizeOf(`rollback/${tars[0]}`) !== 1000) bad.push('sizes')
+    if (plan.count !== want.length || plan.bytes !== plan.items.reduce((n, i) => n + i.size, 0)) bad.push('count/bytes')
+    // overrides: shorter age, fewer rollbacks kept
+    const p3 = planBackupCleanup(B, { now, days: 3, keepRollback: 1 })
+    if (!p3.items.some((i) => rel(i.path) === `backups/deleted/${iso(5)}`) || p3.items.filter((i) => i.kind === 'rollback').length !== 4)
+      bad.push('days/keepRollback override')
+    // config defaults and validation
+    const d = retentionOf({ version: 1 })
+    if (d.enabled !== true || d.days !== 30 || d.keepRollback !== 3) bad.push('defaults')
+    if (validateConfig({ version: 1, backupRetention: { enabled: true, days: 30, keepRollback: 3 } }).length) bad.push('valid config rejected')
+    for (const br of [{ enabled: 'y', days: 30, keepRollback: 3 }, { enabled: true, days: 0, keepRollback: 3 }, { enabled: true, days: 30, keepRollback: 1.5 }, []])
+      if (!validateConfig({ version: 1, backupRetention: br }).length) bad.push(`invalid config accepted ${JSON.stringify(br)}`)
+    // forged targets are refused (path escape, wrong shape)
+    const forged: [Parameters<typeof isCleanupTarget>[1], string][] = [
+      ['deleted', join(outside, iso(90))],
+      ['deleted', join(cfg, 'backups/deleted', '..', '..', 'config.json')],
+      ['deleted', join(cfg, 'backups/deleted/notes')],
+      ['rollback', join(cfg, 'state.json')],
+      ['skills', join(cfg, 'backups/skills/codex/bar')],
+      ['workspaces', join(cfg, 'backups/deleted', iso(40))]
+    ]
+    for (const [k, p] of forged) if (isCleanupTarget(B, k, p)) bad.push(`forged target accepted ${p.replace(B, '')}`)
+
+    // apply with an injected mover (temp move instead of the Trash)
+    const trash = join(B, 'trash-sim')
+    mkdirSync(trash)
+    let n = 0
+    const mover = (p: string): void => renameSync(p, join(trash, `${n++}-${p.split('/').pop()}`))
+    const evil: CleanupPlan = {
+      items: [...plan.items, { kind: 'deleted', path: join(outside, iso(90)), size: 0, at: '' }],
+      count: plan.count + 1,
+      bytes: plan.bytes
+    }
+    const r = await applyBackupCleanup(B, evil, mover)
+    if (r.moved !== plan.count || r.bytes !== plan.bytes) bad.push(`moved ${r.moved}/${plan.count}`)
+    if (r.failed.length !== 1 || r.failed[0].reason !== 'outsideBackups') bad.push(`failed ${JSON.stringify(r.failed.map((f) => f.reason))}`)
+    if (plan.items.some((i) => existsSync(i.path))) bad.push('target still present')
+    if (readdirSync(trash).length !== plan.count) bad.push('trash count')
+    if (!existsSync(join(outside, iso(90), 'keep.txt')) || !existsSync(join(outside, 'keep.txt'))) bad.push('outside content touched')
+    for (const k of [`backups/deleted/${iso(5)}`, 'backups/deleted/notes', `backups/imported/${iso(1)}`, 'backups/skills/codex/bar/SKILL.md', `backups/agents/claude/${iso(200)}`, `rollback/${tars[4]}`, `rollback/${tars[2]}`, 'rollback/notes.txt'])
+      if (!existsSync(join(cfg, k))) bad.push(`kept entry gone: ${k}`)
+    if (planBackupCleanup(B, { now }).count) bad.push('second plan not empty')
+    // missing item → failed, mover not called
+    let called = 0
+    const r2 = await applyBackupCleanup(B, { items: [plan.items[0]], count: 1, bytes: 0 }, () => void called++)
+    if (called || r2.failed[0]?.reason !== 'missing') bad.push('missing item moved')
+    // symlinked backups root is never scanned
+    const L = makeFixture('illithid-m7-B2-')
+    put(join(L, 'elsewhere', iso(90), 'z.md'))
+    mkdirSync(join(L, APP_CONFIG_DIR, 'backups'), { recursive: true })
+    symlinkSync(join(L, 'elsewhere'), join(L, APP_CONFIG_DIR, 'backups/deleted'))
+    if (planBackupCleanup(L, { now }).count) bad.push('symlinked root scanned')
+
+    check(
+      'ad. backup retention — age/count rules, newest kept, forged/escaping targets refused, symlinked root skipped, injected mover',
+      !bad.length,
+      bad.length ? bad.join('; ') : `${plan.count} targets (${plan.bytes} B) moved, ${forged.length} forged refused, 8 kept entries intact, re-plan 0`
+    )
+  }
+
+  // ---- ae. document index — artifacts (md, html tags stripped, txt, json; no images/svg/>1MB) + library, MCP secrets never indexed
+  {
+    const bad: string[] = []
+    const D = makeFixture('illithid-m7-D-')
+    initLibrary(D)
+    const lib = libraryRoot(D)
+    const put = (rel: string, text: string | Buffer): string => {
+      const p = join(lib, rel)
+      mkdirSync(join(p, '..'), { recursive: true })
+      writeFileSync(p, text)
+      return p
+    }
+    put('rules/r1.md', '# rule\n\uD615\uD0DC\uC18C rule body alphaRule\n')
+    put('rules/notes.txt', 'rules non-md NOTINDEXEDRULE')
+    put('agents/ag1.md', '---\nname: ag1\n---\nagent instructions agentBravo\n')
+    put('memory/feedback/m1.md', 'memory note memCharlie \uAC00\uB098\n')
+    put('skills/sk1/SKILL.md', '---\nname: sk1\n---\nskill doc skillDelta\n')
+    const skScript = put('skills/sk1/scripts/run.py', 'print("skillScriptEcho")\n')
+    put('skills/sk1/bin.pyc', Buffer.from([0, 1, 2, 3]))
+    put('skills/sk1/weird.md', Buffer.concat([Buffer.from('BINARYMDTEXT'), Buffer.from([0, 0, 0])]))
+    put('mcps/srv.json', JSON.stringify({ transport: 'http', url: 'https://example.invalid/?token=URLSECRETTOKEN', headers: { Authorization: 'secret:srv/headers/Authorization' }, env: { K: 'ENVSECRETVAL' }, bearerEnv: 'BEARERENVNAME', _: 'mcp description omegaMcp' }))
+    put('mcps/_order.json', '["srv"]')
+    put('artifacts/proj/manifest.json', JSON.stringify({ tool: 'Claude Code' }))
+    put('artifacts/proj/a.md', '# Artifact A\nartifact markdown alphaRule shared\n')
+    put('artifacts/proj/b.html', '<html><head><title>B</title><style>.clsStyleX{color:red}</style><script>var SCRIPTSECRET=1</script></head><body><!-- COMMENTX --><p>Hello &amp; <b>bold</b>word &#x41;&#66;</p></body></html>')
+    put('artifacts/proj/c.txt', 'plain text txtFoxtrot')
+    put('artifacts/proj/d.json', '{"k": "jsonGolf"}')
+    put('artifacts/proj/e.svg', '<svg><text>SVGTEXTHOTEL</text></svg>')
+    put('artifacts/proj/f.csv', 'csvIndia,1')
+    put('artifacts/proj/big.md', 'BIGDOCJULIET ' + 'x'.repeat(1024 * 1024))
+
+    const r1 = indexAllDocs(D)
+    // rule, agent, memory, skill×2 (SKILL.md, run.py; weird.md binary skipped), mcp, artifacts a/b/c/d
+    if (r1.docs !== 11 || r1.indexed !== 10 || r1.skipped !== 1) bad.push(`first index docs ${r1.docs} indexed ${r1.indexed} skipped ${r1.skipped}`)
+    const keys = (q: string, o: Parameters<typeof searchDocs>[2] = {}): string[] =>
+      searchDocs(D, q, o).results.map((x) => `${x.kind}:${x.key.replace(/^.*\/artifacts\//, '')}`).sort()
+    const expect = (q: string, want: string[], o: Parameters<typeof searchDocs>[2] = {}): void => {
+      const got = keys(q, o)
+      if (got.join() !== [...want].sort().join()) bad.push(`"${q}" → [${got.join(', ')}]`)
+    }
+    const artKey = (name: string): string => {
+      const hit = searchDocs(D, name === 'a.md' ? 'artifact markdown' : name === 'b.html' ? 'Hello' : name === 'c.txt' ? 'txtFoxtrot' : 'jsonGolf').results[0]
+      return hit ? `artifact:${hit.key.replace(/^.*\/artifacts\//, '')}` : `artifact:?${name}`
+    }
+    const A = artKey('a.md')
+    expect('alphaRule', ['rule:r1.md', A])
+    expect('alphaRule', ['rule:r1.md'], { kind: 'rule' })
+    expect('agentBravo', ['agent:ag1'])
+    expect('memCharlie', ['memory:feedback/m1.md'])
+    expect('skillDelta', ['skill:sk1/SKILL.md'])
+    expect('skillScriptEcho', ['skill:sk1/scripts/run.py'])
+    expect('omegaMcp', ['mcp:srv'])
+    expect('txtFoxtrot', [artKey('c.txt')])
+    expect('jsonGolf', [artKey('d.json')])
+    expect('Hello & bold word AB', [artKey('b.html')])
+    expect('\uD615\uD0DC\uC18C', ['rule:r1.md'])
+    expect('\uAC00\uB098', ['memory:feedback/m1.md'])
+    if (searchDocs(D, '\uAC00\uB098').mode !== 'like' || searchDocs(D, 'alphaRule').mode !== 'fts') bad.push('mode detection')
+    for (const q of ['URLSECRETTOKEN', 'ENVSECRETVAL', 'secret:srv', 'Authorization', 'BEARERENVNAME', 'example.invalid', 'SCRIPTSECRET', 'clsStyleX', 'COMMENTX', '<b>', '&amp;', 'SVGTEXTHOTEL', 'csvIndia', 'BIGDOCJULIET', 'BINARYMDTEXT', 'NOTINDEXEDRULE'])
+      if (searchDocs(D, q).results.length) bad.push(`not-indexed text found: ${q}`)
+    const title = searchDocs(D, 'artifact markdown').results[0]
+    if (title?.title !== 'Artifact A' || title.tool !== 'claude') bad.push(`artifact title/tool ${title?.title}/${title?.tool}`)
+    for (const q of ['alphaRule', '\uAC00\uB098'])
+      for (const h of searchDocs(D, q).results)
+        if (!h.marks.length || h.marks.some(([a, b]) => h.snippet.slice(a, b).toLowerCase() !== q.toLowerCase())) bad.push(`highlight "${q}" ${h.kind}`)
+    expect('alphaRule', [A], { tool: 'claude' })
+    expect('alphaRule', [], { tool: 'codex' })
+    for (const q of ['"x', 'a"b"c', 'AND OR', '100%', '_x'])
+      try {
+        searchDocs(D, q)
+      } catch (e) {
+        bad.push(`search exception "${q}": ${(e as Error).message}`)
+      }
+    if (htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>') !== 'a<b>"c" ©') bad.push(`htmlToText ${htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>')}`)
+
+    // searchAll: grouped by kind, sessions share the file
+    await indexSessions(D, [])
+    const all = searchAll(D, 'alphaRule')
+    if (all.docs.rule.length !== 1 || all.docs.artifact.length !== 1 || all.docs.skill.length || all.sessions.results.length) bad.push('searchAll groups')
+    if (indexStatus(D).docs !== 10) bad.push(`indexStatus docs ${indexStatus(D).docs}`)
+
+    // idempotent
+    const dbFile = searchIndexPath(D)
+    const h0 = sha(readFileSync(dbFile))
+    const r2 = indexAllDocs(D)
+    if (r2.indexed || r2.removed || r2.changes || sha(readFileSync(dbFile)) !== h0) bad.push(`re-run writes ${r2.changes} indexed ${r2.indexed}`)
+    // edit → only that doc; old text gone
+    const t1 = new Date(Date.now() + 5000)
+    put('rules/r1.md', '# rule\nreplaced body kiloEdit\n')
+    utimesSync(join(lib, 'rules/r1.md'), t1, t1)
+    const r3 = indexAllDocs(D)
+    if (r3.indexed !== 1 || r3.removed) bad.push(`edit indexed ${r3.indexed} removed ${r3.removed}`)
+    expect('kiloEdit', ['rule:r1.md'])
+    expect('alphaRule', [A])
+    // delete → removed
+    unlinkSync(skScript)
+    const r4 = indexAllDocs(D)
+    if (r4.removed !== 1 || r4.indexed) bad.push(`delete removed ${r4.removed} indexed ${r4.indexed}`)
+    expect('skillScriptEcho', [])
+    // an indexed file becoming too large is dropped
+    put('artifacts/proj/c.txt', 'txtFoxtrot ' + 'y'.repeat(1024 * 1024))
+    indexAllDocs(D)
+    expect('txtFoxtrot', [])
+    if (indexAllDocs(D).changes) bad.push('re-run writes after delete')
+
+    check(
+      'ae. document index — artifacts md/html/txt/json + library rules/skills/memory/agents/mcp, html tags stripped, secrets/images/svg/>1MB/binary not indexed, incremental (edit, delete, size), searchAll groups',
+      !bad.length,
+      bad.length ? bad.join('; ') : `${r1.indexed} docs indexed, 16 excluded strings 0 hits, re-run changes 0 and file hash identical, edit 1, delete 1, oversize dropped`
     )
   }
 

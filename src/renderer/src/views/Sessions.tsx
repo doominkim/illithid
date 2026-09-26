@@ -11,6 +11,7 @@ import { Markdown } from '../components/Markdown'
 import { PageHeader } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
+import { Snippet } from '../components/Snippet'
 import { ToolIcon } from '../components/ToolIcon'
 import { cleanTitle, fmtTime, includesCI, relTime } from '../lib/format'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
@@ -63,20 +64,6 @@ function SessionList({ items, selected, onSelect }: { items: Session[]; selected
   )
 }
 
-
-/** Snippet: wrap marks ranges in <mark> */
-function Snippet({ text, marks }: { text: string; marks: [number, number][] }): React.JSX.Element {
-  const parts: React.ReactNode[] = []
-  let at = 0
-  marks.forEach(([a, b], i) => {
-    if (a < at) return
-    if (a > at) parts.push(text.slice(at, a))
-    parts.push(<mark key={i}>{text.slice(a, b)}</mark>)
-    at = b
-  })
-  if (at < text.length) parts.push(text.slice(at))
-  return <>{parts}</>
-}
 
 type ResultRow = { kind: 'session'; s: Session; count: number } | { kind: 'hit'; s: Session; hit: SessionSearchHit }
 

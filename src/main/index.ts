@@ -3,7 +3,7 @@ import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { prepareLibraryOnStart, pullOnStartAndSync, registerIpc, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
+import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, registerIpc, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
 const LEGACY_USER_DATA_DIRS = ['harnesssync']
@@ -120,10 +120,11 @@ app.whenReady().then(() => {
   // Sync source -> tools once right after startup (deferred so it does not block showing the window)
   setTimeout(() => {
     syncOnStart()
+    backupCleanupOnStart()
     startLibraryWatch()
     void pullOnStartAndSync()
   }, 500)
-  // Session content index (worker scans sessions -> incremental index). Slightly delayed to avoid overlapping window display and first reads
+  // Content index (worker scans sessions and documents -> incremental index). Slightly delayed to avoid overlapping window display and first reads
   setTimeout(runSearchIndex, 3000)
 
   // Auto backup on quit (once; quits for real when done)

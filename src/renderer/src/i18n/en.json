@@ -27,7 +27,18 @@
     "fixtureBody": "This app instance reads and writes under {{home}}, not your real home.",
     "applyOn": "Writes enabled",
     "allowApplyConfirm": "Enable",
-    "allowApplyBody": "The app will modify tool config files and tool skill/rule folders."
+    "allowApplyBody": "The app will modify tool config files and tool skill/rule folders.",
+    "cleanup": "Backup cleanup",
+    "cleanupEnabled": "Auto cleanup",
+    "cleanupDays": "Keep days",
+    "cleanupKeepRollback": "Rollback snapshots kept",
+    "cleanupNow": "Clean up now",
+    "cleanupConfirmTitle": "Clean up backups",
+    "cleanupConfirmBody": "{{count}} items · {{size}} → Trash",
+    "cleanupConfirm": "Move to Trash",
+    "cleanupNothing": "Nothing to clean up",
+    "cleanupDone": "Moved {{count}} items ({{size}}) to the Trash",
+    "cleanupFailed": "Backup cleanup failed: {{count}} items"
   },
   "common": {
     "loading": "Loading…",
@@ -131,7 +142,10 @@
     "truncated": "Showing the first 200KB only.",
     "htmlSource": "HTML is shown as source, not rendered.",
     "unknownId": "Not in the latest scan. Reload the list.",
-    "readFailed": "Could not read the file ({{code}})."
+    "readFailed": "Could not read the file ({{code}}).",
+    "modeTitle": "Title",
+    "modeContent": "Content",
+    "searchContent": "Search document content"
   },
   "sessions": {
     "search": "Search title, project",

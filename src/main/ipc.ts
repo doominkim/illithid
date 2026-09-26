@@ -27,7 +27,11 @@ import {
   restore,
   snapshot,
   watchLibrary,
+  applyBackupCleanup,
+  backupRetentionOf,
+  tilde,
   type Artifact,
+  type CleanupPlan,
   type GitResult,
   type ToolId,
   type Unsubscribe
@@ -36,6 +40,7 @@ import type { IndexStatus, TranscriptOptions } from '../engine'
 import type {
   AppConfig,
   ArtifactPreview,
+  BackupCleanupView,
   BackupStatusView,
   Channel,
   ManifestKind,
@@ -210,6 +215,8 @@ export function registerIpc(): void {
     },
     sessionSearch: (q, filters) => inWorker('searchSessions', home, [str(q), filters ?? {}]),
     sessionIndexStatus: () => searchIndexView(),
+    docSearch: (q, filters) => inWorker('searchDocs', home, [str(q), filters ?? {}]),
+    searchAll: (q) => inWorker('searchAll', home, [str(q)]),
     sessionTranscript: async (tool, id, opts): Promise<TranscriptView> => {
       try {
         const tr = await readSessionTranscript(home, tool as ToolId, str(id), (opts ?? {}) as TranscriptOptions)
@@ -221,6 +228,8 @@ export function registerIpc(): void {
     artifacts: async () => {
       const list = await inWorker<Artifact[]>('artifacts', home)
       artifacts = new Map(list.map((a) => [a.id, a]))
+      // Artifact refresh = incremental index (documents are indexed in the same run)
+      runSearchIndex()
       return list
     },
     artifactOpen: async (id) => {
@@ -245,11 +254,15 @@ export function registerIpc(): void {
     },
     // ---- Settings and library setup
     configGet: async () => W.configView(home, fixture),
-    configSet: async (patch) =>
-      W.wrap(() => {
+    configSet: async (patch) => {
+      const r = W.wrap(() => {
         W.configSet(home, (patch ?? {}) as Partial<AppConfig>)
         return W.configView(home, fixture)
-      }),
+      })
+      // Retention settings changed → clean up with the new values (if enabled)
+      if (r.ok && patch && typeof patch === 'object' && 'backupRetention' in patch) void runBackupCleanup()
+      return r
+    },
     pickDirectory: async (current) => {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
       const opts = {
@@ -432,6 +445,21 @@ export function registerIpc(): void {
     backupSetAuto: async (on) => {
       const r = W.wrap(() => W.configSet(home, { autoBackup: !!on } as unknown as Partial<AppConfig>))
       return r.ok ? { ok: true, value: await backupView() } : r
+    },
+    backupCleanupPreview: async () => {
+      try {
+        const p = await inWorker<CleanupPlan>('backupCleanupPlan', home)
+        return { ok: true, value: { count: p.count, bytes: p.bytes } }
+      } catch (e) {
+        return { ok: false, code: 'cleanup', message: (e as Error).message }
+      }
+    },
+    backupCleanupRun: async () => {
+      try {
+        return { ok: true, value: await runBackupCleanup(true) }
+      } catch (e) {
+        return { ok: false, code: 'cleanup', message: (e as Error).message }
+      }
     }
   }
 
@@ -446,7 +474,8 @@ export function prepareLibraryOnStart(): void {
 }
 
 /**
- * Session content index (worker). Only one runs at a time — a request during a run triggers one more run afterwards.
+ * Content index (worker): sessions, then documents (artifacts + library). Only one runs at a time — a request during a run
+ * triggers one more run afterwards.
  * Progress and completion are sent to all windows via api:searchIndexEvent.
  */
 const searchIndex: {
@@ -510,6 +539,44 @@ export function runSearchIndex(): void {
       broadcastSearchIndex(await searchIndexView())
       if (searchIndex.again) runSearchIndex()
     })
+}
+
+/**
+ * Backup cleanup: plan in the worker, move each target to the Trash in main (never deleted permanently).
+ * Automatic runs (start, settings change) only when enabled; results are logged and only failures are sent to the renderer.
+ * One run at a time — a request during a run waits for it.
+ */
+let cleanupRun: Promise<BackupCleanupView> | null = null
+
+export function runBackupCleanup(manual = false): Promise<BackupCleanupView> {
+  const { home } = resolveHome()
+  const empty: BackupCleanupView = { moved: 0, bytes: 0, failed: [] }
+  if (!manual && !backupRetentionOf(home).enabled) return Promise.resolve(empty)
+  if (cleanupRun) return cleanupRun
+  cleanupRun = (async (): Promise<BackupCleanupView> => {
+    const plan = await inWorker<CleanupPlan>('backupCleanupPlan', home)
+    if (!plan.count) return empty
+    const r = await applyBackupCleanup(home, plan, (p) => shell.trashItem(p))
+    const view: BackupCleanupView = {
+      moved: r.moved,
+      bytes: r.bytes,
+      failed: r.failed.map((f) => ({ path: tilde(home, f.path), reason: f.reason }))
+    }
+    if (r.moved) console.log(`[backup-cleanup] moved ${r.moved} to Trash (${r.bytes} bytes)`)
+    if (r.failed.length) {
+      console.warn(`[backup-cleanup] ${r.failed.length} failed`)
+      if (!manual) for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:backupCleanupEvent', view)
+    }
+    return view
+  })().finally(() => {
+    cleanupRun = null
+  })
+  return cleanupRun
+}
+
+/** Automatic cleanup (errors are logged only) */
+export function backupCleanupOnStart(): void {
+  void runBackupCleanup().catch((e) => console.warn(`[backup-cleanup] ${(e as Error).message}`))
 }
 
 /** Sync on app start (only a plan if allowRealApply is off). Writes nothing if there is no library */

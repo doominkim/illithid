@@ -27,7 +27,18 @@
     "fixtureBody": "このアプリは実際のホームではなく {{home}} 以下を読み書きします。",
     "applyOn": "書き込み有効",
     "allowApplyConfirm": "有効にする",
-    "allowApplyBody": "アプリがツール設定ファイルとツールのスキル・ルールフォルダを変更します。"
+    "allowApplyBody": "アプリがツール設定ファイルとツールのスキル・ルールフォルダを変更します。",
+    "cleanup": "バックアップ自動整理",
+    "cleanupEnabled": "自動整理",
+    "cleanupDays": "保存日数",
+    "cleanupKeepRollback": "ロールバック保存数",
+    "cleanupNow": "今すぐ整理",
+    "cleanupConfirmTitle": "バックアップ整理",
+    "cleanupConfirmBody": "{{count}} 件 · {{size}} → ゴミ箱",
+    "cleanupConfirm": "ゴミ箱に移動",
+    "cleanupNothing": "整理するバックアップなし",
+    "cleanupDone": "{{count}} 件 ({{size}}) をゴミ箱に移動しました",
+    "cleanupFailed": "バックアップ整理に失敗: {{count}} 件"
   },
   "common": {
     "loading": "読み込み中…",
@@ -131,7 +142,10 @@
     "truncated": "先頭 200KB のみ表示します。",
     "htmlSource": "HTML はレンダリングせずソースで表示します。",
     "unknownId": "最新スキャンにありません。一覧を再読み込みしてください。",
-    "readFailed": "ファイルを読めませんでした ({{code}})。"
+    "readFailed": "ファイルを読めませんでした ({{code}})。",
+    "modeTitle": "タイトル",
+    "modeContent": "内容",
+    "searchContent": "ドキュメント内容を検索"
   },
   "sessions": {
     "search": "タイトル・プロジェクトを検索",

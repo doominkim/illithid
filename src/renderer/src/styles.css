@@ -170,3 +170,9 @@ body {
   gap: 8px;
   align-items: center;
 }
+
+/* Search term in previews (lib/highlight.ts) */
+::highlight(ac-search) {
+  background-color: var(--mantine-color-yellow-3);
+  color: var(--mantine-color-black);
+}

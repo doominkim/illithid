@@ -27,7 +27,18 @@
     "fixtureBody": "이 앱 인스턴스는 실제 홈이 아니라 {{home}} 아래를 읽고 씁니다.",
     "applyOn": "쓰기 켜짐",
     "allowApplyConfirm": "켜기",
-    "allowApplyBody": "앱이 툴 설정 파일과 툴 스킬·룰 폴더를 수정합니다."
+    "allowApplyBody": "앱이 툴 설정 파일과 툴 스킬·룰 폴더를 수정합니다.",
+    "cleanup": "백업 자동 정리",
+    "cleanupEnabled": "자동 정리",
+    "cleanupDays": "보존 일수",
+    "cleanupKeepRollback": "rollback 보관 개수",
+    "cleanupNow": "지금 정리",
+    "cleanupConfirmTitle": "백업 정리",
+    "cleanupConfirmBody": "{{count}}개 · {{size}} → 휴지통",
+    "cleanupConfirm": "휴지통으로 이동",
+    "cleanupNothing": "정리할 백업 없음",
+    "cleanupDone": "{{count}}개 ({{size}}) 휴지통으로 이동함",
+    "cleanupFailed": "백업 정리 실패: {{count}}개"
   },
   "common": {
     "loading": "불러오는 중…",
@@ -131,7 +142,10 @@
     "truncated": "앞 200KB 만 표시합니다.",
     "htmlSource": "HTML 은 렌더링하지 않고 소스로 표시합니다.",
     "unknownId": "최근 스캔에 없는 항목입니다. 목록을 다시 읽으세요.",
-    "readFailed": "파일을 읽지 못했습니다 ({{code}})."
+    "readFailed": "파일을 읽지 못했습니다 ({{code}}).",
+    "modeTitle": "제목",
+    "modeContent": "내용",
+    "searchContent": "문서 내용 검색"
   },
   "sessions": {
     "search": "제목·프로젝트 검색",

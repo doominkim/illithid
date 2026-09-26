@@ -369,8 +369,14 @@ export interface ToolMemoryView {
 }
 
 // ---- session content search (engine sessionIndex)
-import type { IndexStatus, SessionSearchResponse } from '../engine'
+import type { DocKind, DocSearchResponse, IndexStatus, SearchAllResponse, SessionSearchResponse } from '../engine'
 export type { SessionSearchHit, SessionSearchResponse, SessionSearchResult } from '../engine'
+export type { DocKind, DocSearchResponse, DocSearchResult, SearchAllResponse } from '../engine'
+
+export interface DocSearchFilters {
+  kind?: DocKind
+  tool?: ArtifactTool
+}
 
 export interface SessionSearchFilters {
   tool?: ToolId
@@ -383,6 +389,18 @@ export interface SearchIndexView extends IndexStatus {
   running: boolean
   progress?: { done: number; total: number }
   error?: string
+}
+
+// ---- backup cleanup (engine backupRetention). Paths are for display (~)
+export interface BackupCleanupPreview {
+  count: number
+  bytes: number
+}
+
+export interface BackupCleanupView {
+  moved: number
+  bytes: number
+  failed: { path: string; reason: string }[]
 }
 
 // ---- session transcript (engine readSessionTranscript)
@@ -409,6 +427,10 @@ export interface Api {
   /** Search conversation content (FTS for 3+ chars, LIKE for 1–2) */
   sessionSearch(q: string, filters?: SessionSearchFilters): Promise<SessionSearchResponse>
   sessionIndexStatus(): Promise<SearchIndexView>
+  /** Search artifact and library document content (FTS for 3+ chars, LIKE for 1–2) */
+  docSearch(q: string, filters?: DocSearchFilters): Promise<DocSearchResponse>
+  /** Sessions + documents grouped by kind */
+  searchAll(q: string): Promise<SearchAllResponse>
   /** Index progress/done events. Returns an unsubscribe function */
   onSearchIndexEvent(cb: (s: SearchIndexView) => void): () => void
   // ---- config·library setup
@@ -496,6 +518,12 @@ export interface Api {
   backupDisconnect(): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetDevice(name: string): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetAuto(on: boolean): Promise<WriteResult<BackupStatusView> | Refused>
+  // ---- backup cleanup (moves old backups to the Trash)
+  backupCleanupPreview(): Promise<WriteResult<BackupCleanupPreview>>
+  /** Run now with the current settings (also when auto cleanup is off) */
+  backupCleanupRun(): Promise<WriteResult<BackupCleanupView>>
+  /** Failed automatic cleanups (start, settings change). Returns an unsubscribe function */
+  onBackupCleanupEvent(cb: (r: BackupCleanupView) => void): () => void
 }
 
 export interface SyncPendingView {
@@ -517,6 +545,8 @@ export const CHANNELS = [
   'sessionTranscript',
   'sessionSearch',
   'sessionIndexStatus',
+  'docSearch',
+  'searchAll',
   'configGet',
   'configSet',
   'pickDirectory',
@@ -579,7 +609,9 @@ export const CHANNELS = [
   'backupRestore',
   'backupDisconnect',
   'backupSetDevice',
-  'backupSetAuto'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent'>[]
+  'backupSetAuto',
+  'backupCleanupPreview',
+  'backupCleanupRun'
+] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent'>[]
 
 export type Channel = (typeof CHANNELS)[number]

@@ -68,6 +68,28 @@ export { scanArtifacts, defaultArtifactSources, newManifestCache, toolOfLocation
 export type { Artifact, ArtifactKind, ArtifactSource, ArtifactTool, ManifestCache } from './scan/artifacts'
 export { scanSessions, readSessionTranscript, cleanUserText, titleText } from './scan/sessions'
 export { indexSessions, indexStatus, searchSessions, searchIndexPath, makeSnippet } from './search/sessionIndex'
+export {
+  indexDocs,
+  indexAllDocs,
+  artifactDocs,
+  libraryDocs,
+  htmlToText,
+  mcpDocText,
+  docCount,
+  searchDocs,
+  searchAll,
+  DOC_KINDS,
+  DOC_SIZE_LIMIT
+} from './search/docIndex'
+export type {
+  DocKind,
+  DocSource,
+  DocIndexResult,
+  DocSearchOptions,
+  DocSearchResult,
+  DocSearchResponse,
+  SearchAllResponse
+} from './search/docIndex'
 export type {
   IndexResult,
   IndexStatus,
@@ -337,3 +359,15 @@ export type {
   MemoryType,
   ToolMemoryMoveResult
 } from './toolMemory'
+export {
+  planBackupCleanup,
+  applyBackupCleanup,
+  isCleanupTarget,
+  parseBackupStamp,
+  backupRetention,
+  backupRetentionOf,
+  SKILL_BACKUP_KEEP
+} from './backupRetention'
+export type { CleanupItem, CleanupKind, CleanupMover, CleanupPlan, CleanupResult } from './backupRetention'
+export { DEFAULT_BACKUP_RETENTION } from './config'
+export type { BackupRetention } from './config'

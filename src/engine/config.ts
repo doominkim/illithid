@@ -11,6 +11,19 @@ export interface ArtifactSourceConfig {
   project?: 'first-segment'
 }
 
+/** Automatic cleanup of old backups (backupRetention.ts) */
+export interface BackupRetention {
+  enabled: boolean
+  /** Age limit for timestamp folders in backups/{deleted,imported,workspaces} */
+  days: number
+  /** rollback/*.tar files to keep (newest first) */
+  keepRollback: number
+}
+
+export const DEFAULT_BACKUP_RETENTION: BackupRetention = { enabled: true, days: 30, keepRollback: 3 }
+export const RETENTION_DAYS_MAX = 3650
+export const RETENTION_KEEP_MAX = 100
+
 /** `<home>/.config/illithid/config.json` */
 export interface AppConfig {
   version: 1
@@ -24,6 +37,8 @@ export interface AppConfig {
   allowRealApply?: boolean
   /** Device name recorded in backup snapshots. os.hostname() if absent */
   deviceName?: string
+  /** Backup cleanup. DEFAULT_BACKUP_RETENTION if absent */
+  backupRetention?: BackupRetention
 }
 
 export interface ConfigRead {
@@ -101,6 +116,17 @@ export function validateConfig(v: unknown): string[] {
     errs.push('allowRealApply must be a boolean')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))
     errs.push('deviceName must be a non-empty string')
+  if (o.backupRetention !== undefined) {
+    const r = o.backupRetention as Record<string, unknown> | null
+    if (!r || typeof r !== 'object' || Array.isArray(r)) errs.push('backupRetention must be an object')
+    else {
+      if (typeof r.enabled !== 'boolean') errs.push('backupRetention.enabled must be a boolean')
+      const int = (x: unknown, max: number): boolean => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= max
+      if (!int(r.days, RETENTION_DAYS_MAX)) errs.push(`backupRetention.days must be an integer 1-${RETENTION_DAYS_MAX}`)
+      if (!int(r.keepRollback, RETENTION_KEEP_MAX))
+        errs.push(`backupRetention.keepRollback must be an integer 1-${RETENTION_KEEP_MAX}`)
+    }
+  }
   if (o.artifactSources !== undefined) {
     if (!Array.isArray(o.artifactSources)) errs.push('artifactSources must be an array')
     else
