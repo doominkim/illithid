@@ -1,6 +1,6 @@
 {
   "name": "illithid",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Illithid — a GUI that manages Claude Code, Codex, and OpenCode settings from a single source library",
   "main": "./out/main/index.js",
@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
+    "build:mac": "npm run build && electron-builder --mac",
     "start": "electron-vite preview",
     "cli": "tsx src/cli/index.ts",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:engine",
