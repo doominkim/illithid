@@ -1,0 +1,339 @@
+export { plan, planAll, regionHash, buildContext } from './plan'
+export {
+  readSources,
+  agentsPaths,
+  libraryPaths,
+  libraryExists,
+  readPermissionsFile,
+  emptyAllowlist,
+  mcpServerNamesInDir,
+  readMcpOrder,
+  MCP_ORDER_FILE
+} from './sources'
+export type { LibraryPaths } from './sources'
+export { initLibrary, initLibraryAt, LIBRARY_DIRS, WORKSPACE_FILE } from './init'
+export type { InitLibraryOptions, InitLibraryResult } from './init'
+export { syncAll, planSyncAll, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch } from './sync'
+export type { SyncAllOptions, SyncAllResult, SyncPlan, SyncResults, SwitchLossItem, SwitchLossKind } from './sync'
+export { mcpEntries, sha256 } from './text'
+export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS } from './targets'
+export {
+  skillOverrideHits,
+  SKILL_OVERRIDE_TARGET_OF,
+  librarySkillNames
+} from './targets/skillOverrides'
+export { tools, tool, tilde, canonicalPaths, TOOL_IDS } from './agents'
+export { skillsReport, linkPlan, canonicalSkills, dirContentHash, SKILL_STATES } from './skills'
+export { readModels, setModel, MODEL_KEYS, SetModelError } from './models'
+export { apply } from './apply'
+export { planSkillSync, applySkillSync, skillBackupPath, leftoverSkillTmps } from './skillSync'
+export { planAgentSync, applyAgentSync, agentBackupPath, adoptAgentFiles } from './agentSync'
+export type { AgentSyncAction, AgentSyncItem, AgentSyncResult } from './agentSync'
+export { renderAgent, agentToolDir, agentToolPath } from './agentRender'
+export { deleteSyncCandidates, deletedBackupRoot } from './deleteCopies'
+export type { DeleteRequest, DeleteResult } from './deleteCopies'
+export type { SkillSyncAction, SkillSyncItem, SkillSyncResult, SkillSyncOptions } from './skillSync'
+export { atomicWrite, backup, BACKUP_SUFFIX } from './write'
+export { readRoster, rosterPairing } from './roster'
+export { readState, writeState, statePath, emptyState } from './state'
+export { status, statusReport, RESOURCES } from './status'
+export type {
+  Env,
+  Allowlist,
+  AllowlistEntry,
+  FileChange,
+  Sources,
+  TargetId,
+  LegacyTargetId,
+  ExtraTargetId,
+  McpServer,
+  McpSource
+} from './types'
+export type { ToolId, ToolInfo, RulesInjection, SkillsInjection } from './agents'
+export type { SkillState, SkillEntry, ToolSkills, SkillsReport, LinkAction } from './skills'
+export type { ToolModels, ModelValue, SetModelResult } from './models'
+export type { ApplyResult, ApplyOptions, ApplySkipReason } from './apply'
+export type { Roster, RosterRow, RosterEntry, RosterToolSummary } from './roster'
+export type { AppState, AppliedEntry, StateRead, SkillCopyEntry } from './state'
+export { CELL_STATE_MAP, normalizeCellState } from './status'
+export type {
+  Resource,
+  CellState,
+  LegacyCellState,
+  StatusCell,
+  StatusReport,
+  ChangeSummary
+} from './status'
+export { scanArtifacts, defaultArtifactSources, newManifestCache, toolOfLocation, toolOfManifestString } from './scan/artifacts'
+export type { Artifact, ArtifactKind, ArtifactSource, ArtifactTool, ManifestCache } from './scan/artifacts'
+export { scanSessions, readSessionTranscript, cleanUserText, titleText } from './scan/sessions'
+export { indexSessions, indexStatus, searchSessions, searchIndexPath, makeSnippet } from './search/sessionIndex'
+export type {
+  IndexResult,
+  IndexStatus,
+  SearchOptions,
+  SessionSearchHit,
+  SessionSearchResponse,
+  SessionSearchResult
+} from './search/sessionIndex'
+export type {
+  Session,
+  SessionScanResult,
+  SessionTool,
+  SessionTranscript,
+  TranscriptMessage,
+  TranscriptPrompt,
+  TranscriptOptions,
+  TranscriptTool
+} from './scan/sessions'
+export {
+  backupStatus,
+  connectBackup,
+  snapshot,
+  history,
+  restore,
+  pullOnStart,
+  disconnect,
+  deviceName,
+  validateRemoteUrl,
+  BACKUP_INCLUDES,
+  BACKUP_EXCLUDES,
+  BACKUP_NOT_INCLUDED
+} from './backup'
+export type { BackupStatus, Snapshot, SnapshotResult, RestoreResult, PullResult } from './backup'
+export { deliverFile, deliverDir, deliveredShape, shapeMatches, DELIVER_STRATEGY } from './deliver'
+export type { DeliverStrategy, DeliveredShape } from './deliver'
+export { watchLibrary, isIgnoredLibraryPath } from './watch'
+export type { LibraryChange, WatchLibraryOptions, Unsubscribe } from './watch'
+export { gitStatus, gitFetch, gitLog, gitDiff, gitPull, gitCommit, gitPush } from './git'
+export type { GitStatus, GitFileStatus, GitCommitInfo, GitResult } from './git'
+export {
+  readConfig,
+  writeConfig,
+  libraryRoot,
+  configPath,
+  defaultConfig,
+  validateConfig,
+  expandHome,
+  ConfigError,
+  DEFAULT_LIBRARY_DIR,
+  LEGACY_LIBRARY_DIR,
+  APP_CONFIG_DIR,
+  appConfigDir,
+  LEGACY_APP_GENERATIONS,
+  LEGACY_APP_LIBRARY_DIRS,
+  LEGACY_APP_CONFIG_DIRS,
+  appDataRoot,
+  workspacesRoot,
+  workspaceRoot,
+  workspaceIds,
+  activeWorkspaceId,
+  rootFormLibraryEntries,
+  WORKSPACES_DIR,
+  DEFAULT_WORKSPACE
+} from './config'
+export {
+  listWorkspaces,
+  createWorkspace,
+  switchWorkspace,
+  renameWorkspace,
+  deleteWorkspace,
+  deletedWorkspacesRoot,
+  workspaceName,
+  workspaceSlug,
+  planMigrateToWorkspaces,
+  migrateToWorkspaces,
+  secretAccountsInWorkspaces,
+  exportWorkspace,
+  planImportWorkspace,
+  importWorkspace,
+  WorkspaceError,
+  WORKSPACE_ZIP_EXT,
+  LEGACY_WORKSPACE_ZIP_EXTS,
+  WORKSPACE_ZIP_MAX_BYTES,
+  WORKSPACE_ZIP_MAX_FILES
+} from './workspace'
+export type {
+  WorkspaceInfo,
+  WorkspaceMigrationPlan,
+  WorkspaceMigrationResult,
+  WorkspaceExport,
+  WorkspaceImportPlan,
+  WorkspaceImportResult
+} from './workspace'
+export {
+  planRename,
+  applyRename,
+  renamePendingPaths,
+  autoRenamePending,
+  isEmptyLibrarySkeleton,
+  isEmptyDataRootSkeleton
+} from './rename'
+export { ensureLibrary } from './startup'
+export type { EnsureLibraryResult } from './startup'
+export type { RenamePlan, RenameResult, RenameMove } from './rename'
+export type { AppConfig, ConfigRead, ArtifactSourceConfig } from './config'
+export { artifactSources } from './scan/artifacts'
+export {
+  readManifest,
+  setToggle,
+  renameManifestEntry,
+  isEnabled,
+  manifestPath,
+  emptyManifest,
+  ManifestError,
+  MANIFEST_FILE,
+  LEGACY_MANIFEST_FILES,
+  MANIFEST_KINDS,
+  MANIFEST_TOOLS
+} from './manifest'
+export type { Manifest, ManifestKind, ManifestRead, ToolToggles } from './manifest'
+export {
+  planRuleSync,
+  applyRuleSync,
+  restoreLegacyRulesLink,
+  claudeRulesPaths,
+  CLAUDE_RULES_DIR,
+  LEGACY_CLAUDE_RULES_DIRS,
+  LEGACY_CLAUDE_RULES_LINK
+} from './ruleSync'
+export type { RuleSyncAction, RuleSyncItem, RuleSyncResult, RuleSyncOptions } from './ruleSync'
+export {
+  listRules,
+  readRule,
+  writeRule,
+  createRule,
+  deleteRule,
+  listSkillFiles,
+  readSkillFile,
+  writeSkillFile,
+  createSkill,
+  deleteSkill,
+  readSkillDoc,
+  writeSkillDoc,
+  renameSkill,
+  renameRule,
+  listAgents,
+  readAgentDoc,
+  writeAgentDoc,
+  createAgent,
+  deleteAgent,
+  renameAgent,
+  parseAgentText,
+  agentLibraryText,
+  AGENT_TOOLS,
+  listMemoryFiles,
+  readMemoryFile,
+  writeMemoryFile,
+  deleteMemoryFile,
+  listMcpServers,
+  readMcpServer,
+  readMcpOrderList,
+  writeMcpOrder,
+  upsertMcpServer,
+  deleteMcpServer,
+  validateMcpServer,
+  readPermissions,
+  writePermissions,
+  validatePermissions,
+  looksLikeSecret,
+  isSecretPair,
+  LibraryError,
+  TRASH_DIR
+} from './library'
+export type {
+  LibraryErrorCode,
+  TrashResult,
+  McpUpsertResult,
+  SkillDoc,
+  SkillDocInput,
+  AgentDoc,
+  AgentDocInput,
+  AgentTool,
+  AgentToolSettings
+} from './library'
+export {
+  planImport,
+  applyImport,
+  listImportSources,
+  importAllFromLegacy,
+  importedBackupRoot,
+  OTHER_APP_SKILL_DIRS
+} from './importer'
+export type {
+  ImportPlan,
+  ImportCandidate,
+  ImportKind,
+  ImportSource,
+  ImportSourceKind,
+  RuleImportCandidate,
+  MemoryImportCandidate,
+  PermissionsImportCandidate,
+  PermissionsVariant,
+  FileVariant,
+  Replaceable,
+  SkillImportCandidate,
+  McpImportCandidate,
+  AgentImportCandidate,
+  AgentVariant,
+  SkillVariant,
+  McpVariant,
+  ImportSourceRef,
+  ImportConflict,
+  ImportSelection,
+  ImportResult,
+  ImportAllOptions,
+  ImportAllResult,
+  Portability,
+  PortabilityReason,
+  PortabilityInfo
+} from './importer'
+export type { RuleCopyEntry } from './state'
+export type { ApplyImportOptions } from './importer'
+export type { McpWriteOptions } from './library'
+export {
+  SECRET_SERVICE,
+  LEGACY_SECRET_SERVICES,
+  withLegacySecrets,
+  SECRET_PREFIX,
+  SecretError,
+  MissingSecretError,
+  secretAccount,
+  secretRef,
+  isSecretRef,
+  parseSecretRef,
+  secretRefsOf,
+  memorySecretBackend,
+  fileSecretBackend,
+  macKeychainBackend,
+  defaultSecretBackend
+} from './secrets'
+export type { SecretBackend, SecretRef, SecretTable } from './secrets'
+export {
+  scanClaudeMemory,
+  scanCodexMemory,
+  readCodexMemoryFile,
+  listCodexRolloutSummaries,
+  CODEX_MEMORY_ORDER,
+  CODEX_ROLLOUT_DIR,
+  CODEX_READ_CHUNK,
+  readClaudeMemoryFile,
+  promoteClaudeMemory,
+  moveClaudeMemory,
+  trashClaudeMemory,
+  claudeProjectSlug,
+  INDEX_MAX_LINES,
+  INDEX_MAX_BYTES,
+  MEMORY_TYPES
+} from './toolMemory'
+export type {
+  ClaudeMemoryScan,
+  ClaudeMemoryProject,
+  ClaudeMemoryFile,
+  CodexMemoryEntry,
+  CodexMemoryChunk,
+  CodexRolloutSummary,
+  IndexStat,
+  MemoryType,
+  ToolMemoryMoveResult
+} from './toolMemory'

@@ -1,0 +1,172 @@
+/* Global CSS keeps only minimal token usage. Everything else is handled with Mantine component props. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ac-bg);
+  color: var(--ac-text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Sidebar rows */
+.ac-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--ac-text-2);
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+}
+.ac-nav:hover {
+  background: var(--ac-surface-hover);
+}
+.ac-nav:focus,
+.ac-nav:focus-visible {
+  outline: none;
+}
+.ac-nav[data-active] {
+  background: var(--ac-surface-active);
+  color: var(--ac-text);
+  font-weight: 500;
+}
+.ac-nav[data-active] .ac-nav-icon {
+  color: var(--ac-accent);
+}
+.ac-nav-icon {
+  display: inline-flex;
+  color: var(--ac-text-muted);
+  flex-shrink: 0;
+}
+
+/* Section titles (12px uppercase) */
+.ac-section {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ac-text-muted);
+}
+
+/* Cards */
+.ac-card {
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--ac-shadow-card);
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+}
+.ac-card[data-clickable] {
+  cursor: pointer;
+}
+.ac-card[data-clickable]:hover {
+  box-shadow: var(--ac-shadow-card-hover);
+  border-color: var(--ac-border);
+}
+.ac-card[data-selected] {
+  border-color: var(--ac-accent);
+}
+
+/* List rows */
+.ac-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ac-border-subtle);
+  text-align: left;
+  color: inherit;
+}
+.ac-row:last-child {
+  border-bottom: 0;
+}
+.ac-row:hover {
+  background: var(--ac-surface-hover);
+}
+.ac-row[data-active] {
+  background: var(--ac-accent-bg);
+}
+
+/* Tool pills */
+.ac-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.ac-pill[data-off] {
+  opacity: 0.4;
+}
+.ac-pill[data-problem] {
+  box-shadow: 0 0 0 2px var(--ac-warning);
+}
+.ac-pill[data-pending]::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ac-warning);
+  border: 1.5px solid var(--ac-surface);
+}
+
+/* Detail panel (everything right of the sidebar) */
+.ac-sheet .mantine-Drawer-inner {
+  /* Mantine gives inner width:100vw; subtract the sidebar width so the right edge is not clipped */
+  left: 220px;
+  width: calc(100vw - 220px);
+}
+.ac-sheet .mantine-Drawer-content {
+  background: var(--ac-bg);
+  border-left: 1px solid var(--ac-border);
+}
+/* Everything except the sidebar. Sets Mantine --drawer-size directly (the size prop conflicts with the 440px default) */
+.ac-sheet {
+  --drawer-size: calc(100vw - 220px);
+}
+
+
+/* Markdown preview tone */
+.mantine-Typography-root {
+  font-size: 13px;
+}
+.mantine-Typography-root pre {
+  font-size: 12px;
+}
+
+/* Top drag region (macOS hiddenInset). A strip with no clickable elements */
+.ac-dragbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  -webkit-app-region: drag;
+  z-index: 1;
+}
+
+/* Edit form key/value rows */
+.ac-kv {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr auto;
+  gap: 8px;
+  align-items: center;
+}
