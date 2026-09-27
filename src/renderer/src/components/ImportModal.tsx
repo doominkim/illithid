@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Badge, Box, Button, Checkbox, Group, Modal, Select, Stack, Stepper, Text, UnstyledButton } from '@mantine/core'
 import { Download, FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { ImportCandidate, ImportKind, ImportPlanView, ImportResult, ImportSelection, ImportSource } from '../../../shared/api'
+import type { ImportCandidate, ImportKind, ImportPlanView, ImportResult, ImportSelection, ImportSource, ToolId } from '../../../shared/api'
 import { runWrite } from '../lib/mutate'
 import { TOOL_NAME } from '../lib/tools'
 import { EmptyState } from './EmptyState'
@@ -13,15 +13,17 @@ import { ToolIcon } from './ToolIcon'
 interface Props {
   opened: boolean
   onClose: () => void
-  onImported: () => void
+  onImported: (results: ImportResult[]) => void
   /** Skip the source step and go straight to this source */
   initialSource?: string
   /** Import only this kind, and only from agent (tool) sources (per-menu import). All if omitted */
   kind?: ImportKind
+  /** Offer only these tools' own sources (first run) */
+  tools?: ToolId[]
 }
 
 /** Import: pick source → check candidates (confirm variants and replacements) → apply. Writes to the library only */
-export function ImportModal({ opened, onClose, onImported, initialSource, kind }: Props): React.JSX.Element {
+export function ImportModal({ opened, onClose, onImported, initialSource, kind, tools }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const [sources, setSources] = useState<ImportSource[] | null>(null)
   const [sourceId, setSourceId] = useState<string | null>(null)
@@ -42,10 +44,21 @@ export function ImportModal({ opened, onClose, onImported, initialSource, kind }
     setPicked({})
     setReplace({})
     setSourceId(initialSource ?? null)
-    window.api
-      .importSources()
-      .then((xs) => setSources(kind ? xs.filter((x) => x.kind === 'tool' && x.kinds.includes(kind)) : xs), (e) => setErr(String(e)))
-  }, [opened, initialSource, kind])
+    const toolKey = tools?.join(',')
+    window.api.importSources().then(
+      (xs) =>
+        setSources(
+          xs.filter(
+            (x) =>
+              (!kind || (x.kind === 'tool' && x.kinds.includes(kind))) &&
+              (toolKey === undefined || (x.kind === 'tool' && toolKey.split(',').includes(x.id.slice(5))))
+          )
+        ),
+      (e) => setErr(String(e))
+    )
+    // tools is compared by value
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, initialSource, kind, tools?.join(',')])
 
   useEffect(() => {
     if (!opened || !sourceId) return
@@ -94,7 +107,7 @@ export function ImportModal({ opened, onClose, onImported, initialSource, kind }
     setBusy(false)
     if (r) {
       setResults(r)
-      onImported()
+      onImported(r)
     }
   }
 
@@ -280,7 +293,7 @@ export function ImportModal({ opened, onClose, onImported, initialSource, kind }
 
         {step === 2 && results && (
           <Stack gap="md">
-            {results.some((r) => r.kind === 'mcp' && r.status === 'imported') && (
+            {!sourceId?.startsWith('tool:') && results.some((r) => r.kind === 'mcp' && r.status === 'imported') && (
               <Text size="sm" c="dimmed" data-testid="import-mcp-all-tools">
                 {t('import.mcpAllTools')}
               </Text>

@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { type Menu, PRIMARY, useNav } from '../lib/nav'
 import { useSync } from '../lib/sync'
+import { TOOL_NAME } from '../lib/tools'
 import { WorkspaceBar } from './WorkspaceBar'
 
 const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
@@ -55,10 +56,27 @@ function NavItem({
   )
 }
 
-/** Sync status button: 0 pending = gray disabled, n pending = green, last sync failed = red (failed + pending). Click = one real apply */
+/** Tools whose own first-run file is still missing (not an error): short yellow hint under the sync button */
+function NotInitializedHint(): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const { status } = useSync()
+  const tools = [...new Set((status?.notInitialized ?? []).map((x) => x.tool))]
+  if (!tools.length) return null
+  return (
+    <Stack gap={2} mt={-4} mb={10} px={4} data-testid="sync-not-initialized">
+      {tools.map((tool) => (
+        <Text key={tool} size="xs" c="yellow.8">
+          {t('sync.notInitialized', { tool: TOOL_NAME[tool] })}
+        </Text>
+      ))}
+    </Stack>
+  )
+}
+
+/** Sync status button: 0 pending = gray disabled, n pending = green, last sync failed = red (failed + pending). Click = apply preview → apply */
 function SyncButton(): React.JSX.Element {
   const { t } = useTranslation()
-  const { pending, busy, applyOnce } = useSync()
+  const { pending, busy, openPreview } = useSync()
   const failed = pending?.failed ?? 0
   const n = failed + (pending?.pending ?? 0)
   const color = failed ? 'red' : n ? 'green' : 'gray'
@@ -73,7 +91,7 @@ function SyncButton(): React.JSX.Element {
       leftSection={<RefreshCw size={14} />}
       disabled={!n && !busy}
       loading={busy}
-      onClick={() => void applyOnce()}
+      onClick={openPreview}
       aria-label={t('sync.buttonAria')}
       data-testid="sync-button"
       data-state={failed ? 'failed' : n ? 'pending' : 'synced'}
@@ -119,6 +137,7 @@ export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }
     >
       <WorkspaceBar onChanged={onWorkspaceChange} />
       <SyncButton />
+      <NotInitializedHint />
       <Stack gap={2}>
         {PRIMARY.map((m) =>
           m === 'artifacts' ? (

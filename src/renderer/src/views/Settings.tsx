@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Badge, Box, Button, Group, MantineColorScheme, NumberInput, SegmentedControl, Select, Stack, Switch, Text, useMantineColorScheme } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { Command, ShieldAlert } from 'lucide-react'
@@ -9,7 +9,11 @@ import { useReload } from '../components/ReloadButton'
 import { LANGUAGES, Language, setLanguage } from '../i18n'
 import { useConfig } from '../lib/config'
 import { fmtSize } from '../lib/format'
-import { runWrite } from '../lib/mutate'
+import { LIBRARY_CHANGED, runWrite } from '../lib/mutate'
+import { useSync } from '../lib/sync'
+import { TOOL_NAME, TOOLS } from '../lib/tools'
+import { ToolIcon } from '../components/ToolIcon'
+import type { ToolId, ToolsInUseView } from '../../../shared/api'
 
 function Section({ title, children, right }: { title: string; children: React.ReactNode; right?: React.ReactNode }): React.JSX.Element {
   return (
@@ -37,6 +41,49 @@ function Row({ label, hint, control }: { label: string; hint?: React.ReactNode; 
       </Box>
       <Box style={{ flexShrink: 0 }}>{control}</Box>
     </Group>
+  )
+}
+
+/** Tools in use: on → save → apply preview. Off → save only (files already written stay as they are) */
+function ToolsInUse(): React.JSX.Element {
+  const { t } = useTranslation()
+  const { refresh } = useConfig()
+  const { openPreview } = useSync()
+  const reload = useReload()
+  const [view, setView] = useState<ToolsInUseView | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    window.api.toolsInUseGet().then(setView, () => {})
+  }, [])
+
+  const set = async (tool: ToolId, on: boolean): Promise<void> => {
+    if (!view) return
+    const next = on ? TOOLS.filter((x) => x === tool || view.inUse.includes(x)) : view.inUse.filter((x) => x !== tool)
+    setBusy(true)
+    const r = await runWrite(window.api.toolsInUseSet(next), { success: t('settings.saved') })
+    setBusy(false)
+    if (!r) return
+    setView(r)
+    refresh()
+    reload()
+    window.dispatchEvent(new Event(LIBRARY_CHANGED))
+    if (on) openPreview()
+  }
+
+  return (
+    <Section title={t('settings.tools')}>
+      {TOOLS.map((tool) => (
+        <Group key={tool} justify="space-between" wrap="nowrap" gap="lg" py={6}>
+          <Group gap={8} wrap="nowrap">
+            <ToolIcon tool={tool} size={18} />
+            <Text size="md" fw={500}>
+              {TOOL_NAME[tool]}
+            </Text>
+          </Group>
+          <Switch size="md" checked={!!view?.inUse.includes(tool)} disabled={!view || busy} onChange={(e) => void set(tool, e.currentTarget.checked)} data-testid={`tool-in-use-${tool}`} />
+        </Group>
+      ))}
+    </Section>
   )
 }
 
@@ -195,6 +242,8 @@ function Settings(): React.JSX.Element {
         />
       </Section>
 
+
+      <ToolsInUse />
 
       <Section
         title={t('settings.apply')}

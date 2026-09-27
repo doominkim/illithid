@@ -29,6 +29,7 @@ import {
   watchLibrary,
   applyBackupCleanup,
   backupRetentionOf,
+  detectTools,
   tilde,
   type Artifact,
   type CleanupPlan,
@@ -51,6 +52,8 @@ import type {
 } from '../shared/api'
 import type { Op } from './reads'
 import * as W from './writes'
+import { keepImportedOriginal } from './preview'
+import { shellEnvReady } from './shellEnv'
 import createWorker from './worker?nodeWorker'
 
 /** fixture HOME. Used by check scripts to inject a temp directory instead of the real HOME */
@@ -74,7 +77,9 @@ const MIME: Record<string, string> = {
 }
 
 /** Run synchronous scans on a worker thread so the main event loop is not blocked */
-function inWorker<T>(op: Op, home: string, args: unknown[] = [], onProgress?: (p: unknown) => void): Promise<T> {
+async function inWorker<T>(op: Op, home: string, args: unknown[] = [], onProgress?: (p: unknown) => void): Promise<T> {
+  // Workers get a copy of process.env — wait for the login shell environment first
+  await shellEnvReady()
   return new Promise((resolve, reject) => {
     const w = createWorker({ workerData: { op, home, env: { ...process.env }, args } })
     let settled = false
@@ -157,16 +162,21 @@ process.env.GIT_TERMINAL_PROMPT = '0'
 
 export function registerIpc(): void {
   const { home, fixture } = resolveHome()
-  const env = { ...process.env }
+  // Read at call time, after the login shell environment has loaded (Finder launches start with a minimal PATH)
+  const envNow = async (): Promise<NodeJS.ProcessEnv> => {
+    await shellEnvReady()
+    return { ...process.env }
+  }
   /** Latest artifacts scan result. preview only reads ids listed here */
   let artifacts = new Map<string, Artifact>()
   const str = (v: unknown): string => (typeof v === 'string' ? v : '')
   /** Tool file write: runs after passing the allowRealApply gate */
   const gated = <T>(fn: () => T): WriteResult<T> | Refused => W.gate(home) ?? W.wrap(fn)
   /** Library write: readiness gate → run → sync immediately if allowRealApply (result attached as sync) */
-  const libWrite = <T>(fn: () => T): WriteResult<T> | Refused => {
+  const libWrite = async <T>(fn: () => T): Promise<WriteResult<T> | Refused> => {
     const g = W.libGate(home)
     if (g) return g
+    const env = await envNow()
     W.markSelfWrite()
     const r = W.wrap(fn)
     if (!r.ok) return r
@@ -263,6 +273,15 @@ export function registerIpc(): void {
       if (r.ok && patch && typeof patch === 'object' && 'backupRetention' in patch) void runBackupCleanup()
       return r
     },
+    toolsInUseGet: async () => W.toolsInUseView(home, await envNow()),
+    toolsInUseSet: async (tools) => {
+      const env = await envNow()
+      return W.wrap(() => {
+        W.toolsInUseSet(home, tools as ToolId[] | null)
+        return W.toolsInUseView(home, env)
+      })
+    },
+    detectTools: async () => detectTools(home, await envNow()),
     pickDirectory: async (current) => {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
       const opts = {
@@ -285,12 +304,18 @@ export function registerIpc(): void {
         W.markSelfWrite(3000)
         return W.workspaceDelete(home, str(id))
       }),
-    workspaceSwitchPreview: async (id) => W.wrap(() => W.workspaceSwitchPreview(home, env, str(id))),
-    workspaceSwitch: async (id) => {
+    workspaceSwitchPreview: async (id) => {
+      const env = await envNow()
+      return W.wrap(() => W.workspaceSwitchPreview(home, env, str(id)))
+    },
+    workspaceSwitch: async (id, apply) => {
+      const env = await envNow()
       W.markSelfWrite(5000)
       const r = W.wrap(() => W.workspaceSwitch(home, str(id)))
       if (!r.ok) return r
       reattachLibraryWatch()
+      // apply=false (first run): switch only, the apply preview follows
+      if (apply === false) return { ok: true, value: W.syncStatus() }
       // Confirming the switch is the apply approval — align tools to the new workspace even if auto-apply is off
       const sync = W.syncNow(home, env, true)
       W.markSelfWrite(3000)
@@ -328,6 +353,7 @@ export function registerIpc(): void {
       })
     },
     libraryInit: async (path, importLegacy) => {
+      const env = await envNow()
       W.markSelfWrite(3000)
       const r = W.wrap(() => W.libraryInitRun(home, typeof path === 'string' && path ? path : undefined, !!importLegacy))
       if (!r.ok) return r
@@ -385,16 +411,31 @@ export function registerIpc(): void {
       libWrite(() => W.importApplyRun(home, str(sourceId), selections as never)),
     // ---- Sync
     syncStatus: async () => W.syncStatus(),
-    syncNow: async () => W.syncNow(home, env),
+    syncNow: async () => W.syncNow(home, await envNow()),
     syncPending: async () => ({ pending: await inWorker<number>('syncPending', home), failed: W.syncFailedCount() }),
     // Sidebar sync button: a user click is a one-time approval (independent of allowRealApply, which is not changed)
     syncApplyOnce: async () => {
+      const env = await envNow()
       W.markSelfWrite(3000)
       const s = W.syncNow(home, env, true)
       W.markSelfWrite(3000)
       return s
     },
-    deleteCandidates: async (items) => gated(() => W.deleteCandidates(home, env, items as never)),
+    syncPreview: () => inWorker('syncPreview', home),
+    importedKeep: async (item) => {
+      const g = W.libGate(home)
+      if (g) return g
+      const env = await envNow()
+      W.markSelfWrite()
+      const req = (item ?? {}) as { kind?: unknown; tool?: unknown; path?: unknown }
+      return W.wrap(() =>
+        keepImportedOriginal(home, env, { kind: req.kind as never, tool: req.tool as ToolId, path: str(req.path) })
+      )
+    },
+    deleteCandidates: async (items) => {
+      const env = await envNow()
+      return gated(() => W.deleteCandidates(home, env, items as never))
+    },
     modelSet: async (tool, key, value) => gated(() => W.modelSet(home, tool as ToolId, str(key), str(value))),
     // ---- Backup (library git). Remote access only via the user-provided URL
     backupStatus: async () => backupView(),
@@ -426,7 +467,7 @@ export function registerIpc(): void {
       const r = fromGit(await restore(home, str(hash)))
       if (!r.ok) return r
       // Apply the restored source to tools
-      const sync = W.syncNow(home, env)
+      const sync = W.syncNow(home, await envNow())
       W.markSelfWrite(3000)
       return { ok: true, value: sync }
     },

@@ -38,7 +38,8 @@
     "cleanupConfirm": "휴지통으로 이동",
     "cleanupNothing": "정리할 백업 없음",
     "cleanupDone": "{{count}}개 ({{size}}) 휴지통으로 이동함",
-    "cleanupFailed": "백업 정리 실패: {{count}}개"
+    "cleanupFailed": "백업 정리 실패: {{count}}개",
+    "tools": "사용 중인 툴"
   },
   "common": {
     "loading": "불러오는 중…",
@@ -64,7 +65,8 @@
     "remove": "제거",
     "save": "저장",
     "import": "가져오기",
-    "back": "뒤로"
+    "back": "뒤로",
+    "empty": "아직 비어 있습니다."
   },
   "rules": {
     "search": "룰 검색",
@@ -179,7 +181,13 @@
     "watchSynced": "라이브러리 변경 감지 — 자동 동기화 ({{n}}개 씀)",
     "button": "동기화 ({{n}})",
     "buttonSynced": "동기화됨",
-    "buttonAria": "동기화 상태"
+    "buttonAria": "동기화 상태",
+    "reason": {
+      "importedChanged": "가져온 뒤 수정됨 — 그대로 둠",
+      "noAppCopy": "앱 사본이 아직 없음 — 원본 유지",
+      "originalGone": "원본이 없음"
+    },
+    "notInitialized": "{{tool}} 를 한 번 실행한 뒤 다시 반영하세요"
   },
   "app": {
     "name": "Illithid"
@@ -271,12 +279,12 @@
     },
     "adopted": "앱 소유로 채택",
     "userOwnedKept": "사용자 파일 유지 (동기화 안 함)",
-    "converted": "원본 백업 후 앱 소유로 전환",
+    "converted": "다음 반영 때 원본 백업 후 교체",
     "inlineRemains": "opencode.json 인라인 정의가 남아 같은 이름이 둘",
     "mcpAllTools": "가져온 MCP 서버는 다른 툴에도 반영됩니다",
     "warn": {
-      "opencodeInstructionRemains": "opencode.json instructions 의 원래 경로 항목은 남음 (OpenCode 에 같은 룰이 둘)",
-      "agentRenderDiffers": "렌더 결과가 원본 바이트와 다름 (원본은 backups/imported)"
+      "agentRenderDiffers": "렌더 결과가 원본 바이트와 다름 (원본은 다음 반영 때 백업됨)",
+      "togglesNotSet": "다른 툴 끄기에 실패함 (항목의 툴 스위치를 확인)"
     }
   },
   "rel": {
@@ -298,7 +306,7 @@
     "connection": "연결",
     "history": "백업 기록",
     "restore": "복원",
-    "restoreBody": "라이브러리를 스냅샷 {{id}} 로 되돌리고 툴에 동기화합니다. 현재 상태는 먼저 스냅샷으로 남깁니다.",
+    "restoreBody": "라이브러리를 스냅샷 {{id}} 로 되돌립니다. 툴에 반영될 변경은 적용 전에 보여줍니다. 현재 상태는 먼저 스냅샷으로 남깁니다.",
     "restored": "복원했습니다",
     "scope": "백업 범위",
     "scopeIn": {
@@ -379,5 +387,44 @@
     "delete": "삭제",
     "deleteTitle": "워크스페이스 삭제",
     "switchRemoves": "툴에서 빠짐 {{n}}"
+  },
+  "preview": {
+    "title": "툴에 반영",
+    "nothing": "반영할 변경이 없습니다.",
+    "apply": "반영 ({{n}})",
+    "keepOriginal": "원본 유지",
+    "kept": "원본을 유지합니다",
+    "action": {
+      "add": "추가",
+      "update": "변경",
+      "replace": "교체 · 원본 백업",
+      "retire": "원본을 백업으로",
+      "remove": "제거"
+    },
+    "kind": {
+      "rule": "룰",
+      "skill": "스킬",
+      "agent": "에이전트",
+      "config": "설정 파일",
+      "instruction": "instructions 항목"
+    }
+  },
+  "onboarding": {
+    "title": "Illithid 시작하기",
+    "stepStart": "시작",
+    "stepTools": "툴",
+    "stepImport": "가져오기",
+    "stepRestore": "복원",
+    "stepApply": "반영",
+    "modeImport": "기존 설정 가져오기",
+    "modeFresh": "새로 시작",
+    "modeRestore": "백업이나 워크스페이스 파일에서 복원",
+    "notDetected": "찾지 못함",
+    "next": "다음",
+    "imported": "{{n}}개 가져옴",
+    "restoreZip": "워크스페이스 파일 (.zip)",
+    "restoreBackup": "Git 백업",
+    "later": "나중에",
+    "finish": "완료"
   }
 }

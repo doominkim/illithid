@@ -30,6 +30,8 @@ import Agents from './views/Agents'
 import Artifacts from './views/Artifacts'
 import Sessions from './views/Sessions'
 import Backup from './views/Backup'
+import Onboarding from './views/Onboarding'
+import { ApplyPreviewModal } from './components/ApplyPreviewModal'
 import { SyncContext } from './lib/sync'
 import { LIBRARY_CHANGED, notifySync } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
@@ -143,7 +145,7 @@ function App(): React.JSX.Element {
     window.addEventListener(LIBRARY_CHANGED, refreshPending)
     return () => window.removeEventListener(LIBRARY_CHANGED, refreshPending)
   }, [refreshPending])
-  const applyOnce = useCallback(async (): Promise<void> => {
+  const applyOnce = useCallback(async (): Promise<SyncStatusView | null> => {
     setSyncBusy(true)
     try {
       const s = await window.api.syncApplyOnce()
@@ -151,16 +153,29 @@ function App(): React.JSX.Element {
       notifySync(s)
       clearApiCache()
       setTick((n) => n + 1)
+      return s
     } catch {
       // Recount on the next refresh without notifying
+      return null
     } finally {
       setSyncBusy(false)
     }
   }, [])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const openPreview = useCallback(() => setPreviewOpen(true), [])
   const syncCtx = useMemo(
-    () => ({ status: syncStatus, refresh: refreshSync, syncNow, busy: syncBusy, pending, applyOnce }),
-    [syncStatus, refreshSync, syncNow, syncBusy, pending, applyOnce]
+    () => ({ status: syncStatus, refresh: refreshSync, syncNow, busy: syncBusy, pending, applyOnce, openPreview }),
+    [syncStatus, refreshSync, syncNow, syncBusy, pending, applyOnce, openPreview]
   )
+
+  // First run: tools in use never chosen and the library is empty. Decided once at start (the flow itself saves toolsInUse)
+  const [onboarding, setOnboarding] = useState<boolean | null>(null)
+  useEffect(() => {
+    Promise.all([window.api.configGet(), window.api.toolsInUseGet()]).then(
+      ([c, v]) => setOnboarding(!v.configured && c.libraryEmpty),
+      () => setOnboarding(false)
+    )
+  }, [])
 
   const navigate = useCallback((menu: Menu, opts?: { select?: string; tool?: ToolId | null }) => {
     setRequest((r) => ({
@@ -243,6 +258,15 @@ function App(): React.JSX.Element {
        <SyncContext.Provider value={syncCtx}>
         {/* Drag region for the macOS hiddenInset title bar */}
         <div className="ac-dragbar" />
+        {onboarding === null ? null : onboarding ? (
+          <Onboarding
+            onDone={(menu) => {
+              setOnboarding(false)
+              onWorkspaceChange()
+              if (menu) navigate(menu, { tool: null })
+            }}
+          />
+        ) : (
         <Box style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
           <Sidebar onWorkspaceChange={onWorkspaceChange} />
           <Box component="main" style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'auto', position: 'relative' }}>
@@ -260,6 +284,8 @@ function App(): React.JSX.Element {
             </Box>
           </Box>
         </Box>
+        )}
+        <ApplyPreviewModal opened={previewOpen} onClose={() => setPreviewOpen(false)} />
        </SyncContext.Provider>
       </ConfigContext.Provider>
       <Spotlight

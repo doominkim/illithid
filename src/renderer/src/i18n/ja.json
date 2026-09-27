@@ -38,7 +38,8 @@
     "cleanupConfirm": "ゴミ箱に移動",
     "cleanupNothing": "整理するバックアップなし",
     "cleanupDone": "{{count}} 件 ({{size}}) をゴミ箱に移動しました",
-    "cleanupFailed": "バックアップ整理に失敗: {{count}} 件"
+    "cleanupFailed": "バックアップ整理に失敗: {{count}} 件",
+    "tools": "使用中のツール"
   },
   "common": {
     "loading": "読み込み中…",
@@ -64,7 +65,8 @@
     "remove": "削除",
     "save": "保存",
     "import": "取り込み",
-    "back": "戻る"
+    "back": "戻る",
+    "empty": "まだ何もありません。"
   },
   "rules": {
     "search": "ルールを検索",
@@ -179,7 +181,13 @@
     "watchSynced": "ライブラリの変更を検知 — 自動同期（{{n}} 件書き込み）",
     "button": "同期 ({{n}})",
     "buttonSynced": "同期済み",
-    "buttonAria": "同期状態"
+    "buttonAria": "同期状態",
+    "reason": {
+      "importedChanged": "インポート後に変更あり — そのまま",
+      "noAppCopy": "アプリのコピーが未作成 — 元ファイルを維持",
+      "originalGone": "元ファイルがありません"
+    },
+    "notInitialized": "{{tool}} を一度起動してから再度反映してください"
   },
   "app": {
     "name": "Illithid"
@@ -271,12 +279,12 @@
     },
     "adopted": "アプリ管理として採用",
     "userOwnedKept": "ユーザーファイルを維持（同期しない）",
-    "converted": "元ファイルをバックアップしアプリ管理に切替",
+    "converted": "次回の反映時に元ファイルをバックアップして置き換え",
     "inlineRemains": "opencode.json のインライン定義が残り同名が重複",
     "mcpAllTools": "取り込んだ MCP サーバーは他のツールにも反映されます",
     "warn": {
-      "opencodeInstructionRemains": "opencode.json instructions の元のパス項目は残ります (OpenCode で同じルールが二重)",
-      "agentRenderDiffers": "レンダー結果が元のバイトと異なります (元は backups/imported)"
+      "agentRenderDiffers": "レンダー結果が元のバイトと異なります (元ファイルは次回の反映時にバックアップされます)",
+      "togglesNotSet": "他のツールをオフにできませんでした (項目のツールスイッチを確認)"
     }
   },
   "rel": {
@@ -298,7 +306,7 @@
     "connection": "接続",
     "history": "バックアップ履歴",
     "restore": "復元",
-    "restoreBody": "ライブラリをスナップショット {{id}} に戻してツールに同期します。現在の状態は先にスナップショットとして残します。",
+    "restoreBody": "ライブラリをスナップショット {{id}} に戻します。ツールへの変更は反映前に表示します。現在の状態は先にスナップショットとして残します。",
     "restored": "復元しました",
     "scope": "バックアップ範囲",
     "scopeIn": {
@@ -379,5 +387,44 @@
     "delete": "削除",
     "deleteTitle": "ワークスペースを削除",
     "switchRemoves": "ツールから外れる項目 {{n}}"
+  },
+  "preview": {
+    "title": "ツールに反映",
+    "nothing": "反映する変更はありません。",
+    "apply": "反映 ({{n}})",
+    "keepOriginal": "元ファイルを維持",
+    "kept": "元ファイルを維持します",
+    "action": {
+      "add": "追加",
+      "update": "変更",
+      "replace": "置き換え · 元ファイルをバックアップ",
+      "retire": "元ファイルをバックアップへ",
+      "remove": "削除"
+    },
+    "kind": {
+      "rule": "ルール",
+      "skill": "スキル",
+      "agent": "エージェント",
+      "config": "設定ファイル",
+      "instruction": "instructions 項目"
+    }
+  },
+  "onboarding": {
+    "title": "Illithid をはじめる",
+    "stepStart": "開始",
+    "stepTools": "ツール",
+    "stepImport": "インポート",
+    "stepRestore": "復元",
+    "stepApply": "反映",
+    "modeImport": "既存の設定をインポート",
+    "modeFresh": "新しく始める",
+    "modeRestore": "バックアップまたはワークスペースファイルから復元",
+    "notDetected": "見つかりません",
+    "next": "次へ",
+    "imported": "{{n}} 件インポート",
+    "restoreZip": "ワークスペースファイル (.zip)",
+    "restoreBackup": "Git バックアップ",
+    "later": "あとで",
+    "finish": "完了"
   }
 }

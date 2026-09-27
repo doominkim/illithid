@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
-import { EmptyState } from '../components/EmptyState'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
@@ -165,7 +165,9 @@ function Rules(): React.JSX.Element {
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('rules.search')} />}
         right={<ViewToggle value={view} onChange={setView} />}
       />
-      {files.length === 0 ? (
+      {data.files.length === 0 ? (
+        <EmptyLibrary onImport={() => setImportOpen(true)} />
+      ) : files.length === 0 ? (
         <EmptyState title={t('common.noResults')} />
       ) : view === 'grid' ? (
         <CardGrid>

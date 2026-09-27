@@ -17,7 +17,7 @@ import type { AgentDoc, ToolId } from '../../../shared/api'
 import { effortsFor, MODEL_CATALOG } from '../../../shared/modelCatalog'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
-import { EmptyState } from '../components/EmptyState'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
@@ -172,7 +172,9 @@ function Agents(): React.JSX.Element {
         }
       />
 
-      {visible.length === 0 ? (
+      {rows.length === 0 ? (
+        <EmptyLibrary onImport={() => setImportOpen(true)} />
+      ) : visible.length === 0 ? (
         <EmptyState title={t('common.noResults')} />
       ) : view === 'grid' ? (
         <CardGrid>

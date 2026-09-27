@@ -38,7 +38,8 @@
     "cleanupConfirm": "移到废纸篓",
     "cleanupNothing": "没有可清理的备份",
     "cleanupDone": "已将 {{count}} 项 ({{size}}) 移到废纸篓",
-    "cleanupFailed": "备份清理失败: {{count}} 项"
+    "cleanupFailed": "备份清理失败: {{count}} 项",
+    "tools": "使用中的工具"
   },
   "common": {
     "loading": "加载中…",
@@ -64,7 +65,8 @@
     "remove": "移除",
     "save": "保存",
     "import": "导入",
-    "back": "返回"
+    "back": "返回",
+    "empty": "这里还没有内容。"
   },
   "rules": {
     "search": "搜索规则",
@@ -179,7 +181,13 @@
     "watchSynced": "检测到库变更 — 已自动同步（写入 {{n}}）",
     "button": "同步 ({{n}})",
     "buttonSynced": "已同步",
-    "buttonAria": "同步状态"
+    "buttonAria": "同步状态",
+    "reason": {
+      "importedChanged": "导入后已修改 — 保持原样",
+      "noAppCopy": "应用副本尚未写入 — 保留原文件",
+      "originalGone": "原文件已不存在"
+    },
+    "notInitialized": "请先运行一次 {{tool}}，然后重新应用"
   },
   "app": {
     "name": "Illithid"
@@ -271,12 +279,12 @@
     },
     "adopted": "已采用为应用管理",
     "userOwnedKept": "保留用户文件（不同步）",
-    "converted": "已备份原文件并转为应用管理",
+    "converted": "下次应用时备份原文件并替换",
     "inlineRemains": "opencode.json 内联定义仍在，同名重复",
     "mcpAllTools": "导入的 MCP 服务器也会同步到其他工具",
     "warn": {
-      "opencodeInstructionRemains": "opencode.json instructions 中的原路径条目仍保留 (OpenCode 中同一规则出现两次)",
-      "agentRenderDiffers": "渲染结果与原文件字节不同 (原文件在 backups/imported)"
+      "agentRenderDiffers": "渲染结果与原文件字节不同 (原文件将在下次应用时备份)",
+      "togglesNotSet": "无法关闭其他工具 (请检查该项的工具开关)"
     }
   },
   "rel": {
@@ -298,7 +306,7 @@
     "connection": "连接",
     "history": "备份历史",
     "restore": "恢复",
-    "restoreBody": "将库恢复到快照 {{id}} 并同步到工具。当前状态会先保存为快照。",
+    "restoreBody": "将库恢复到快照 {{id}}。应用到工具的变更会在应用前显示。当前状态会先保存为快照。",
     "restored": "已恢复",
     "scope": "备份范围",
     "scopeIn": {
@@ -379,5 +387,44 @@
     "delete": "删除",
     "deleteTitle": "删除工作区",
     "switchRemoves": "将从工具中移除 {{n}}"
+  },
+  "preview": {
+    "title": "应用到工具",
+    "nothing": "没有需要应用的变更。",
+    "apply": "应用 ({{n}})",
+    "keepOriginal": "保留原文件",
+    "kept": "已保留原文件",
+    "action": {
+      "add": "添加",
+      "update": "更新",
+      "replace": "替换 · 备份原文件",
+      "retire": "原文件移至备份",
+      "remove": "移除"
+    },
+    "kind": {
+      "rule": "规则",
+      "skill": "技能",
+      "agent": "代理",
+      "config": "配置文件",
+      "instruction": "instructions 条目"
+    }
+  },
+  "onboarding": {
+    "title": "开始使用 Illithid",
+    "stepStart": "开始",
+    "stepTools": "工具",
+    "stepImport": "导入",
+    "stepRestore": "恢复",
+    "stepApply": "应用",
+    "modeImport": "导入现有配置",
+    "modeFresh": "全新开始",
+    "modeRestore": "从备份或工作区文件恢复",
+    "notDetected": "未找到",
+    "next": "下一步",
+    "imported": "已导入 {{n}} 项",
+    "restoreZip": "工作区文件 (.zip)",
+    "restoreBackup": "Git 备份",
+    "later": "稍后",
+    "finish": "完成"
   }
 }

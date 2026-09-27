@@ -34,7 +34,7 @@ function Card({ title, icon, children, right, tone }: { title: string; icon: Rea
 function Backup(): React.JSX.Element {
   const { t } = useTranslation()
   const reload = useReload()
-  const { syncNow } = useSync()
+  const { openPreview } = useSync()
   const [st, setSt] = useState<BackupStatusView | null>(null)
   const [history, setHistory] = useState<Snapshot[]>([])
   const [snapshotFirst, setSnapshotFirst] = useState(true)
@@ -221,8 +221,8 @@ function Backup(): React.JSX.Element {
           const r = await run('restore', window.api.backupRestore(restore.hash, st.dirty && snapshotFirst), t('backup.restored'))
           setRestore(null)
           if (r) {
-            await syncNow()
             reload()
+            openPreview()
           }
         }}
         danger

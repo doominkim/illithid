@@ -56,6 +56,7 @@ import type {
   SyncState
 } from '../shared/api'
 import { skillDescriptions, toggles } from './writes'
+import { applyPreview } from './preview'
 
 export function rules(home: string): RulesData {
   const dir = canonicalPaths(home).rules
@@ -337,6 +338,7 @@ export type Op =
   | 'sessions'
   | 'toolMemory'
   | 'syncPending'
+  | 'syncPreview'
   | 'searchIndex'
   | 'searchSessions'
   | 'searchStatus'
@@ -406,5 +408,7 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
       return { claude: scanClaudeMemory(home), codex: scanCodexMemory(home) }
     case 'syncPending':
       return pendingSyncCount(home, env)
+    case 'syncPreview':
+      return applyPreview(home, env)
   }
 }

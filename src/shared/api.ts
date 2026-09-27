@@ -38,7 +38,7 @@ import type {
   ToolModels
 } from '../engine'
 
-import type { ImportSource, SwitchLossItem } from '../engine'
+import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
 export type { SwitchLossItem } from '../engine'
 import type {
   ClaudeMemoryScan,
@@ -121,7 +121,8 @@ export type {
   PortabilityReason,
   SkillSyncAction,
   RuleSyncAction,
-  AgentSyncAction
+  AgentSyncAction,
+  ToolDetection
 } from '../engine'
 
 /** Placeholder for a masked secret. If saved as-is, main keeps the existing value */
@@ -199,6 +200,16 @@ export interface McpData {
 // ---------------------------------------------------------------- write channel types
 
 /** App config view. Paths are for display (~) */
+/** Tools in use on this device (config.toolsInUse). Tools not in use get no writes at all */
+export interface ToolsInUseView {
+  /** Effective list (all tools while unset) */
+  inUse: ToolId[]
+  /** false = config.toolsInUse not set yet (users from before the setting, or first run) */
+  configured: boolean
+  /** What looks installed on this device (config folder or executable on PATH) */
+  detected: ToolDetection[]
+}
+
 export interface ConfigView {
   path: string
   exists: boolean
@@ -307,6 +318,15 @@ export interface SyncStatusView {
   errorCount: number
   /** Delete candidates (approval flow) */
   deleteCandidates: DeleteCandidateRequest[]
+  /** Files the tool creates on its first run that are still missing while the library has content for them (not an error) */
+  notInitialized: NotInitializedView[]
+}
+
+/** A tool file skipped because the tool has not created it yet (FileChange.skip = toolNotInitialized) */
+export interface NotInitializedView {
+  tool: ToolId
+  /** Display path (~) */
+  label: string
 }
 
 export interface DeleteCandidateRequest {
@@ -436,6 +456,12 @@ export interface Api {
   // ---- config·library setup
   configGet(): Promise<ConfigView>
   configSet(patch: Partial<AppConfig>): Promise<WriteResult<ConfigView>>
+  /** Tools in use + detection (read-only) */
+  toolsInUseGet(): Promise<ToolsInUseView>
+  /** Save the tools in use (null = unset, all tools). Writes config only — applying to a newly enabled tool is a separate sync */
+  toolsInUseSet(tools: ToolId[] | null): Promise<WriteResult<ToolsInUseView>>
+  /** Installed-tool detection only (read-only) */
+  detectTools(): Promise<ToolDetection[]>
   pickDirectory(current?: string): Promise<string | null>
   libraryInit(path?: string, importLegacy?: boolean): Promise<WriteResult<LibraryInitResult>>
   // ---- workspaces
@@ -446,7 +472,7 @@ export interface Api {
   /** Move to the backup folder (refuses active or last one). value = backup path (~ form) */
   workspaceDelete(id: string): Promise<WriteResult<string>>
   /** Switch → reconnect watcher → sync */
-  workspaceSwitch(id: string): Promise<WriteResult<SyncStatusView>>
+  workspaceSwitch(id: string, apply?: boolean): Promise<WriteResult<SyncStatusView>>
   /** Items that would be removed from tools on switch (read-only) */
   workspaceSwitchPreview(id: string): Promise<WriteResult<SwitchLossItem[]>>
   /** Active workspace → save dialog. value null if cancelled */
@@ -506,6 +532,10 @@ export interface Api {
   syncPending(): Promise<SyncPendingView>
   /** Apply once now (ignores allowRealApply — the user click is the approval) */
   syncApplyOnce(): Promise<SyncStatusView>
+  /** What an apply would change, per tool (read-only plan) */
+  syncPreview(): Promise<ApplyPreviewView>
+  /** Keep an imported original that changed since import and stop replacing it */
+  importedKeep(item: ImportedKeepRequest): Promise<WriteResult | Refused>
   deleteCandidates(items: DeleteCandidateRequest[]): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
   modelSet(tool: ToolId, key: string, value: string): Promise<WriteResult<SetModelResult> | Refused>
   // ---- backup (available=false / notAvailable until the engine is ready)
@@ -531,6 +561,41 @@ export interface SyncPendingView {
   failed: number
 }
 
+// ---- apply preview (sync plan summarized per tool, read-only)
+/** replace = imported original backed up and replaced by the app copy · retire = imported original moved to the backup */
+export type ApplyPreviewAction = 'add' | 'update' | 'replace' | 'retire' | 'remove'
+
+export interface ApplyPreviewItem {
+  tool: ToolId
+  kind: 'rule' | 'skill' | 'agent' | 'config'
+  action: ApplyPreviewAction
+  /** Item name (config: the file) */
+  name: string
+  /** Display path (~) */
+  path: string
+}
+
+/** Imported original edited after import — sync leaves it in place */
+export interface ImportedChangedItem {
+  kind: RetireKind
+  tool: ToolId
+  name: string
+  /** Display path (~) */
+  path: string
+}
+
+export type ImportedKeepRequest = Pick<ImportedChangedItem, 'kind' | 'tool' | 'path'>
+
+export interface ApplyPreviewView {
+  items: ApplyPreviewItem[]
+  importedChanged: ImportedChangedItem[]
+  errors: string[]
+  notInitialized: NotInitializedView[]
+  libraryMissing?: boolean
+  /** Tools in use (effective) */
+  inUse: ToolId[]
+}
+
 export const CHANNELS = [
   'status',
   'rules',
@@ -549,6 +614,9 @@ export const CHANNELS = [
   'searchAll',
   'configGet',
   'configSet',
+  'toolsInUseGet',
+  'toolsInUseSet',
+  'detectTools',
   'pickDirectory',
   'libraryInit',
   'workspaces',
@@ -600,6 +668,8 @@ export const CHANNELS = [
   'syncNow',
   'syncPending',
   'syncApplyOnce',
+  'syncPreview',
+  'importedKeep',
   'deleteCandidates',
   'modelSet',
   'backupStatus',

@@ -11,14 +11,17 @@ export interface SyncCtx {
   /** Pending and failed counts (sidebar sync button) */
   pending?: SyncPendingView
   /** One real apply now (user click only) */
-  applyOnce: () => Promise<void>
+  applyOnce: () => Promise<SyncStatusView | null>
+  /** Open the apply preview (changes per tool → Apply) */
+  openPreview: () => void
 }
 
 export const SyncContext = createContext<SyncCtx>({
   refresh: () => {},
   syncNow: async () => null,
   busy: false,
-  applyOnce: async () => {}
+  applyOnce: async () => null,
+  openPreview: () => {}
 })
 
 export function useSync(): SyncCtx {

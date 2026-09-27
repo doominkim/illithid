@@ -55,6 +55,9 @@ export async function runWrite<T>(
 /** Library write succeeded (to recount pending applies) */
 export const LIBRARY_CHANGED = 'illithid:libraryChanged'
 
+/** Skip reasons worth telling the user about after an apply (imported originals left in place) */
+const NOTICE_REASONS = new Set(['importedChanged', 'noAppCopy'])
+
 /** Sync result notification (written count or errors) */
 export function notifySync(s: SyncStatusView): void {
   const t = i18n.t.bind(i18n)
@@ -62,6 +65,12 @@ export function notifySync(s: SyncStatusView): void {
     const n = s.targets.filter((x) => x.status === 'written').length + [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'done').length
     if (s.errorCount) notifications.show({ color: 'red', title: t('sync.syncedWithErrors', { n: s.errorCount }), message: s.errors.join(' · ') })
     else notifications.show({ color: 'accent', message: t('sync.syncedNow', { n }), autoClose: 2500 })
+    const notices = [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'skipped' && x.reason && NOTICE_REASONS.has(x.reason))
+    if (notices.length)
+      notifications.show({
+        color: 'yellow',
+        message: notices.map((x) => `${x.name}: ${t(`sync.reason.${x.reason}`)}`).join(' · ')
+      })
   } else if (s.refused === 'realHomeNotAllowed') {
     notifications.show({ color: 'yellow', title: t('sync.savedOnly'), message: t('refused.allowRealApplyHint') })
   }

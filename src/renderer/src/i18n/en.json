@@ -38,7 +38,8 @@
     "cleanupConfirm": "Move to Trash",
     "cleanupNothing": "Nothing to clean up",
     "cleanupDone": "Moved {{count}} items ({{size}}) to the Trash",
-    "cleanupFailed": "Backup cleanup failed: {{count}} items"
+    "cleanupFailed": "Backup cleanup failed: {{count}} items",
+    "tools": "Tools in use"
   },
   "common": {
     "loading": "Loading…",
@@ -64,7 +65,8 @@
     "remove": "Remove",
     "save": "Save",
     "import": "Import",
-    "back": "Back"
+    "back": "Back",
+    "empty": "Nothing here yet."
   },
   "rules": {
     "search": "Search rules",
@@ -179,7 +181,13 @@
     "watchSynced": "Library changed on disk — synced to tools ({{n}} written)",
     "button": "Sync ({{n}})",
     "buttonSynced": "Synced",
-    "buttonAria": "Sync status"
+    "buttonAria": "Sync status",
+    "reason": {
+      "importedChanged": "Changed since import — left as is",
+      "noAppCopy": "App copy not written yet — original left in place",
+      "originalGone": "Original no longer exists"
+    },
+    "notInitialized": "Run {{tool}} once, then apply again"
   },
   "app": {
     "name": "Illithid"
@@ -271,12 +279,12 @@
     },
     "adopted": "Adopted as app-managed",
     "userOwnedKept": "User file kept (not synced)",
-    "converted": "Original backed up, now app-managed",
+    "converted": "Original backed up and replaced at the next apply",
     "inlineRemains": "Inline definition in opencode.json remains (duplicate name)",
     "mcpAllTools": "Imported MCP servers are also applied to the other tools",
     "warn": {
-      "opencodeInstructionRemains": "The original path entry in opencode.json instructions remains (OpenCode loads the rule twice)",
-      "agentRenderDiffers": "Rendered file differs from the original bytes (original in backups/imported)"
+      "agentRenderDiffers": "Rendered file differs from the original bytes (the original is backed up at the next apply)",
+      "togglesNotSet": "Could not turn off the other tools for this item (check its tool switches)"
     }
   },
   "rel": {
@@ -298,7 +306,7 @@
     "connection": "Connection",
     "history": "Backup history",
     "restore": "Restore",
-    "restoreBody": "Replace the library with snapshot {{id}} and sync to tools. The current state is snapshotted first.",
+    "restoreBody": "Replace the library with snapshot {{id}}. Changes to tools are shown before they are applied. The current state is snapshotted first.",
     "restored": "Restored",
     "scope": "Backup scope",
     "scopeIn": {
@@ -379,5 +387,44 @@
     "delete": "Delete",
     "deleteTitle": "Delete workspace",
     "switchRemoves": "Removed from tools {{n}}"
+  },
+  "preview": {
+    "title": "Apply to tools",
+    "nothing": "Nothing to apply.",
+    "apply": "Apply ({{n}})",
+    "keepOriginal": "Keep original",
+    "kept": "Original kept",
+    "action": {
+      "add": "Add",
+      "update": "Update",
+      "replace": "Replace · original backed up",
+      "retire": "Original to backup",
+      "remove": "Remove"
+    },
+    "kind": {
+      "rule": "rule",
+      "skill": "skill",
+      "agent": "agent",
+      "config": "config file",
+      "instruction": "instructions entry"
+    }
+  },
+  "onboarding": {
+    "title": "Set up Illithid",
+    "stepStart": "Start",
+    "stepTools": "Tools",
+    "stepImport": "Import",
+    "stepRestore": "Restore",
+    "stepApply": "Apply",
+    "modeImport": "Import my existing setup",
+    "modeFresh": "Start fresh",
+    "modeRestore": "Restore from a backup or workspace file",
+    "notDetected": "Not found",
+    "next": "Next",
+    "imported": "{{n}} imported",
+    "restoreZip": "Workspace file (.zip)",
+    "restoreBackup": "Git backup",
+    "later": "Later",
+    "finish": "Finish"
   }
 }

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { MASK, type McpEditView, type McpServer, type McpServerView, type ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
-import { EmptyState } from '../components/EmptyState'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
@@ -113,7 +113,9 @@ function Mcp(): React.JSX.Element {
         </Box>
       )}
       <Toolbar left={<SearchInput value={query} onChange={setQuery} placeholder={t('mcp.search')} />} right={<ViewToggle value={view} onChange={setView} />} />
-      {servers.length === 0 ? (
+      {data.servers.length === 0 ? (
+        <EmptyLibrary onImport={() => setImportOpen(true)} />
+      ) : servers.length === 0 ? (
         <EmptyState title={t('common.noResults')} />
       ) : view === 'grid' ? (
         <CardGrid>

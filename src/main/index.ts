@@ -3,6 +3,7 @@ import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { shellEnvReady } from './shellEnv'
 import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, registerIpc, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
@@ -114,15 +115,19 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Finder/Dock launches lack the shell's variables; sync waits for them, the window does not
+  const envReady = shellEnvReady()
   registerIpc()
   prepareLibraryOnStart()
   createWindow()
   // Sync source -> tools once right after startup (deferred so it does not block showing the window)
   setTimeout(() => {
-    syncOnStart()
-    backupCleanupOnStart()
-    startLibraryWatch()
-    void pullOnStartAndSync()
+    void envReady.then(() => {
+      syncOnStart()
+      backupCleanupOnStart()
+      startLibraryWatch()
+      void pullOnStartAndSync()
+    })
   }, 500)
   // Content index (worker scans sessions and documents -> incremental index). Slightly delayed to avoid overlapping window display and first reads
   setTimeout(runSearchIndex, 3000)

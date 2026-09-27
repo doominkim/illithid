@@ -4,7 +4,8 @@ import { Brain, FileText, FolderOpen, Layers, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
-import { EmptyState } from '../components/EmptyState'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
+import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
@@ -48,6 +49,7 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
 
   if (files.error) return <ErrorAlert message={files.error} />
@@ -98,7 +100,10 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
           </>
         }
       />
-      {visible.length === 0 ? (
+      <ImportModal opened={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />
+      {files.data.length === 0 ? (
+        <EmptyLibrary onImport={() => setImportOpen(true)} icon={<Brain size={18} />} />
+      ) : visible.length === 0 ? (
         <EmptyState title={t('common.noResults')} icon={<Brain size={18} />} />
       ) : view === 'grid' ? (
         <CardGrid>

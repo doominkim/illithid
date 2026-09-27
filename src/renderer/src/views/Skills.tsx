@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { SkillDoc, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
-import { EmptyState } from '../components/EmptyState'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
@@ -147,7 +147,9 @@ function Skills(): React.JSX.Element {
         }
       />
 
-      {visible.length === 0 ? (
+      {rows.length === 0 ? (
+        <EmptyLibrary onImport={() => setImportOpen(true)} />
+      ) : visible.length === 0 ? (
         <EmptyState title={t('common.noResults')} />
       ) : view === 'grid' ? (
         <CardGrid>

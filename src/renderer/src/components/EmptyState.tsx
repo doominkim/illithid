@@ -1,5 +1,6 @@
-import { Box, Stack, Text } from '@mantine/core'
-import { Inbox } from 'lucide-react'
+import { Box, Button, Stack, Text } from '@mantine/core'
+import { Download, Inbox } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 /** Empty state: icon + title + hint. Usable inside cards or panels */
 export function EmptyState({
@@ -41,5 +42,21 @@ export function EmptyState({
         {action && <Box mt="xs">{action}</Box>}
       </Stack>
     </Box>
+  )
+}
+
+/** Empty library list: title + Import button */
+export function EmptyLibrary({ onImport, icon }: { onImport: () => void; icon?: React.ReactNode }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <EmptyState
+      title={t('common.empty')}
+      icon={icon}
+      action={
+        <Button size="xs" variant="default" leftSection={<Download size={13} />} onClick={onImport} data-testid="empty-import">
+          {t('common.import')}
+        </Button>
+      }
+    />
   )
 }

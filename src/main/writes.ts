@@ -64,9 +64,11 @@ import { LEGACY_LIBRARY_DIR } from '../engine/config'
 import { initLibrary } from '../engine/init'
 import { renamePendingPaths } from '../engine/rename'
 import { ensureLibrary } from '../engine/startup'
-import { importAllFromLegacy, listImportSources, type ImportSource } from '../engine/importer'
+import { detectTools, importAllFromLegacy, listImportSources, type ImportSource } from '../engine/importer'
+import { setToolsInUse, toolsInUse } from '../engine/config'
 import { libraryExists } from '../engine/sources'
 import { syncAll, type SyncAllResult } from '../engine/sync'
+import { ALL_TARGETS } from '../engine/targets'
 import { deleteSyncCandidates } from '../engine/deleteCopies'
 import {
   createWorkspace,
@@ -89,10 +91,12 @@ import {
   type DeleteCandidateResult,
   type ImportPlanView,
   type LibraryInitResult,
+  type NotInitializedView,
   type McpEditView,
   type Refused,
   type SyncStatusView,
   type SyncTargetView,
+  type ToolsInUseView,
   type WriteResult
 } from '../shared/api'
 
@@ -247,7 +251,8 @@ let lastSync: SyncStatusView = {
   errors: [],
   needsSync: 0,
   errorCount: 0,
-  deleteCandidates: []
+  deleteCandidates: [],
+  notInitialized: []
 }
 
 export function syncStatus(): SyncStatusView {
@@ -286,9 +291,9 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
   const planned = r.results
     ? 0
     : r.plan.targets.filter((c) => c.changed && !c.error).length +
-      r.plan.rules.filter((x) => x.action === 'copy' || x.action === 'update').length +
-      r.plan.skills.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'replaceLink').length +
-      r.plan.agents.filter((x) => x.action === 'copy' || x.action === 'update').length
+      r.plan.rules.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'retireImported').length +
+      r.plan.skills.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'replaceLink' || x.action === 'replaceImported' || x.action === 'retireImported').length +
+      r.plan.agents.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'replaceImported' || x.action === 'retireImported').length
   const skipped = targets.filter((t) => t.status === 'skipped').length + [...rules, ...skills, ...agents].filter((x) => x.status === 'skipped' || x.status === 'refused').length
   // Error list: plan errors + target file errors + copy/delete failures (no contents — names and reasons only)
   const itemLabel = (kind: string, x: { name: string; tool?: string }): string =>
@@ -325,6 +330,7 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
       .map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash }))
   ]
   const deleteCandidates = allCandidates.filter((d) => !doneDelete(d.kind, d.tool, d.name))
+  const notInitialized = notInitializedOf(r.plan.targets)
   return {
     at,
     wrote: !!r.results,
@@ -336,8 +342,21 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
     errors,
     needsSync: planned + skipped,
     errorCount,
-    deleteCandidates
+    deleteCandidates,
+    notInitialized
   }
+}
+
+const TARGET_TOOL = new Map(ALL_TARGETS.map((t) => [t.id, t.tool]))
+
+/** Plan targets skipped because the tool has not created its file yet (one entry per file). nothingToWrite is not shown */
+export function notInitializedOf(changes: SyncAllResult['plan']['targets']): NotInitializedView[] {
+  const out = new Map<string, NotInitializedView>()
+  for (const c of changes) {
+    const tool = TARGET_TOOL.get(c.id)
+    if (c.skip === 'toolNotInitialized' && tool && !out.has(c.path)) out.set(c.path, { tool, label: c.label })
+  }
+  return [...out.values()]
 }
 
 /** Failure count of the last sync (red state of the sidebar sync button) */
@@ -395,6 +414,21 @@ export function configSet(home: string, patch: Partial<AppConfig>): void {
     else next[k] = v
   }
   writeConfig(home, next as unknown as AppConfig)
+}
+
+/** Tools in use + detection (read-only) */
+export function toolsInUseView(home: string, env: Env): ToolsInUseView {
+  return {
+    inUse: toolsInUse(home),
+    configured: readConfig(home).config.toolsInUse !== undefined,
+    detected: detectTools(home, env)
+  }
+}
+
+/** Save tools in use (null/undefined = unset → all tools). Config only; nothing is applied to tools here */
+export function toolsInUseSet(home: string, list: ToolId[] | null | undefined): void {
+  if (list !== null && list !== undefined && !Array.isArray(list)) throw new ConfigError('toolsInUse must be an array')
+  setToolsInUse(home, list ?? undefined)
 }
 
 // ---------------------------------------------------------------- Library
