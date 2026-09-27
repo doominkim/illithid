@@ -1,13 +1,14 @@
 /**
  * README demo video from a demo HOME (never the real one).
  * - Reuses the readme-shots demo HOME, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
- * - Sequence: Rules grid → open 20-git.md → Edit → append to a line → Save (synced) → turn OpenCode off for 40-testing.md → Sessions search.
- * - Checks on disk that the edit reached Claude Code, Codex and OpenCode, then encodes docs/demo/illithid-demo.{mp4,gif}.
+ * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
+ * - Sequence: Rules grid → open 20-git.md → Edit → append to a line → Save → preview → Apply → turn OpenCode off for 40-testing.md → preview → Apply → Sessions search.
+ * - Checks on disk that tool files only change on Apply and that the edit reached Claude Code, Codex and OpenCode, then encodes docs/demo/illithid-demo.{mp4,gif}.
  *
  * Usage: npx electron-vite build && npx tsx scripts/readme-demo.ts
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator, type Page } from 'playwright-core'
@@ -64,36 +65,50 @@ async function waitLoaded(page: Page): Promise<void> {
   await page.waitForFunction(() => !document.body.innerText.includes('Loading'), undefined, { timeout: 60_000 })
 }
 
-async function waitSynced(page: Page): Promise<void> {
-  const btn = page.locator('[data-testid="sync-button"]')
-  const deadline = Date.now() + 15_000
-  let clicked = false
-  while (Date.now() < deadline) {
-    const state = await btn.getAttribute('data-state')
-    if (state === 'synced') return
-    if (state === 'failed') throw new Error('sync failed in the app')
-    // The watcher normally syncs on its own; fall back to the sidebar button once
-    if (!clicked && Date.now() > deadline - 11_000) {
-      await clickSlow(page, btn, 300)
-      clicked = true
-    }
-    await page.waitForTimeout(250)
-  }
-  throw new Error('sync button never reached the synced state')
+async function waitState(page: Page, state: 'pending' | 'synced'): Promise<void> {
+  await page.waitForSelector(`[data-testid="sync-button"][data-state="${state}"]`, { timeout: 15_000 })
 }
 
-async function sequence(page: Page): Promise<void> {
+/** Sidebar Sync → apply preview (per-tool changes) → Apply */
+async function applyViaPreview(page: Page, tools: string[], focus: string, hold: number): Promise<void> {
+  await waitState(page, 'pending')
+  await clickSlow(page, page.locator('[data-testid="sync-button"]'), 300)
+  await page.waitForSelector('[data-testid="apply-preview"]')
+  for (const tool of tools) await page.waitForSelector(`[data-testid="apply-preview-${tool}"]`)
+  await page.waitForTimeout(400)
+  for (const tool of tools) await moveTo(page, page.locator(`[data-testid="apply-preview-${tool}"]`))
+  // Rest on the line that tells the story (library-direct / Remove)
+  await moveTo(page, page.locator(`[data-testid="apply-preview"] [data-testid="${focus}"]`).first())
+  await page.waitForTimeout(hold)
+  await clickSlow(page, page.locator('[data-testid="apply-preview-apply"]'), 300)
+  await waitState(page, 'synced')
+  await page.locator('[data-testid="apply-preview"]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+}
+
+/** Tool-side files the demo touches; must stay byte-identical until Apply */
+function toolFiles(home: string): Record<string, string> {
+  const read = (rel: string): string => readFileSync(join(home, rel), 'utf8')
+  return {
+    claude: read(join('.claude/rules/illithid', RULE)),
+    codex: read('.codex/AGENTS.md'),
+    opencode: read('.config/opencode/opencode.json')
+  }
+}
+
+const same = (a: Record<string, string>, b: Record<string, string>): boolean => Object.keys(a).every((k) => a[k] === b[k])
+
+async function sequence(page: Page, home: string): Promise<Record<string, boolean>> {
   const main = page.locator('main')
-  await page.waitForTimeout(1800)
+  await page.waitForTimeout(1000)
 
   // Rules grid with per-tool icons on each card
   const card = main.locator(`[data-card="${RULE}"]`)
   await moveTo(page, card.locator('[data-tool="codex"]'))
-  await page.waitForTimeout(900)
-  await clickSlow(page, card, 1400)
+  await page.waitForTimeout(600)
+  await clickSlow(page, card, 1100)
 
   // Edit one line
-  await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 900)
+  await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 800)
   const area = page.locator('.mantine-Drawer-content textarea').first()
   await moveTo(page, area)
   await area.click()
@@ -102,35 +117,48 @@ async function sequence(page: Page): Promise<void> {
     el.setSelectionRange(at, at)
   }, ANCHOR)
   await page.waitForTimeout(400)
-  await page.keyboard.type(ADDED, { delay: 65 })
-  await page.waitForTimeout(900)
+  await page.keyboard.type(ADDED, { delay: 60 })
+  await page.waitForTimeout(800)
 
-  // Save → the watcher syncs to all three tools
+  // Save → library only, sidebar turns green
+  const before = toolFiles(home)
   await clickSlow(page, page.locator('[data-testid="editor-save"]'), 300)
-  await waitSynced(page)
-  await moveTo(page, page.locator('[data-testid="sync-button"]'))
-  await page.waitForTimeout(2000)
-
-  // Back to the grid, turn one tool off for another rule
-  await page.keyboard.press('Escape')
+  await waitState(page, 'pending')
   await page.waitForTimeout(1000)
+  const afterSave = toolFiles(home)
+
+  // Preview per tool (straight from the open detail) → Apply
+  await applyViaPreview(page, ['claude', 'codex', 'opencode'], 'apply-preview-library-direct', 1500)
+  await page.waitForTimeout(700)
+
+  // Back to the grid
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(800)
+
+  // Turn OpenCode off for another rule → preview → Apply
+  const beforeToggle = toolFiles(home)
   const off = main.locator(`[data-card="${OFF_RULE}"] [data-tool="opencode"]`)
   await clickSlow(page, off, 400)
   await page.waitForFunction((sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false, `[data-card="${OFF_RULE}"] [data-tool="opencode"]`, { timeout: 10_000 })
-  await waitSynced(page)
-  await page.waitForTimeout(1800)
+  await waitState(page, 'pending')
+  await page.waitForTimeout(700)
+  const afterToggle = toolFiles(home)
+  await applyViaPreview(page, ['opencode'], 'apply-preview-action-remove', 1500)
+  await page.waitForTimeout(900)
 
   // Sessions from every tool, searched in one place
   await clickSlow(page, page.locator('[data-menu="sessions"]'), 300)
   await waitLoaded(page)
-  await page.waitForTimeout(900)
+  await page.waitForTimeout(800)
   const search = main.locator('input[type="text"], input:not([type])').first()
   await clickSlow(page, search, 300)
-  await page.keyboard.type('checkout', { delay: 110 })
-  await page.waitForTimeout(1200)
+  await page.keyboard.type('checkout', { delay: 100 })
+  await page.waitForTimeout(1000)
   const hit = main.locator('.mantine-NavLink-root').first()
-  if (await hit.count()) await clickSlow(page, hit, 2200)
+  if (await hit.count()) await clickSlow(page, hit, 1700)
   else await page.waitForTimeout(2200)
+
+  return { toolsUnchangedAfterSave: same(before, afterSave), toolsUnchangedAfterToggle: same(beforeToggle, afterToggle) }
 }
 
 /** Edited text must be in the Claude copy, the Codex AGENTS.md block and the OpenCode instructions */
@@ -178,12 +206,15 @@ async function main(): Promise<void> {
   try {
     buildDemoHome(home)
     syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
+    // Auto apply off: saves stay in the library until Apply in the preview
+    writeFileSync(join(home, '.config/illithid/config.json'), JSON.stringify({ version: 1, allowRealApply: false, activeWorkspace: 'default' }, null, 2) + '\n')
     const env = { ...baseEnv(home), ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
     const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env, recordVideo: { dir: videoDir, size: SIZE } })
     const errors: string[] = []
     let raw = ''
     let trim = 0
     let duration = 0
+    let gated: Record<string, boolean> = {}
     try {
       const page = await app.firstWindow()
       const t0 = Date.now()
@@ -203,7 +234,7 @@ async function main(): Promise<void> {
       await addCursor(page)
       await page.waitForTimeout(300)
       const start = Date.now()
-      await sequence(page)
+      gated = await sequence(page, home)
       trim = (start - t0) / 1000
       duration = (Date.now() - start) / 1000
       raw = (await page.video()?.path()) ?? ''
@@ -211,7 +242,7 @@ async function main(): Promise<void> {
       await app.close()
     }
     if (!raw || !existsSync(raw)) throw new Error('no video recorded')
-    const check = verifyOnDisk(home)
+    const check = { ...gated, ...verifyOnDisk(home) }
     console.log(JSON.stringify({ errors, trim, duration, check }, null, 2))
     if (!Object.values(check).every(Boolean)) throw new Error('sync check failed')
     encode(raw, trim, duration)
