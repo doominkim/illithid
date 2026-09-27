@@ -126,6 +126,14 @@ export interface FileChange {
   skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]
+  /** MCP targets: servers this change adds, updates or removes (names only) */
+  servers?: ServerChange[]
+}
+
+/** One MCP server entering, changing in or leaving a tool config file */
+export interface ServerChange {
+  name: string
+  action: 'add' | 'update' | 'remove'
 }
 
 /** Thrown by a generator to report an unrecoverable state. plan() moves it into the change's error. */

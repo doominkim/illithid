@@ -35,6 +35,7 @@ import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { useToolsInUse } from '../lib/config'
 import { dotOfPills, pillFromCellState, TOOL_NAME, TOOLS, type PillMap } from '../lib/tools'
+import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
 interface Row {
@@ -57,7 +58,7 @@ function Agents(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ViewMode>('grid')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
-  const [busy, setBusy] = useState<{ name: string; tool: ToolId } | null>(null)
+  const pending = useToggleBusy()
   const [importOpen, setImportOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -95,9 +96,7 @@ function Agents(): React.JSX.Element {
   const current = rows.find((r) => r.name === selected) ?? (prev && { ...prev, name: renamed!.to })
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
-    setBusy({ name, tool })
-    await runWrite(window.api.toggle('agents', name, tool, on), { success: t('toggles.saved') })
-    setBusy(null)
+    await pending.run(name, tool, () => runWrite(window.api.toggle('agents', name, tool, on), { success: t('toggles.saved') }))
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
@@ -193,7 +192,7 @@ function Agents(): React.JSX.Element {
                   pills={r.pills}
                   size={18}
                   onToggle={pillToggle(r)}
-                  busy={busy?.name === r.name ? busy.tool : null}
+                  busy={pending.of(r.name)}
                 />
               }
               selected={r.name === selected}
@@ -214,7 +213,7 @@ function Agents(): React.JSX.Element {
                   pills={r.pills}
                   size={18}
                   onToggle={pillToggle(r)}
-                  busy={busy?.name === r.name ? busy.tool : null}
+                  busy={pending.of(r.name)}
                 />
               }
               active={r.name === selected}

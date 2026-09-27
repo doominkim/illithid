@@ -163,7 +163,7 @@ import {
 } from '../src/engine/toolMemory'
 import { memoryPortability, rulePortability } from '../src/engine/importer'
 import { MASK } from '../src/shared/api'
-import { TARGETS } from '../src/engine/targets'
+import { serverChanges, TARGETS } from '../src/engine/targets'
 import { skills as readsSkills } from '../src/main/reads'
 import { applyPreview } from '../src/main/preview'
 import {
@@ -1132,6 +1132,39 @@ async function toolSteps(): Promise<void> {
         'ai3. HAR-21 toolsInUse unset → default tools whose config folder exists — Claude only (OpenCode only on PATH): no ~/.codex or ~/.config/opencode on any path, not pending, status notApplicable, Settings shows the same list; saved list writes OpenCode; three folders → all three; explicit list unchanged',
         !bad.length,
         bad.length ? bad.join('; ') : `pending ${pending} → 0, only Claude written`
+      )
+    }
+
+    // aj. HAR-22 preview MCP server rows — per tool config file, names and actions only
+    {
+      const bad: string[] = []
+      const H = iHome('illithid-m7-J1-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n', '.codex/config.toml': '' }, ['claude', 'codex'])
+      upsertMcpServer(H, 's1', { transport: 'stdio', command: 'one' })
+      upsertMcpServer(H, 's2', { transport: 'stdio', command: 'two', env: { TOKEN: 'fixture-literal-value-xyz' } })
+      syncAll(H, envI, { allowReal: true, approvedOnce: true, secrets: memI })
+      const rows = (): string[] =>
+        applyPreview(H, envI)
+          .items.filter((x) => x.kind === 'mcp')
+          .map((x) => `${x.tool}:${x.parent}:${x.name}:${x.action}`)
+          .sort()
+      setToggle(H, 'mcp', 's1', 'codex', false)
+      const off = rows().join(',')
+      if (off !== 'codex:~/.codex/config.toml:s1:remove') bad.push(`off ${off}`)
+      const fc = planSyncAll(H, envI, memI).targets.find((c) => c.id === 'codexMcp')
+      if (JSON.stringify(fc?.servers) !== '[{"name":"s1","action":"remove"}]') bad.push(`FileChange.servers ${JSON.stringify(fc?.servers)}`)
+      setToggle(H, 'mcp', 's1', 'codex', true)
+      upsertMcpServer(H, 's3', { transport: 'http', url: 'https://s3.example.com/mcp' })
+      upsertMcpServer(H, 's2', { transport: 'stdio', command: 'two', env: { TOKEN: 'fixture-literal-value-changed' } })
+      const added = rows().join(',')
+      if (added !== 'claude:~/.claude.json:s2:update,claude:~/.claude.json:s3:add,codex:~/.codex/config.toml:s2:update,codex:~/.codex/config.toml:s3:add') bad.push(`add/update ${added}`)
+      const pv = JSON.stringify(applyPreview(H, envI))
+      if (pv.includes('fixture-literal-value') || pv.includes('"command"')) bad.push('values in preview data')
+      if (serverChanges('claudeMcp', JSON.stringify({ mcpServers: { x: { a: 1, b: 2 } } }), JSON.stringify({ mcpServers: { x: { b: 2, a: 1 } } })).length) bad.push('key reorder counted as update')
+      if (applyPreview(H, envI).items.filter((x) => !x.parent).some((x) => x.kind === 'mcp')) bad.push('server rows counted as top-level')
+      check(
+        'aj. HAR-22 preview MCP server rows — turning a server off for one tool lists {name, remove} under that tool config file only; new/changed servers list add/update under each tool; names only, no values',
+        !bad.length,
+        bad.length ? bad.join('; ') : `off: ${off}; add/update: ${added}`
       )
     }
   }

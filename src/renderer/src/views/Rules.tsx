@@ -16,12 +16,14 @@ import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
+import { ToolToggleRow } from '../components/ToolToggleRow'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
 /** First heading (# …) or first non-empty line */
@@ -48,7 +50,7 @@ function Rules(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ViewMode>('grid')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
-  const [busy, setBusy] = useState<{ name: string; tool: ToolId } | null>(null)
+  const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -88,9 +90,7 @@ function Rules(): React.JSX.Element {
     ) as PillMap
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
-    setBusy({ name, tool })
-    await runWrite(window.api.toggle('rules', name, tool, on), { success: t('toggles.saved') })
-    setBusy(null)
+    await pending.run(name, tool, () => runWrite(window.api.toggle('rules', name, tool, on), { success: t('toggles.saved') }))
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
@@ -185,7 +185,7 @@ function Rules(): React.JSX.Element {
                   {t('rules.lines', { n: f.text.split('\n').length })}
                 </Badge>
               }
-              footerRight={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={busy?.name === f.name ? busy.tool : null} />}
+              footerRight={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={pending.of(f.name)} />}
               selected={f.name === selected}
               onClick={() => setSelected(f.name)}
             />
@@ -199,7 +199,7 @@ function Rules(): React.JSX.Element {
               avatar={<Initial text={f.name.replace(/^\d+-/, '')} />}
               title={f.name}
               subtitle={cardTitle(f.name, f.text)}
-              right={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={busy?.name === f.name ? busy.tool : null} />}
+              right={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={pending.of(f.name)} />}
               active={f.name === selected}
               onClick={() => setSelected(f.name)}
             />
@@ -226,6 +226,12 @@ function Rules(): React.JSX.Element {
       >
         {current && (
           <Stack gap="lg">
+            <ToolToggleRow
+              pills={pillsOf(current.name)}
+              onToggle={(tool) => void toggle(current.name, tool, !enabled(current.name, tool))}
+              busy={pending.of(current.name)}
+              testId="rule-detail-tools"
+            />
             <Group gap="xs" align="flex-end">
               <TextInput
                 label={t('common.name')}

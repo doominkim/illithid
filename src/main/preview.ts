@@ -63,6 +63,9 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     // opencode.json instructions: which rules enter or leave (the file row alone does not say)
     const c = p.targets.find((x) => x.id === 'opencodeRules' && x.path === abs && x.changed && !x.error)
     if (c) items.push(...instructionDiff(home, c.before, c.after, f.path))
+    // MCP servers entering, changing or leaving the file (names only)
+    for (const m of p.targets.filter((x) => x.path === abs && x.changed && !x.error && x.servers?.length))
+      for (const s of m.servers!) items.push({ tool: f.tool, kind: 'mcp', action: s.action, name: s.name, path: s.name, parent: f.path })
   }
 
   // Rules, skills, agents. An imported original moved aside next to a copy of the same item reads as one "replace"

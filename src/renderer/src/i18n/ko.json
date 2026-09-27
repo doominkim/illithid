@@ -209,7 +209,8 @@
   "detail": {
     "source": "원본",
     "edit": "편집",
-    "fields": "필드"
+    "fields": "필드",
+    "tools": "툴"
   },
   "editor": {
     "lines": "{{n}}줄",
@@ -410,7 +411,8 @@
       "skill": "스킬",
       "agent": "에이전트",
       "config": "설정 파일",
-      "instruction": "instructions 항목"
+      "instruction": "instructions 항목",
+      "mcp": "MCP 서버"
     },
     "libraryDirect": "라이브러리를 직접 읽음",
     "planChanged": "열어 둔 사이에 변경 사항이 바뀌었습니다. 다시 확인한 뒤 반영하세요."

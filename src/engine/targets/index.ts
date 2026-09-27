@@ -1,6 +1,6 @@
 import { parse as parseToml } from 'smol-toml'
 import type { ToolId } from '../toolIds'
-import type { TargetDef, TargetId } from '../types'
+import type { ServerChange, TargetDef, TargetId } from '../types'
 import { claudeMcp } from './claudeMcp'
 import { claudePermissions } from './claudePermissions'
 import { codexAgents } from './codexAgents'
@@ -80,6 +80,32 @@ export function parseServerTable(id: TargetId, text: string): Record<string, unk
   } catch {
     return null
   }
+}
+
+/** JSON with object keys sorted — a server whose keys were only reordered is not an update */
+function stableJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === 'object' && !Array.isArray(x)
+      ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)))
+      : x
+  )
+}
+
+/**
+ * Server-level changes between two versions of an MCP target file (names only — never definitions, which can hold resolved
+ * secrets). Empty for non-MCP targets or when either side can't be parsed
+ */
+export function serverChanges(id: TargetId, before: string, after: string): ServerChange[] {
+  const b = parseServerTable(id, before)
+  const a = parseServerTable(id, after)
+  // Unparseable side: no server rows at all (the file row still shows; guessing from half a diff would mislead)
+  if (!b || !a) return []
+  const out: ServerChange[] = []
+  for (const n of Object.keys(a).sort())
+    if (!(n in b)) out.push({ name: n, action: 'add' })
+    else if (stableJson(a[n]) !== stableJson(b[n])) out.push({ name: n, action: 'update' })
+  for (const n of Object.keys(b).sort()) if (!(n in a)) out.push({ name: n, action: 'remove' })
+  return out
 }
 
 /** MCP target file text -> server name -> definition (in tool syntax). Empty object on parse failure or non-MCP target */

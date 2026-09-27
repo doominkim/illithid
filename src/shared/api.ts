@@ -574,13 +574,13 @@ export type ApplyPreviewAction = 'add' | 'update' | 'replace' | 'retire' | 'remo
 
 export interface ApplyPreviewItem {
   tool: ToolId
-  kind: 'rule' | 'skill' | 'agent' | 'config'
+  kind: 'rule' | 'skill' | 'agent' | 'config' | 'mcp'
   action: ApplyPreviewAction
   /** Item name (config: the file) */
   name: string
   /** Display path (~) */
   path: string
-  /** Detail of a config file row (its path): e.g. a rule entering or leaving opencode.json — not counted separately */
+  /** Detail of a config file row (its path): a rule entering or leaving opencode.json, an MCP server in a tool config — not counted separately */
   parent?: string
 }
 

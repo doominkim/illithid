@@ -209,7 +209,8 @@
   "detail": {
     "source": "ソース",
     "edit": "編集",
-    "fields": "フィールド"
+    "fields": "フィールド",
+    "tools": "ツール"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -410,7 +411,8 @@
       "skill": "スキル",
       "agent": "エージェント",
       "config": "設定ファイル",
-      "instruction": "instructions 項目"
+      "instruction": "instructions 項目",
+      "mcp": "MCP サーバー"
     },
     "libraryDirect": "ライブラリを直接読み込み",
     "planChanged": "表示後に変更内容が更新されました。もう一度確認してから反映してください。"

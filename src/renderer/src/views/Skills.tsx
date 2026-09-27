@@ -15,12 +15,14 @@ import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
+import { ToolToggleRow } from '../components/ToolToggleRow'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { dotOfPills, pillFromCellState, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS, type PillMap } from '../lib/tools'
+import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
 
@@ -40,7 +42,7 @@ function Skills(): React.JSX.Element {
   const [importOpen, setImportOpen] = useState(false)
   const [view, setView] = useState<ViewMode>('grid')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
-  const [busy, setBusy] = useState<{ name: string; tool: ToolId } | null>(null)
+  const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -79,9 +81,7 @@ function Skills(): React.JSX.Element {
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
     if (!TOGGLE_TOOLS.includes(tool)) return
-    setBusy({ name, tool })
-    await runWrite(window.api.toggle('skills', name, tool, on), { success: t('toggles.saved') })
-    setBusy(null)
+    await pending.run(name, tool, () => runWrite(window.api.toggle('skills', name, tool, on), { success: t('toggles.saved') }))
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
@@ -161,7 +161,7 @@ function Skills(): React.JSX.Element {
               switchChecked={TOGGLE_TOOLS.every((tool) => enabled(r.name, tool))}
               switchIndeterminate={TOGGLE_TOOLS.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
-              footerRight={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={busy?.name === r.name ? busy.tool : null} />}
+              footerRight={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
               selected={r.name === selected}
               onClick={() => setSelected(r.name)}
             />
@@ -175,7 +175,7 @@ function Skills(): React.JSX.Element {
               avatar={<Initial text={r.name} />}
               title={r.name}
               subtitle={r.description}
-              right={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={busy?.name === r.name ? busy.tool : null} />}
+              right={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
               active={r.name === selected}
               onClick={() => setSelected(r.name)}
             />
@@ -200,16 +200,25 @@ function Skills(): React.JSX.Element {
         }
       >
         {current && (
-          <SkillEditor
-            key={current.name}
-            name={current.name}
-            onSaved={reload}
-            onRenamed={(to) => {
-              setRenamed({ from: current.name, to })
-              setSelected(to)
-              reload()
-            }}
-          />
+          <Stack gap="lg">
+            <ToolToggleRow
+              pills={current.pills}
+              tools={TOGGLE_TOOLS}
+              onToggle={pillToggle(current)}
+              busy={pending.of(current.name)}
+              testId="skill-detail-tools"
+            />
+            <SkillEditor
+              key={current.name}
+              name={current.name}
+              onSaved={reload}
+              onRenamed={(to) => {
+                setRenamed({ from: current.name, to })
+                setSelected(to)
+                reload()
+              }}
+            />
+          </Stack>
         )}
       </DetailSheet>
 

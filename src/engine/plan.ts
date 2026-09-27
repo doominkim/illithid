@@ -6,7 +6,7 @@ import { activePending } from './pendingRetire'
 import { defaultSecretBackend, memoSecretBackend, type SecretBackend } from './secrets'
 import { readSources } from './sources'
 import { readState } from './state'
-import { ALL_TARGETS, TARGETS } from './targets'
+import { ALL_TARGETS, MCP_TARGET_TOOL, serverChanges, TARGETS } from './targets'
 import { sha256 } from './text'
 import {
   TargetError,
@@ -114,6 +114,10 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
       afterRegionHash: regionHash(t, after, sources, ctx)
     }
     if (owned) change.owned = owned
+    if (change.changed && MCP_TARGET_TOOL[t.id]) {
+      const servers = serverChanges(t.id, before, after)
+      if (servers.length) change.servers = servers
+    }
     if (retired?.length) change.retired = retired
     if (importedChanged?.length) change.importedChanged = importedChanged
     if (serverErrors && Object.keys(serverErrors).length) change.serverErrors = serverErrors

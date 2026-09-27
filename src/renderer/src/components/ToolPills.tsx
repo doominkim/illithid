@@ -8,7 +8,8 @@ interface Props {
   pills: PillMap
   /** Toggle callback. Display-only if omitted (always display-only until M7c) */
   onToggle?: (tool: ToolId) => void
-  busy?: ToolId | null
+  /** Tools with a save in flight (spinner). While any is saving, all pills of the row are disabled */
+  busy?: ToolId | readonly ToolId[] | null
   size?: number
   /** Whether to show not-applicable (na) tools dimmed */
   showNa?: boolean
@@ -17,13 +18,15 @@ interface Props {
 /** Tool pill row: on opaque / off 40% / problem amber ring / pending dot. Tools not in use on this device are not shown */
 export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: Props): React.JSX.Element {
   const tools = useToolsInUse()
+  const saving: readonly ToolId[] = busy == null ? [] : typeof busy === 'string' ? [busy] : busy
+  const toggle = saving.length ? undefined : onToggle
   return (
     <Group gap={6} wrap="nowrap">
       {tools.map((tool) => {
         const p = pills[tool]
         if (!p || (p.na && !showNa)) return null
         const icon =
-          busy === tool ? (
+          saving.includes(tool) ? (
             <Loader size={size - 4} color="accent" />
           ) : (
             <ToolIcon tool={tool} size={size} />
@@ -50,9 +53,10 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
         return onToggle ? (
           <UnstyledButton
             key={tool}
+            disabled={!toggle}
             onClick={(e) => {
               e.stopPropagation()
-              onToggle(tool)
+              toggle?.(tool)
             }}
             aria-label={TOOL_NAME[tool]}
             display="inline-flex"

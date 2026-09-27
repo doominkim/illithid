@@ -15,11 +15,13 @@ import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
+import { ToolToggleRow } from '../components/ToolToggleRow'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
 const NEW = '__new__'
@@ -32,7 +34,7 @@ function Mcp(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [view, setView] = useState<ViewMode>('grid')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
-  const [busy, setBusy] = useState<{ name: string; tool: ToolId } | null>(null)
+  const pending = useToggleBusy()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
@@ -52,9 +54,7 @@ function Mcp(): React.JSX.Element {
     ) as PillMap
 
   const toggle = async (s: McpServerView, tool: ToolId): Promise<void> => {
-    setBusy({ name: s.name, tool })
-    await runWrite(window.api.toggle('mcp', s.name, tool, !enabled(s.name, tool)), { success: t('toggles.saved') })
-    setBusy(null)
+    await pending.run(s.name, tool, () => runWrite(window.api.toggle('mcp', s.name, tool, !enabled(s.name, tool)), { success: t('toggles.saved') }))
     reload()
   }
   const toggleAll = async (s: McpServerView, on: boolean): Promise<void> => {
@@ -131,7 +131,7 @@ function Mcp(): React.JSX.Element {
                 switchChecked={TOOLS.every((tool) => enabled(s.name, tool))}
                 switchIndeterminate={TOOLS.some((tool) => enabled(s.name, tool))}
                 onSwitch={(v) => void toggleAll(s, v)}
-                footerRight={<ToolPills pills={p} size={18} onToggle={(tool) => void toggle(s, tool)} busy={busy?.name === s.name ? busy.tool : null} />}
+                footerRight={<ToolPills pills={p} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
                 selected={s.name === selected}
                 onClick={() => setSelected(s.name)}
               />
@@ -147,7 +147,7 @@ function Mcp(): React.JSX.Element {
               title={s.name}
               tags={transportTag(s)}
               subtitle={endpoint(s) || none}
-              right={<ToolPills pills={pillsOf(s)} size={18} onToggle={(tool) => void toggle(s, tool)} busy={busy?.name === s.name ? busy.tool : null} />}
+              right={<ToolPills pills={pillsOf(s)} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
               active={s.name === selected}
               onClick={() => setSelected(s.name)}
             />
@@ -179,6 +179,12 @@ function Mcp(): React.JSX.Element {
       >
         {current && (
           <Stack gap="lg">
+            <ToolToggleRow
+              pills={pillsOf(current)}
+              onToggle={(tool) => void toggle(current, tool)}
+              busy={pending.of(current.name)}
+              testId="mcp-detail-tools"
+            />
             <Tabs defaultValue="fields" variant="pills" keepMounted={false}>
               <Tabs.List>
                 <Tabs.Tab value="fields">{t('detail.fields')}</Tabs.Tab>

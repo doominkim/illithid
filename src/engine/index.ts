@@ -44,6 +44,7 @@ export type {
   Allowlist,
   AllowlistEntry,
   FileChange,
+  ServerChange,
   Sources,
   TargetId,
   LegacyTargetId,
