@@ -9,6 +9,7 @@ import { claudeRulesPaths, planRuleSync, type RuleSyncItem } from './ruleSync'
 import { readRoster, type Roster } from './roster'
 import { skillsReport, type SkillsReport, type ToolSkills } from './skills'
 import { planSkillSync, type SkillSyncItem } from './skillSync'
+import { toolsInUse } from './config'
 import { readState, type StateRead } from './state'
 import { SKILL_OVERRIDE_TARGET_OF } from './targets/skillOverrides'
 import type { Env, FileChange, TargetId } from './types'
@@ -106,6 +107,9 @@ function changeCell(
     return { ...base, state: 'error', detail: sourcesError ?? 'no plan result' }
   }
   const target = c.id
+  if (c.skip === 'nothingToWrite') return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — nothing to write` }
+  if (c.skip === 'toolNotInitialized')
+    return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — run the tool once so it creates it` }
   if (c.error) {
     if (!existsSync(c.path)) return { ...base, target, state: 'error', detail: `${c.label} missing` }
     return { ...base, target, state: 'error', detail: `${c.label}: ${c.error}` }
@@ -134,6 +138,8 @@ function syncActionState(action: string, reason: string | undefined): CellState 
     case 'replaceLink':
     case 'deleteCandidate':
     case 'migrateLegacyDir':
+    case 'replaceImported':
+    case 'retireImported':
       return 'needsSync'
     case 'skip':
       return reason === 'sourceUnreadable' ? 'error' : null
@@ -259,9 +265,14 @@ export function statusReport(
   const models = readModels(home)
   const roster = readRoster(home)
   const cells: StatusCell[] = []
+  const inUse = toolsInUse(home)
 
   for (const resource of RESOURCES) {
     for (const tool of TOOL_IDS) {
+      if (!inUse.includes(tool)) {
+        cells.push({ resource, tool, state: 'notApplicable', detail: 'tool not in use' })
+        continue
+      }
       const targetId = TARGET_OF[resource]?.[tool]
       const overrideOf = (cell: StatusCell): StatusCell =>
         resource === 'skills'

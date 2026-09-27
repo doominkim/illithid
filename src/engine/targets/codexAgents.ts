@@ -56,6 +56,7 @@ export function buildCodexAgentsBody(sources: Sources): string {
 /** 1. ~/.codex/AGENTS.md — rules/*.md + memory/MEMORY.md concat (inside the markers only) */
 export const codexAgents: TargetDef = {
   id: 'codexAgents',
+  tool: 'codex',
   rel: '.codex/AGENTS.md',
   optional: true,
   region: (text) => blockBodyMulti(text, ALL_MD_MARKERS),

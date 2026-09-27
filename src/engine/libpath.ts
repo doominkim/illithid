@@ -20,6 +20,8 @@ export type LibraryErrorCode =
   | 'invalidSchema'
   | 'configError'
   | 'libraryMissing'
+  /** The tool is not in use on this device (config.toolsInUse) — its files are not written */
+  | 'toolNotInUse'
 
 export class LibraryError extends Error {
   constructor(

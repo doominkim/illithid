@@ -40,8 +40,14 @@ function ownedSet(sources: Sources, ctx: BuildContext | undefined): Set<string> 
  */
 export const opencodeSkills: TargetDef = {
   id: 'opencodeSkills',
+  tool: 'opencode',
   rel: '.config/opencode/opencode.json',
+  // opencode.json is plain user config (OpenCode runs without it) — created with only our keys when there is content, OpenCode is
+  // explicitly in use and no opencode.jsonc is there (creating a second config file would change how OpenCode merges its settings)
   optional: false,
+  createIfInUse: true,
+  alternates: ['.config/opencode/opencode.jsonc'],
+  seed: '{}\n',
   region: (text, sources, ctx) => {
     let obj: Record<string, unknown>
     try {

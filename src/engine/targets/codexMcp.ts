@@ -174,6 +174,7 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** 5. ~/.codex/config.toml — replace only mcp.json servers in the marker block */
 export const codexMcp: TargetDef = {
   id: 'codexMcp',
+  tool: 'codex',
   rel: '.codex/config.toml',
   optional: true,
   region: (text) => blockBodyMulti(text, ALL_TOML_MCP_MARKERS),

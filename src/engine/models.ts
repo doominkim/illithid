@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
 import { parse as parseToml, TomlError } from 'smol-toml'
 import { tools, type ToolId } from './agents'
+import { toolInUse } from './config'
 import { sha256 } from './text'
 import { atomicWrite, backup, ConcurrentChangeError } from './write'
 
@@ -142,6 +143,7 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   ) {
     throw new SetModelError('value must be a 1–200 character string without control characters')
   }
+  if (!toolInUse(home, tool)) throw new SetModelError(`${tool} is not in use on this device (settings → tools in use)`)
   const t = tools(home).find((x) => x.id === tool)!
   const { path, format } = t.models
   if (!existsSync(path)) throw new SetModelError('config file not found')

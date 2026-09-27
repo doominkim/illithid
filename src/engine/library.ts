@@ -32,6 +32,7 @@ import {
   type SecretBackend
 } from './secrets'
 import { MANIFEST_FILE, readManifest, renameManifestEntry } from './manifest'
+import { renamePendingRetire } from './pendingRetire'
 import { libraryPaths, MCP_ORDER_FILE, mcpServerNamesInDir, readMcpOrder } from './sources'
 import type { Allowlist, McpServer } from './types'
 import { appTmpName, atomicWrite } from './write'
@@ -169,6 +170,7 @@ export function renameRule(home: string, from: string, to: string): { name: stri
   renameSync(realSrc, realDst)
   try {
     renameManifestEntry(home, 'rules', from, next)
+    renamePendingRetire(home, 'rule', from, next)
   } catch (e) {
     try {
       renameSync(realDst, realSrc)
@@ -569,6 +571,7 @@ export function renameSkill(home: string, from: string, to: string): { name: str
   try {
     if (newText !== null && newText !== oldText) writeLibFile(home, join(dst, 'SKILL.md'), newText)
     renameManifestEntry(home, 'skills', from, to)
+    renamePendingRetire(home, 'skill', from, to)
   } catch (e) {
     try {
       if (oldText !== null) writeLibFile(home, join(dst, 'SKILL.md'), oldText)
@@ -774,6 +777,7 @@ export function renameAgent(home: string, from: string, to: string): { name: str
   try {
     if (newText !== oldText) writeLibFile(home, dst, newText)
     renameManifestEntry(home, 'agents', from, to)
+    renamePendingRetire(home, 'agent', from, to)
   } catch (e) {
     try {
       writeLibFile(home, dst, oldText)

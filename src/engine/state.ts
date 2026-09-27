@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ToolId } from './agents'
 import { appConfigDir } from './config'
+import type { PendingRetire } from './pendingRetire'
 import type { TargetId } from './types'
 import { atomicWrite } from './write'
 
@@ -44,6 +45,8 @@ export interface AppState {
   rules?: Record<string, RuleCopyEntry>
   /** App-owned agent files per tool (library name -> record, hash = render output). Files not listed here are user-owned */
   agents?: Partial<Record<ToolId, Record<string, RuleCopyEntry>>>
+  /** Imported tool-side originals the next approved sync replaces with the app copy (pendingRetire.ts) */
+  pendingRetire?: PendingRetire[]
 }
 
 export interface StateRead {
@@ -123,6 +126,30 @@ export function readState(home: string): StateRead {
     }
     agents[tool as ToolId] = m
   }
+  const pendingRetire: PendingRetire[] = []
+  if (Array.isArray(o.pendingRetire)) {
+    for (const v of o.pendingRetire as unknown[]) {
+      const e = v as Record<string, unknown> | null
+      if (
+        e &&
+        ['rule', 'skill', 'agent', 'instruction'].includes(e.kind as string) &&
+        ['claude', 'codex', 'opencode'].includes(e.tool as string) &&
+        typeof e.name === 'string' &&
+        typeof e.path === 'string' &&
+        typeof e.hash === 'string' &&
+        typeof e.at === 'string'
+      )
+        pendingRetire.push({
+          kind: e.kind,
+          tool: e.tool,
+          name: e.name,
+          path: e.path,
+          hash: e.hash,
+          at: e.at,
+          ...(typeof e.workspace === 'string' ? { workspace: e.workspace } : {})
+        } as PendingRetire)
+    }
+  }
   return {
     path,
     exists: true,
@@ -132,7 +159,8 @@ export function readState(home: string): StateRead {
       ...(Object.keys(skills).length ? { skills } : {}),
       ...(Object.keys(owned).length ? { owned } : {}),
       ...(Object.keys(rules).length ? { rules } : {}),
-      ...(Object.keys(agents).length ? { agents } : {})
+      ...(Object.keys(agents).length ? { agents } : {}),
+      ...(pendingRetire.length ? { pendingRetire } : {})
     }
   }
 }

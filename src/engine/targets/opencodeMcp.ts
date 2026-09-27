@@ -64,8 +64,14 @@ export function buildOpencodeMcp(
 /** 6. ~/.config/opencode/opencode.json — replaces only mcp (other keys untouched) */
 export const opencodeMcp: TargetDef = {
   id: 'opencodeMcp',
+  tool: 'opencode',
   rel: '.config/opencode/opencode.json',
+  // opencode.json is plain user config (OpenCode runs without it) — created with only our keys when there is content, OpenCode is
+  // explicitly in use and no opencode.jsonc is there (creating a second config file would change how OpenCode merges its settings)
   optional: false,
+  createIfInUse: true,
+  alternates: ['.config/opencode/opencode.jsonc'],
+  seed: '{}\n',
   // Servers outside the SSOT (e.g. local figma) are not subject to drift
   region: (text, sources, ctx) =>
     jsonSubKeysRegion(text, 'mcp', ownedServerNames(sources, 'opencode', ctx, 'opencodeMcp')),

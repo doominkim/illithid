@@ -12,7 +12,19 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { canonicalPaths, tools, type ToolId } from './agents'
-import { appConfigDir } from './config'
+import { appConfigDir, toolInUse, toolsInUse } from './config'
+import {
+  activePending,
+  dropPending,
+  importedBackupDest,
+  importStamp,
+  moveToImportedBackup,
+  pendingOf,
+  retireHash,
+  retireSkipReason,
+  retireOriginal
+} from './pendingRetire'
+import { plan } from './plan'
 import { deliverDir, deliveredShape, shapeMatches } from './deliver'
 import { isEnabled, MANIFEST_FILE, readManifest } from './manifest'
 import { canonicalSkills, dirContentHash } from './skills'
@@ -30,10 +42,15 @@ import { isAppTmpName } from './write'
  * - inSync          app-written copy matches the canonical dir
  * - deleteCandidate app copy whose source is gone or disabled for that tool (reason=disabled), or a disabled skill's
  *                   symlink to the canonical dir (currentLink) → shown as a delete candidate only (not executed)
+ * - replaceImported real directory the app never wrote that is an imported original (state.pendingRetire) still matching its import hash
+ *                   → moved to backups/imported and replaced by the app copy in one step (changed since import: skip, reason=importedChanged)
+ * - retireImported  imported OpenCode original (`~/.config/opencode/{skill,skills}/<name>`) → moved to backups/imported once
+ *                   opencode.json skills.paths points at the library (OpenCode reads the library copy from then on)
  * Hidden entries, and entries absent from the canonical set that the app never wrote, are left out of the plan.
+ * Tools not in use (config.toolsInUse) are left out entirely.
  */
 export type SkillSyncAction =
-  'copy' | 'replaceLink' | 'update' | 'skip' | 'inSync' | 'deleteCandidate'
+  'copy' | 'replaceLink' | 'update' | 'skip' | 'inSync' | 'deleteCandidate' | 'replaceImported' | 'retireImported'
 
 export interface SkillSyncItem {
   tool: ToolId
@@ -85,10 +102,17 @@ export interface SkillSyncOptions {
   force?: boolean
 }
 
+/** Tool skill directories the app copies into (Claude, Codex) — tools in use only */
 function symlinkDirs(home: string): Map<ToolId, string> {
   const m = new Map<ToolId, string>()
-  for (const t of tools(home)) if (t.skills.kind === 'symlinkDir') m.set(t.id, t.skills.dir)
+  const inUse = toolsInUse(home)
+  for (const t of tools(home)) if (t.skills.kind === 'symlinkDir' && inUse.includes(t.id)) m.set(t.id, t.skills.dir)
   return m
+}
+
+/** OpenCode's own skill folders (imported originals there are retired, not replaced) */
+function opencodeSkillDirs(home: string): string[] {
+  return [join(home, '.config/opencode/skill'), join(home, '.config/opencode/skills')]
 }
 
 /**
@@ -113,7 +137,8 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
   const canonDir = canonicalPaths(home).skills
   const canon = canonicalSkills(home)
   const canonSet = new Set(canon)
-  const managedAll = readState(home).state.skills ?? {}
+  const appState = readState(home).state
+  const managedAll = appState.skills ?? {}
   const mf = readManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const items: SkillSyncItem[] = []
@@ -147,6 +172,19 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
         }
         continue
       }
+      // Imported originals elsewhere in this tool's skills folder (e.g. the old name after a library rename) — retired once the copy is in place
+      for (const p of pendingOf(home, appState, 'skill', tool, name)) {
+        if (p.path === path) continue
+        const currentHash = retireHash(p.path)
+        if (currentHash === null) continue
+        items.push({
+          ...base,
+          path: p.path,
+          action: currentHash === p.hash ? 'retireImported' : 'skip',
+          currentHash,
+          ...(currentHash === p.hash ? {} : { reason: retireSkipReason(currentHash) })
+        })
+      }
       let sourceHash: string
       try {
         sourceHash = dirContentHash(source)
@@ -165,7 +203,16 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
       } else {
         const currentHash = dirContentHash(path)
         const rec = managed[name]
-        if (!rec) {
+        const imported = rec ? undefined : pendingOf(home, appState, 'skill', tool, name).find((p) => p.path === path)
+        if (imported) {
+          items.push({
+            ...base,
+            action: imported.hash === currentHash ? 'replaceImported' : 'skip',
+            sourceHash,
+            currentHash,
+            ...(imported.hash === currentHash ? {} : { reason: retireSkipReason(currentHash) })
+          })
+        } else if (!rec) {
           items.push({
             ...base,
             action: 'skip',
@@ -208,6 +255,23 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
           currentHash: dirContentHash(path)
         })
       }
+    }
+  }
+  // Imported OpenCode originals (OpenCode reads library skills through skills.paths)
+  if (toolInUse(home, 'opencode')) {
+    for (const p of activePending(home, appState.pendingRetire)) {
+      if (p.kind !== 'skill' || p.tool !== 'opencode' || !canonSet.has(p.name)) continue
+      const currentHash = retireHash(p.path)
+      if (currentHash === null) continue
+      items.push({
+        tool: 'opencode',
+        name: p.name,
+        action: currentHash === p.hash ? 'retireImported' : 'skip',
+        path: p.path,
+        source: join(canonDir, p.name),
+        currentHash,
+        ...(currentHash === p.hash ? {} : { reason: retireSkipReason(currentHash) })
+      })
     }
   }
   return items
@@ -263,8 +327,10 @@ export function applySkillSync(
     writeState(home, state)
   }
   const fresh = planSkillSync(home, env)
+  const ts = importStamp()
 
   for (const it of items) {
+    if (it.action === 'retireImported') continue
     if (it.action === 'skip') {
       out(it, 'skipped', { reason: it.reason ?? 'skip' })
       continue
@@ -285,7 +351,7 @@ export function applySkillSync(
       out(it, 'refused', { reason: 'outOfScope' })
       continue
     }
-    const f = fresh.find((x) => x.tool === it.tool && x.name === it.name)
+    const f = fresh.find((x) => x.tool === it.tool && x.name === it.name && x.path === it.path)
     if (
       !f ||
       f.action !== it.action ||
@@ -342,6 +408,27 @@ export function applySkillSync(
           previousLink: f.currentLink!
         })
         out(it, 'done', { previousLink: f.currentLink! })
+      } else if (f.action === 'replaceImported') {
+        // Imported original: back up to backups/imported and replace in one step (put back if the swap fails)
+        const p = pendingOf(home, state, 'skill', f.tool, f.name).find((x) => x.path === f.path)
+        const cur = lstatOrNull(f.path)
+        if (!p || p.hash !== f.currentHash || !cur?.isDirectory() || cur.isSymbolicLink() || dirContentHash(f.path) !== f.currentHash) {
+          out(it, 'refused', { reason: 'changedSinceCheck' })
+          continue
+        }
+        const bak = importedBackupDest(home, ts, p)
+        const r = deliverDir(f.source, f.path, {
+          expectedHash: f.sourceHash,
+          vacate: () => moveToImportedBackup(f.path, bak),
+          restore: () => moveDir(bak, f.path)
+        })
+        if (!r.ok) {
+          out(it, 'failed', { reason: r.reason === 'hashMismatch' ? 'copyHashMismatch' : r.reason })
+          continue
+        }
+        dropPending(state, [p])
+        record(f.tool, f.name, { contentHash: f.sourceHash!, at: new Date().toISOString() })
+        out(it, 'done', { backupPath: bak })
       } else {
         // update: move the app-owned real directory to the backup location and replace it
         const cur = lstatOrNull(f.path)
@@ -370,6 +457,60 @@ export function applySkillSync(
       }
     } catch (e) {
       out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+    }
+  }
+  // Imported originals outside the app copy location: OpenCode ones once opencode.json skills.paths points at the library,
+  // Claude/Codex ones once the app copy is in place and recorded
+  const retire = items.filter((it) => it.action === 'retireImported')
+  if (retire.length) {
+    let libraryVisible = false
+    if (retire.some((it) => it.tool === 'opencode')) {
+      try {
+        const c = plan(home, env, ['opencodeSkills'])[0]
+        libraryVisible = !!c && !c.error && !c.changed
+      } catch {
+        libraryVisible = false
+      }
+    }
+    for (const it of retire) {
+      const p = pendingOf(home, state, 'skill', it.tool, it.name).find((x) => x.path === it.path)
+      const toolDir = dirs.get(it.tool)
+      const allowed = it.tool === 'opencode' ? opencodeSkillDirs(home) : toolDir ? [toolDir] : []
+      if (!allowed.includes(dirname(resolve(it.path))) || (toolDir && resolve(it.path) === join(toolDir, it.name))) {
+        out(it, 'refused', { reason: 'outOfScope' })
+        continue
+      }
+      if (!p || p.hash !== it.currentHash) {
+        out(it, 'refused', { reason: 'changedSinceCheck' })
+        continue
+      }
+      let copyReady = false
+      if (it.tool === 'opencode') copyReady = libraryVisible
+      else if (toolDir) {
+        const rec = state.skills![it.tool]?.[it.name]
+        const slot = lstatOrNull(join(toolDir, it.name))
+        try {
+          copyReady = !!rec && !!slot?.isDirectory() && !slot.isSymbolicLink() && dirContentHash(join(toolDir, it.name)) === rec.contentHash
+        } catch {
+          copyReady = false
+        }
+      }
+      if (!copyReady || !canonicalSkills(home).includes(it.name)) {
+        out(it, 'skipped', { reason: 'noAppCopy' })
+        continue
+      }
+      try {
+        const r = retireOriginal(home, p, ts)
+        if (r.status === 'changed' || r.status === 'unreadable') {
+          out(it, 'skipped', { reason: r.status === 'changed' ? 'importedChanged' : 'unreadable' })
+          continue
+        }
+        dropPending(state, [p])
+        writeState(home, state)
+        out(it, r.status === 'moved' ? 'done' : 'unchanged', r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' })
+      } catch (e) {
+        out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+      }
     }
   }
   return results
@@ -407,6 +548,8 @@ export function adoptSkillCopies(home: string, name: string): { adopted: ToolId[
     if (!isEnabled(mf.manifest, 'skills', name, tool)) continue
     if (state.skills![tool]?.[name]) continue
     const path = join(dir, name)
+    // Imported original awaiting replacement (pendingRetire) — the next sync swaps it, it is not the user's
+    if (pendingOf(home, state, 'skill', tool, name).some((p) => p.path === path)) continue
     const cur = lstatOrNull(path)
     if (!cur || !cur.isDirectory() || cur.isSymbolicLink()) continue
     let hash: string

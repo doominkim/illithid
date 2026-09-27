@@ -42,8 +42,12 @@ export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, set
 /** 3. ~/.claude/settings.json — replaces only permissions.allow/deny/ask (other keys untouched) */
 export const claudePermissions: TargetDef = {
   id: 'claudePermissions',
+  tool: 'claude',
   rel: '.claude/settings.json',
+  // settings.json is plain user config — created with only our keys when there is content and Claude is explicitly in use
   optional: false,
+  createIfInUse: true,
+  seed: '{}\n',
   // Other permissions keys (defaultMode, additionalDirectories, etc.) are user-owned and not subject to drift
   region: (text) => jsonSubKeysRegion(text, 'permissions', [...OWNED_PERMISSION_KEYS]),
   build(before, { sources }) {

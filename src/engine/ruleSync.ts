@@ -12,6 +12,8 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { canonicalPaths, tilde } from './agents'
+import { toolInUse } from './config'
+import { dropPending, importStamp, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { libraryPaths } from './sources'
 import { isEnabled, MANIFEST_FILE, readManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
@@ -85,9 +87,13 @@ export function claudeRulesPaths(home: string): {
  *                   → move into the new folder and delete the old one (runs before other items, newest generation first). If non-app-owned entries
  *                   are mixed in, it becomes skip (reason=legacyDirUserFiles) and is left alone.
  *                   When present, other items are planned against post-move content (the old folder if missing from the new one).
+ * - retireImported  imported original `~/.claude/rules/<name>` (state.pendingRetire) still matching its import hash → moved to
+ *                   backups/imported once the app copy is in place, so Claude doesn't read the rule twice. If the original changed
+ *                   since import it becomes skip (reason=importedChanged) and is left alone.
+ * Empty plan when Claude is not in use (config.toolsInUse).
  */
 export type RuleSyncAction =
-  'copy' | 'update' | 'inSync' | 'skip' | 'deleteCandidate' | 'replaceLink' | 'migrateLegacyDir'
+  'copy' | 'update' | 'inSync' | 'skip' | 'deleteCandidate' | 'replaceLink' | 'migrateLegacyDir' | 'retireImported'
 
 export interface RuleSyncItem {
   name: string
@@ -188,11 +194,13 @@ function planLegacyDir(
 /** Plan. Read-only */
 export function planRuleSync(home: string, _env: Env = process.env): RuleSyncItem[] {
   void _env
+  if (!toolInUse(home, 'claude')) return []
   const rulesDir = canonicalPaths(home).rules
   const { dir, legacyLink, legacyDirs } = claudeRulesPaths(home)
   const mf = readManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
-  const managed = readState(home).state.rules ?? {}
+  const appState = readState(home).state
+  const managed = appState.rules ?? {}
   const items: RuleSyncItem[] = []
 
   // Old-name folders: a migration item (runs first) if all app-owned, otherwise skip
@@ -240,6 +248,19 @@ export function planRuleSync(home: string, _env: Env = process.env): RuleSyncIte
   for (const name of [...sources.keys()].sort()) {
     const path = join(dir, name)
     const source = sources.get(name)!
+    // Imported original awaiting retirement (listed before the copy item; runs once the copy is in place)
+    for (const p of pendingOf(home, appState, 'rule', 'claude', name)) {
+      const currentHash = retireHash(p.path)
+      if (currentHash === null) continue
+      items.push({
+        name,
+        action: currentHash === p.hash ? 'retireImported' : 'skip',
+        path: p.path,
+        source: path,
+        currentHash,
+        ...(currentHash === p.hash ? {} : { reason: retireSkipReason(currentHash) })
+      })
+    }
     const sourceHash = sha256(sourceContent(home, name, source))
     const base = { name, path, source, sourceHash }
     const cur = current(name)
@@ -381,7 +402,7 @@ export function applyRuleSync(
   const fresh = planRuleSync(home, env)
 
   for (const it of items) {
-    if (it.action === 'migrateLegacyDir') continue
+    if (it.action === 'migrateLegacyDir' || it.action === 'retireImported') continue
     if (it.action === 'skip') {
       out(it, 'skipped', { reason: it.reason ?? 'skip' })
       continue
@@ -460,6 +481,40 @@ export function applyRuleSync(
     } catch (e) {
       if (e instanceof ConcurrentChangeError) out(it, 'refused', { reason: 'changedSinceCheck' })
       else out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+    }
+  }
+  // Imported originals: moved only after the app copy is in place and recorded (never a moment without the rule)
+  const ts = importStamp()
+  for (const it of items) {
+    if (it.action !== 'retireImported') continue
+    const copy = join(dir, it.name)
+    const rec = state.rules![it.name]
+    const p = pendingOf(home, state, 'rule', 'claude', it.name).find((x) => resolve(x.path) === resolve(it.path))
+    // The original sits directly in ~/.claude/rules (its file name may differ from it.name after a library rename)
+    if (dirname(resolve(it.path)) !== join(home, '.claude/rules') || !it.path.endsWith('.md') || !it.name.endsWith('.md') || it.name.includes('/')) {
+      out(it, 'refused', { reason: 'outOfScope' })
+      continue
+    }
+    if (!p || p.hash !== it.currentHash) {
+      out(it, 'refused', { reason: 'changedSinceCheck' })
+      continue
+    }
+    const copySt = lstatOrNull(copy)
+    if (!rec || !copySt?.isFile() || copySt.isSymbolicLink() || fileHash(copy) !== rec.contentHash) {
+      out(it, 'skipped', { reason: 'noAppCopy' })
+      continue
+    }
+    try {
+      const r = retireOriginal(home, p, ts)
+      if (r.status === 'changed' || r.status === 'unreadable') {
+        out(it, 'skipped', { reason: r.status === 'changed' ? 'importedChanged' : 'unreadable' })
+        continue
+      }
+      dropPending(state, [p])
+      writeState(home, state)
+      out(it, r.status === 'moved' ? 'done' : 'unchanged', r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' })
+    } catch (e) {
+      out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
     }
   }
   return results

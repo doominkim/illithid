@@ -66,6 +66,7 @@ function claudeHits(settings: Json, sources: Sources): string[] {
 /** 10. ~/.claude/settings.json — remove only "off" entries in skillOverrides for skills enabled in the library */
 export const claudeSkillOverrides: TargetDef = {
   id: 'claudeSkillOverrides',
+  tool: 'claude',
   rel: '.claude/settings.json',
   optional: true,
   region: (text, sources) => {
@@ -207,6 +208,7 @@ function withoutSkillConfig(root: Json): Json {
 /** 11. ~/.codex/config.toml — remove only [[skills.config]] enabled = false blocks for skills enabled in the library */
 export const codexSkillConfig: TargetDef = {
   id: 'codexSkillConfig',
+  tool: 'codex',
   rel: '.codex/config.toml',
   optional: true,
   region: (text, sources, ctx) => {
@@ -281,6 +283,7 @@ function opencodeHits(config: Json, src: Sources): string[] {
 /** 12. opencode.json — remove only "deny" entries in permission.skill for library skills (wildcard rules are kept) */
 export const opencodeSkillPermissions: TargetDef = {
   id: 'opencodeSkillPermissions',
+  tool: 'opencode',
   rel: '.config/opencode/opencode.json',
   optional: true,
   region: (text, src) => {

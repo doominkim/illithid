@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readConfig, toolsInUse } from './config'
+import { activePending } from './pendingRetire'
 import { defaultSecretBackend, memoSecretBackend, type SecretBackend } from './secrets'
 import { readSources } from './sources'
 import { readState } from './state'
@@ -36,8 +38,17 @@ export function buildContext(
   env: Env,
   secrets: SecretBackend = defaultSecretBackend()
 ): BuildContext {
-  const owned = readState(home).state.owned
-  return { sources, env, home, secrets: memoSecretBackend(secrets), ...(owned ? { owned } : {}) }
+  const st = readState(home).state
+  const owned = st.owned
+  const pendingRetire = activePending(home, st.pendingRetire)
+  return {
+    sources,
+    env,
+    home,
+    secrets: memoSecretBackend(secrets),
+    ...(owned ? { owned } : {}),
+    ...(pendingRetire.length ? { pendingRetire } : {})
+  }
 }
 
 /** Plan for one target. Also used by apply to recompute when writing the same file in sequence */
@@ -47,23 +58,37 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
   const label = `~/${t.rel}`
   const base = { id: t.id, path, label }
 
-  if (!existsSync(path) && !t.optional) {
-    return {
+  const exists = existsSync(path)
+  const seed = t.seed ?? ''
+  if (!exists) {
+    // Missing file: only matters if the library has something for it (a build from the seed yields an owned region)
+    let has = true
+    try {
+      has = regionHash(t, t.build(seed, ctx).after, sources, ctx) !== null
+    } catch (e) {
+      if (!(e instanceof TargetError)) throw e
+    }
+    const absent = (skip: NonNullable<FileChange['skip']>, notes: string[]): FileChange => ({
       ...base,
       before: '',
       after: '',
       changed: false,
-      notes: [],
-      error: 'file not found',
+      notes,
+      skip,
       beforeRegionHash: null,
       afterRegionHash: null
-    }
+    })
+    if (!has) return absent('nothingToWrite', [`${label} absent — nothing to write`])
+    const alternate = (t.alternates ?? []).find((r) => existsSync(join(home, r)))
+    if (alternate) return absent('toolNotInitialized', [`${label} absent — ~/${alternate} is used instead, not creating a second file`])
+    const creatable = t.optional || (!!t.createIfInUse && !!readConfig(home).config.toolsInUse?.includes(t.tool))
+    if (!creatable) return absent('toolNotInitialized', [`${label} absent — run the tool once so it creates it`])
   }
-  const before = existsSync(path) ? readFileSync(path, 'utf8') : ''
+  const before = exists ? readFileSync(path, 'utf8') : ''
   const beforeRegionHash = regionHash(t, before, sources, ctx)
 
   try {
-    const { after, notes, error, owned, serverErrors } = t.build(before, ctx)
+    const { after, notes, error, owned, serverErrors, retired, importedChanged } = t.build(exists ? before : seed, ctx)
     const change: FileChange = {
       ...base,
       before,
@@ -74,6 +99,8 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
       afterRegionHash: regionHash(t, after, sources, ctx)
     }
     if (owned) change.owned = owned
+    if (retired?.length) change.retired = retired
+    if (importedChanged?.length) change.importedChanged = importedChanged
     if (serverErrors && Object.keys(serverErrors).length) change.serverErrors = serverErrors
     if (error) change.error = error
     return change
@@ -96,6 +123,7 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
  * Library source -> target change plan. Writes no files.
  * Without ids, the 6 default targets (TARGETS); with ids, only those from ALL_TARGETS (in ALL_TARGETS order).
  * Per-target failures (file not found, parse failure, missing env var, change outside the owned scope) are returned as that change's error.
+ * Targets of tools not in use (config.toolsInUse) are left out — apply() re-plans through here, so they are never written either.
  */
 export function plan(
   home: string,
@@ -105,7 +133,8 @@ export function plan(
 ): FileChange[] {
   const sources = readSources(home)
   const ctx = buildContext(home, sources, env, secrets)
-  const targets = ids ? ALL_TARGETS.filter((t) => ids.includes(t.id)) : TARGETS
+  const inUse = toolsInUse(home)
+  const targets = (ids ? ALL_TARGETS.filter((t) => ids.includes(t.id)) : TARGETS).filter((t) => inUse.includes(t.tool))
   return targets.map((t) => planTarget(home, t, ctx))
 }
 

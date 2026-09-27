@@ -1,6 +1,7 @@
 /**
  * Backup retention — computes which old backups under `<home>/.config/illithid` can be cleaned up.
- * - backups/{deleted,imported,workspaces}/<ts>: timestamp folders older than `days`
+ * - backups/{deleted,workspaces}/<ts>: timestamp folders older than `days`
+ * - backups/imported is never a target: it holds the only copy of originals switched over by import (pendingRetire.ts)
  * - backups/skills/<tool>/<name>/<ts>: per skill, timestamp entries beyond the newest SKILL_BACKUP_KEEP
  *   (the current layout keeps a single copy directly in <name>/, which is never a target)
  * - rollback/*.tar: beyond the newest `keepRollback` (by mtime)
@@ -15,7 +16,7 @@ import { appConfigDir, DEFAULT_BACKUP_RETENTION, readConfig, type AppConfig, typ
 export const SKILL_BACKUP_KEEP = 3
 
 /** Folders under backups/ cleaned up by age */
-export const AGED_BACKUP_DIRS = ['deleted', 'imported', 'workspaces'] as const
+export const AGED_BACKUP_DIRS = ['deleted', 'workspaces'] as const
 
 export type CleanupKind = (typeof AGED_BACKUP_DIRS)[number] | 'skills' | 'rollback'
 
@@ -187,7 +188,6 @@ export function isCleanupTarget(home: string, kind: CleanupKind, path: string): 
   const name = basename(p)
   switch (kind) {
     case 'deleted':
-    case 'imported':
     case 'workspaces':
       return rel.length === 3 && rel[0] === 'backups' && rel[1] === kind && parseBackupStamp(name) !== undefined && rootsOk(home, 'backups', kind)
     case 'skills':

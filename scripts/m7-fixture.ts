@@ -10,6 +10,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
+  chmodSync,
   cpSync,
   existsSync,
   lstatSync,
@@ -118,6 +119,14 @@ import {
   withLegacySecrets,
   autoRenamePending,
   renamePendingPaths,
+  readManifest,
+  setModel,
+  SetModelError,
+  detectTools,
+  toolsInUse,
+  ALL_TARGETS,
+  importedChangedOf,
+  keepImportedOriginal,
   type Allowlist,
   type Env,
   type FileChange,
@@ -439,13 +448,16 @@ async function run(): Promise<void> {
     if (!r1.results) bad.push('sync did not run after init')
     else {
       const t = r1.results.targets
-      // 5 required targets without files (claude 2, opencode 3) are error skips, codexRules without permissions is unchanged, other codex files are created
+      // HAR-12: absent claude/opencode files with nothing to write are left alone quietly (unchanged, nothingToWrite) — not error skips.
+      // Before: the 5 required targets (claude 2, opencode 3) were error skips ('file not found') and showed as failures on first run
       const skipped = t.filter((x) => x.status === 'skipped')
-      if (
-        skipped.length !== 5 ||
-        skipped.some((x) => x.reason !== 'error' || !x.detail?.includes('file not found'))
-      )
-        bad.push(`skip ${skipped.map((x) => `${x.id}:${x.reason}`).join(',')}`)
+      const quiet = t.filter((x) => x.reason === 'nothingToWrite').map((x) => x.id).sort()
+      if (skipped.length) bad.push(`skip ${skipped.map((x) => `${x.id}:${x.reason}`).join(',')}`)
+      for (const id of ['claudeMcp', 'claudePermissions', 'opencodeMcp', 'opencodeRules', 'opencodeSkills'] as const)
+        if (!quiet.includes(id)) bad.push(`${id} not nothingToWrite (${quiet.join(',')})`)
+      if (existsSync(join(E, '.claude')) || existsSync(join(E, '.claude.json')) || existsSync(join(E, '.config/opencode')))
+        bad.push('claude/opencode files created for an empty library')
+      if (planAll(E, {}).some((c) => c.error)) bad.push('plan errors for absent files')
       if (t.find((x) => x.id === 'codexRules')?.status !== 'unchanged')
         bad.push('touched codexRules without permissions.json')
       if (existsSync(join(E, '.codex/rules/default.rules'))) bad.push('default.rules created')
@@ -2117,6 +2129,11 @@ async function run(): Promise<void> {
       bad.push('import reference / backend')
     if (leaks(libText())) bad.push('library plaintext after import')
     syncAll(F, env, { allowReal: true, secrets: mem })
+    // HAR-12: imported from Claude → enabled for Claude only; Codex gets it only after it is turned on there
+    if (get(claudeS(), 'zz-imp', 'headers', 'X-Token') !== I1) bad.push('imported server claude literal')
+    if ('zz-imp' in codexS() || 'zz-imp' in ocS()) bad.push('imported server reached tools other than its source')
+    setToggle(F, 'mcp', 'zz-imp', 'codex', true)
+    syncAll(F, env, { allowReal: true, secrets: mem })
     if (get(codexS(), 'zz-imp', 'http_headers', 'X-Token') !== I1) bad.push('imported server codex literal')
 
     // 6) delete → backend entries removed, removed from tools
@@ -2904,13 +2921,17 @@ async function run(): Promise<void> {
     if (rp[0]?.reason !== 'toolOnly') bad.push(`primary apply ${rp[0]?.status}:${rp[0]?.reason}`)
     if (JSON.stringify(listAgents(F)) !== '["zz-imp","zz-same"]') bad.push(`library ${listAgents(F)}`)
     if (read(lib2('zz-imp')) !== imp?.text) bad.push('library file = candidate text')
-    const ib = importedBackup('claude/agents/zz-imp.md')
-    if (!ib || read(ib) !== impText || existsSync(join(cDir, 'zz-imp.md'))) bad.push('conversion backup source bytes')
+    // HAR-12: import leaves the source in place (pendingRetire) — it is backed up and replaced by the next sync
+    if (read(join(cDir, 'zz-imp.md')) !== impText || importedBackup('claude/agents/zz-imp.md')) bad.push('source moved at import')
+    if (!readState(F).state.pendingRetire?.some((p) => p.kind === 'agent' && p.tool === 'claude' && p.name === 'zz-imp')) bad.push('pendingRetire not recorded')
     if (read(join(cDir, 'zz-same.md')) !== sameText || !readState(F).state.agents?.claude?.['zz-same'])
       bad.push('adopt (bytes unchanged, state)')
     const sy = syncAll(F, env, { allowReal: true })
     const act = (n: string, t: string): string => sy.plan.agents.find((x) => x.name === n && x.tool === t)?.action ?? '-'
-    if (act('zz-same', 'claude') !== 'inSync' || act('zz-imp', 'claude') !== 'copy') bad.push(`sync after apply ${act('zz-same', 'claude')}/${act('zz-imp', 'claude')}`)
+    if (act('zz-same', 'claude') !== 'inSync' || act('zz-imp', 'claude') !== 'replaceImported') bad.push(`sync after apply ${act('zz-same', 'claude')}/${act('zz-imp', 'claude')}`)
+    const ib = importedBackup('claude/agents/zz-imp.md')
+    if (!ib || read(ib) !== impText) bad.push('conversion backup source bytes')
+    if (readState(F).state.pendingRetire?.some((p) => p.name === 'zz-imp')) bad.push('pendingRetire left after sync')
     const acts2 = planSyncAll(F, env).agents.filter((x) => x.name === 'zz-imp').map((x) => x.action)
     if (acts2.some((a) => a !== 'inSync')) bad.push(`not inSync after conversion ${acts2}`)
     if (read(join(cDir, 'zz-imp.md')) !== renderAgent('claude', readAgentDoc(F, 'zz-imp'))) bad.push('render result after conversion')
@@ -2922,14 +2943,17 @@ async function run(): Promise<void> {
     const r2s = r2.map(res).join(',')
     if (r2s !== 'zz-cx:imported::codex:::,zz-oc:imported::opencode:::,zz-inline:imported:::::inline,zz-sing:imported::opencode:::')
       bad.push(`codex/opencode apply ${r2s}`)
+    if (read(join(F, '.codex/agents/zz-cx.toml')) !== cxText || read(join(F, '.config/opencode/agent/zz-sing.md')) !== singText)
+      bad.push('codex/opencode source moved at import')
+    if (read(ocPath) !== ocWithAgents) bad.push('opencode.json bytes changed')
+    syncAll(F, env, { allowReal: true })
     const xb = importedBackup('codex/agents/zz-cx.toml')
     const ob = importedBackup('opencode/agents/zz-oc.md')
     const sb = importedBackup('opencode/agent/zz-sing.md')
     if (!xb || read(xb) !== cxText || !ob || read(ob) !== ocAgentText || !sb || read(sb) !== singText)
       bad.push('codex/opencode backup source bytes')
     if (existsSync(join(F, '.config/opencode/agent/zz-sing.md'))) bad.push('agent/ source left')
-    if (read(ocPath) !== ocWithAgents) bad.push('opencode.json bytes changed')
-    syncAll(F, env, { allowReal: true })
+    if (read(ocPath) !== ocWithAgents) bad.push('opencode.json bytes changed by sync')
     const notIn = planSyncAll(F, env).agents.filter((x) => x.action !== 'inSync').map((x) => `${x.tool}/${x.name}:${x.action}`)
     if (notIn.length) bad.push(`sync after conversion ${notIn}`)
     if (!existsSync(agentToolPath(F, 'opencode', 'zz-sing'))) bad.push('import from agent/ not applied to agents/')
@@ -2969,7 +2993,7 @@ async function run(): Promise<void> {
       !bad.length,
       bad.length
         ? bad.join('; ')
-        : 'candidates claude 3, codex 1, opencode 5 (agent/, agents/, inline), app copies pending deletion excluded, warning key names only, model outside catalog kept, 4 tool files converted (source bytes kept in backups/imported, incl. singular agent/) → all inSync after sync, 1 adopted with same bytes, inline opencode.json bytes unchanged + inlineRemains, toolOnly and invalidName refused, remaining rescan candidates = 3 refused, existsInLibrary refused, overwrite trashes'
+        : 'candidates claude 3, codex 1, opencode 5 (agent/, agents/, inline), app copies pending deletion excluded, warning key names only, model outside catalog kept, 4 tool files left in place at import (pendingRetire) and converted by the next sync (source bytes kept in backups/imported, incl. singular agent/) → all inSync after sync, 1 adopted with same bytes, inline opencode.json bytes unchanged + inlineRemains, toolOnly and invalidName refused, remaining rescan candidates = 3 refused, existsInLibrary refused, overwrite trashes'
     )
   }
 
@@ -3609,6 +3633,8 @@ async function run(): Promise<void> {
       if (notImported.length) bad.push(`import failed ${notImported.map((x) => `${x.name}:${x.reason}`).join(',')}`)
       const converted = ir.filter((x) => x.converted?.length).map((x) => `${x.name}→${x.converted!.join('/')}`)
       const adopted = ir.filter((x) => x.adopted?.length).map((x) => `${x.name}→${x.adopted!.join('/')}`)
+      // HAR-12: import itself moves nothing — originals stay until the approved Sync below switches them over
+      if (!existsSync(join(Z, '.claude/rules/my-rule.md')) || existsSync(importedBackupRoot(Z))) bad.push('original moved at import')
       const t0 = tree()
       const r = once()
       const t1 = tree()
@@ -4073,7 +4099,9 @@ async function run(): Promise<void> {
     put(join(cfg, 'backups/deleted', iso(5), 'c.md'))
     put(join(cfg, 'backups/deleted/notes/old.md'))
     symlinkSync(join(outside, iso(90)), join(cfg, 'backups/deleted', iso(60))) // stamped symlink → only the link is a target
+    // imported originals (HAR-12): never targets, whatever their age — they may be the only copy of a user's file
     put(join(cfg, 'backups/imported', iso(45), 'x.md'), 20)
+    put(join(cfg, 'backups/imported', iso(400), 'claude/rules/old.md'), 20)
     put(join(cfg, 'backups/imported', iso(1), 'y.md'))
     put(join(cfg, 'backups/workspaces', iso(100), 'w/rules/r.md'), 30)
     // skills: 5 stamped entries → oldest 2 are targets; single-copy layout (no timestamps) → kept
@@ -4097,7 +4125,6 @@ async function run(): Promise<void> {
       `backups/deleted/${iso(40)}`,
       `backups/deleted/${iso(31)}`,
       `backups/deleted/${iso(60)}`,
-      `backups/imported/${iso(45)}`,
       `backups/workspaces/${iso(100)}`,
       `backups/skills/claude/foo/${iso(31)}`,
       `backups/skills/claude/foo/${iso(41)}`,
@@ -4112,6 +4139,7 @@ async function run(): Promise<void> {
     if (plan.count !== want.length || plan.bytes !== plan.items.reduce((n, i) => n + i.size, 0)) bad.push('count/bytes')
     // overrides: shorter age, fewer rollbacks kept
     const p3 = planBackupCleanup(B, { now, days: 3, keepRollback: 1 })
+    if (p3.items.some((i) => rel(i.path).startsWith('backups/imported'))) bad.push('backups/imported targeted with days=3')
     if (!p3.items.some((i) => rel(i.path) === `backups/deleted/${iso(5)}`) || p3.items.filter((i) => i.kind === 'rollback').length !== 4)
       bad.push('days/keepRollback override')
     // config defaults and validation
@@ -4127,7 +4155,9 @@ async function run(): Promise<void> {
       ['deleted', join(cfg, 'backups/deleted/notes')],
       ['rollback', join(cfg, 'state.json')],
       ['skills', join(cfg, 'backups/skills/codex/bar')],
-      ['workspaces', join(cfg, 'backups/deleted', iso(40))]
+      ['workspaces', join(cfg, 'backups/deleted', iso(40))],
+      ['deleted', join(cfg, 'backups/imported', iso(45))],
+      ['workspaces', join(cfg, 'backups/imported', iso(400))]
     ]
     for (const [k, p] of forged) if (isCleanupTarget(B, k, p)) bad.push(`forged target accepted ${p.replace(B, '')}`)
 
@@ -4147,7 +4177,7 @@ async function run(): Promise<void> {
     if (plan.items.some((i) => existsSync(i.path))) bad.push('target still present')
     if (readdirSync(trash).length !== plan.count) bad.push('trash count')
     if (!existsSync(join(outside, iso(90), 'keep.txt')) || !existsSync(join(outside, 'keep.txt'))) bad.push('outside content touched')
-    for (const k of [`backups/deleted/${iso(5)}`, 'backups/deleted/notes', `backups/imported/${iso(1)}`, 'backups/skills/codex/bar/SKILL.md', `backups/agents/claude/${iso(200)}`, `rollback/${tars[4]}`, `rollback/${tars[2]}`, 'rollback/notes.txt'])
+    for (const k of [`backups/deleted/${iso(5)}`, 'backups/deleted/notes', `backups/imported/${iso(1)}`, `backups/imported/${iso(45)}/x.md`, `backups/imported/${iso(400)}/claude/rules/old.md`, 'backups/skills/codex/bar/SKILL.md', `backups/agents/claude/${iso(200)}`, `rollback/${tars[4]}`, `rollback/${tars[2]}`, 'rollback/notes.txt'])
       if (!existsSync(join(cfg, k))) bad.push(`kept entry gone: ${k}`)
     if (planBackupCleanup(B, { now }).count) bad.push('second plan not empty')
     // missing item → failed, mover not called
@@ -4162,9 +4192,9 @@ async function run(): Promise<void> {
     if (planBackupCleanup(L, { now }).count) bad.push('symlinked root scanned')
 
     check(
-      'ad. backup retention — age/count rules, newest kept, forged/escaping targets refused, symlinked root skipped, injected mover',
+      'ad. backup retention — age/count rules, newest kept, backups/imported never targeted, forged/escaping targets refused, symlinked root skipped, injected mover',
       !bad.length,
-      bad.length ? bad.join('; ') : `${plan.count} targets (${plan.bytes} B) moved, ${forged.length} forged refused, 8 kept entries intact, re-plan 0`
+      bad.length ? bad.join('; ') : `${plan.count} targets (${plan.bytes} B) moved, ${forged.length} forged refused, 10 kept entries intact (incl. 3 backups/imported), re-plan 0`
     )
   }
 
@@ -4278,6 +4308,476 @@ async function run(): Promise<void> {
       !bad.length,
       bad.length ? bad.join('; ') : `${r1.indexed} docs indexed, 16 excluded strings 0 hits, re-run changes 0 and file hash identical, edit 1, delete 1, oversize dropped`
     )
+  }
+
+  // ---- af. HAR-12 safe first run — non-destructive import, pendingRetire applied by the approved Sync, hash mismatch, toolsInUse, source-only toggles
+  {
+    const envH: Env = { PATH: '' }
+    const memH = memorySecretBackend()
+    const harHome = (prefix: string, files: Record<string, string>, toolsInUse?: ('claude' | 'codex' | 'opencode')[]): string => {
+      const H = makeFixture(prefix)
+      unlinkSync(join(H, '.agents'))
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
+      initLibrary(H)
+      return H
+    }
+    const snap = (H: string, rels: string[]): string =>
+      rels
+        .map((r) => {
+          const p = join(H, r)
+          if (!existsSync(p)) return `${r}:absent`
+          return `${r}:${readdirSync(p, { recursive: true }).map(String).sort().map((n) => (statSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : n)).join(',')}`
+        })
+        .join('|')
+    const importedFile = (H: string, rel: string): string | null => {
+      const root = importedBackupRoot(H)
+      if (!existsSync(root)) return null
+      const hit = readdirSync(root).sort().reverse().map((ts) => join(root, ts, rel)).find((p) => existsSync(p))
+      return hit ? read(hit) : null
+    }
+    const RULE = '# Team style\n\n- Use tabs.\n'
+    const SKILL = '---\nname: pr-check\ndescription: Check a PR\n---\n\nCheck it.\n'
+    const AGENT = '---\nname: helper\ndescription: Helps\nmodel: haiku\ntools: Read\n---\n\nHelp.\n'
+    const OC_RULE = '# OpenCode style\n\n- Short.\n'
+    const OC_SKILL = '---\nname: oc-skill\ndescription: OpenCode skill\n---\n\nOC.\n'
+    const DIFF_SKILL = '---\nname: diff-skill\ndescription: User version\n---\n\nMine.\n'
+
+    // af1. repro: import with automatic apply off → originals untouched; approved Sync → app copy in place, original in backups/imported
+    {
+      const bad: string[] = []
+      const H = makeFixture('illithid-m7-H1-')
+      unlinkSync(join(H, '.agents'))
+      const ocRule = join(H, 'notes/oc-style.md')
+      const files: Record<string, string> = {
+        '.claude/rules/team-style.md': RULE,
+        '.claude/skills/pr-check/SKILL.md': SKILL,
+        '.claude/agents/helper.md': AGENT,
+        '.claude/settings.json': '{}\n',
+        '.claude.json': JSON.stringify({ mcpServers: { 'h-srv': { type: 'stdio', command: 'echo', args: ['hi'] } } }, null, 2) + '\n',
+        '.config/opencode/opencode.json': JSON.stringify({ $schema: 'https://opencode.ai/config.json', instructions: [ocRule] }, null, 2) + '\n',
+        '.config/opencode/skills/oc-skill/SKILL.md': OC_SKILL,
+        'notes/oc-style.md': OC_RULE
+      }
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      initLibrary(H)
+      const toolRels = ['.claude', '.config/opencode', '.codex', 'notes']
+      const t0 = snap(H, toolRels)
+      const pc = planImport(H, 'tool:claude')
+      const sels: ImportSelection[] = [...pc.rules, ...pc.skills, ...pc.agents, ...pc.mcp]
+        .filter((c) => c.portability !== 'toolOnly')
+        .map((c) => ({ kind: c.kind, name: c.name }))
+      const ir = [
+        ...applyImport(H, sels, 'tool:claude', { secrets: memH }),
+        ...applyImport(H, [{ kind: 'rule', name: 'oc-style.md' }, { kind: 'skill', name: 'oc-skill' }], 'tool:opencode', { secrets: memH })
+      ]
+      const irs = ir.map((x) => `${x.kind}:${x.name}:${x.status}${x.converted ? `:${x.converted.join('+')}` : ''}${x.adopted ? `:adopted=${x.adopted.join('+')}` : ''}`).join(',')
+      if (ir.some((x) => x.status !== 'imported' || x.userOwned?.length)) bad.push(`import ${irs}`)
+      if (snap(H, toolRels) !== t0) bad.push('import changed tool files')
+      if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created at import')
+      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
+      if (pend !== 'agent:claude:helper,instruction:opencode:oc-style.md,rule:claude:team-style.md,skill:opencode:oc-skill') bad.push(`pendingRetire ${pend}`)
+      // a Claude skill folder that differs from its library copy (recorded like import does) → replaced in one step with a backup
+      createSkill(H, 'diff-skill', 'Library version')
+      mkdirSync(join(H, '.claude/skills/diff-skill'), { recursive: true })
+      writeFileSync(join(H, '.claude/skills/diff-skill/SKILL.md'), DIFF_SKILL)
+      const stH = readState(H).state
+      writeState(H, {
+        ...stH,
+        pendingRetire: [
+          ...(stH.pendingRetire ?? []),
+          { kind: 'skill', tool: 'claude', name: 'diff-skill', path: join(H, '.claude/skills/diff-skill'), hash: dirContentHash(join(H, '.claude/skills/diff-skill')), at: new Date().toISOString() }
+        ]
+      })
+      setToggle(H, 'skills', 'diff-skill', 'codex', false)
+      const t0b = snap(H, toolRels)
+      // (d) toggles: each item on only for its source tool
+      const mf = readManifest(H).manifest
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      const wantToggles: [string, string][] = [
+        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false}'],
+        [tg('skills', 'pr-check'), '{"codex":false}'],
+        [tg('agents', 'helper'), '{"codex":false,"opencode":false}'],
+        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false}'],
+        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false}'],
+        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false}']
+      ]
+      for (const [got, want] of wantToggles) if (got !== want) bad.push(`toggles ${got} ≠ ${want}`)
+      // automatic apply off (libWrite path): plan only, nothing written — ~/.claude/rules keeps the original
+      const r0 = syncAll(H, envH, { allowReal: false, secrets: memH })
+      const acts = [
+        ...r0.plan.rules.filter((x) => x.action !== 'inSync').map((x) => `rule:${x.name}:${x.action}`),
+        ...r0.plan.agents.filter((x) => x.action !== 'inSync').map((x) => `agent:${x.tool}/${x.name}:${x.action}`),
+        ...r0.plan.targets.filter((c) => c.changed).map((c) => `target:${c.id}`)
+      ].sort()
+      acts.push(...r0.plan.skills.filter((x) => x.action !== 'inSync').map((x) => `skill:${x.tool}/${x.name}:${x.action}`))
+      if (r0.results || snap(H, toolRels) !== t0b) bad.push('allowReal=false sync wrote')
+      for (const a of ['rule:team-style.md:retireImported', 'agent:claude/helper:replaceImported', 'target:opencodeRules', 'skill:opencode/oc-skill:retireImported', 'skill:claude/diff-skill:replaceImported'])
+        if (!acts.includes(a)) bad.push(`plan lacks ${a}: ${acts.join(',')}`)
+      const pending0 = pendingSyncCount(H, envH, memH)
+      // approved Sync (sidebar button)
+      const r1 = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      if (!r1.results) bad.push('approved sync refused')
+      const failed = [...(r1.results?.rules ?? []), ...(r1.results?.skills ?? []), ...(r1.results?.agents ?? [])].filter((x) => x.status === 'failed' || x.status === 'refused')
+      if (failed.length) bad.push(`sync failures ${failed.map((x) => `${x.name}:${x.reason}`).join(',')}`)
+      const rulesTop = readdirSync(join(H, '.claude/rules')).sort().join(',')
+      if (rulesTop !== CLAUDE_RULES_DIR) bad.push(`~/.claude/rules = ${rulesTop} (duplicate or missing)`)
+      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== RULE) bad.push('app rule copy')
+      if (importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('rule original not in backups/imported')
+      if (read(join(H, '.claude/agents/helper.md')) !== renderAgent('claude', readAgentDoc(H, 'helper'))) bad.push('agent not replaced by render')
+      if (importedFile(H, 'claude/agents/helper.md') !== AGENT) bad.push('agent original not in backups/imported')
+      if (read(join(H, '.claude/skills/pr-check/SKILL.md')) !== SKILL || !readState(H).state.skills?.claude?.['pr-check']) bad.push('skill adopted copy')
+      const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+      if (ins.includes(ocRule) || !ins.includes(join(libraryRoot(H), 'rules/oc-style.md')) || ins.some((x) => x.endsWith('team-style.md')))
+        bad.push(`opencode instructions ${ins.map((x) => x.replace(H, '~')).join(',')}`)
+      if (read(ocRule) !== OC_RULE) bad.push('instruction original file touched')
+      if (existsSync(join(H, '.config/opencode/skills/oc-skill')) || importedFile(H, 'opencode/skills/oc-skill/SKILL.md') !== OC_SKILL) bad.push('OpenCode skill original not retired')
+      const sp = ((readJson(join(H, '.config/opencode/opencode.json')).skills as Json | undefined)?.paths as string[] | undefined) ?? []
+      if (!sp.includes(libraryPaths(H).skillsDir)) bad.push('OpenCode skills.paths lacks the library')
+      if (read(join(H, '.claude/skills/diff-skill/SKILL.md')) === DIFF_SKILL || importedFile(H, 'claude/skills/diff-skill/SKILL.md') !== DIFF_SKILL)
+        bad.push('differing Claude skill not replaced with backup')
+      if (existsSync(join(H, '.codex/AGENTS.md')) && read(join(H, '.codex/AGENTS.md')).includes('style.md')) bad.push('rule reached Codex')
+      if (existsSync(join(H, '.codex/config.toml')) && 'h-srv' in tomlServers(read(join(H, '.codex/config.toml')))) bad.push('MCP reached Codex')
+      if (existsSync(join(H, '.config/opencode/agents/helper.md')) || existsSync(join(H, '.codex/agents/helper.toml'))) bad.push('agent reached other tools')
+      if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
+      if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending ≠ 0 after Sync')
+      check(
+        'af1. HAR-12 repro — import with automatic apply off leaves ~/.claude/rules intact; approved Sync writes the app copy and only then moves the original to backups/imported (no gap, no duplicate); imported items on for their source tool only',
+        !bad.length,
+        bad.length ? bad.join('; ') : `imported ${irs}; auto-apply-off sync wrote 0 (plan ${acts.join(', ')}); pending ${pending0} → 0; ~/.claude/rules = ${rulesTop}/; originals (rule, agent, OpenCode skill, differing Claude skill) in backups/imported, opencode instructions entry swapped for the library path`
+      )
+    }
+
+    // af2. original edited after import → not moved, reported (importedChanged); nothing dropped
+    {
+      const bad: string[] = []
+      const nPath = (H: string): string => join(H, 'notes/n1.md')
+      const H = harHome('illithid-m7-H2-', {
+        '.claude/rules/r1.md': '# r1\n',
+        '.claude/agents/a1.md': '---\nname: a1\ndescription: A1\ntools: Read\n---\n\nA1.\n',
+        '.claude/settings.json': '{}\n',
+        '.claude.json': '{}\n',
+        'notes/n1.md': '# n1\n'
+      })
+      mkdirSync(join(H, '.config/opencode'), { recursive: true })
+      writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [nPath(H)] })
+      applyImport(H, [{ kind: 'rule', name: 'r1.md' }, { kind: 'agent', name: 'a1' }], 'tool:claude')
+      applyImport(H, [{ kind: 'rule', name: 'n1.md' }], 'tool:opencode')
+      for (const rel of ['.claude/rules/r1.md', '.claude/agents/a1.md', 'notes/n1.md']) writeFileSync(join(H, rel), read(join(H, rel)) + '\nedited later\n')
+      const p = planSyncAll(H, envH, memH)
+      const pr = p.rules.find((x) => x.path === join(H, '.claude/rules/r1.md'))
+      const pa = p.agents.find((x) => x.tool === 'claude' && x.name === 'a1')
+      if (pr?.action !== 'skip' || pr.reason !== 'importedChanged' || pa?.action !== 'skip' || pa.reason !== 'importedChanged')
+        bad.push(`plan ${pr?.action}:${pr?.reason} / ${pa?.action}:${pa?.reason}`)
+      const noteKept = p.targets.find((c) => c.id === 'opencodeRules')?.notes.some((n) => n.includes('original changed since import'))
+      if (!noteKept) bad.push('opencodeRules note for changed instruction original')
+      const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      const rr = r.results?.rules.find((x) => x.path === join(H, '.claude/rules/r1.md'))
+      const ra = r.results?.agents.find((x) => x.tool === 'claude' && x.name === 'a1')
+      if (rr?.status !== 'skipped' || rr.reason !== 'importedChanged' || ra?.status !== 'skipped' || ra.reason !== 'importedChanged')
+        bad.push(`results ${rr?.status}:${rr?.reason} / ${ra?.status}:${ra?.reason}`)
+      if (!read(join(H, '.claude/rules/r1.md')).includes('edited later') || !read(join(H, '.claude/agents/a1.md')).includes('edited later')) bad.push('edited original moved')
+      if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created')
+      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r1.md'))) bad.push('app rule copy missing')
+      const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+      if (!ins.includes(nPath(H))) bad.push('changed instruction entry dropped')
+      if ((readState(H).state.pendingRetire ?? []).length !== 3) bad.push('pendingRetire records dropped')
+      check(
+        'af2. HAR-12 hash mismatch — originals edited after import (rule, agent, OpenCode instruction file) are left in place and reported importedChanged; records kept',
+        !bad.length,
+        bad.length ? bad.join('; ') : 'plan skip(importedChanged) ×2 + opencodeRules note, Sync results skipped(importedChanged), originals and instructions entry kept, backups/imported not created'
+      )
+    }
+
+    // af3. toolsInUse=['claude'] — zero writes and zero folders for Codex and OpenCode; guards; lenient config; detection
+    {
+      const bad: string[] = []
+      const H = harHome('illithid-m7-H3-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+      createRule(H, 'x.md', '# x\n')
+      createSkill(H, 'sk', 'A skill')
+      createAgent(H, 'ag', 'An agent')
+      upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
+      const p = planSyncAll(H, envH, memH)
+      const toolOf = (id: string): string => ALL_TARGETS.find((t) => t.id === id)!.tool
+      if (p.targets.some((c) => toolOf(c.id) !== 'claude')) bad.push(`targets ${p.targets.map((c) => c.id).join(',')}`)
+      if (p.skills.some((x) => x.tool !== 'claude') || p.agents.some((x) => x.tool !== 'claude')) bad.push('skill/agent plan for other tools')
+      const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      if (!r.results) bad.push('sync refused')
+      for (const rel of ['.codex', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'x.md')) || !existsSync(join(H, '.claude/skills/sk/SKILL.md')) || !existsSync(join(H, '.claude/agents/ag.md')))
+        bad.push('Claude copies missing')
+      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {}))) bad.push('Claude MCP missing')
+      const cells = statusReport(H, envH, memH).cells
+      if (cells.some((c) => c.tool !== 'claude' && c.state !== 'notApplicable')) bad.push('status cells for tools not in use')
+      if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending ≠ 0')
+      // guards outside syncAll
+      let modelErr = ''
+      try {
+        setModel(H, 'codex', 'model', 'gpt-x')
+      } catch (e) {
+        modelErr = e instanceof SetModelError ? 'model' : 'other'
+      }
+      if (modelErr !== 'model') bad.push('setModel for a tool not in use not refused')
+      writeConfig(H, { ...readConfig(H).config, toolsInUse: ['codex'] })
+      if (errCode(() => trashClaudeMemory(H, 'x', 'y.md')) !== 'toolNotInUse') bad.push('Claude memory write not refused')
+      if (planRuleSync(H).length) bad.push('Claude rule plan not empty')
+      // lenient config: a bad toolsInUse is ignored alone (= all tools), the rest of config survives
+      writeJson(join(H, APP_CONFIG_DIR, 'config.json'), { version: 1, allowRealApply: true, toolsInUse: ['vim'] })
+      const rc = readConfig(H)
+      if (rc.error || rc.config.allowRealApply !== true || rc.config.toolsInUse !== undefined || toolsInUse(H).join() !== 'claude,codex,opencode')
+        bad.push('bad toolsInUse reset the config')
+      if (!validateConfig({ version: 1, toolsInUse: ['vim'] }).length || validateConfig({ version: 1, toolsInUse: ['codex'] }).length) bad.push('validateConfig toolsInUse')
+      // detection: config folder or executable on PATH (injected PATH, no real lookups)
+      const bin = join(H, 'bin')
+      mkdirSync(bin)
+      writeFileSync(join(bin, 'codex'), '#!/bin/sh\n', { mode: 0o755 })
+      writeFileSync(join(bin, 'opencode'), 'not executable\n', { mode: 0o644 })
+      const det = detectTools(H, { PATH: bin })
+        .map((d) => `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`)
+        .join(',')
+      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false') bad.push(`detectTools ${det}`)
+      check(
+        'af3. HAR-12 toolsInUse=[claude] — Codex/OpenCode get no files or folders, status notApplicable; setModel and Claude memory writes refused for tools not in use; bad toolsInUse ignored alone; detectTools',
+        !bad.length,
+        bad.length ? bad.join('; ') : `targets ${p.targets.map((c) => c.id).join(',')}; ~/.codex and ~/.config/opencode absent after Sync; detect ${det}`
+      )
+    }
+
+    // af5. absent tool files — nothing to write: quiet; content: settings.json / opencode.json created, ~/.claude.json never (toolNotInitialized)
+    {
+      const bad: string[] = []
+      const H = makeFixture('illithid-m7-H5-')
+      unlinkSync(join(H, '.agents'))
+      mkdirSync(join(H, '.claude'))
+      writeConfig(H, { version: 1, toolsInUse: ['claude', 'opencode'] })
+      initLibrary(H)
+      writePermissions(H, { bash: [['ls']], claudeOnly: { allow: ['Read'], deny: [] } })
+      upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
+      createRule(H, 'x.md', '# x\n')
+      const pl = planAll(H, envH, memH)
+      const desc = pl.map((c) => `${c.id}:${c.skip ?? (c.error ? 'error' : c.changed ? 'changed' : 'same')}`).join(',')
+      const byT = (id: string): FileChange | undefined => pl.find((c) => c.id === id)
+      if (pl.some((c) => c.error)) bad.push(`plan errors ${desc}`)
+      if (byT('claudeMcp')?.skip !== 'toolNotInitialized' || byT('claudeMcp')?.changed) bad.push(`claudeMcp ${desc}`)
+      for (const id of ['claudePermissions', 'opencodeMcp', 'opencodeRules']) if (!byT(id)?.changed) bad.push(`${id} not planned (${desc})`)
+      const pend = pendingSyncCount(H, envH, memH)
+      const cell = statusReport(H, envH, memH).cells.find((c) => c.resource === 'mcp' && c.tool === 'claude')
+      if (cell?.state !== 'notApplicable') bad.push(`claude mcp cell ${cell?.state}`)
+      const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      const tr = r.results?.targets ?? []
+      const cm = tr.find((x) => x.id === 'claudeMcp')
+      if (cm?.status !== 'unchanged' || cm.reason !== 'toolNotInitialized') bad.push(`claudeMcp result ${cm?.status}:${cm?.reason}`)
+      if (tr.some((x) => x.status === 'skipped')) bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
+      if (existsSync(join(H, '.claude.json'))) bad.push('~/.claude.json created')
+      const perms = (readJson(join(H, '.claude/settings.json')).permissions as Json | undefined)?.allow as string[] | undefined
+      if (!perms?.includes('Read')) bad.push('settings.json not created with permissions')
+      const oc = readJson(join(H, '.config/opencode/opencode.json'))
+      if (!('m1' in ((oc.mcp as Json | undefined) ?? {})) || !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md')))
+        bad.push('opencode.json not created with mcp + instructions')
+      const pend2 = pendingSyncCount(H, envH, memH)
+      if (pend2 !== 0) bad.push(`pending after Sync ${pend2}`)
+      // once Claude Code has created its state file, the server goes in
+      writeFileSync(join(H, '.claude.json'), '{}\n')
+      syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {}))) bad.push('m1 not written after ~/.claude.json appeared')
+      check(
+        'af5. HAR-12 absent tool files — nothing to write is quiet, settings.json/opencode.json created with our keys only, ~/.claude.json never created (toolNotInitialized, not a failure)',
+        !bad.length,
+        bad.length ? bad.join('; ') : `plan ${desc}; pending ${pend} → ${pend2}; claudeMcp unchanged(toolNotInitialized) until ~/.claude.json exists`
+      )
+    }
+
+    // af6. keepImportedOriginal — record dropped; rule/instruction/other-folder agent switched off for that tool; skill/slot agent record only
+    {
+      const bad: string[] = []
+      const H = harHome('illithid-m7-H6-', {
+        '.claude/rules/k1.md': '# k1\n',
+        '.claude/agents/ka.md': '---\nname: ka\ndescription: KA\ntools: Read\n---\n\nKA.\n',
+        '.config/opencode/agent/ko.md': '---\ndescription: KO\nmode: subagent\n---\n\nKO.\n',
+        '.claude/settings.json': '{}\n',
+        '.claude.json': '{}\n',
+        'notes/n2.md': '# n2\n'
+      })
+      writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [join(H, 'notes/n2.md')] })
+      applyImport(H, [{ kind: 'rule', name: 'k1.md' }, { kind: 'agent', name: 'ka' }], 'tool:claude')
+      applyImport(H, [{ kind: 'rule', name: 'n2.md' }, { kind: 'agent', name: 'ko' }], 'tool:opencode')
+      createSkill(H, 'kskill', 'Library version')
+      mkdirSync(join(H, '.claude/skills/kskill'), { recursive: true })
+      writeFileSync(join(H, '.claude/skills/kskill/SKILL.md'), '---\nname: kskill\ndescription: Mine\n---\n\nMine.\n')
+      const st6 = readState(H).state
+      writeState(H, {
+        ...st6,
+        pendingRetire: [
+          ...(st6.pendingRetire ?? []),
+          { kind: 'skill', tool: 'claude', name: 'kskill', path: join(H, '.claude/skills/kskill'), hash: 'stale', at: new Date().toISOString(), workspace: 'default' }
+        ]
+      })
+      for (const rel of ['.claude/rules/k1.md', '.claude/agents/ka.md', '.config/opencode/agent/ko.md', 'notes/n2.md'])
+        writeFileSync(join(H, rel), read(join(H, rel)) + '\nedited\n')
+      const ch = importedChangedOf(planSyncAll(H, envH, memH))
+      const chDesc = ch.map((x) => `${x.kind}:${x.tool}:${x.name}`).sort().join(',')
+      if (chDesc !== 'agent:claude:ka,agent:opencode:ko,instruction:opencode:n2.md,rule:claude:k1.md,skill:claude:kskill') bad.push(`importedChanged ${chDesc}`)
+      const kept = ch.map((x) => keepImportedOriginal(H, { kind: x.kind, tool: x.tool, path: x.path }))
+      const offs = kept.filter((k) => k.toggledOff).map((k) => `${k.toggledOff!.kind}.${k.name}.${k.toggledOff!.tool}`).sort().join(',')
+      if (offs !== 'agents.ko.opencode,rules.k1.md.claude,rules.n2.md.opencode') bad.push(`toggled off ${offs}`)
+      const mf = readManifest(H).manifest
+      if (mf.agents.ka?.claude === false || mf.skills.kskill?.claude === false) bad.push('slot agent / skill toggled off')
+      if (readState(H).state.pendingRetire?.length) bad.push('records left')
+      if (importedChangedOf(planSyncAll(H, envH, memH)).length) bad.push('still listed after keep')
+      if (errCode(() => keepImportedOriginal(H, { kind: 'rule', tool: 'claude', path: join(H, '.claude/rules/k1.md') })) !== 'notFound') bad.push('second keep not notFound')
+      syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      for (const rel of ['.claude/rules/k1.md', '.claude/agents/ka.md', '.config/opencode/agent/ko.md', '.claude/skills/kskill/SKILL.md'])
+        if (!existsSync(join(H, rel))) bad.push(`original gone ${rel}`)
+      if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created')
+      if (existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'k1.md')) || existsSync(join(H, '.config/opencode/agents/ko.md'))) bad.push('switched-off item still delivered')
+      if (!((readJson(join(H, '.config/opencode/opencode.json')).instructions as string[]) ?? []).includes(join(H, 'notes/n2.md'))) bad.push('kept instruction entry removed')
+      check(
+        'af6. HAR-12 keepImportedOriginal — importedChangedOf lists rule/skill/agent/instruction; keep drops the record, switches off rule·instruction·other-folder agent for that tool, leaves skill and slot agent toggles; Sync then keeps every original',
+        !bad.length,
+        bad.length ? bad.join('; ') : `listed ${chDesc}; toggled off ${offs}; records 0; originals kept after Sync`
+      )
+    }
+
+    // af7. review follow-ups — instruction kept when the library entry doesn't replace it; no new files for users who never chose tools;
+    //      unknown toolsInUse ids; unreadable originals; records follow library renames; opencode.jsonc
+    {
+      const bad: string[] = []
+      const notes: string[] = []
+      // (1) rule off for OpenCode → its instructions entry and record stay (OpenCode keeps the rule)
+      {
+        const H = harHome('illithid-m7-H7a-', { 'notes/n3.md': '# n3\n', '.claude/settings.json': '{}\n', '.claude.json': '{}\n' })
+        mkdirSync(join(H, '.config/opencode'), { recursive: true })
+        writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [join(H, 'notes/n3.md')] })
+        applyImport(H, [{ kind: 'rule', name: 'n3.md' }], 'tool:opencode')
+        setToggle(H, 'rules', 'n3.md', 'opencode', false)
+        syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+        if (!ins.includes(join(H, 'notes/n3.md'))) bad.push('instruction entry dropped while the library rule is off')
+        if (!readState(H).state.pendingRetire?.some((p) => p.kind === 'instruction')) bad.push('instruction record dropped while the library rule is off')
+        setToggle(H, 'rules', 'n3.md', 'opencode', true)
+        syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const ins2 = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+        if (ins2.includes(join(H, 'notes/n3.md')) || !ins2.includes(join(libraryRoot(H), 'rules/n3.md'))) bad.push('entry not swapped once the rule is on')
+        notes.push('off→kept, on→swapped')
+      }
+      // (2) toolsInUse unset, no OpenCode, a rule and permissions → no ~/.config/opencode, no ~/.claude/settings.json; not errors
+      {
+        const H = makeFixture('illithid-m7-H7b-')
+        unlinkSync(join(H, '.agents'))
+        mkdirSync(join(H, '.claude'))
+        initLibrary(H)
+        createRule(H, 'x.md', '# x\n')
+        writePermissions(H, { bash: [['ls']], claudeOnly: { allow: ['Read'], deny: [] } })
+        const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const tr = r.results?.targets ?? []
+        if (existsSync(join(H, '.config/opencode')) || existsSync(join(H, '.claude/settings.json'))) bad.push('files created for a user who never chose tools')
+        if (tr.some((x) => x.status === 'skipped')) bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
+        const tni = tr.filter((x) => x.reason === 'toolNotInitialized').map((x) => x.id).sort().join(',')
+        if (tni !== 'claudePermissions,opencodeRules') bad.push(`toolNotInitialized ${tni}`)
+        if (!detectTools(H, { PATH: '' }).find((d) => d.tool === 'opencode' && !d.detected)) bad.push('OpenCode detected after Sync')
+        notes.push(`unset toolsInUse → ${tni} toolNotInitialized`)
+        // (3) unknown ids are dropped, known ones kept
+        writeJson(join(H, APP_CONFIG_DIR, 'config.json'), { version: 1, toolsInUse: ['claude', 'vim'] })
+        if (toolsInUse(H).join() !== 'claude' || readConfig(H).error) bad.push(`toolsInUse with an unknown id → ${toolsInUse(H).join()}`)
+      }
+      // (4) unreadable original → skip(unreadable), not moved, record kept; readable again → retired
+      {
+        const H = harHome('illithid-m7-H7c-', { '.claude/rules/u1.md': '# u1\n', '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+        applyImport(H, [{ kind: 'rule', name: 'u1.md' }], 'tool:claude')
+        chmodSync(join(H, '.claude/rules/u1.md'), 0o000)
+        const it = planSyncAll(H, envH, memH).rules.find((x) => x.path === join(H, '.claude/rules/u1.md'))
+        syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        chmodSync(join(H, '.claude/rules/u1.md'), 0o644)
+        if (it?.action !== 'skip' || it.reason !== 'unreadable') bad.push(`unreadable plan ${it?.action}:${it?.reason}`)
+        if (!existsSync(join(H, '.claude/rules/u1.md')) || !readState(H).state.pendingRetire?.length) bad.push('unreadable original moved or record dropped')
+        syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        if (existsSync(join(H, '.claude/rules/u1.md')) || importedFile(H, 'claude/rules/u1.md') !== '# u1\n') bad.push('not retired once readable')
+      }
+      // (5) rename before Sync — records follow the library name; originals still retired under their old file names
+      {
+        const H = harHome('illithid-m7-H7d-', {
+          '.claude/rules/r5.md': '# r5\n',
+          '.claude/agents/a5.md': '---\nname: a5\ndescription: A5\ntools: Read\n---\n\nA5.\n',
+          '.claude/settings.json': '{}\n',
+          '.claude.json': '{}\n'
+        }, ['claude'])
+        applyImport(H, [{ kind: 'rule', name: 'r5.md' }, { kind: 'agent', name: 'a5' }], 'tool:claude')
+        createSkill(H, 's5', 'Library version')
+        mkdirSync(join(H, '.claude/skills/s5'), { recursive: true })
+        writeFileSync(join(H, '.claude/skills/s5/SKILL.md'), '---\nname: s5\ndescription: Mine\n---\n\nMine.\n')
+        const st7 = readState(H).state
+        writeState(H, {
+          ...st7,
+          pendingRetire: [
+            ...(st7.pendingRetire ?? []),
+            { kind: 'skill', tool: 'claude', name: 's5', path: join(H, '.claude/skills/s5'), hash: dirContentHash(join(H, '.claude/skills/s5')), at: new Date().toISOString(), workspace: 'default' }
+          ]
+        })
+        renameRule(H, 'r5.md', 'r6.md')
+        renameAgent(H, 'a5', 'a6')
+        renameSkill(H, 's5', 's6')
+        const names = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.name}`).sort().join(',')
+        if (names !== 'agent:a6,rule:r6.md,skill:s6') bad.push(`records after rename ${names}`)
+        const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const fails = [...(r.results?.rules ?? []), ...(r.results?.skills ?? []), ...(r.results?.agents ?? [])].filter((x) => x.status === 'failed' || x.status === 'refused')
+        if (fails.length) bad.push(`rename sync ${fails.map((x) => `${x.name}:${x.reason}`).join(',')}`)
+        for (const rel of ['.claude/rules/r5.md', '.claude/agents/a5.md', '.claude/skills/s5']) if (existsSync(join(H, rel))) bad.push(`old original left ${rel}`)
+        if (!importedFile(H, 'claude/rules/r5.md') || !importedFile(H, 'claude/agents/a5.md') || !importedFile(H, 'claude/skills/s5/SKILL.md')) bad.push('old originals not in backups/imported')
+        if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r6.md')) || !existsSync(join(H, '.claude/agents/a6.md')) || !existsSync(join(H, '.claude/skills/s6/SKILL.md'))) bad.push('renamed app copies missing')
+        if (readState(H).state.pendingRetire?.length) bad.push('records left after rename sync')
+        notes.push(`rename records ${names}`)
+      }
+      // (6) opencode.jsonc present → opencode.json never created, even with OpenCode explicitly in use
+      {
+        const H = harHome('illithid-m7-H7e-', { '.config/opencode/opencode.jsonc': '{\n  // user config\n}\n' }, ['opencode'])
+        createRule(H, 'x.md', '# x\n')
+        const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        if (existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('opencode.json created next to opencode.jsonc')
+        if (r.results?.targets.find((x) => x.id === 'opencodeRules')?.reason !== 'toolNotInitialized') bad.push('jsonc skip reason')
+      }
+      check(
+        'af7. HAR-12 review follow-ups — instruction entry kept unless the library entry replaces it, no new tool files without explicit toolsInUse, unknown ids dropped, unreadable originals kept, records follow renames, opencode.jsonc respected',
+        !bad.length,
+        bad.length ? bad.join('; ') : notes.join('; ')
+      )
+    }
+
+    // af4. pendingRetire belongs to the workspace active at import — another workspace with a same-name rule never swaps the original
+    {
+      const bad: string[] = []
+      const OTHER = '# Team style (other workspace)\n'
+      const H = harHome('illithid-m7-H4-', { '.claude/rules/team-style.md': RULE, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+      applyImport(H, [{ kind: 'rule', name: 'team-style.md' }], 'tool:claude')
+      const rec = (readState(H).state.pendingRetire ?? []).map((p) => `${p.name}@${p.workspace}`).join(',')
+      if (rec !== 'team-style.md@default') bad.push(`record ${rec}`)
+      const ws = createWorkspace(H, 'other', { from: 'empty' })
+      switchWorkspace(H, ws.id)
+      createRule(H, 'team-style.md', OTHER)
+      const pOther = planSyncAll(H, envH, memH).rules.map((x) => `${x.name}:${x.action}`).join(',')
+      if (pOther.includes('retireImported') || pOther.includes('importedChanged')) bad.push(`other-workspace plan ${pOther}`)
+      syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      if (read(join(H, '.claude/rules/team-style.md')) !== RULE || existsSync(importedBackupRoot(H))) bad.push('original swapped from another workspace')
+      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== OTHER) bad.push('other-workspace app copy')
+      if ((readState(H).state.pendingRetire ?? []).length !== 1) bad.push('record dropped in another workspace')
+      switchWorkspace(H, 'default')
+      const pBack = planSyncAll(H, envH, memH).rules.map((x) => `${x.name}:${x.action}`).join(',')
+      if (!pBack.includes('team-style.md:retireImported')) bad.push(`plan after switching back ${pBack}`)
+      syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+      if (existsSync(join(H, '.claude/rules/team-style.md')) || importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('original not retired after switching back')
+      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== RULE) bad.push('default app copy')
+      if (readState(H).state.pendingRetire?.length) bad.push('record left after switching back')
+      check(
+        'af4. HAR-12 pendingRetire per workspace — Sync in another workspace with a same-name rule leaves the original and the record; switching back retires it',
+        !bad.length,
+        bad.length ? bad.join('; ') : `record ${rec}; other workspace plan ${pOther}, original kept; back in default plan ${pBack}, original in backups/imported`
+      )
+    }
   }
 
   // ---- j. real HOME unchanged + CLI guard

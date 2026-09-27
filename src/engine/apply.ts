@@ -4,6 +4,8 @@ import { deletedBackupRoot } from './deleteCopies'
 import { buildContext, plan, planTarget } from './plan'
 import { readSources } from './sources'
 import { ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
+import { activeWorkspaceId } from './config'
+import { dropPending } from './pendingRetire'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
 import type { SecretBackend } from './secrets'
@@ -23,8 +25,16 @@ import {
  * - stateError         could not read state.json (abort everything so state is not overwritten)
  * - writeFailed        I/O failure during backup/write
  * - drift              (not produced since M7d — kept for compatibility. The source always wins; tool-side changes are backed up and overwritten)
+ * - nothingToWrite / toolNotInitialized  (status unchanged, not a failure) the file is absent and left alone — FileChange.skip
  */
-export type ApplySkipReason = 'error' | 'changedSinceCheck' | 'drift' | 'stateError' | 'writeFailed'
+export type ApplySkipReason =
+  | 'error'
+  | 'changedSinceCheck'
+  | 'drift'
+  | 'stateError'
+  | 'writeFailed'
+  | 'nothingToWrite'
+  | 'toolNotInitialized'
 
 export interface ApplyResult {
   id: TargetId
@@ -125,7 +135,10 @@ export function apply(
     if (c.afterRegionHash !== null) {
       state.applied[c.id] = { regionHash: c.afterRegionHash, at: new Date().toISOString() }
     }
-    if (c.owned || c.afterRegionHash !== null) writeState(home, state)
+    const dropped = c.retired?.length
+      ? dropPending(state, c.retired.map((path) => ({ kind: 'instruction' as const, tool: 'opencode' as const, path, workspace: activeWorkspaceId(home) })))
+      : false
+    if (c.owned || c.afterRegionHash !== null || dropped) writeState(home, state)
   }
   /** Files written in this call → sha256 of written content */
   const writtenNow = new Map<string, string>()
@@ -141,6 +154,11 @@ export function apply(
     const base = { id: c.id, label: c.label, ...(c.serverErrors ? { serverErrors: c.serverErrors } : {}) }
     const skip = (reason: ApplySkipReason, detail?: string): void => {
       results.push({ ...base, status: 'skipped', reason, ...(detail ? { detail } : {}) })
+    }
+    // Absent file left alone (nothing to write, or a file only the tool itself creates) — not a failure, nothing recorded
+    if (c.skip) {
+      results.push({ ...base, status: 'unchanged', reason: c.skip, ...(c.notes[0] ? { detail: c.notes[0] } : {}) })
+      continue
     }
     if (c.error) {
       skip('error', c.error)

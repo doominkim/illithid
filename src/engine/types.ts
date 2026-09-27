@@ -1,4 +1,6 @@
+import type { ToolId } from './agents'
 import type { Manifest } from './manifest'
+import type { PendingRetire } from './pendingRetire'
 import type { SecretBackend } from './secrets'
 
 /** Environment variable lookup. Defaults to process.env; fixture checks pass an arbitrary object. */
@@ -110,6 +112,16 @@ export interface FileChange {
    * The file is still applied, but that server's entry keeps its previous content
    */
   serverErrors?: Record<string, string>
+  /** Imported originals (pendingRetire paths) this change no longer references — apply clears their records */
+  retired?: string[]
+  /**
+   * The file does not exist and is left alone (changed=false, no error):
+   * - nothingToWrite      the library has nothing for this target — not an error, nothing to show
+   * - toolNotInitialized  there is content, but the file is one the tool creates itself on first run (~/.claude.json) — run the tool once
+   */
+  skip?: 'nothingToWrite' | 'toolNotInitialized'
+  /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
+  importedChanged?: PendingRetire[]
 }
 
 /** Thrown by a generator to report an unrecoverable state. plan() moves it into the change's error. */
@@ -124,6 +136,8 @@ export interface BuildContext {
   owned?: Partial<Record<TargetId, string[]>>
   /** Backend that resolves `secret:` references. Without it, servers with references go to serverErrors */
   secrets?: SecretBackend
+  /** Imported originals awaiting retirement (state.pendingRetire) */
+  pendingRetire?: PendingRetire[]
 }
 
 export interface BuildResult {
@@ -135,14 +149,32 @@ export interface BuildResult {
   owned?: string[]
   /** Per-server errors (FileChange.serverErrors) */
   serverErrors?: Record<string, string>
+  /** FileChange.retired */
+  retired?: string[]
+  /** FileChange.importedChanged */
+  importedChanged?: PendingRetire[]
 }
 
 export interface TargetDef {
   id: TargetId
+  /** Tool whose file this target writes (targets of tools not in use are skipped — config.toolsInUse) */
+  tool: ToolId
   /** Path relative to home */
   rel: string
-  /** Whether a missing file can be treated as '' and created */
+  /**
+   * Whether a missing file may be created. If false and the library has content for it, planning reports skip=toolNotInitialized.
+   * Either way a missing file with nothing to write is left alone (skip=nothingToWrite)
+   */
   optional: boolean
+  /** Text a missing file is built from (JSON targets: '{}\n'). '' if absent */
+  seed?: string
+  /**
+   * optional=false but a missing file may still be created when the tool is explicitly listed in config.toolsInUse
+   * (users who never chose their tools keep the old behavior: an absent file is never created — skip=toolNotInitialized)
+   */
+  createIfInUse?: boolean
+  /** Other files (relative to home) the tool reads instead — if one exists, a missing file is never created */
+  alternates?: string[]
   build(before: string, ctx: BuildContext): BuildResult
   /**
    * Normalized string of the app-owned region. Used for state.applied and UI excerpts (not used for skip decisions since M7d).

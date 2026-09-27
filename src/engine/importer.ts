@@ -8,22 +8,22 @@
  *
  * - planImport is read-only. Candidate data never holds raw secret values — literals are replaced with ${KEY}
  *   and reported only as `replaceable: [{key, looksSecret}]`. applyImport's `replace` picks the keys to actually substitute.
- * - applyImport writes only to the library. Source-side files are never touched.
+ * - applyImport writes only to the library (+ its on/off manifest and state.json). Source-side files are never touched at import:
+ *   originals that the app copy will replace are recorded as pendingRetire and switched over by the next approved sync
+ *   (moved to backups/imported right when the app copy lands — pendingRetire.ts). Items imported from a tool start enabled
+ *   for that tool only.
  */
 import { createHash } from 'node:crypto'
 import {
-  cpSync,
+  accessSync,
+  constants as fsConstants,
   existsSync,
   lstatSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
-  renameSync,
-  rmSync,
-  statSync,
-  unlinkSync
+  statSync
 } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
@@ -33,7 +33,7 @@ import { adoptAgentFiles } from './agentSync'
 import { adoptSkillCopies } from './skillSync'
 import { renderAgent } from './agentRender'
 import { TOOL_IDS, tilde, type ToolId } from './agents'
-import { appConfigDir, LEGACY_LIBRARY_DIR, libraryRoot } from './config'
+import { activeWorkspaceId, LEGACY_LIBRARY_DIR, libraryRoot } from './config'
 import {
   agentLibraryText,
   agentNormalizedText,
@@ -63,13 +63,14 @@ import {
 } from './library'
 import { secretRefsOf, type SecretBackend } from './secrets'
 import { canonicalSkills, dirContentHash } from './skills'
-import { readState } from './state'
+import { MANIFEST_TOOLS, setToggle, type ManifestKind } from './manifest'
+import { addPending, importedBackupRoot, retireHash, UNREADABLE_HASH, type PendingRetire } from './pendingRetire'
+import { readState, writeState } from './state'
 import { libraryPaths, readMcp } from './sources'
 import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
 import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
-import { mcpEntries, outsideBlockMulti, parseJsonObject, sha256, toJsonText } from './text'
-import { atomicWrite, backup } from './write'
-import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource } from './types'
+import { mcpEntries, outsideBlockMulti, sha256 } from './text'
+import type { Allowlist, AllowlistEntry, Env, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
 
@@ -166,6 +167,51 @@ export function listImportSources(home: string): ImportSource[] {
     })
   }
   return out
+}
+
+// ---------------------------------------------------------------- Tool detection
+
+/** Executable names looked up on PATH per tool */
+export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = { claude: 'claude', codex: 'codex', opencode: 'opencode' }
+
+export interface ToolDetection {
+  tool: ToolId
+  /** The tool's config folder/file exists (same check as listImportSources) */
+  configFound: boolean
+  /** Absolute path of the executable found on PATH */
+  executable?: string
+  /** configFound or executable */
+  detected: boolean
+}
+
+export interface DetectToolsOptions {
+  /** Executable check (default: regular file with an execute bit). Injected by fixtures */
+  isExecutable?: (path: string) => boolean
+}
+
+function executableFile(p: string): boolean {
+  try {
+    if (!statSync(p).isFile()) return false
+    accessSync(p, fsConstants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Which tools look installed on this device (read-only): the tool's config location exists or its executable is on env.PATH.
+ * Used to pre-check config.toolsInUse; the user decides
+ */
+export function detectTools(home: string, env: Env = process.env, opts: DetectToolsOptions = {}): ToolDetection[] {
+  const isExec = opts.isExecutable ?? executableFile
+  const dirs = (env.PATH ?? '').split(':').filter((d) => d && isAbsolute(d))
+  const sources = listImportSources(home)
+  return TOOL_IDS.map((tool) => {
+    const configFound = !!sources.find((s) => s.id === `tool:${tool}`)?.available
+    const executable = dirs.map((d) => join(d, TOOL_EXECUTABLES[tool])).find((p) => isExec(p))
+    return { tool, configFound, ...(executable ? { executable } : {}), detected: configFound || !!executable }
+  })
 }
 
 // ---------------------------------------------------------------- Candidate types
@@ -410,7 +456,7 @@ export interface ImportResult {
   adopted?: ToolId[]
   /** agent: tools whose same-name file differed from the rendered output and was left as a user file (sync skips it) */
   userOwned?: ToolId[]
-  /** agent: tools whose imported source file was moved to backups/imported and switched to app-owned (next sync writes the rendered output) */
+  /** rule·skill·agent: tools whose imported original is switched to app-owned — the next approved sync backs it up to backups/imported and writes the app copy */
   converted?: ToolId[]
   /** agent: the opencode.json inline definition stays, so OpenCode ends up with two definitions of the same name */
   inlineRemains?: boolean
@@ -1005,31 +1051,28 @@ function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: st
   }
 }
 
-/** Backup root that import moves originals into (<home>/.config/illithid/backups/imported) */
-export function importedBackupRoot(home: string): string {
-  return join(appConfigDir(home), 'backups/imported')
-}
+export { importedBackupRoot }
 
-/** Per-tool agent source folders (where import may move source files from) */
+/** Per-tool agent source folders (originals there are switched to app-owned on the next sync) */
 function agentSourceDirs(home: string, tool: ToolId): string[] {
   if (tool === 'claude') return [join(home, '.claude/agents')]
   if (tool === 'codex') return [join(home, '.codex/agents')]
   return [join(home, '.config/opencode/agent'), join(home, '.config/opencode/agents')]
 }
 
+function pendingEntry(home: string, kind: PendingRetire['kind'], tool: ToolId, name: string, path: string): PendingRetire | null {
+  const hash = retireHash(path)
+  return hash === null || hash === UNREADABLE_HASH ? null : { kind, tool, name, path, hash, at: new Date().toISOString(), workspace: activeWorkspaceId(home) }
+}
+
 /**
- * Switch an imported agent's source tool file to app-owned: move the original to backups/imported/<ts>/<tool>/<folder>/<file>
- * (never permanently deleted). The next sync writes the rendered output to agents/<name> and records it in state.
- * agents/<name> files already byte-identical to the rendered output are not moved (adopted). opencode.json inline is left alone.
+ * Imported agent: source tool files that the app file will replace (pendingRetire — moved to backups/imported by the next approved sync,
+ * never permanently deleted). Files already byte-identical to the rendered output at the sync location are adopted instead (adoptAgentFiles).
+ * opencode.json inline definitions are left alone.
  */
-function retireAgentSources(
-  home: string,
-  name: string,
-  v: AgentVariant
-): { converted: ToolId[]; inline: boolean } {
-  const out = { converted: [] as ToolId[], inline: false }
+function agentRetirements(home: string, name: string, v: AgentVariant): { pending: PendingRetire[]; converted: ToolId[]; inline: boolean } {
+  const out = { pending: [] as PendingRetire[], converted: [] as ToolId[], inline: false }
   const doc = readAgentDoc(home, name)
-  const ts = new Date().toISOString().replace(/[:.]/g, '-')
   for (const src of v.sources) {
     if (src.path.includes('#agent.')) {
       out.inline = true
@@ -1047,93 +1090,46 @@ function retireAgentSources(
       continue
     }
     if (!st.isFile() && !st.isSymbolicLink()) continue
-    // If the file at the sync location already matches the rendered output, adopt it instead of moving (adoptAgentFiles)
+    // If the file at the sync location already matches the rendered output, it is adopted instead (adoptAgentFiles)
     if (
       src.path === agentToolPath(home, tool, name) &&
       st.isFile() &&
       sha256(readFileSync(src.path, 'utf8')) === sha256(renderAgent(tool, doc))
     )
       continue
-    const dest = join(importedBackupRoot(home), ts, tool, basename(dir), basename(src.path))
-    mkdirSync(dirname(dest), { recursive: true, mode: 0o700 })
-    try {
-      renameSync(src.path, dest)
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-      cpSync(src.path, dest, { verbatimSymlinks: true, errorOnExist: true, force: false })
-      unlinkSync(src.path)
-    }
+    const e = pendingEntry(home, 'agent', tool, name, src.path)
+    if (!e) continue
+    out.pending.push(e)
     if (!out.converted.includes(tool)) out.converted.push(tool)
   }
   return out
 }
 
-/** Move src (file, directory, link) to dest (never permanently deleted; copy then remove across devices) */
-function moveToImportedBackup(src: string, dest: string): void {
-  mkdirSync(dirname(dest), { recursive: true, mode: 0o700 })
-  try {
-    renameSync(src, dest)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-    cpSync(src, dest, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false })
-    rmSync(src, { recursive: true, force: true })
-  }
-}
-
-const importStamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
-
 /**
- * Switch an imported rule's source tool file to app-owned: move the original `~/.claude/rules/<name>` to backups/imported/<ts>/claude/rules/<name>.
- * Sync writes the app copy (`~/.claude/rules/illithid/<name>`), so leaving the original makes Claude read the same rule twice.
- * Files referenced by opencode.json instructions are user paths, so they are not moved; only that entry is removed from instructions
- * (sync adds the library path, so leaving it makes OpenCode read the same rule twice). If it can't be removed: instructionRemains.
+ * Imported rule: `~/.claude/rules/<name>` is replaced by the app copy (`~/.claude/rules/illithid/<name>`) on the next approved sync —
+ * leaving both makes Claude read the same rule twice. Files referenced by opencode.json instructions are user paths and never moved;
+ * only that instructions entry is removed by the opencodeRules target (sync adds the library path instead).
  */
-function retireRuleSources(home: string, name: string, v: FileVariant): { converted: ToolId[]; instructionRemains: boolean } {
-  const out = { converted: [] as ToolId[], instructionRemains: false }
-  const ts = importStamp()
+function ruleRetirements(home: string, name: string, v: FileVariant): { pending: PendingRetire[]; converted: ToolId[] } {
+  const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
   const claudeRule = join(home, '.claude/rules', name)
   for (const src of v.sources) {
     if (src.origin !== 'tool') continue
-    if (src.label === 'opencode') {
+    let e: PendingRetire | null = null
+    if (src.label === 'opencode') e = pendingEntry(home, 'instruction', 'opencode', name, src.path)
+    else if (src.label === 'claude' && src.path === claudeRule) {
       try {
-        if (!dropOpencodeInstruction(home, src.path)) out.instructionRemains = true
-        else if (!out.converted.includes('opencode')) out.converted.push('opencode')
+        if (!lstatSync(src.path).isFile()) continue
       } catch {
-        out.instructionRemains = true
+        continue
       }
-      continue
+      e = pendingEntry(home, 'rule', 'claude', name, src.path)
     }
-    if (src.label !== 'claude' || src.path !== claudeRule) continue
-    let st: ReturnType<typeof lstatSync>
-    try {
-      st = lstatSync(src.path)
-    } catch {
-      continue
-    }
-    if (!st.isFile()) continue
-    moveToImportedBackup(src.path, join(importedBackupRoot(home), ts, 'claude', 'rules', name))
-    if (!out.converted.includes('claude')) out.converted.push('claude')
+    if (!e) continue
+    out.pending.push(e)
+    if (!out.converted.includes(e.tool)) out.converted.push(e.tool)
   }
   return out
-}
-
-/**
- * Remove only the opencode.json instructions entries pointing to path (absolute or `~/` form). Other entries and key order stay;
- * like other write paths, back up to .illithid.bak then write atomically. The referenced file itself is untouched. true if removed
- */
-function dropOpencodeInstruction(home: string, path: string): boolean {
-  const op = join(home, '.config/opencode/opencode.json')
-  if (!existsSync(op)) return false
-  const before = readFileSync(op, 'utf8')
-  const o = parseJsonObject(before)
-  if (!Array.isArray(o.instructions)) return false
-  const abs = (x: string): string => (x.startsWith('~/') ? join(home, x.slice(2)) : x)
-  const rest = o.instructions.filter((x) => !(typeof x === 'string' && abs(x) === path))
-  if (rest.length === o.instructions.length) return false
-  o.instructions = rest
-  backup(op)
-  atomicWrite(op, toJsonText(o))
-  return true
 }
 
 /** Per-tool skill source folders */
@@ -1144,13 +1140,13 @@ function skillSourceDirs(home: string, tool: ToolId): string[] {
 }
 
 /**
- * Switch an imported skill's source tool folder to app-owned: move the original to backups/imported/<ts>/<tool>/<folder>/<name>.
- * For Claude·Codex, sync writes app copies; OpenCode reads the library via skills.paths.
- * Real directories at the Claude·Codex locations with the same content as the library original are not moved (adoptSkillCopies adopts them).
+ * Imported skill: source tool folders the app copy replaces on the next approved sync. Claude·Codex get app copies;
+ * OpenCode reads the library via skills.paths, so its own copy is retired. Real directories at the Claude·Codex locations with the
+ * same content as the library copy are adopted instead (adoptSkillCopies); symlinks there are replaced by sync (replaceLink — the
+ * link target is untouched), so they need no record.
  */
-function retireSkillSources(home: string, name: string, v: SkillVariant): { converted: ToolId[] } {
-  const out = { converted: [] as ToolId[] }
-  const ts = importStamp()
+function skillRetirements(home: string, name: string, v: SkillVariant): { pending: PendingRetire[]; converted: ToolId[] } {
+  const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
   let libHash: string | null = null
   try {
     libHash = dirContentHash(join(libraryPaths(home).skillsDir, name))
@@ -1170,19 +1166,55 @@ function retireSkillSources(home: string, name: string, v: SkillVariant): { conv
       continue
     }
     if (!st.isDirectory() && !st.isSymbolicLink()) continue
-    if (tool !== 'opencode' && st.isDirectory() && libHash !== null) {
+    if (tool !== 'opencode') {
+      if (st.isSymbolicLink()) {
+        if (!out.converted.includes(tool)) out.converted.push(tool)
+        continue
+      }
       let h: string | null = null
       try {
         h = dirContentHash(src.path)
       } catch {
         h = null
       }
-      if (h === libHash) continue
+      if (libHash !== null && h === libHash) continue
     }
-    moveToImportedBackup(src.path, join(importedBackupRoot(home), ts, tool, basename(dir), name))
+    const e = pendingEntry(home, 'skill', tool, name, src.path)
+    if (!e) continue
+    out.pending.push(e)
     if (!out.converted.includes(tool)) out.converted.push(tool)
   }
   return out
+}
+
+/** enableOnlySourceTools that never fails the import (false = toggles could not be saved, the item stays on for all tools) */
+function sourceToggles(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): boolean {
+  try {
+    enableOnlySourceTools(home, kind, name, sources)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Record pending retirements in state.json (the next approved sync executes them) */
+function recordRetirements(home: string, pending: PendingRetire[]): void {
+  if (!pending.length) return
+  const st = readState(home)
+  if (st.error) throw new LibraryError('configError', `state.json: ${st.error}`)
+  const state = { ...st.state }
+  addPending(state, pending)
+  writeState(home, state)
+}
+
+/**
+ * Newly imported items start enabled only for the tool(s) they came from (tool sources only; library·manager sources keep the
+ * all-on default). Tools the kind can't toggle (MANIFEST_TOOLS) are left alone
+ */
+function enableOnlySourceTools(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): void {
+  const from = new Set(sources.filter((s) => s.origin === 'tool').map((s) => s.label))
+  if (!from.size) return
+  for (const tool of MANIFEST_TOOLS[kind]) setToggle(home, kind, name, tool, from.has(tool))
 }
 
 // ---------------------------------------------------------------- MCP conversion
@@ -2043,8 +2075,11 @@ export function planImport(home: string, sourceId?: string): ImportPlan {
 }
 
 /**
- * Add the selected candidates to the library (atomic). Source-side files are never touched.
- * Recomputes the plan and runs only if the selection matches the current candidates.
+ * Add the selected candidates to the library (atomic). Recomputes the plan and runs only if the selection matches the current candidates.
+ * Source-side files are never touched here: tool originals the app copy will replace (Claude rule files, differing skill folders,
+ * agent files, OpenCode instructions entries) are recorded in state.json pendingRetire, and the next approved sync backs them up to
+ * backups/imported right as it writes the app copy. Nothing changes on the tool side until that sync, so there is no gap and no loss
+ * even when automatic apply is off. New items imported from a tool are enabled only for that tool (manifest toggles).
  */
 export interface ApplyImportOptions {
   /**
@@ -2124,8 +2159,10 @@ export function applyImport(
           trashPath = trashLibraryPath(home, join(paths.rulesDir, cand.name)).trashPath
         }
         createRule(home, cand.name, content)
-        const moved = retireRuleSources(home, cand.name, v)
-        const warnings = moved.instructionRemains ? ['opencodeInstructionRemains'] : []
+        const togglesOk = exists || sourceToggles(home, 'rules', cand.name, v.sources)
+        const moved = ruleRetirements(home, cand.name, v)
+        recordRetirements(home, moved.pending)
+        const warnings = togglesOk ? [] : ['togglesNotSet']
         results.push({
           ...base,
           status: 'imported',
@@ -2159,7 +2196,9 @@ export function applyImport(
         let trashPath: string | undefined
         if (exists) trashPath = deleteSkill(home, cand.name).trashPath
         copySkillIntoLibrary(home, cand.name, v.resolvedPath)
-        const moved = retireSkillSources(home, cand.name, v)
+        const togglesOk = exists || sourceToggles(home, 'skills', cand.name, v.sources)
+        const moved = skillRetirements(home, cand.name, v)
+        recordRetirements(home, moved.pending)
         let own: ReturnType<typeof adoptSkillCopies> = { adopted: [], userOwned: [] }
         try {
           own = adoptSkillCopies(home, cand.name)
@@ -2170,6 +2209,7 @@ export function applyImport(
           ...base,
           status: 'imported',
           ...(trashPath ? { trashPath } : {}),
+          ...(togglesOk ? {} : { warnings: ['togglesNotSet'] }),
           ...(moved.converted.length ? { converted: moved.converted } : {}),
           ...(own.adopted.length ? { adopted: own.adopted } : {}),
           ...(own.userOwned.length ? { userOwned: own.userOwned } : {})
@@ -2179,8 +2219,10 @@ export function applyImport(
         let trashPath: string | undefined
         if (exists) trashPath = deleteAgent(home, cand.name).trashPath
         writeNewAgentText(home, cand.name, v.text)
-        // Source tool files are moved to backup and switched to app-owned (sync writes the rendered output). Inline definitions stay
-        const moved = retireAgentSources(home, cand.name, v)
+        const togglesOk = exists || sourceToggles(home, 'agents', cand.name, v.sources)
+        // Source tool files are switched to app-owned: the next approved sync backs them up and writes the rendered output. Inline definitions stay
+        const moved = agentRetirements(home, cand.name, v)
+        recordRetirements(home, moved.pending)
         // Other same-name files: adopt as app-owned if they match the rendered output, otherwise leave as user files
         let own: ReturnType<typeof adoptAgentFiles> = { adopted: [], userOwned: [] }
         try {
@@ -2192,8 +2234,8 @@ export function applyImport(
           ...base,
           status: 'imported',
           ...(trashPath ? { trashPath } : {}),
-          ...(v.warnings.length || moved.converted.length
-            ? { warnings: [...v.warnings, ...(moved.converted.length ? ['agentRenderDiffers'] : [])] }
+          ...(v.warnings.length || moved.converted.length || !togglesOk
+            ? { warnings: [...v.warnings, ...(moved.converted.length ? ['agentRenderDiffers'] : []), ...(togglesOk ? [] : ['togglesNotSet'])] }
             : {}),
           ...(moved.converted.length ? { converted: moved.converted } : {}),
           ...(own.adopted.length ? { adopted: own.adopted } : {}),
@@ -2235,7 +2277,8 @@ export function applyImport(
           const keep = new Set(secretRefsOf(readMcpServer(home, cand.name)).map((x) => x.account))
           for (const a of prevRefs) if (!keep.has(a)) opts.secrets.delete(a)
         }
-        const warnings = [...v.warnings, ...r.warnings]
+        const togglesOk = exists || sourceToggles(home, 'mcp', cand.name, v.sources)
+        const warnings = [...v.warnings, ...r.warnings, ...(togglesOk ? [] : ['togglesNotSet'])]
         results.push({
           ...base,
           status: 'imported',

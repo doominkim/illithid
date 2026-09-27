@@ -62,6 +62,7 @@ export function buildCodexRulesBody(
 /** 2. ~/.codex/rules/default.rules — allowlist.bash → prefix_rule (inside the markers only; duplicates outside the markers are skipped) */
 export const codexRules: TargetDef = {
   id: 'codexRules',
+  tool: 'codex',
   rel: '.codex/rules/default.rules',
   optional: true,
   region: (text) => blockBodyMulti(text, ALL_RULES_MARKERS),

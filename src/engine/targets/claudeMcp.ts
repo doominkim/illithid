@@ -59,8 +59,11 @@ export function buildClaudeMcp(
 /** 4. ~/.claude.json — replaces only mcpServers (runtime keys such as projects untouched) */
 export const claudeMcp: TargetDef = {
   id: 'claudeMcp',
+  tool: 'claude',
   rel: '.claude.json',
+  // ~/.claude.json is Claude Code's own state file, created on its first run — never created by the app (toolNotInitialized)
   optional: false,
+  seed: '{}\n',
   // Servers outside the SSOT (tool-only or per-project) are not subject to drift
   // Owned region = enabled servers ∪ previously owned servers (without a manifest, all of mcp.json = same as before)
   region: (text, sources, ctx) =>

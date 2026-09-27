@@ -27,6 +27,7 @@ import { listMemoryFiles, readMemoryFile, TRASH_DIR, writeMemoryFile } from './l
 import { assertInsideLibrary, LibraryError, libraryRealRoot } from './libpath'
 import { readHead } from './scan/common'
 import { libraryPaths } from './sources'
+import { toolInUse } from './config'
 import { atomicWrite } from './write'
 
 /** Limit Claude reads from the index (the rest is cut off) */
@@ -592,6 +593,11 @@ export function readCodexMemoryFile(
 
 // ---------------------------------------------------------------- writes
 
+/** Claude memory writes are refused when Claude is not in use on this device (config.toolsInUse) */
+function assertClaudeInUse(home: string): void {
+  if (!toolInUse(home, 'claude')) throw new LibraryError('toolNotInUse', 'Claude Code is not in use on this device')
+}
+
 function checkType(type: unknown): MemoryType {
   if (typeof type !== 'string' || !(MEMORY_TYPES as readonly string[]).includes(type))
     throw new LibraryError('invalidName', 'invalid type')
@@ -608,6 +614,7 @@ export function promoteClaudeMemory(
   file: string,
   type: string
 ): ToolMemoryMoveResult {
+  assertClaudeInUse(home)
   const t = checkType(type)
   const src = existingFile(home, slug, file)
   const dir = dirname(src)
@@ -646,6 +653,7 @@ export function moveClaudeMemory(
   file: string,
   toSlug: string
 ): ToolMemoryMoveResult {
+  assertClaudeInUse(home)
   const src = existingFile(home, slug, file)
   const toProject = slugDir(home, toSlug)
   if (toProject === dirname(dirname(src))) throw new LibraryError('invalidName', 'same project')
@@ -672,6 +680,7 @@ export function moveClaudeMemory(
 
 /** Trash: move the file + remove its index line. If only MEMORY.md remains and it has no link lines, trash the index too */
 export function trashClaudeMemory(home: string, slug: string, file: string): ToolMemoryMoveResult {
+  assertClaudeInUse(home)
   const src = existingFile(home, slug, file)
   const dir = dirname(src)
   const trashDir = trashDirFor(home, slug)

@@ -25,6 +25,8 @@ import {
 } from './skillSync'
 import type { SecretBackend } from './secrets'
 import { libraryExists } from './sources'
+import { activePending, dropPending, retireHash, type RetireKind } from './pendingRetire'
+import { readState, writeState } from './state'
 import { ALL_TARGET_IDS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
 import type { Env, FileChange } from './types'
 
@@ -123,7 +125,8 @@ export function planSyncAll(
 /**
  * Pending apply count (read-only — no writes). Counts only what planSyncAll would actually change:
  * - Target config files: content that would change (errors excluded)
- * - Rules (incl. Claude MEMORY.md copy), skills, agents: copy, update, replaceLink (skills), migrateLegacyDir (rules)
+ * - Rules (incl. Claude MEMORY.md copy), skills, agents: copy, update, replaceLink (skills), migrateLegacyDir (rules),
+ *   replaceImported / retireImported (imported originals switched to the app copy)
  * - Delete candidates (deleteCandidate — the plan only includes app-owned ones)
  * inSync and skip (userOwned etc.) are excluded. Rule replaceLink (removing the shared symlink) has its own approval gate
  * and is not resolved by sync, so it is excluded. 0 if there is no library.
@@ -131,7 +134,8 @@ export function planSyncAll(
 export function pendingSyncCount(home: string, env: Env = process.env, secrets?: SecretBackend): number {
   if (!libraryExists(home)) return 0
   const p = planSyncAll(home, env, secrets)
-  const change = (a: string): boolean => a === 'copy' || a === 'update' || a === 'deleteCandidate'
+  const change = (a: string): boolean =>
+    a === 'copy' || a === 'update' || a === 'deleteCandidate' || a === 'replaceImported' || a === 'retireImported'
   return (
     p.targets.filter((c) => c.changed && !c.error).length +
     p.rules.filter((x) => change(x.action) || x.action === 'migrateLegacyDir').length +
@@ -158,7 +162,16 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
     agents: applyAgentSync(home, env, plan.agents)
   }
   applyDeletes(home, env, plan, results)
+  pruneGonePending(home)
   return { libraryExists: true, plan, results }
+}
+
+/** Drop the active workspace's pendingRetire records whose original no longer exists (the user removed it — nothing left to switch over) */
+function pruneGonePending(home: string): void {
+  const st = readState(home)
+  if (st.error || !st.state.pendingRetire?.length) return
+  const state = { ...st.state }
+  if (dropPending(state, activePending(home, st.state.pendingRetire).filter((p) => retireHash(p.path) === null))) writeState(home, state)
 }
 
 /** Execute delete candidates → set each result's (action deleteCandidate) status to done/refused/failed */
@@ -210,6 +223,25 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
   results.rules = merge(results.rules, 'rule', () => undefined)
   results.skills = merge(results.skills, 'skill', (r) => r.tool)
   results.agents = merge(results.agents, 'agent', (r) => r.tool)
+}
+
+/** An imported original kept in place because it changed since import (sync reports it instead of replacing it) */
+export interface ImportedChange {
+  kind: RetireKind
+  tool: ToolId
+  name: string
+  /** Absolute path of the original */
+  path: string
+}
+
+/** Imported originals changed since import, from a plan: rule/skill/agent skip(importedChanged) + opencode.json instructions entries */
+export function importedChangedOf(p: SyncPlan): ImportedChange[] {
+  return [
+    ...p.rules.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'rule' as const, tool: 'claude' as const, name: x.name, path: x.path })),
+    ...p.skills.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path })),
+    ...p.agents.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path })),
+    ...p.targets.flatMap((c) => (c.error ? [] : (c.importedChanged ?? []).map((r) => ({ kind: r.kind, tool: r.tool, name: r.name, path: r.path }))))
+  ]
 }
 
 /** Result summary (counts only) */

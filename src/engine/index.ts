@@ -13,7 +13,8 @@ export {
 export type { LibraryPaths } from './sources'
 export { initLibrary, initLibraryAt, LIBRARY_DIRS, WORKSPACE_FILE } from './init'
 export type { InitLibraryOptions, InitLibraryResult } from './init'
-export { syncAll, planSyncAll, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch } from './sync'
+export { syncAll, planSyncAll, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch, importedChangedOf } from './sync'
+export { keepImportedOriginal } from './pendingRetire'
 export type { SyncAllOptions, SyncAllResult, SyncPlan, SyncResults, SwitchLossItem, SwitchLossKind } from './sync'
 export { mcpEntries, sha256 } from './text'
 export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS } from './targets'
@@ -50,6 +51,9 @@ export type {
   McpSource
 } from './types'
 export type { ToolId, ToolInfo, RulesInjection, SkillsInjection } from './agents'
+export type { ToolDetection, DetectToolsOptions } from './importer'
+export type { PendingRetire, RetireKind, KeepImportedResult } from './pendingRetire'
+export type { ImportedChange } from './sync'
 export type { SkillState, SkillEntry, ToolSkills, SkillsReport, LinkAction } from './skills'
 export type { ToolModels, ModelValue, SetModelResult } from './models'
 export type { ApplyResult, ApplyOptions, ApplySkipReason } from './apply'
@@ -152,7 +156,11 @@ export {
   activeWorkspaceId,
   rootFormLibraryEntries,
   WORKSPACES_DIR,
-  DEFAULT_WORKSPACE
+  DEFAULT_WORKSPACE,
+  toolsInUse,
+  toolInUse,
+  setToolsInUse,
+  CONFIG_TOOL_IDS
 } from './config'
 export {
   listWorkspaces,
@@ -280,6 +288,8 @@ export {
   listImportSources,
   importAllFromLegacy,
   importedBackupRoot,
+  detectTools,
+  TOOL_EXECUTABLES,
   OTHER_APP_SKILL_DIRS
 } from './importer'
 export type {
