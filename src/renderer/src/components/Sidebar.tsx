@@ -10,10 +10,12 @@ import {
   RefreshCw,
   Settings,
   Sparkles,
+  Store,
   Users
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { type Menu, PRIMARY, useNav } from '../lib/nav'
+import { useConfig } from '../lib/config'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME } from '../lib/tools'
 import type { ToolId } from '../../../shared/api'
@@ -25,6 +27,7 @@ const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
   skills: Sparkles,
   mcp: Plug,
   agents: Users,
+  market: Store,
   artifacts: FolderOpen,
   sessions: MessagesSquare,
   backup: CloudUpload,
@@ -108,7 +111,9 @@ function SyncButton(): React.JSX.Element {
 export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }): React.JSX.Element {
   const { t } = useTranslation()
   const { request, navigate } = useNav()
+  const { config } = useConfig()
   const active = request.menu
+  const marketOn = config?.config.marketEnabled !== false
 
   const menuItem = (menu: Menu, right?: React.ReactNode): React.JSX.Element => {
     const Icon = ICON[menu]
@@ -143,7 +148,7 @@ export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }
       <SyncButton />
       <NotInitializedHint />
       <Stack gap={2}>
-        {PRIMARY.map((m) =>
+        {PRIMARY.filter((m) => m !== 'market' || marketOn).map((m) =>
           m === 'artifacts' ? (
             <Box key="sep" pt={10} mt={8} style={{ borderTop: '1px solid var(--ac-border-subtle)' }}>
               {menuItem(m)}

@@ -401,6 +401,7 @@ export const WORKSPACE_ZIP_FILES = [
   // on/off files in zips exported under old app names (renamed on import)
   ...LEGACY_MANIFEST_FILES,
   WORKSPACE_FILE,
+  'market.json',
   '.gitignore'
 ] as const
 export const WORKSPACE_ZIP_MAX_FILES = 5000

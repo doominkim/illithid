@@ -383,3 +383,43 @@ export {
 export type { CleanupItem, CleanupKind, CleanupMover, CleanupPlan, CleanupResult } from './backupRetention'
 export { DEFAULT_BACKUP_RETENTION } from './config'
 export type { BackupRetention } from './config'
+export { marketEnabled } from './config'
+export {
+  checkUpdates as marketCheckUpdates,
+  commitMcp as marketCommitMcp,
+  commitMcpUpdate as marketCommitMcpUpdate,
+  commitRule as marketCommitRule,
+  commitSkill as marketCommitSkill,
+  installChoices as marketInstallChoices,
+  installedIndex as marketInstalledIndex,
+  listInstructions as marketListRules,
+  prepareRule as marketPrepareRule,
+  prepareSkill as marketPrepareSkill,
+  searchServers as marketSearchServers,
+  searchSkills as marketSearchSkills,
+  findSkills as marketFindSkills,
+  popularSkills as marketPopularSkills,
+  popularServers as marketPopularServers,
+  rankServers as marketRankServers,
+  serverDetail as marketServerDetail,
+  skillAudit as marketSkillAudit,
+  suggestMcpName as marketSuggestMcpName,
+  AWESOME_COPILOT_REPO,
+  MarketError,
+  readOrigins
+} from './market'
+export type {
+  AuditPartner,
+  FetchFn,
+  InputSpec as MarketInputSpec,
+  InstallChoice as MarketInstallChoice,
+  MarketKind,
+  MarketMcpItem,
+  MarketRuleItem,
+  MarketSkillItem,
+  MarketUpdate,
+  PreparedRule,
+  PreparedSkill,
+  RegistryServer,
+  McpRunKind
+} from './market'

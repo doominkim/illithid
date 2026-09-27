@@ -39,6 +39,26 @@ import type {
 } from '../engine'
 
 import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
+import type {
+  AuditPartner,
+  MarketInstallChoice,
+  MarketKind,
+  MarketMcpItem,
+  MarketRuleItem,
+  MarketSkillItem,
+  MarketUpdate
+} from '../engine'
+export type {
+  AuditPartner,
+  MarketInputSpec,
+  MarketInstallChoice,
+  MarketKind,
+  MarketMcpItem,
+  MarketRuleItem,
+  MarketSkillItem,
+  MarketUpdate,
+  McpRunKind
+} from '../engine'
 export type { SwitchLossItem } from '../engine'
 import type {
   ClaudeMemoryScan,
@@ -435,6 +455,70 @@ export interface TranscriptView extends SessionTranscript {
   error?: string
 }
 
+// ---- marketplace
+export interface MarketSearchView {
+  skills?: MarketSkillItem[]
+  mcp?: MarketMcpItem[]
+  rules?: MarketRuleItem[]
+  /** MCP registry paging */
+  nextCursor?: string
+  /** `<kind>:<source id>` → library name, for items installed from the marketplace */
+  installed: Record<string, string>
+}
+
+export type MarketDetailView =
+  | {
+      kind: 'skill'
+      id: string
+      source: string
+      skillId: string
+      name: string
+      description?: string
+      skillMd: string
+      files: { rel: string; size: number }[]
+      skipped: string[]
+      audit: Record<string, AuditPartner> | null
+      /** Commit the detail showed — pass back on install */
+      ref: string
+      installedAs?: string
+    }
+  | {
+      kind: 'mcp'
+      id: string
+      title?: string
+      description: string
+      version: string
+      repo?: string
+      website?: string
+      choices: MarketInstallChoice[]
+      name: string
+      ref: string
+      installedAs?: string
+    }
+  | {
+      kind: 'rule'
+      id: string
+      title: string
+      description: string
+      applyTo?: string
+      body: string
+      name: string
+      url: string
+      ref: string
+      installedAs?: string
+    }
+
+export interface MarketInstallOptions {
+  /** Library name (rules: with or without .md) */
+  name: string
+  /** MCP install option id */
+  choice?: string
+  /** MCP form values by InputSpec.key */
+  values?: Record<string, string>
+  /** MarketDetailView.ref — install is refused if the source changed since */
+  ref?: string
+}
+
 export interface Api {
   // ---- reads
   status(): Promise<StatusReport>
@@ -459,6 +543,12 @@ export interface Api {
   searchAll(q: string): Promise<SearchAllResponse>
   /** Index progress/done events. Returns an unsubscribe function */
   onSearchIndexEvent(cb: (s: SearchIndexView) => void): () => void
+  // ---- marketplace (network in main only; refused with code 'disabled' when marketEnabled is false)
+  marketSearch(kind: MarketKind, q: string, cursor?: string): Promise<WriteResult<MarketSearchView>>
+  marketDetail(kind: MarketKind, id: string): Promise<WriteResult<MarketDetailView>>
+  marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
+  marketUpdates(): Promise<WriteResult<{ updates: MarketUpdate[]; failed: string[] }>>
+  marketUpdate(kind: MarketKind, name: string): Promise<WriteResult<{ name: string }> | Refused>
   // ---- config·library setup
   configGet(): Promise<ConfigView>
   configSet(patch: Partial<AppConfig>): Promise<WriteResult<ConfigView>>
@@ -631,6 +721,11 @@ export const CHANNELS = [
   'sessionIndexStatus',
   'docSearch',
   'searchAll',
+  'marketSearch',
+  'marketDetail',
+  'marketInstall',
+  'marketUpdates',
+  'marketUpdate',
   'configGet',
   'configSet',
   'toolsInUseGet',

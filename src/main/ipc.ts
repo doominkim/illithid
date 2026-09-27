@@ -54,6 +54,7 @@ import type { Op } from './reads'
 import * as W from './writes'
 import { keepImportedOriginal } from './preview'
 import { shellEnvReady } from './shellEnv'
+import { marketHandlers } from './market'
 import createWorker from './worker?nodeWorker'
 
 /** fixture HOME. Used by check scripts to inject a temp directory instead of the real HOME */
@@ -215,7 +216,9 @@ export function registerIpc(): void {
     }
   }
 
+  const market = marketHandlers(home, libWrite)
   const handlers: Record<Channel, (...args: unknown[]) => Promise<unknown>> = {
+    ...market,
     status: () => inWorker('status', home),
     rules: () => inWorker('rules', home),
     skills: () => inWorker('skills', home),

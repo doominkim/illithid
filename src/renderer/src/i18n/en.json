@@ -4,6 +4,7 @@
     "skills": "Skills",
     "mcp": "MCP",
     "agents": "Agents",
+    "market": "Market",
     "artifacts": "Artifacts",
     "sessions": "Sessions",
     "settings": "Settings",
@@ -40,7 +41,8 @@
     "cleanupDone": "Moved {{count}} items ({{size}}) to the Trash",
     "cleanupFailed": "Backup cleanup failed: {{count}} items",
     "tools": "Tools in use",
-    "copilotDoubleLoad": "With Claude Code also in use, VS Code may load rules, skills and agents twice."
+    "copilotDoubleLoad": "With Claude Code also in use, VS Code may load rules, skills and agents twice.",
+    "marketEnabled": "Use the marketplace"
   },
   "common": {
     "loading": "Loading…",
@@ -237,7 +239,14 @@
     "manifest": "illithid.json error",
     "config": "Config error",
     "model": "Model key error",
-    "error": "Error"
+    "error": "Error",
+    "network": "Network error",
+    "rateLimited": "Rate limited, try again later",
+    "tooLarge": "Too large",
+    "unsupported": "Not supported",
+    "disabled": "Marketplace is off",
+    "invalid": "Invalid",
+    "changed": "Source changed"
   },
   "import": {
     "none": "Nothing to import.",
@@ -434,5 +443,38 @@
     "restoreBackup": "Git backup",
     "later": "Later",
     "finish": "Finish"
+  },
+  "market": {
+    "tab": {
+      "skill": "Skills",
+      "mcp": "MCP",
+      "rule": "Rules"
+    },
+    "search": "Search",
+    "installs": "{{n}} installs",
+    "installed": "Installed",
+    "installedAs": "Installed as {{name}}",
+    "open": "Open",
+    "install": "Install",
+    "installedToast": "Installed {{name}}",
+    "name": "Name",
+    "files": "Files ({{n}})",
+    "skipped": "Skipped: {{list}}",
+    "option": "Install option",
+    "noOptions": "No option can be installed here. Set it up from the repository.",
+    "more": "Load more",
+    "checkUpdates": "Check for updates",
+    "noUpdates": "Everything is up to date",
+    "update": "Update",
+    "updated": "Updated {{name}}",
+    "updateFailed": "{{n}} could not be checked",
+    "repo": "Repository",
+    "website": "Website",
+    "weekly": "{{n}}/week",
+    "reason": {
+      "kind": "unsupported type",
+      "transport": "unsupported transport",
+      "secretInArgs": "secret in arguments"
+    }
   }
 }

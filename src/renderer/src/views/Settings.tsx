@@ -210,9 +210,9 @@ function Settings(): React.JSX.Element {
   const { config, allowRealApply, refresh } = useConfig()
   const reload = useReload()
   const [confirmApply, setConfirmApply] = useState(false)
-  const [saving, setSaving] = useState<'apply' | null>(null)
+  const [saving, setSaving] = useState<'apply' | 'market' | null>(null)
 
-  const save = async (patch: Parameters<typeof window.api.configSet>[0], what: 'apply'): Promise<void> => {
+  const save = async (patch: Parameters<typeof window.api.configSet>[0], what: 'apply' | 'market'): Promise<void> => {
     setSaving(what)
     const r = await runWrite(window.api.configSet(patch), { success: t('settings.saved') })
     setSaving(null)
@@ -272,6 +272,21 @@ function Settings(): React.JSX.Element {
 
 
       <ToolsInUse />
+
+      <Section title={t('nav.market')}>
+        <Row
+          label={t('settings.marketEnabled')}
+          control={
+            <Switch
+              size="md"
+              checked={config?.config.marketEnabled !== false}
+              disabled={!config || saving === 'market'}
+              onChange={(e) => void save({ marketEnabled: e.currentTarget.checked ? undefined : false }, 'market')}
+              data-testid="market-enabled"
+            />
+          }
+        />
+      </Section>
 
       <Section
         title={t('settings.apply')}

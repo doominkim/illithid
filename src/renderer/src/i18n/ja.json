@@ -4,6 +4,7 @@
     "skills": "スキル",
     "mcp": "MCP",
     "agents": "エージェント",
+    "market": "マーケット",
     "artifacts": "成果物",
     "sessions": "セッション",
     "settings": "設定",
@@ -40,7 +41,8 @@
     "cleanupDone": "{{count}} 件 ({{size}}) をゴミ箱に移動しました",
     "cleanupFailed": "バックアップ整理に失敗: {{count}} 件",
     "tools": "使用中のツール",
-    "copilotDoubleLoad": "Claude Code と併用すると、VS Code でルール・スキル・エージェントが二重に読み込まれることがあります。"
+    "copilotDoubleLoad": "Claude Code と併用すると、VS Code でルール・スキル・エージェントが二重に読み込まれることがあります。",
+    "marketEnabled": "マーケットを使う"
   },
   "common": {
     "loading": "読み込み中…",
@@ -237,7 +239,14 @@
     "manifest": "illithid.json エラー",
     "config": "設定エラー",
     "model": "モデルキーエラー",
-    "error": "エラー"
+    "error": "エラー",
+    "network": "ネットワークエラー",
+    "rateLimited": "リクエスト上限、しばらくして再試行",
+    "tooLarge": "大きすぎます",
+    "unsupported": "未対応",
+    "disabled": "マーケットはオフ",
+    "invalid": "無効",
+    "changed": "ソースが変更されました"
   },
   "import": {
     "none": "取り込む項目がありません。",
@@ -434,5 +443,38 @@
     "restoreBackup": "Git バックアップ",
     "later": "あとで",
     "finish": "完了"
+  },
+  "market": {
+    "tab": {
+      "skill": "スキル",
+      "mcp": "MCP",
+      "rule": "ルール"
+    },
+    "search": "検索",
+    "installs": "{{n}} インストール",
+    "installed": "インストール済み",
+    "installedAs": "{{name}} としてインストール済み",
+    "open": "開く",
+    "install": "インストール",
+    "installedToast": "{{name}} をインストールしました",
+    "name": "名前",
+    "files": "ファイル ({{n}})",
+    "skipped": "スキップ: {{list}}",
+    "option": "インストール方法",
+    "noOptions": "ここでインストールできる方法がありません。リポジトリから設定してください。",
+    "more": "さらに表示",
+    "checkUpdates": "アップデートを確認",
+    "noUpdates": "すべて最新",
+    "update": "アップデート",
+    "updated": "{{name}} をアップデートしました",
+    "updateFailed": "{{n}} 件を確認できませんでした",
+    "repo": "リポジトリ",
+    "website": "ウェブサイト",
+    "weekly": "週 {{n}}",
+    "reason": {
+      "kind": "未対応の形式",
+      "transport": "未対応の接続",
+      "secretInArgs": "引数にシークレット"
+    }
   }
 }

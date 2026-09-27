@@ -46,6 +46,8 @@ export interface AppConfig {
    * If absent: the default tools that look installed (toolsInUse) — later tools (Gemini, Copilot) stay off
    */
   toolsInUse?: ToolId[]
+  /** Marketplace (skills.sh · MCP registry · awesome-copilot). Default on; off = no menu and no network calls */
+  marketEnabled?: boolean
 }
 
 /** Tools that toolsInUse accepts (= TOOL_IDS, in tool order) */
@@ -128,6 +130,8 @@ export function validateConfig(v: unknown): string[] {
     errs.push('activeWorkspace must be a workspace id (lowercase letters, digits, -)')
   if (o.allowRealApply !== undefined && typeof o.allowRealApply !== 'boolean')
     errs.push('allowRealApply must be a boolean')
+  if (o.marketEnabled !== undefined && typeof o.marketEnabled !== 'boolean')
+    errs.push('marketEnabled must be a boolean')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))
     errs.push('deviceName must be a non-empty string')
   if (o.backupRetention !== undefined) {
@@ -318,4 +322,9 @@ export function activeWorkspaceId(home: string): string {
 /** Library root (absolute path) = active workspace folder. config.libraryPath is ignored */
 export function libraryRoot(home: string): string {
   return workspaceRoot(home, activeWorkspaceId(home))
+}
+
+/** Marketplace on (default) unless config says false */
+export function marketEnabled(home: string): boolean {
+  return readConfig(home).config.marketEnabled !== false
 }

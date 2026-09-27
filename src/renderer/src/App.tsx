@@ -13,6 +13,7 @@ import {
   Search,
   Settings as SettingsIcon,
   Sparkles,
+  Store,
   Users
 } from 'lucide-react'
 import type { ConfigView, ToolId } from '../../shared/api'
@@ -27,6 +28,7 @@ import Memory from './views/Memory'
 import Skills from './views/Skills'
 import Mcp from './views/Mcp'
 import Agents from './views/Agents'
+import Market from './views/Market'
 import Artifacts from './views/Artifacts'
 import Sessions from './views/Sessions'
 import Backup from './views/Backup'
@@ -44,6 +46,7 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
   skills: <Sparkles size={16} />,
   mcp: <Plug size={16} />,
   agents: <Users size={16} />,
+  market: <Store size={16} />,
   artifacts: <FolderOpen size={16} />,
   sessions: <MessagesSquare size={16} />,
   backup: <CloudUpload size={16} />,
@@ -214,7 +217,7 @@ function App(): React.JSX.Element {
   }
 
   const actions = useMemo<SpotlightActionData[]>(() => {
-    const nav: SpotlightActionData[] = [...PRIMARY, ...SECONDARY].map((m) => ({
+    const nav: SpotlightActionData[] = [...PRIMARY, ...SECONDARY].filter((m) => m !== 'market' || config?.config.marketEnabled !== false).map((m) => ({
       id: `nav:${m}`,
       group: t('spotlight.screens'),
       label: t(`nav.${m}`),
@@ -251,7 +254,7 @@ function App(): React.JSX.Element {
       onClick: () => navigate('agents', { select: r.name })
     }))
     return [...nav, ...skills, ...servers, ...ruleFiles, ...agents]
-  }, [t, navigate, status.data, mcp.data, rules.data])
+  }, [t, navigate, status.data, mcp.data, rules.data, config])
 
   const startError = config?.libraryStartError
   const view: Record<Menu, React.JSX.Element> = {
@@ -260,6 +263,7 @@ function App(): React.JSX.Element {
     skills: <Skills />,
     mcp: <Mcp />,
     agents: <Agents />,
+    market: <Market />,
     artifacts: <Artifacts />,
     sessions: <Sessions />,
     backup: <Backup />,

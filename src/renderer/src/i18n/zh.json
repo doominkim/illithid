@@ -4,6 +4,7 @@
     "skills": "技能",
     "mcp": "MCP",
     "agents": "智能体",
+    "market": "市场",
     "artifacts": "产出物",
     "sessions": "会话",
     "settings": "设置",
@@ -40,7 +41,8 @@
     "cleanupDone": "已将 {{count}} 项 ({{size}}) 移到废纸篓",
     "cleanupFailed": "备份清理失败: {{count}} 项",
     "tools": "使用中的工具",
-    "copilotDoubleLoad": "与 Claude Code 同时使用时，VS Code 可能会重复加载规则、技能和代理。"
+    "copilotDoubleLoad": "与 Claude Code 同时使用时，VS Code 可能会重复加载规则、技能和代理。",
+    "marketEnabled": "使用市场"
   },
   "common": {
     "loading": "加载中…",
@@ -237,7 +239,14 @@
     "manifest": "illithid.json 错误",
     "config": "配置错误",
     "model": "模型键错误",
-    "error": "错误"
+    "error": "错误",
+    "network": "网络错误",
+    "rateLimited": "请求受限，请稍后再试",
+    "tooLarge": "过大",
+    "unsupported": "不支持",
+    "disabled": "市场已关闭",
+    "invalid": "无效",
+    "changed": "来源已变更"
   },
   "import": {
     "none": "没有可导入的项目。",
@@ -434,5 +443,38 @@
     "restoreBackup": "Git 备份",
     "later": "稍后",
     "finish": "完成"
+  },
+  "market": {
+    "tab": {
+      "skill": "技能",
+      "mcp": "MCP",
+      "rule": "规则"
+    },
+    "search": "搜索",
+    "installs": "{{n}} 次安装",
+    "installed": "已安装",
+    "installedAs": "已安装为 {{name}}",
+    "open": "打开",
+    "install": "安装",
+    "installedToast": "已安装 {{name}}",
+    "name": "名称",
+    "files": "文件 ({{n}})",
+    "skipped": "已跳过：{{list}}",
+    "option": "安装方式",
+    "noOptions": "这里没有可安装的方式，请到仓库中配置。",
+    "more": "加载更多",
+    "checkUpdates": "检查更新",
+    "noUpdates": "全部为最新",
+    "update": "更新",
+    "updated": "已更新 {{name}}",
+    "updateFailed": "{{n}} 项无法检查",
+    "repo": "仓库",
+    "website": "网站",
+    "weekly": "每周 {{n}}",
+    "reason": {
+      "kind": "不支持的类型",
+      "transport": "不支持的连接",
+      "secretInArgs": "参数中含密钥"
+    }
   }
 }

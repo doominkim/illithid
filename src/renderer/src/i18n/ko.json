@@ -4,6 +4,7 @@
     "skills": "스킬",
     "mcp": "MCP",
     "agents": "에이전트",
+    "market": "마켓",
     "artifacts": "산출물",
     "sessions": "세션",
     "settings": "설정",
@@ -40,7 +41,8 @@
     "cleanupDone": "{{count}}개 ({{size}}) 휴지통으로 이동함",
     "cleanupFailed": "백업 정리 실패: {{count}}개",
     "tools": "사용 중인 툴",
-    "copilotDoubleLoad": "Claude Code와 함께 쓰면 VS Code에서 룰·스킬·에이전트가 두 번 로드될 수 있습니다."
+    "copilotDoubleLoad": "Claude Code와 함께 쓰면 VS Code에서 룰·스킬·에이전트가 두 번 로드될 수 있습니다.",
+    "marketEnabled": "마켓 사용"
   },
   "common": {
     "loading": "불러오는 중…",
@@ -237,7 +239,14 @@
     "manifest": "illithid.json 오류",
     "config": "설정 오류",
     "model": "모델 키 오류",
-    "error": "오류"
+    "error": "오류",
+    "network": "네트워크 오류",
+    "rateLimited": "요청 한도 초과, 잠시 후 다시",
+    "tooLarge": "너무 큼",
+    "unsupported": "지원 안 함",
+    "disabled": "마켓 꺼짐",
+    "invalid": "잘못된 값",
+    "changed": "출처가 바뀜"
   },
   "import": {
     "none": "가져올 항목이 없습니다.",
@@ -434,5 +443,38 @@
     "restoreBackup": "Git 백업",
     "later": "나중에",
     "finish": "완료"
+  },
+  "market": {
+    "tab": {
+      "skill": "스킬",
+      "mcp": "MCP",
+      "rule": "룰"
+    },
+    "search": "검색",
+    "installs": "설치 {{n}}",
+    "installed": "설치됨",
+    "installedAs": "{{name}}(으)로 설치됨",
+    "open": "열기",
+    "install": "설치",
+    "installedToast": "{{name}} 설치함",
+    "name": "이름",
+    "files": "파일 ({{n}})",
+    "skipped": "건너뜀: {{list}}",
+    "option": "설치 방식",
+    "noOptions": "여기서 설치할 수 있는 방식이 없어요. 레포에서 설정하세요.",
+    "more": "더 보기",
+    "checkUpdates": "업데이트 확인",
+    "noUpdates": "모두 최신",
+    "update": "업데이트",
+    "updated": "{{name}} 업데이트함",
+    "updateFailed": "{{n}}개 확인 실패",
+    "repo": "레포",
+    "website": "웹사이트",
+    "weekly": "주간 {{n}}",
+    "reason": {
+      "kind": "지원 안 하는 형식",
+      "transport": "지원 안 하는 연결",
+      "secretInArgs": "인자에 비밀값"
+    }
   }
 }
