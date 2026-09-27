@@ -242,7 +242,17 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
 }
 
 /** Apply preview dialog (sidebar sync button, backup restore, tool turned on in settings) */
-export function ApplyPreviewModal({ opened, onClose }: { opened: boolean; onClose: () => void }): React.JSX.Element {
+export function ApplyPreviewModal({
+  opened,
+  onCancel,
+  onDone
+}: {
+  opened: boolean
+  /** Dismissed without applying: cancel button, close button, Esc, overlay */
+  onCancel: () => void
+  /** Applied, or nothing left to apply */
+  onDone: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   // Keep the body until the close transition ends, so the dialog never shrinks to an empty frame while closing
   const [mounted, setMounted] = useState(false)
@@ -254,7 +264,7 @@ export function ApplyPreviewModal({ opened, onClose }: { opened: boolean; onClos
     // Above drawers and modals (default 200) so it works from an open item detail; below notifications (400)
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={onCancel}
       onExitTransitionEnd={() => setMounted(false)}
       title={t('preview.title')}
       size="lg"
@@ -262,7 +272,7 @@ export function ApplyPreviewModal({ opened, onClose }: { opened: boolean; onClos
       radius="lg"
       zIndex={300}
     >
-      {mounted && <ApplyPreviewBody key={session.n} cancelLabel={t('common.cancel')} onCancel={onClose} onDone={onClose} />}
+      {mounted && <ApplyPreviewBody key={session.n} cancelLabel={t('common.cancel')} onCancel={onCancel} onDone={onDone} />}
     </Modal>
   )
 }

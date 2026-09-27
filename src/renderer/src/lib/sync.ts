@@ -14,7 +14,8 @@ export interface SyncCtx {
   /** fingerprint = the reviewed preview's plan; a changed plan is refused (planChanged) and nothing is written */
   applyOnce: (fingerprint: string) => Promise<SyncStatusView | null>
   /** Open the apply preview (changes per tool → Apply) */
-  openPreview: () => void
+  /** onCancel runs when the preview is dismissed without applying (cancel, close button, Esc) */
+  openPreview: (opts?: { onCancel?: () => void }) => void
 }
 
 export const SyncContext = createContext<SyncCtx>({

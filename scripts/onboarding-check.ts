@@ -11,7 +11,7 @@
  *
  * Usage: npx electron-vite build && npx tsx scripts/onboarding-check.ts
  */
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Page } from 'playwright-core'
@@ -413,6 +413,109 @@ async function firstToolSaveRun(shots: string): Promise<RunResult> {
   }
 }
 
+/**
+ * Scenario 5: turning a tool on in Settings saves the list and opens the apply preview; dismissing that preview (Cancel, Esc, the
+ * close button) restores the previous list (unset stays unset), Apply keeps it. A preview opened from the sidebar changes no settings
+ */
+async function toolsCancelRun(shots: string): Promise<RunResult> {
+  const home = '/Users/Shared/illithid-tools-cancel'
+  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  mkdirSync(home)
+  const userData = mkdtempSync(join(tmpdir(), 'illithid-toolscancel-userdata-'))
+  const ws = '.illithid/workspaces/default'
+  const cfgPath = join(home, '.config/illithid/config.json')
+  put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
+  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
+  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n')
+  put(home, '.claude/settings.json', '{}\n')
+  put(home, '.claude.json', '{}\n')
+  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  syncAll(home, env, { allowReal: true, approvedOnce: true })
+  const failures: string[] = []
+  const check = (ok: boolean, what: string): void => {
+    if (!ok) failures.push(what)
+  }
+  const errors: string[] = []
+  const cfg = (): { toolsInUse?: string[] } => JSON.parse(readFileSync(cfgPath, 'utf8')) as { toolsInUse?: string[] }
+  const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => errors.push(e.message))
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(1280, 800)
+    })
+    await page.evaluate(() => localStorage.setItem('illithid-language', 'en'))
+    await page.reload()
+    const tid = (id: string): ReturnType<Page['locator']> => page.locator(`[data-testid="${id}"]`)
+    const openSettings = async (): Promise<void> => {
+      await page.locator('[data-menu="settings"]').waitFor({ timeout: 30_000 })
+      await page.click('[data-menu="settings"]')
+      await tid('tool-in-use-gemini').waitFor()
+      await page.waitForTimeout(400)
+    }
+    /** Turn Gemini on, wait for the preview, dismiss it the given way, wait until the preview is gone and the settle */
+    const geminiOnThen = async (dismiss: () => Promise<void>): Promise<void> => {
+      await tid('tool-in-use-gemini').click({ force: true })
+      await tid('apply-preview').waitFor({ timeout: 30_000 })
+      await page.waitForTimeout(300)
+      await dismiss()
+      await tid('apply-preview').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+      await page.waitForTimeout(1000)
+    }
+    const cancel = (): Promise<void> => tid('apply-preview-cancel').click()
+    const esc = (): Promise<void> => page.keyboard.press('Escape')
+    const closeX = (): Promise<void> => page.locator('.mantine-Modal-close').first().click()
+
+    await openSettings()
+    // 1. explicit [claude] → Gemini on → Cancel → back to [claude], switch off, ~/.gemini untouched
+    await geminiOnThen(cancel)
+    check(!(await tid('tool-in-use-gemini').isChecked()), 'Cancel: Gemini switch off again')
+    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `Cancel: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(!existsSync(join(home, '.gemini')), 'Cancel: ~/.gemini not created')
+    // 2. same with Esc
+    await geminiOnThen(esc)
+    check(!(await tid('tool-in-use-gemini').isChecked()), 'Esc: Gemini switch off again')
+    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `Esc: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(!existsSync(join(home, '.gemini')), 'Esc: ~/.gemini not created')
+    // 3. unset → Gemini on → close button → the key is gone again (unset)
+    writeFileSync(cfgPath, JSON.stringify({ version: 1, activeWorkspace: 'default' }) + '\n')
+    await page.reload()
+    await openSettings()
+    await geminiOnThen(closeX)
+    check(!('toolsInUse' in cfg()), `close button: toolsInUse unset again (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(!existsSync(join(home, '.gemini')), 'close button: ~/.gemini not created')
+    // 4. Gemini on → Apply → kept, ~/.gemini written
+    await tid('tool-in-use-gemini').click({ force: true })
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    await page.waitForTimeout(800)
+    check(JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]', `Apply: list kept (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(existsSync(join(home, '.gemini/GEMINI.md')), 'Apply: ~/.gemini written')
+    check(await tid('tool-in-use-gemini').isChecked(), 'Apply: Gemini switch stays on')
+    // 5. a preview opened from the sidebar Sync button, cancelled → settings unchanged
+    put(home, `${ws}/rules/more.md`, '# More\n')
+    await page.click('[data-menu="rules"]')
+    await page.getByRole('button', { name: 'Reload' }).click()
+    await tid('sync-button').waitFor()
+    await page.waitForFunction(() => !(document.querySelector('[data-testid="sync-button"]') as HTMLButtonElement | null)?.disabled, null, { timeout: 30_000 }).catch(() => {})
+    await tid('sync-button').click()
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    await cancel()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+    await page.waitForTimeout(1000)
+    check(JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]', `sidebar preview cancel: settings unchanged (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(!existsSync(join(home, '.claude/rules/illithid/more.md')), 'sidebar preview cancel: nothing applied')
+    await page.screenshot({ path: join(shots, 'toolscancel-1-after.png') })
+    return { failures, errors }
+  } finally {
+    await app.close()
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const shots = process.env.SHOTS_DIR ?? mkdtempSync(join(tmpdir(), 'illithid-onboarding-shots-'))
   mkdirSync(shots, { recursive: true })
@@ -420,8 +523,9 @@ async function main(): Promise<void> {
   const b = await notInitializedRun(shots)
   const c = await previewDetailsRun(shots)
   const d = await firstToolSaveRun(shots)
-  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d }, null, 2))
-  if ([a, b, c, d].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
+  const e = await toolsCancelRun(shots)
+  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d, toolsCancel: e }, null, 2))
+  if ([a, b, c, d, e].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
 }
 
 main().catch((e) => {

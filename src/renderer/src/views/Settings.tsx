@@ -63,6 +63,8 @@ function ToolsInUse(): React.JSX.Element {
   const set = async (tool: ToolId, on: boolean): Promise<void> => {
     if (!view) return
     const next = on ? TOOLS.filter((x) => x === tool || shown.includes(x)) : shown.filter((x) => x !== tool)
+    // Restored if the apply preview is dismissed: a never-saved list goes back to unset
+    const previous = view.configured ? view.inUse : null
     setBusy(true)
     const r = await runWrite(window.api.toolsInUseSet(next), { success: t('settings.saved') })
     setBusy(false)
@@ -71,7 +73,17 @@ function ToolsInUse(): React.JSX.Element {
     refresh()
     reload()
     window.dispatchEvent(new Event(LIBRARY_CHANGED))
-    if (on) openPreview()
+    if (on) openPreview({ onCancel: () => void restore(previous) })
+  }
+  const restore = async (previous: ToolId[] | null): Promise<void> => {
+    setBusy(true)
+    const r = await runWrite(window.api.toolsInUseSet(previous))
+    setBusy(false)
+    if (!r) return
+    setView(r)
+    refresh()
+    reload()
+    window.dispatchEvent(new Event(LIBRARY_CHANGED))
   }
 
   return (

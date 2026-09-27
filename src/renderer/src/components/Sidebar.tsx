@@ -95,7 +95,7 @@ function SyncButton(): React.JSX.Element {
       leftSection={<RefreshCw size={14} />}
       disabled={!n && !busy}
       loading={busy}
-      onClick={openPreview}
+      onClick={() => openPreview()}
       aria-label={t('sync.buttonAria')}
       data-testid="sync-button"
       data-state={failed ? 'failed' : n ? 'pending' : 'synced'}

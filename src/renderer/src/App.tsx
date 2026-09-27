@@ -162,7 +162,21 @@ function App(): React.JSX.Element {
     }
   }, [])
   const [previewOpen, setPreviewOpen] = useState(false)
-  const openPreview = useCallback(() => setPreviewOpen(true), [])
+  const previewCancel = useRef<(() => void) | null>(null)
+  const openPreview = useCallback((opts?: { onCancel?: () => void }) => {
+    previewCancel.current = opts?.onCancel ?? null
+    setPreviewOpen(true)
+  }, [])
+  const cancelPreview = useCallback(() => {
+    const f = previewCancel.current
+    previewCancel.current = null
+    setPreviewOpen(false)
+    f?.()
+  }, [])
+  const finishPreview = useCallback(() => {
+    previewCancel.current = null
+    setPreviewOpen(false)
+  }, [])
   const syncCtx = useMemo(
     () => ({ status: syncStatus, refresh: refreshSync, syncNow, busy: syncBusy, pending, applyOnce, openPreview }),
     [syncStatus, refreshSync, syncNow, syncBusy, pending, applyOnce, openPreview]
@@ -285,7 +299,7 @@ function App(): React.JSX.Element {
           </Box>
         </Box>
         )}
-        <ApplyPreviewModal opened={previewOpen} onClose={() => setPreviewOpen(false)} />
+        <ApplyPreviewModal opened={previewOpen} onCancel={cancelPreview} onDone={finishPreview} />
        </SyncContext.Provider>
       </ConfigContext.Provider>
       <Spotlight
