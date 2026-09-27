@@ -414,10 +414,10 @@ export function registerIpc(): void {
     syncNow: async () => W.syncNow(home, await envNow()),
     syncPending: async () => ({ pending: await inWorker<number>('syncPending', home), failed: W.syncFailedCount() }),
     // Sidebar sync button: a user click is a one-time approval (independent of allowRealApply, which is not changed)
-    syncApplyOnce: async () => {
+    syncApplyOnce: async (fingerprint) => {
       const env = await envNow()
       W.markSelfWrite(3000)
-      const s = W.syncNow(home, env, true)
+      const s = W.syncNow(home, env, true, typeof fingerprint === 'string' ? fingerprint : '')
       W.markSelfWrite(3000)
       return s
     },

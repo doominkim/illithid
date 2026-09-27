@@ -151,6 +151,8 @@ export interface SkillsData {
   toggles: Record<string, ToolToggles>
   /** SKILL.md frontmatter description */
   descriptions: Record<string, string>
+  /** Library skills the tool's own settings turn off (Gemini skills.disabled / skills.enabled=false) — shown as a warning, never changed */
+  toolDisabled?: Partial<Record<ToolId, string[]>>
 }
 
 /** Library agent (agents/<name>.md) */
@@ -308,7 +310,7 @@ export interface SyncStatusView {
   at?: string
   /** Whether it actually wrote */
   wrote: boolean
-  refused?: 'libraryMissing' | 'realHomeNotAllowed'
+  refused?: 'libraryMissing' | 'realHomeNotAllowed' | 'planChanged'
   targets: SyncTargetView[]
   rules: RuleSyncResult[]
   skills: SkillSyncResult[]
@@ -535,7 +537,8 @@ export interface Api {
   /** Pending count (read-only plan) + last sync failure count */
   syncPending(): Promise<SyncPendingView>
   /** Apply once now (ignores allowRealApply — the user click is the approval) */
-  syncApplyOnce(): Promise<SyncStatusView>
+  /** fingerprint = ApplyPreviewView.fingerprint the user reviewed; if the plan changed since, nothing is written (refused planChanged) */
+  syncApplyOnce(fingerprint: string): Promise<SyncStatusView>
   /** What an apply would change, per tool (read-only plan) */
   syncPreview(): Promise<ApplyPreviewView>
   /** Keep an imported original that changed since import and stop replacing it */
@@ -608,6 +611,8 @@ export interface ApplyPreviewView {
   libraryMissing?: boolean
   /** Tools in use (effective) */
   inUse: ToolId[]
+  /** planFingerprint of the plan shown — passed back to syncApplyOnce */
+  fingerprint?: string
 }
 
 export const CHANNELS = [

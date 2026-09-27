@@ -93,7 +93,8 @@
     "renamed": "名前を変更しました",
     "description": "Description",
     "body": "本文",
-    "files": "ファイル"
+    "files": "ファイル",
+    "disabledInGemini": "Gemini CLI の設定で無効"
   },
   "mcp": {
     "transport": "トランスポート",
@@ -411,7 +412,8 @@
       "config": "設定ファイル",
       "instruction": "instructions 項目"
     },
-    "libraryDirect": "ライブラリを直接読み込み"
+    "libraryDirect": "ライブラリを直接読み込み",
+    "planChanged": "表示後に変更内容が更新されました。もう一度確認してから反映してください。"
   },
   "onboarding": {
     "title": "Illithid をはじめる",

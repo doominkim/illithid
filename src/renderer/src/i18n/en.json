@@ -93,7 +93,8 @@
     "renamed": "Renamed",
     "description": "Description",
     "body": "Body",
-    "files": "Files"
+    "files": "Files",
+    "disabledInGemini": "Disabled in Gemini CLI settings"
   },
   "mcp": {
     "transport": "Transport",
@@ -411,7 +412,8 @@
       "config": "config file",
       "instruction": "instructions entry"
     },
-    "libraryDirect": "Reads the library directly"
+    "libraryDirect": "Reads the library directly",
+    "planChanged": "The changes were updated since you opened this. Review them again, then apply."
   },
   "onboarding": {
     "title": "Set up Illithid",

@@ -1,4 +1,4 @@
-import { Group, Loader, UnstyledButton } from '@mantine/core'
+import { Group, Loader, Tooltip, UnstyledButton } from '@mantine/core'
 import type { ToolId } from '../../../shared/api'
 import { useToolsInUse } from '../lib/config'
 import { TOOL_NAME, type PillMap } from '../lib/tools'
@@ -28,7 +28,7 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
           ) : (
             <ToolIcon tool={tool} size={size} />
           )
-        const body = (
+        const pill = (
           <span
             className="ac-pill"
             style={{ width: size, height: size, borderRadius: Math.round(size * 0.3) }}
@@ -39,6 +39,13 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
           >
             {icon}
           </span>
+        )
+        const body = p.hint ? (
+          <Tooltip label={p.hint} withArrow>
+            {pill}
+          </Tooltip>
+        ) : (
+          pill
         )
         return onToggle ? (
           <UnstyledButton

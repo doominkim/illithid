@@ -14,6 +14,7 @@ import { useSync } from '../lib/sync'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { ToolIcon } from '../components/ToolIcon'
 import type { ToolId, ToolsInUseView } from '../../../shared/api'
+import { DEFAULT_TOOLS_IN_USE } from '../../../engine/toolIds'
 
 function Section({ title, children, right }: { title: string; children: React.ReactNode; right?: React.ReactNode }): React.JSX.Element {
   return (
@@ -56,9 +57,12 @@ function ToolsInUse(): React.JSX.Element {
     window.api.toolsInUseGet().then(setView, () => {})
   }, [])
 
+  // Never chosen yet: inUse is already the default tools that look installed (engine toolsInUse) — the first change saves that list
+  const detected = (tool: ToolId): boolean => !!view?.detected.find((d) => d.tool === tool)?.detected
+  const shown: ToolId[] = view?.inUse ?? []
   const set = async (tool: ToolId, on: boolean): Promise<void> => {
     if (!view) return
-    const next = on ? TOOLS.filter((x) => x === tool || view.inUse.includes(x)) : view.inUse.filter((x) => x !== tool)
+    const next = on ? TOOLS.filter((x) => x === tool || shown.includes(x)) : shown.filter((x) => x !== tool)
     setBusy(true)
     const r = await runWrite(window.api.toolsInUseSet(next), { success: t('settings.saved') })
     setBusy(false)
@@ -80,6 +84,11 @@ function ToolsInUse(): React.JSX.Element {
               <Text size="md" fw={500}>
                 {TOOL_NAME[tool]}
               </Text>
+              {view && !view.configured && DEFAULT_TOOLS_IN_USE.includes(tool) && !detected(tool) && (
+                <Text size="xs" c="dimmed" data-testid={`tool-not-found-${tool}`}>
+                  {t('onboarding.notDetected')}
+                </Text>
+              )}
               {tool === 'copilot' && (
                 <Text size="xs" c="dimmed">
                   {t('settings.copilotDoubleLoad')}
@@ -87,7 +96,7 @@ function ToolsInUse(): React.JSX.Element {
               )}
             </Box>
           </Group>
-          <Switch size="md" checked={!!view?.inUse.includes(tool)} disabled={!view || busy} onChange={(e) => void set(tool, e.currentTarget.checked)} data-testid={`tool-in-use-${tool}`} />
+          <Switch size="md" checked={shown.includes(tool)} disabled={!view || busy} onChange={(e) => void set(tool, e.currentTarget.checked)} data-testid={`tool-in-use-${tool}`} />
         </Group>
       ))}
     </Section>

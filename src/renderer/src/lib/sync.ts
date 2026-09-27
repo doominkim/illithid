@@ -11,7 +11,8 @@ export interface SyncCtx {
   /** Pending and failed counts (sidebar sync button) */
   pending?: SyncPendingView
   /** One real apply now (user click only) */
-  applyOnce: () => Promise<SyncStatusView | null>
+  /** fingerprint = the reviewed preview's plan; a changed plan is refused (planChanged) and nothing is written */
+  applyOnce: (fingerprint: string) => Promise<SyncStatusView | null>
   /** Open the apply preview (changes per tool → Apply) */
   openPreview: () => void
 }

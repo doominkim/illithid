@@ -13,10 +13,11 @@ export {
 export type { LibraryPaths } from './sources'
 export { initLibrary, initLibraryAt, LIBRARY_DIRS, WORKSPACE_FILE } from './init'
 export type { InitLibraryOptions, InitLibraryResult } from './init'
-export { syncAll, planSyncAll, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch, importedChangedOf } from './sync'
+export { syncAll, planSyncAll, planFingerprint, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch, importedChangedOf } from './sync'
 export { keepImportedOriginal } from './pendingRetire'
 export type { SyncAllOptions, SyncAllResult, SyncPlan, SyncResults, SwitchLossItem, SwitchLossKind } from './sync'
 export { mcpEntries, sha256 } from './text'
+export { geminiDisabledSkillsOf } from './targets/geminiMcp'
 export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS, MCP_TARGET_OF, MCP_TARGET_TOOL, parseServerTable } from './targets'
 export {
   skillOverrideHits,

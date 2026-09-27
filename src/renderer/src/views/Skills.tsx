@@ -60,13 +60,14 @@ function Skills(): React.JSX.Element {
           const on = !TOGGLE_TOOLS.includes(tool) || data.toggles[name]?.[tool] !== false
           if (!on) return [tool, { on: false }]
           if (failedIn('skill', name, tool)) return [tool, { on: true, problem: true }]
+          if (data.toolDisabled?.[tool]?.includes(name)) return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
           return [tool, { ...pillFromCellState(st ?? 'synced'), on: true }]
         })
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
     })
-  }, [data, failedIn])
+  }, [data, failedIn, t])
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />

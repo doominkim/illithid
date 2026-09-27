@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
+import { toolConfigFound } from './detect'
 import { DEFAULT_TOOLS_IN_USE, TOOL_IDS, type ToolId } from './toolIds'
 import { atomicWrite } from './write'
 
@@ -42,7 +43,7 @@ export interface AppConfig {
   backupRetention?: BackupRetention
   /**
    * Tools this device uses. Tools not listed get no writes at all (no files, no folders).
-   * DEFAULT_TOOLS_IN_USE if absent (users from before this setting existed are unchanged; later tools stay off)
+   * If absent: the default tools that look installed (toolsInUse) — later tools (Gemini, Copilot) stay off
    */
   toolsInUse?: ToolId[]
 }
@@ -186,10 +187,17 @@ export function readConfig(home: string): ConfigRead {
   return { path, exists: true, config: raw as AppConfig }
 }
 
-/** Tools in use on this device (config.toolsInUse, deduplicated in tool order). DEFAULT_TOOLS_IN_USE if unset */
+/**
+ * Tools in use on this device: config.toolsInUse (deduplicated in tool order), or while unset the default tools whose config
+ * folder exists (DEFAULT_TOOLS_IN_USE ∩ toolConfigFound). Folders only, never PATH: every caller (sync, status, adopt, setModel,
+ * tool memory) then agrees without needing the user's environment, and a tool that is installed but has never run gets no partial
+ * writes. PATH detection only feeds the onboarding/Settings "detected" hint; saving there makes the list explicit.
+ * Settings shows this same list and saves it as-is on the first change
+ */
 export function toolsInUse(home: string): ToolId[] {
   const v = readConfig(home).config.toolsInUse
-  return v === undefined ? [...DEFAULT_TOOLS_IN_USE] : CONFIG_TOOL_IDS.filter((t) => v.includes(t))
+  if (v !== undefined) return CONFIG_TOOL_IDS.filter((t) => v.includes(t))
+  return DEFAULT_TOOLS_IN_USE.filter((t) => toolConfigFound(home, t))
 }
 
 export function toolInUse(home: string, tool: ToolId): boolean {

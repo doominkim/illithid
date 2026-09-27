@@ -145,10 +145,10 @@ function App(): React.JSX.Element {
     window.addEventListener(LIBRARY_CHANGED, refreshPending)
     return () => window.removeEventListener(LIBRARY_CHANGED, refreshPending)
   }, [refreshPending])
-  const applyOnce = useCallback(async (): Promise<SyncStatusView | null> => {
+  const applyOnce = useCallback(async (fingerprint: string): Promise<SyncStatusView | null> => {
     setSyncBusy(true)
     try {
-      const s = await window.api.syncApplyOnce()
+      const s = await window.api.syncApplyOnce(fingerprint)
       setSyncStatus(s)
       notifySync(s)
       clearApiCache()

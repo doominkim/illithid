@@ -10,6 +10,7 @@ import {
   readManifest,
   keepImportedOriginal as keepOriginal,
   libraryExists,
+  planFingerprint,
   planSyncAll,
   tilde,
   type Env,
@@ -97,7 +98,15 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     if (!merged.has(k)) items.push({ tool: r.tool, kind: r.kind, name: r.name, action: 'retire', path: tilde(home, r.path) })
 
   const importedChanged = importedChangedOf(p).map((x) => ({ ...x, path: tilde(home, x.path) }))
-  return { items, importedChanged, errors, notInitialized: notInitializedOf(p.targets), libraryDirect: libraryDirect(home, inUse, items), inUse }
+  return {
+    items,
+    importedChanged,
+    errors,
+    notInitialized: notInitializedOf(p.targets),
+    libraryDirect: libraryDirect(home, inUse, items),
+    inUse,
+    fingerprint: planFingerprint(p)
+  }
 }
 
 function instructionList(text: string): string[] {

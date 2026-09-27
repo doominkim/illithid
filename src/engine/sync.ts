@@ -27,6 +27,7 @@ import { libraryExists } from './sources'
 import { activePending, dropPending, retireHash, type RetireKind } from './pendingRetire'
 import { readState, writeState } from './state'
 import { ALL_TARGET_IDS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
+import { sha256 } from './text'
 import type { Env, FileChange } from './types'
 
 export interface SyncAllOptions {
@@ -41,6 +42,11 @@ export interface SyncAllOptions {
    * Writes to the real HOME for this call even if config.allowRealApply is off. The setting is not changed
    */
   approvedOnce?: boolean
+  /**
+   * Fingerprint (planFingerprint) of the plan the user reviewed. If given and the current plan differs, nothing is written
+   * (refused=planChanged) — what gets applied is exactly what was previewed
+   */
+  expectFingerprint?: string
 }
 
 /** Plan (raw file content is in targets[].before/after — excerpt/mask it before showing in UI or logs) */
@@ -69,8 +75,9 @@ export interface SyncAllResult {
    * Why writing was refused
    * - libraryMissing       no library (run initLibrary or import first)
    * - realHomeNotAllowed   home is the real HOME but config.allowRealApply is off
+   * - planChanged          expectFingerprint no longer matches the plan (the library or a tool file changed after the preview)
    */
-  refused?: 'libraryMissing' | 'realHomeNotAllowed'
+  refused?: 'libraryMissing' | 'realHomeNotAllowed' | 'planChanged'
 }
 
 function sameDir(a: string, b: string): boolean {
@@ -143,6 +150,32 @@ export function pendingSyncCount(home: string, env: Env = process.env, secrets?:
   )
 }
 
+/**
+ * Stable hash of what a sync would change. No raw content. Two plans with the same fingerprint write the same things:
+ * - target files that change or fail: id + owned-region hashes before/after (whole-file hash only when a side has no region),
+ *   owned entries, retired originals, error — edits outside the owned region (e.g. Claude Code rewriting ~/.claude.json) don't count
+ * - rule/skill/agent items the sync acts on (not inSync, not skip): tool, name, action, path, hashes — copies, imported originals
+ *   to retire and delete candidates
+ */
+export function planFingerprint(p: SyncPlan): string {
+  const rows: string[] = []
+  for (const c of p.targets) {
+    if (!c.changed && !c.error) continue
+    const before = c.beforeRegionHash ?? `file:${sha256(c.before)}`
+    const after = c.afterRegionHash ?? `file:${sha256(c.after)}`
+    rows.push(['target', c.id, before, after, (c.owned ?? []).join(','), (c.retired ?? []).join(','), c.error ?? ''].join('|'))
+  }
+  const item = (kind: string, x: { tool?: string; name: string; action: string; path: string; reason?: string; sourceHash?: string; currentHash?: string }): void => {
+    if (x.action === 'inSync' || x.action === 'skip') return
+    rows.push([kind, x.tool ?? '', x.name, x.action, x.path, x.reason ?? '', x.sourceHash ?? '', x.currentHash ?? ''].join('|'))
+  }
+  for (const x of p.rules) item('rule', x)
+  for (const x of p.skills) item('skill', x)
+  for (const x of p.agents) item('agent', x)
+  for (const e of p.errors) rows.push(`error|${e}`)
+  return sha256(rows.sort().join('\n'))
+}
+
 export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllResult {
   if (!libraryExists(home)) {
     return {
@@ -154,6 +187,8 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   const plan = planSyncAll(home, env, opts.secrets)
   if (!opts.allowReal) return { libraryExists: true, plan }
   if (!opts.approvedOnce && !realApplyAllowed(home)) return { libraryExists: true, plan, refused: 'realHomeNotAllowed' }
+  if (opts.expectFingerprint !== undefined && opts.expectFingerprint !== planFingerprint(plan))
+    return { libraryExists: true, plan, refused: 'planChanged' }
   const results: SyncResults = {
     targets: apply(home, env, [...ALL_TARGET_IDS], opts.secrets ? { secrets: opts.secrets } : {}),
     rules: applyRuleSync(home, env, plan.rules, { allowLinkRemoval: !!opts.allowLinkRemoval }),

@@ -36,6 +36,8 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [keeping, setKeeping] = useState<string | null>(null)
+  /** The plan changed between preview and Apply — nothing was written, the refreshed plan is shown */
+  const [changed, setChanged] = useState(false)
 
   const load = useCallback(() => {
     window.api.syncPreview().then(
@@ -56,11 +58,15 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
   }
 
   const apply = async (): Promise<void> => {
+    if (!view?.fingerprint) return
     setBusy(true)
-    const s = await applyOnce()
+    const s = await applyOnce(view.fingerprint)
     setBusy(false)
     if (s && s.wrote) onDone()
-    else load()
+    else {
+      setChanged(s?.refused === 'planChanged')
+      load()
+    }
   }
 
   if (err)
@@ -109,6 +115,11 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
       {view.libraryMissing && (
         <Alert color="yellow" variant="light">
           {t('sync.libraryMissing')}
+        </Alert>
+      )}
+      {changed && (
+        <Alert color="yellow" variant="light" data-testid="apply-preview-changed">
+          {t('preview.planChanged')}
         </Alert>
       )}
       {view.errors.length > 0 && (

@@ -12,6 +12,8 @@ import { planSkillSync, type SkillSyncItem } from './skillSync'
 import { toolsInUse } from './config'
 import { readState, type StateRead } from './state'
 import { MCP_TARGET_OF } from './targets'
+import { geminiDisabledSkillsOf } from './targets/geminiMcp'
+import { readSources } from './sources'
 import { SKILL_OVERRIDE_TARGET_OF } from './targets/skillOverrides'
 import type { Env, FileChange, TargetId } from './types'
 
@@ -279,6 +281,13 @@ export function statusReport(
   const roster = readRoster(home)
   const cells: StatusCell[] = []
   const inUse = toolsInUse(home)
+  const geminiOff = (): string[] => {
+    try {
+      return geminiDisabledSkillsOf(home, readSources(home))
+    } catch {
+      return []
+    }
+  }
 
   for (const resource of RESOURCES) {
     for (const tool of TOOL_IDS) {
@@ -297,15 +306,10 @@ export function statusReport(
       else if (targetId) {
         cells.push(overrideOf(changeCell(resource, tool, byId.get(targetId), sourcesError)))
       } else if (resource === 'skills') {
-        cells.push(
-          overrideOf(
-            skillsCell(
-              home,
-              skills.tools.find((t) => t.tool === tool)!,
-              sync
-            )
-          )
-        )
+        const cell = overrideOf(skillsCell(home, skills.tools.find((t) => t.tool === tool)!, sync))
+        // Gemini's own settings turning library skills off: shown (warning in the detail), never changed
+        const off = tool === 'gemini' ? geminiOff() : []
+        cells.push(off.length ? { ...cell, detail: `${cell.detail} · disabled in Gemini settings: ${off.join(', ')}` } : cell)
       } else if (resource === 'models') {
         const m = models.find((x) => x.tool === tool)!
         cells.push(

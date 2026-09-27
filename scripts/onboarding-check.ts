@@ -291,14 +291,78 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
   }
 }
 
+/**
+ * Scenario 4: tools in use never chosen (config.toolsInUse unset), library already filled, Claude Code installed, OpenCode and Codex not.
+ * Settings shows only the detected default tools on (OpenCode off, "Not found"); turning Gemini CLI on saves exactly that list,
+ * so no ~/.config/opencode (or ~/.codex) is created by the apply that follows
+ */
+async function firstToolSaveRun(shots: string): Promise<RunResult> {
+  const home = '/Users/Shared/illithid-first-tool-save'
+  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  mkdirSync(home)
+  const userData = mkdtempSync(join(tmpdir(), 'illithid-toolsave-userdata-'))
+  const ws = '.illithid/workspaces/default'
+  put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
+  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
+  put(home, `${ws}/mcps/context7.json`, JSON.stringify({ transport: 'http', url: 'https://mcp.context7.com/mcp' }) + '\n')
+  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default' }) + '\n')
+  put(home, '.claude/settings.json', '{}\n')
+  put(home, '.claude.json', '{}\n')
+  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const failures: string[] = []
+  const check = (ok: boolean, what: string): void => {
+    if (!ok) failures.push(what)
+  }
+  const errors: string[] = []
+  const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => errors.push(e.message))
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(1280, 800)
+    })
+    await page.evaluate(() => localStorage.setItem('illithid-language', 'en'))
+    await page.reload()
+    const tid = (id: string): ReturnType<Page['locator']> => page.locator(`[data-testid="${id}"]`)
+    await page.locator('[data-menu="settings"]').waitFor({ timeout: 30_000 })
+    await page.click('[data-menu="settings"]')
+    await tid('tool-in-use-claude').waitFor()
+    await page.waitForTimeout(400)
+    check(await tid('tool-in-use-claude').isChecked(), 'Claude Code shown on (detected)')
+    check(!(await tid('tool-in-use-opencode').isChecked()) && !(await tid('tool-in-use-codex').isChecked()), 'OpenCode and Codex shown off (not detected)')
+    check(await tid('tool-not-found-opencode').isVisible(), 'OpenCode marked Not found')
+    await page.screenshot({ path: join(shots, 'toolsave-1-settings.png') })
+    await tid('tool-in-use-gemini').click({ force: true })
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    check(!(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-codex').count()), 'preview has no OpenCode or Codex rows')
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: join(shots, 'toolsave-2-preview.png') })
+    const cfg = JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')) as { toolsInUse?: string[] }
+    check(JSON.stringify(cfg.toolsInUse) === '["claude","gemini"]', `first save = shown tools + Gemini (got ${JSON.stringify(cfg.toolsInUse)})`)
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    await page.waitForTimeout(600)
+    check(!existsSync(join(home, '.config/opencode')), '~/.config/opencode not created')
+    check(!existsSync(join(home, '.codex')), '~/.codex not created')
+    check(existsSync(join(home, '.gemini/GEMINI.md')) && existsSync(join(home, '.gemini/settings.json')), 'Gemini files written')
+    return { failures, errors }
+  } finally {
+    await app.close()
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const shots = process.env.SHOTS_DIR ?? mkdtempSync(join(tmpdir(), 'illithid-onboarding-shots-'))
   mkdirSync(shots, { recursive: true })
   const a = await firstRun(shots)
   const b = await notInitializedRun(shots)
   const c = await previewDetailsRun(shots)
-  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c }, null, 2))
-  if ([a, b, c].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
+  const d = await firstToolSaveRun(shots)
+  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d }, null, 2))
+  if ([a, b, c, d].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
 }
 
 main().catch((e) => {

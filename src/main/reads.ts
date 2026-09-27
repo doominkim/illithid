@@ -37,6 +37,8 @@ import {
   statusReport,
   tilde,
   MCP_TARGET_OF,
+  geminiDisabledSkillsOf,
+  toolsInUse,
   parseServerTable,
   TOOL_IDS,
   type AgentSyncItem,
@@ -147,13 +149,20 @@ export function skills(home: string, env: Env): SkillsData {
     syncError = (e as Error).message
   }
   markSkillOverrides(home, env, state)
+  let geminiOff: string[] = []
+  try {
+    if (toolsInUse(home).includes('gemini')) geminiOff = geminiDisabledSkillsOf(home, readSources(home))
+  } catch {
+    geminiOff = []
+  }
   return {
     dir: tilde(home, canonicalPaths(home).skills),
     names,
     state,
     ...(syncError ? { syncError } : {}),
     toggles: toggles(home, 'skills'),
-    descriptions: skillDescriptions(home, names)
+    descriptions: skillDescriptions(home, names),
+    ...(geminiOff.length ? { toolDisabled: { gemini: geminiOff } } : {})
   }
 }
 

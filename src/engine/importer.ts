@@ -15,8 +15,6 @@
  */
 import { createHash } from 'node:crypto'
 import {
-  accessSync,
-  constants as fsConstants,
   existsSync,
   lstatSync,
   readdirSync,
@@ -33,6 +31,7 @@ import { adoptAgentFiles } from './agentSync'
 import { adoptSkillCopies } from './skillSync'
 import { renderAgent } from './agentRender'
 import { TOOL_IDS, tilde, tools, type ToolId } from './agents'
+import { toolConfigFound } from './detect'
 import { activeWorkspaceId, LEGACY_LIBRARY_DIR, libraryRoot } from './config'
 import {
   agentLibraryText,
@@ -70,7 +69,7 @@ import { libraryPaths, readMcp } from './sources'
 import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
 import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
 import { mcpEntries, outsideBlockMulti, sha256, stripJsonComments } from './text'
-import type { Allowlist, AllowlistEntry, Env, McpCodexOptions, McpServer, McpSource } from './types'
+import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
 
@@ -124,31 +123,31 @@ export function listImportSources(home: string): ImportSource[] {
     claude: {
       label: 'Claude Code (~/.claude, ~/.claude.json)',
       path: join(home, '.claude'),
-      available: isDir(join(home, '.claude')) || existsSync(join(home, '.claude.json')),
+      available: toolConfigFound(home, 'claude'),
       kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
     },
     codex: {
       label: 'Codex (~/.codex)',
       path: join(home, '.codex'),
-      available: isDir(join(home, '.codex')),
+      available: toolConfigFound(home, 'codex'),
       kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
     },
     opencode: {
       label: 'OpenCode (~/.config/opencode)',
       path: join(home, '.config/opencode'),
-      available: isDir(join(home, '.config/opencode')),
+      available: toolConfigFound(home, 'opencode'),
       kinds: ['rule', 'mcp', 'skill', 'agent']
     },
     gemini: {
       label: 'Gemini CLI (~/.gemini)',
       path: join(home, '.gemini'),
-      available: isDir(join(home, '.gemini')),
+      available: toolConfigFound(home, 'gemini'),
       kinds: ['rule', 'mcp', 'skill', 'agent']
     },
     copilot: {
       label: 'GitHub Copilot (~/.copilot)',
       path: join(home, '.copilot'),
-      available: isDir(join(home, '.copilot')),
+      available: toolConfigFound(home, 'copilot'),
       kinds: ['rule', 'mcp', 'skill', 'agent']
     }
   }
@@ -180,54 +179,7 @@ export function listImportSources(home: string): ImportSource[] {
 
 // ---------------------------------------------------------------- Tool detection
 
-/** Executable names looked up on PATH per tool */
-export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = {
-  claude: 'claude',
-  codex: 'codex',
-  opencode: 'opencode',
-  gemini: 'gemini',
-  copilot: 'copilot'
-}
-
-export interface ToolDetection {
-  tool: ToolId
-  /** The tool's config folder/file exists (same check as listImportSources) */
-  configFound: boolean
-  /** Absolute path of the executable found on PATH */
-  executable?: string
-  /** configFound or executable */
-  detected: boolean
-}
-
-export interface DetectToolsOptions {
-  /** Executable check (default: regular file with an execute bit). Injected by fixtures */
-  isExecutable?: (path: string) => boolean
-}
-
-function executableFile(p: string): boolean {
-  try {
-    if (!statSync(p).isFile()) return false
-    accessSync(p, fsConstants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Which tools look installed on this device (read-only): the tool's config location exists or its executable is on env.PATH.
- * Used to pre-check config.toolsInUse; the user decides
- */
-export function detectTools(home: string, env: Env = process.env, opts: DetectToolsOptions = {}): ToolDetection[] {
-  const isExec = opts.isExecutable ?? executableFile
-  const dirs = (env.PATH ?? '').split(':').filter((d) => d && isAbsolute(d))
-  const sources = listImportSources(home)
-  return TOOL_IDS.map((tool) => {
-    const configFound = !!sources.find((s) => s.id === `tool:${tool}`)?.available
-    const executable = dirs.map((d) => join(d, TOOL_EXECUTABLES[tool])).find((p) => isExec(p))
-    return { tool, configFound, ...(executable ? { executable } : {}), detected: configFound || !!executable }
-  })
-}
+export { detectTools, TOOL_EXECUTABLES, type DetectToolsOptions, type ToolDetection } from './detect'
 
 // ---------------------------------------------------------------- Candidate types
 

@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   jsonSubKeysRegion,
+  stripJsonComments,
   mcpEntries,
   parseJsonObject,
   removeServers,
@@ -112,16 +115,34 @@ export function keepToolOnlyKeys(servers: Record<string, Json>, prev: Json, keys
   return kept
 }
 
-/** Library skills on for Gemini that Gemini's own settings turn off (skills.enabled / skills.disabled) — warned, not changed */
-function disabledSkillNotes(settings: Json, sources: Sources): string[] {
+/**
+ * Library skills on for Gemini that Gemini's own settings turn off — all of them if skills.enabled is false, else those in
+ * skills.disabled. Warned about, never changed
+ */
+export function geminiDisabledSkills(settings: Json, sources: Sources): { allOff: boolean; names: string[] } {
   const sk = settings.skills
-  if (!sk || typeof sk !== 'object' || Array.isArray(sk)) return []
+  if (!sk || typeof sk !== 'object' || Array.isArray(sk)) return { allOff: false, names: [] }
   const s = sk as Json
   const on = librarySkillNames(sources).filter((n) => isEnabled(sources.manifest, 'skills', n, 'gemini'))
-  if (!on.length) return []
-  if (s.enabled === false) return ['skills.enabled is false in settings.json — Gemini loads no skills, including library ones']
-  const off = Array.isArray(s.disabled) ? on.filter((n) => (s.disabled as unknown[]).includes(n)) : []
-  return off.length ? [`library skills disabled by skills.disabled in settings.json (left as-is): ${off.join(', ')}`] : []
+  if (s.enabled === false) return { allOff: true, names: on }
+  return { allOff: false, names: Array.isArray(s.disabled) ? on.filter((n) => (s.disabled as unknown[]).includes(n)) : [] }
+}
+
+/** geminiDisabledSkills from ~/.gemini/settings.json (read with comments allowed, like Gemini). Empty if missing or unreadable */
+export function geminiDisabledSkillsOf(home: string, sources: Sources): string[] {
+  try {
+    const v = JSON.parse(stripJsonComments(readFileSync(join(home, '.gemini/settings.json'), 'utf8'))) as unknown
+    return v && typeof v === 'object' && !Array.isArray(v) ? geminiDisabledSkills(v as Json, sources).names : []
+  } catch {
+    return []
+  }
+}
+
+function disabledSkillNotes(settings: Json, sources: Sources): string[] {
+  const { allOff, names } = geminiDisabledSkills(settings, sources)
+  if (!names.length) return []
+  if (allOff) return ['skills.enabled is false in settings.json — Gemini loads no skills, including library ones']
+  return [`library skills disabled by skills.disabled in settings.json (left as-is): ${names.join(', ')}`]
 }
 
 /** Serialize keeping the file's indentation and trailing newline */

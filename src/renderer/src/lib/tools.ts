@@ -33,6 +33,8 @@ export interface PillState {
   pending?: boolean
   /** Not applicable to this tool → hidden */
   na?: boolean
+  /** Tooltip explaining the state (e.g. why it is flagged) */
+  hint?: string
 }
 
 export type PillMap = Partial<Record<ToolId, PillState>>

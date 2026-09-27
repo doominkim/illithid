@@ -370,11 +370,11 @@ export function syncFailedCount(): number {
  * Source → tool sync. approvedOnce = user explicitly approved this one run (ignores allowRealApply, settings unchanged). Writes for real if allowRealApply (or fixture HOME), otherwise plans only.
  * The source always wins, so drift is ignored (forced here until the engine defaults to force).
  */
-export function syncNow(home: string, env: Env, approvedOnce = false): SyncStatusView {
+export function syncNow(home: string, env: Env, approvedOnce = false, expectFingerprint?: string): SyncStatusView {
   const at = new Date().toISOString()
   try {
     const allowReal = approvedOnce || !!readConfig(home).config.allowRealApply
-    const r = syncAll(home, env, { allowReal, approvedOnce })
+    const r = syncAll(home, env, { allowReal, approvedOnce, ...(expectFingerprint !== undefined ? { expectFingerprint } : {}) })
     lastSync = toView(home, r, at)
   } catch (e) {
     lastSync = { ...lastSync, at, wrote: false, errors: [(e as Error).message], errorCount: lastSync.errorCount + 1 }
