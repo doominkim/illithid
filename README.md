@@ -131,3 +131,7 @@ Without a Developer ID certificate, build unsigned with `CSC_IDENTITY_AUTO_DISCO
 ## App languages
 
 English, Korean, Japanese and Chinese.
+
+## License
+
+[MIT](LICENSE)

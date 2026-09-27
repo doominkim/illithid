@@ -131,3 +131,7 @@ Developer ID 証明書がない場合は `CSC_IDENTITY_AUTO_DISCOVERY=false npm 
 ## アプリの言語
 
 英語、韓国語、日本語、中国語。
+
+## ライセンス
+
+[MIT](LICENSE)

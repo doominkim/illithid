@@ -131,3 +131,7 @@ npm run build:mac    # 在 dist/ 生成 DMG
 ## 应用语言
 
 英语、韩语、日语、中文。
+
+## 许可证
+
+[MIT](LICENSE)

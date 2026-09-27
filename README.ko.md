@@ -131,3 +131,7 @@ Developer ID 인증서가 없으면 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run b
 ## 앱 언어
 
 영어, 한국어, 일본어, 중국어.
+
+## 라이선스
+
+[MIT](LICENSE)
