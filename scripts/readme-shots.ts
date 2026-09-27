@@ -34,11 +34,16 @@ export const baseEnv = (home: string): Record<string, string> => ({
 
 const iso = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 60_000).toISOString()
 
-export function buildDemoHome(home: string): void {
+export const ALL_TOOLS = ['claude', 'codex', 'opencode', 'gemini', 'copilot'] as const
+
+/** tools: 'all' also sets up Gemini CLI and GitHub Copilot and lists all five in toolsInUse. Default = the three config folders only */
+export function buildDemoHome(home: string, opts: { tools?: 'all' } = {}): void {
+  const all = opts.tools === 'all'
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }, null, 2) + '\n')
   put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }, null, 2) + '\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, allowRealApply: true, activeWorkspace: 'default' }, null, 2) + '\n')
+  const config = { version: 1, allowRealApply: true, activeWorkspace: 'default', ...(all ? { toolsInUse: [...ALL_TOOLS] } : {}) }
+  put(home, '.config/illithid/config.json', JSON.stringify(config, null, 2) + '\n')
 
   const rules: Record<string, string> = {
     '00-communication.md': '# Communication\n\n- Answer in the language the user writes in.\n- Lead with the result, then the reasoning.\n- Keep status updates to one or two lines.\n',
@@ -86,6 +91,10 @@ export function buildDemoHome(home: string): void {
   put(home, '.claude.json', '{}\n')
   put(home, '.codex/config.toml', 'model = "gpt-5.5"\n')
   put(home, '.config/opencode/opencode.json', '{}\n')
+  if (all) {
+    put(home, '.gemini/settings.json', '{}\n')
+    mkdirSync(join(home, '.copilot'), { recursive: true })
+  }
 
   const claudeSession = (id: string, cwd: string, title: string, turns: [string, string][], ago: number): void => {
     const lines: unknown[] = [{ type: 'ai-title', aiTitle: title, sessionId: id }]
@@ -98,17 +107,6 @@ export function buildDemoHome(home: string): void {
     }
     put(home, `.claude/projects/${cwd.replace(/\//g, '-')}/${id}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
   }
-  claudeSession('0b6f3c1e-5a52-4f0e-9d7a-2f1c9e8b7a01', '/Users/alex/code/shop-api', 'Speed up checkout endpoint', [
-    ['Checkout p95 went over 400ms after the last deploy. Can you find why?', 'The regression comes from `applyCoupons()` in `src/checkout/pricing.ts:88`. It now loads every coupon for the account on each request.\n\nFix: query only active coupons with the account index. Expected p95 back to about 180ms.'],
-    ['Do it and add a test.', 'Done. Changed the query in `pricing.ts` and added `pricing.test.ts` covering expired and active coupons. All 214 tests pass.']
-  ], 20)
-  claudeSession('1c7a4d2f-6b63-4a1f-8e8b-3a2d0f9c8b12', '/Users/alex/code/web', 'Fix flaky login e2e test', [
-    ['The login e2e test fails about 1 in 5 runs on CI.', 'It clicks "Sign in" before the form finishes hydrating. I switched the test to wait for the `data-ready` attribute. 50 local runs, 0 failures.']
-  ], 240)
-  claudeSession('2d8b5e30-7c74-4b20-9f9c-4b3e1a0d9c23', '/Users/alex/code/shop-api', 'Add rate limiting to public API', [
-    ['Add rate limiting to the public endpoints.', 'Added a token bucket middleware (100 req/min per key) on `/v1/*`, with `Retry-After` on 429.']
-  ], 1500)
-
   const codexSession = (id: string, cwd: string, prompt: string, answer: string, ago: number, day: string): void => {
     const lines = [
       { type: 'session_meta', timestamp: iso(ago + 6), payload: { id, cwd, timestamp: iso(ago + 6) } },
@@ -118,8 +116,107 @@ export function buildDemoHome(home: string): void {
     ]
     put(home, `.codex/sessions/${day}/rollout-${day.replace(/\//g, '-')}T10-00-00-${id}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
   }
-  codexSession('3e9c6f41-8d85-4c31-a0ad-5c4f2b1e0d34', '/Users/alex/code/web', 'Migrate the settings page to the new form library', 'Migrated `SettingsForm` to the new form hooks. Validation messages are unchanged; bundle size down 11 KB.', 90, '2026/09/26')
-  codexSession('4fad7052-9e96-4d42-b1be-6d503c2f1e45', '/Users/alex/code/infra', 'Write a runbook for rotating the database password', 'Wrote `docs/runbooks/rotate-db-password.md`: create the new user, update the secret, roll the pods, drop the old user.', 2000, '2026/09/25')
+  if (!all) {
+    claudeSession('0b6f3c1e-5a52-4f0e-9d7a-2f1c9e8b7a01', '/Users/alex/code/shop-api', 'Speed up checkout endpoint', [
+      ['Checkout p95 went over 400ms after the last deploy. Can you find why?', 'The regression comes from `applyCoupons()` in `src/checkout/pricing.ts:88`. It now loads every coupon for the account on each request.\n\nFix: query only active coupons with the account index. Expected p95 back to about 180ms.'],
+      ['Do it and add a test.', 'Done. Changed the query in `pricing.ts` and added `pricing.test.ts` covering expired and active coupons. All 214 tests pass.']
+    ], 20)
+    claudeSession('1c7a4d2f-6b63-4a1f-8e8b-3a2d0f9c8b12', '/Users/alex/code/web', 'Fix flaky login e2e test', [
+      ['The login e2e test fails about 1 in 5 runs on CI.', 'It clicks "Sign in" before the form finishes hydrating. I switched the test to wait for the `data-ready` attribute. 50 local runs, 0 failures.']
+    ], 240)
+    claudeSession('2d8b5e30-7c74-4b20-9f9c-4b3e1a0d9c23', '/Users/alex/code/shop-api', 'Add rate limiting to public API', [
+      ['Add rate limiting to the public endpoints.', 'Added a token bucket middleware (100 req/min per key) on `/v1/*`, with `Retry-After` on 429.']
+    ], 1500)
+
+    codexSession('3e9c6f41-8d85-4c31-a0ad-5c4f2b1e0d34', '/Users/alex/code/web', 'Migrate the settings page to the new form library', 'Migrated `SettingsForm` to the new form hooks. Validation messages are unchanged; bundle size down 11 KB.', 90, '2026/09/26')
+    codexSession('4fad7052-9e96-4d42-b1be-6d503c2f1e45', '/Users/alex/code/infra', 'Write a runbook for rotating the database password', 'Wrote `docs/runbooks/rotate-db-password.md`: create the new user, update the secret, roll the pods, drop the old user.', 2000, '2026/09/25')
+    return
+  }
+
+  // All tools: several requests per session, "checkout" across Claude, Codex, OpenCode and Gemini (Copilot sessions are not scanned)
+  claudeSession('0b6f3c1e-5a52-4f0e-9d7a-2f1c9e8b7a01', '/Users/alex/code/shop-api', 'Speed up checkout endpoint', [
+    ['Checkout p95 went over 400ms after the last deploy. Can you find why?', 'The regression comes from `applyCoupons()` in `src/checkout/pricing.ts:88`. It now loads every coupon for the account on each request.\n\nFix: query only active coupons with the account index. Expected p95 back to about 180ms.'],
+    ['Query only active coupons and keep the account index.', 'Changed the query in `pricing.ts` to filter on `active = true` and use `coupons_account_id_idx`. Checkout now reads 3 rows instead of 1,200 for the largest account.'],
+    ['Add a test for expired coupons.', 'Added `pricing.test.ts` cases for expired, future and active coupons. All 216 tests pass.'],
+    ['Run the checkout load test again and compare p95.', 'Checkout p95 is 176 ms (was 412 ms), p99 is 240 ms. Error rate unchanged at 0.02%.']
+  ], 20)
+  claudeSession('1c7a4d2f-6b63-4a1f-8e8b-3a2d0f9c8b12', '/Users/alex/code/web', 'Fix flaky login e2e test', [
+    ['The login e2e test fails about 1 in 5 runs on CI.', 'It clicks "Sign in" before the form finishes hydrating. I switched the test to wait for the `data-ready` attribute. 50 local runs, 0 failures.'],
+    ['Check the checkout e2e for the same race.', 'Same pattern in `checkout.spec.ts`: it fills the card form before hydration. Applied the same `data-ready` wait.'],
+    ['Run both suites 50 times on CI.', '100 runs, 0 failures. Average suite time went from 4m10s to 4m02s.']
+  ], 180)
+  claudeSession('2d8b5e30-7c74-4b20-9f9c-4b3e1a0d9c23', '/Users/alex/code/shop-api', 'Add rate limiting to public API', [
+    ['Add rate limiting to the public endpoints.', 'Added a token bucket middleware (100 req/min per key) on `/v1/*`, with `Retry-After` on 429.'],
+    ['Exclude the checkout webhook from the limit.', 'Excluded `/v1/webhooks/checkout`; it is already authenticated by signature.'],
+    ['Document the limits in the API reference.', 'Added a "Rate limits" section to `docs/api.md` with the headers and an example 429 response.']
+  ], 1500)
+
+  const codexTurns = (id: string, cwd: string, turns: [string, string][], ago: number, day: string): void => {
+    let t = ago + turns.length * 5 + 1
+    const lines: unknown[] = [{ type: 'session_meta', timestamp: iso(t), payload: { id, cwd, timestamp: iso(t) } }]
+    for (const [u, a] of turns) {
+      t -= 1
+      lines.push({ type: 'event_msg', timestamp: iso(t), payload: { type: 'user_message', message: u } })
+      lines.push({ type: 'response_item', timestamp: iso(t), payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: u }] } })
+      t -= 4
+      lines.push({ type: 'response_item', timestamp: iso(t), payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: a }] } })
+    }
+    put(home, `.codex/sessions/${day}/rollout-${day.replace(/\//g, '-')}T10-00-00-${id}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  }
+  codexTurns('3e9c6f41-8d85-4c31-a0ad-5c4f2b1e0d34', '/Users/alex/code/shop-api', [
+    ['Write the migration for the new index on coupons(account_id, active).', 'Added `migrations/0042_coupons_account_active_idx.sql` creating `coupons_account_active_idx`.'],
+    ['Create it concurrently so checkout is not blocked.', 'Switched to `CREATE INDEX CONCURRENTLY` and moved it out of the transaction block.'],
+    ['Add a rollback step.', 'Added `DROP INDEX CONCURRENTLY IF EXISTS coupons_account_active_idx` to the down migration.']
+  ], 60, '2026/09/27')
+  codexTurns('4fad7052-9e96-4d42-b1be-6d503c2f1e45', '/Users/alex/code/infra', [
+    ['Write a runbook for rotating the database password.', 'Wrote `docs/runbooks/rotate-db-password.md`: create the new user, update the secret, roll the pods, drop the old user.'],
+    ['Add a check that the checkout service reconnected.', 'Added step 5: watch `checkout_db_pool_active` and the `/healthz` of `checkout-api` until both are green.'],
+    ['Link it from the on-call index.', 'Linked it under "Database" in `docs/runbooks/README.md`.']
+  ], 2000, '2026/09/25')
+
+  // OpenCode keeps sessions in SQLite (session / message / part, the tables the scanner reads)
+  const sqlite = process.getBuiltinModule?.('node:sqlite') as typeof import('node:sqlite') | undefined
+  if (sqlite) {
+    mkdirSync(join(home, '.local/share/opencode'), { recursive: true })
+    const db = new sqlite.DatabaseSync(join(home, '.local/share/opencode/opencode.db'))
+    db.exec(`create table session (id text primary key, title text, directory text, parent_id text, time_created integer, time_updated integer);
+      create table message (id text primary key, session_id text, time_created integer, data text);
+      create table part (id text primary key, message_id text, time_created integer, data text);`)
+    const ms = (minutesAgo: number): number => Date.now() - minutesAgo * 60_000
+    const sid = 'ses_7c21d9a0f3e14b52'
+    const turns: [string, string][] = [
+      ['The checkout button is hidden under the keyboard on iOS Safari.', 'The footer is `position: fixed; bottom: 0`, which iOS places under the keyboard. The card input keeps focus while the button is covered.'],
+      ['Use a sticky footer instead.', 'Changed `CheckoutFooter` to `position: sticky` inside the scroll container and added `env(safe-area-inset-bottom)` padding.'],
+      ['Add a screenshot test at 390px width.', 'Added `checkout-footer.visual.ts` at 390x844 with the keyboard open and closed. Baselines committed.']
+    ]
+    let t = 120 + turns.length * 5
+    db.prepare('insert into session values (?, ?, ?, ?, ?, ?)').run(sid, 'Checkout button hidden on iOS', '/Users/alex/code/web', null, ms(t), ms(120))
+    const msg = db.prepare('insert into message values (?, ?, ?, ?)')
+    const part = db.prepare('insert into part values (?, ?, ?, ?)')
+    turns.forEach(([u, a], i) => {
+      for (const [role, text, at] of [['user', u, (t -= 1)], ['assistant', a, (t -= 4)]] as const) {
+        const mid = `msg_${i}_${role}`
+        msg.run(mid, sid, ms(at), JSON.stringify({ role, time: { created: ms(at) } }))
+        part.run(`prt_${i}_${role}`, mid, ms(at), JSON.stringify({ type: 'text', text }))
+      }
+    })
+    db.close()
+  }
+
+  const gid = '5a0b8163-af07-4e53-82cf-7e614d3a2f56'
+  const gTurns: [string, string][] = [
+    ['Add idempotency keys to the checkout webhook handler.', 'Added an `Idempotency-Key` check in `src/webhooks/checkout.ts`. Duplicate deliveries now return the stored response instead of charging twice.'],
+    ['Store the responses for 24 hours.', 'Responses go to the `webhook_responses` table with a 24 h TTL, cleaned by the nightly job.'],
+    ['Write a test for duplicate deliveries.', 'Added `checkout-webhook.test.ts`: the same event sent twice charges once and returns identical bodies.']
+  ]
+  let gt = 45 + gTurns.length * 5
+  const gHeader = { sessionId: gid, projectHash: 'c0ffee5e7a1d', startTime: iso(gt), lastUpdated: iso(45), kind: 'main' }
+  const gMsgs = gTurns.flatMap(([u, a], i) => [
+    { id: `u${i}`, timestamp: iso((gt -= 1)), type: 'user', content: [{ text: u }] },
+    { id: `g${i}`, timestamp: iso((gt -= 4)), type: 'gemini', content: [{ text: a }] }
+  ])
+  put(home, '.gemini/tmp/shop-api/.project_root', '/Users/alex/code/shop-api\n')
+  put(home, `.gemini/tmp/shop-api/chats/session-${gHeader.startTime.slice(0, 16).replace(':', '-')}-${gid.slice(0, 8)}.jsonl`, [gHeader, ...gMsgs].map((l) => JSON.stringify(l)).join('\n') + '\n')
 }
 
 async function waitLoaded(page: Page): Promise<void> {

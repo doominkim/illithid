@@ -1,14 +1,14 @@
 /**
  * README demo video from a demo HOME (never the real one).
- * - Reuses the readme-shots demo HOME, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
+ * - Reuses the readme-shots demo HOME with all five tools, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
  * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
- * - Sequence: Rules grid → open 20-git.md → Edit → append to a line → Save → preview → Apply → turn OpenCode off for 40-testing.md → preview → Apply → Sessions search.
- * - Checks on disk that tool files only change on Apply and that the edit reached Claude Code, Codex and OpenCode, then encodes docs/demo/illithid-demo.{mp4,gif}.
+ * - Sequence: rule edit (all five tools) → skill off for Gemini → MCP server off for Copilot → a session's requests in Contents.
+ * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes docs/demo/illithid-demo.{mp4,gif}.
  *
  * Usage: npx electron-vite build && npx tsx scripts/readme-demo.ts
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator, type Page } from 'playwright-core'
@@ -23,8 +23,12 @@ const SIZE = { width: 1280, height: 800 }
 const RULE = '20-git.md'
 const ANCHOR = '- One logical change per commit.'
 const ADDED = ' Explain the why in the body.'
-const OFF_RULE = '40-testing.md'
+const SKILL = 'frontend-qa'
+const SKILL_OFF = 'gemini'
+const MCP = 'playwright'
+const MCP_OFF = 'copilot'
 const WS = '.illithid/workspaces/default'
+const COPILOT_RULE = `.copilot/instructions/illithid/${RULE.replace(/\.md$/, '.instructions.md')}`
 
 /** Visible pointer: Playwright videos do not draw the OS cursor */
 async function addCursor(page: Page): Promise<void> {
@@ -69,18 +73,28 @@ async function waitState(page: Page, state: 'pending' | 'synced'): Promise<void>
   await page.waitForSelector(`[data-testid="sync-button"][data-state="${state}"]`, { timeout: 15_000 })
 }
 
-/** Sidebar Sync → apply preview (per-tool changes) → Apply */
-async function applyViaPreview(page: Page, tools: string[], focus: string, hold: number): Promise<void> {
+/** Wheel-scroll (under the current pointer) until the target is fully on screen, so long dialogs scroll visibly */
+async function reveal(page: Page, target: Locator): Promise<void> {
+  for (let i = 0; i < 40; i++) {
+    const box = await target.boundingBox()
+    if (!box) return
+    if (box.y + box.height <= SIZE.height - 24) return
+    await page.mouse.wheel(0, 60)
+    await page.waitForTimeout(50)
+  }
+}
+
+/** Sidebar Sync → apply preview (pause on the per-tool list) → Apply */
+async function applyViaPreview(page: Page, tools: string[], hold: number): Promise<void> {
   await waitState(page, 'pending')
   await clickSlow(page, page.locator('[data-testid="sync-button"]'), 300)
   await page.waitForSelector('[data-testid="apply-preview"]')
   for (const tool of tools) await page.waitForSelector(`[data-testid="apply-preview-${tool}"]`)
-  await page.waitForTimeout(400)
-  for (const tool of tools) await moveTo(page, page.locator(`[data-testid="apply-preview-${tool}"]`))
-  // Rest on the line that tells the story (library-direct / Remove)
-  await moveTo(page, page.locator(`[data-testid="apply-preview"] [data-testid="${focus}"]`).first())
+  await moveTo(page, page.locator(`[data-testid="apply-preview-${tools[tools.length - 1]}"]`))
   await page.waitForTimeout(hold)
-  await clickSlow(page, page.locator('[data-testid="apply-preview-apply"]'), 300)
+  const apply = page.locator('[data-testid="apply-preview-apply"]')
+  await reveal(page, apply)
+  await clickSlow(page, apply, 300)
   await waitState(page, 'synced')
   await page.locator('[data-testid="apply-preview"]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
 }
@@ -91,24 +105,47 @@ function toolFiles(home: string): Record<string, string> {
   return {
     claude: read(join('.claude/rules/illithid', RULE)),
     codex: read('.codex/AGENTS.md'),
-    opencode: read('.config/opencode/opencode.json')
+    opencode: read('.config/opencode/opencode.json'),
+    gemini: read('.gemini/GEMINI.md'),
+    copilot: read(COPILOT_RULE)
   }
 }
 
 const same = (a: Record<string, string>, b: Record<string, string>): boolean => Object.keys(a).every((k) => a[k] === b[k])
 
+/** Skill copy in the tool's skills dir and the MCP server entry in the tool's config */
+function offTargets(home: string): { skill: boolean; mcp: boolean } {
+  const skillLink = join(home, `.${SKILL_OFF}/skills`, SKILL)
+  let skill = false
+  try {
+    lstatSync(skillLink)
+    skill = true
+  } catch {
+    skill = false
+  }
+  const mcpConfig = join(home, '.copilot/mcp-config.json')
+  const mcp = existsSync(mcpConfig) && MCP in ((JSON.parse(readFileSync(mcpConfig, 'utf8')) as { mcpServers?: Record<string, unknown> }).mcpServers ?? {})
+  return { skill, mcp }
+}
+
+/** Click one tool icon on a card → Sync → preview for that tool → Apply */
+async function toggleOff(page: Page, card: string, tool: string, hold: number): Promise<void> {
+  const pill = page.locator(`main [data-card="${card}"] [data-tool="${tool}"]`)
+  await clickSlow(page, pill, 300)
+  await page.waitForFunction((sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false, `main [data-card="${card}"] [data-tool="${tool}"]`, { timeout: 10_000 })
+  await applyViaPreview(page, [tool], hold)
+}
+
 async function sequence(page: Page, home: string): Promise<Record<string, boolean>> {
   const main = page.locator('main')
-  await page.waitForTimeout(1000)
+  await page.waitForTimeout(800)
 
-  // Rules grid with per-tool icons on each card
+  // 1. Rules: one edit → Sync → preview for all five tools → Apply
   const card = main.locator(`[data-card="${RULE}"]`)
-  await moveTo(page, card.locator('[data-tool="codex"]'))
-  await page.waitForTimeout(600)
-  await clickSlow(page, card, 1100)
-
-  // Edit one line
-  await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 800)
+  await moveTo(page, card.locator('[data-tool="copilot"]'))
+  await page.waitForTimeout(500)
+  await clickSlow(page, card, 800)
+  await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 500)
   const area = page.locator('.mantine-Drawer-content textarea').first()
   await moveTo(page, area)
   await area.click()
@@ -116,60 +153,78 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     const at = el.value.indexOf(anchor) + anchor.length
     el.setSelectionRange(at, at)
   }, ANCHOR)
+  await page.keyboard.type(ADDED, { delay: 45 })
   await page.waitForTimeout(400)
-  await page.keyboard.type(ADDED, { delay: 60 })
-  await page.waitForTimeout(800)
-
-  // Save → library only, sidebar turns green
   const before = toolFiles(home)
   await clickSlow(page, page.locator('[data-testid="editor-save"]'), 300)
   await waitState(page, 'pending')
-  await page.waitForTimeout(1000)
-  const afterSave = toolFiles(home)
-
-  // Preview per tool (straight from the open detail) → Apply
-  await applyViaPreview(page, ['claude', 'codex', 'opencode'], 'apply-preview-library-direct', 1500)
-  await page.waitForTimeout(700)
-
-  // Back to the grid
-  await page.keyboard.press('Escape')
   await page.waitForTimeout(800)
-
-  // Turn OpenCode off for another rule → preview → Apply
-  const beforeToggle = toolFiles(home)
-  const off = main.locator(`[data-card="${OFF_RULE}"] [data-tool="opencode"]`)
-  await clickSlow(page, off, 400)
-  await page.waitForFunction((sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false, `[data-card="${OFF_RULE}"] [data-tool="opencode"]`, { timeout: 10_000 })
-  await waitState(page, 'pending')
+  const afterSave = toolFiles(home)
+  await applyViaPreview(page, ['claude', 'codex', 'opencode', 'gemini', 'copilot'], 1500)
   await page.waitForTimeout(700)
-  const afterToggle = toolFiles(home)
-  await applyViaPreview(page, ['opencode'], 'apply-preview-action-remove', 1500)
-  await page.waitForTimeout(900)
+  await page.keyboard.press('Escape')
 
-  // Sessions from every tool, searched in one place
+  // 2. Skills: turn one skill off for Gemini
+  const offBefore = offTargets(home)
+  await clickSlow(page, page.locator('[data-menu="skills"]'), 300)
+  await waitLoaded(page)
+  await main.locator(`[data-card="${SKILL}"]`).waitFor()
+  await page.waitForTimeout(300)
+  await toggleOff(page, SKILL, SKILL_OFF, 900)
+  await page.waitForTimeout(400)
+
+  // 3. MCP: server cards with per-tool icons → turn one server off for Copilot
+  await clickSlow(page, page.locator('[data-menu="mcp"]'), 300)
+  await waitLoaded(page)
+  const server = main.locator(`[data-card="${MCP}"]`)
+  await server.waitFor()
+  await moveTo(page, server.locator('[data-tool="claude"]'))
+  await page.waitForTimeout(400)
+  await toggleOff(page, MCP, MCP_OFF, 900)
+  await page.waitForTimeout(400)
+
+  // 4. Sessions: open one and walk its requests in Contents
   await clickSlow(page, page.locator('[data-menu="sessions"]'), 300)
   await waitLoaded(page)
-  await page.waitForTimeout(800)
-  const search = main.locator('input[type="text"], input:not([type])').first()
-  await clickSlow(page, search, 300)
-  await page.keyboard.type('checkout', { delay: 100 })
+  const rows = main.locator('.mantine-NavLink-root')
+  await rows.first().waitFor()
+  await moveTo(page, rows.nth(1))
+  const session = rows.filter({ hasText: 'Write the migration' }).first()
+  await clickSlow(page, (await session.count()) ? session : rows.nth(2), 400)
+  const items = main.locator('[data-testid="contents-item"]')
+  await items.first().waitFor({ timeout: 10_000 })
+  await moveTo(page, items.first())
+  await page.waitForTimeout(1500)
+  for (const i of [1, 2]) if ((await items.count()) > i) await clickSlow(page, items.nth(i), 1000)
+  await moveTo(page, main.locator('[data-testid="resume-copy"]'))
   await page.waitForTimeout(1000)
-  const hit = main.locator('.mantine-NavLink-root').first()
-  if (await hit.count()) await clickSlow(page, hit, 1700)
-  else await page.waitForTimeout(2200)
 
-  return { toolsUnchangedAfterSave: same(before, afterSave), toolsUnchangedAfterToggle: same(beforeToggle, afterToggle) }
+  const offAfter = offTargets(home)
+  return {
+    toolsUnchangedAfterSave: same(before, afterSave),
+    skillPresentBefore: offBefore.skill,
+    skillRemovedFromGemini: !offAfter.skill,
+    mcpPresentBefore: offBefore.mcp,
+    mcpRemovedFromCopilot: !offAfter.mcp
+  }
 }
 
-/** Edited text must be in the Claude copy, the Codex AGENTS.md block and the OpenCode instructions */
+/** Marker block of a tool instructions file ('' if missing) */
+function markerBlock(path: string): string {
+  const text = readFileSync(path, 'utf8')
+  const b = text.indexOf(MD_BEGIN)
+  const e = text.indexOf(MD_END)
+  return b >= 0 && e > b ? text.slice(b, e) : ''
+}
+
+/** Edited text must reach Claude, Codex, OpenCode, Gemini CLI and GitHub Copilot */
 function verifyOnDisk(home: string): Record<string, boolean> {
   const line = ANCHOR + ADDED
   const libRule = join(home, WS, 'rules', RULE)
   const claude = readFileSync(join(home, '.claude/rules/illithid', RULE), 'utf8')
-  const agents = readFileSync(join(home, '.codex/AGENTS.md'), 'utf8')
-  const b = agents.indexOf(MD_BEGIN)
-  const e = agents.indexOf(MD_END)
-  const block = b >= 0 && e > b ? agents.slice(b, e) : ''
+  const block = markerBlock(join(home, '.codex/AGENTS.md'))
+  const gemini = markerBlock(join(home, '.gemini/GEMINI.md'))
+  const copilot = readFileSync(join(home, COPILOT_RULE), 'utf8')
   const oc = JSON.parse(readFileSync(join(home, '.config/opencode/opencode.json'), 'utf8')) as { instructions?: string[] }
   const instructions = oc.instructions ?? []
   return {
@@ -177,8 +232,8 @@ function verifyOnDisk(home: string): Record<string, boolean> {
     claude: claude.includes(line),
     codex: block.includes(line),
     opencode: instructions.includes(libRule) && readFileSync(libRule, 'utf8').includes(line),
-    opencodeOffRemoved: !instructions.some((p) => p.endsWith(`/${OFF_RULE}`)),
-    codexOffKept: block.includes('# Testing')
+    gemini: gemini.includes(line),
+    copilot: copilot.includes(line) && /^---\n[\s\S]*?applyTo: ["']?\*\*["']?\n[\s\S]*?---\n/.test(copilot)
   }
 }
 
@@ -186,7 +241,7 @@ function encode(raw: string, trim: number, duration: number): void {
   const mp4 = join(OUT_DIR, 'illithid-demo.mp4')
   const gif = join(OUT_DIR, 'illithid-demo.gif')
   const cut = ['-ss', trim.toFixed(2), '-t', duration.toFixed(2), '-i', raw]
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=1280:-2:flags=lanczos', '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', mp4])
+  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=1280:-2:flags=lanczos,setpts=PTS-STARTPTS', '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-output_ts_offset', '0', '-an', mp4])
   // Palette GIF; drop fps until it fits under 8 MB
   for (const fps of [12, 10, 8]) {
     const vf = `fps=${fps},scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`
@@ -204,10 +259,12 @@ async function main(): Promise<void> {
   const videoDir = mkdtempSync(join(tmpdir(), 'illithid-demo-video-'))
   let ok = false
   try {
-    buildDemoHome(home)
+    buildDemoHome(home, { tools: 'all' })
     syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
     // Auto apply off: saves stay in the library until Apply in the preview
-    writeFileSync(join(home, '.config/illithid/config.json'), JSON.stringify({ version: 1, allowRealApply: false, activeWorkspace: 'default' }, null, 2) + '\n')
+    const configPath = join(home, '.config/illithid/config.json')
+    const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
+    writeFileSync(configPath, JSON.stringify({ ...config, allowRealApply: false }, null, 2) + '\n')
     const env = { ...baseEnv(home), ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
     const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env, recordVideo: { dir: videoDir, size: SIZE } })
     const errors: string[] = []
