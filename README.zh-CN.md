@@ -1,0 +1,136 @@
+<p align="center"><a href="README.md">English</a> | <a href="README.ko.md">한국어</a> | <a href="README.ja.md">日本語</a> | <b>中文</b></p>
+
+<div align="center">
+  <img src="build/icon.png" width="160" alt="Illithid 图标">
+  <h1>Illithid</h1>
+  <p><b>一个库，管理所有 AI 编程智能体。</b><br>
+  规则、技能、子智能体和 MCP 服务器只需写一次。Illithid 会把它们同步到 Claude Code、Codex、OpenCode 等工具。</p>
+
+  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI (计划中)</sub></p>
+
+  <p>
+    <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="下载"></a>
+    <img src="https://img.shields.io/badge/macOS-12%2B-blue?style=flat-square" alt="macOS 12+">
+    <img src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-lightgrey?style=flat-square" alt="Apple Silicon、Intel">
+  </p>
+
+  <p>
+    <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-arm64.dmg">下载 Apple Silicon 版</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-x64.dmg">下载 Intel 版</a>
+  </p>
+</div>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/rules-dark.png">
+  <img src="docs/screenshots/rules-light.png" alt="同步到 Claude Code、Codex、OpenCode 的规则">
+</picture>
+
+## 安装
+
+```sh
+brew install --cask doominkim/tap/illithid
+```
+
+也可以从上方链接下载 DMG。
+
+## 为什么需要它
+
+**每出一个新模型或编程智能体，就要重写一遍规则?**<br>
+**每改一条规则，就要把所有智能体的配置挨个改一遍?**
+
+每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
+
+Illithid 把这一切集中在一个地方管理。规则改一次，所有工具同步生效；新增工具时，也能直接沿用你现有的配置。
+
+Illithid 不运行模型，也不介入你和智能体之间。它只负责写配置文件，各工具照常工作。
+
+## 功能
+
+### 规则和技能，全工具生效
+
+规则改一次，Claude Code、Codex、OpenCode 全部生效。也可以一键只在某个工具中关闭。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
+  <img src="docs/screenshots/skills-light.png" alt="技能">
+</picture>
+
+### 子智能体，每个工具用合适的模型
+
+一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml` 和 OpenCode 的 `.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
+  <img src="docs/screenshots/agents-light.png" alt="按工具设置模型的子智能体">
+</picture>
+
+### 不泄露密钥的 MCP 服务器
+
+无论 HTTP 还是 stdio，MCP 服务器只需添加一次。API 密钥保存在 macOS 钥匙串中，库里只保留引用。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/mcp-dark.png">
+  <img src="docs/screenshots/mcp-light.png" alt="MCP 服务器">
+</picture>
+
+### 所有会话，均可搜索
+
+在一个列表中浏览 Claude Code、Codex、OpenCode 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
+  <img src="docs/screenshots/sessions-light.png" alt="会话">
+</picture>
+
+### 产出物集中管理
+
+智能体生成的报告、文档和图片，按生成它们的工具分类展示。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artifacts-dark.png">
+  <img src="docs/screenshots/artifacts-light.png" alt="产出物">
+</picture>
+
+### 更多
+
+- **工作区**: 把工作和个人等配置分开，一键切换。支持导出和导入 zip。
+- **记忆**: 审阅 Claude 的自动记忆，有用的条目提升到共享库，其余移到废纸篓。
+- **Git 备份**: 把库推送到私有仓库，并可恢复到任意快照。
+- **导入**: 导入你已在使用的规则、技能、子智能体和 MCP 服务器。
+
+## 默认安全
+
+- 在设置中开启 **自动同步** 之前，不会改动任何工具的配置文件。
+- 被替换或删除的文件只会移到 `~/.config/illithid/backups/`，不会被清除。
+- 旧备份在 30 天后移到废纸篓 (期限可调整)。
+
+## 常见问题
+
+**我的代码或提示词会经过 Illithid 吗?**
+不会。Illithid 不与任何模型 API 通信。它只编辑本地配置文件、读取本地会话记录。唯一的网络访问是 Git 备份，而且只在你连接了远程仓库时才会发生。
+
+**会覆盖我现有的配置吗?**
+首次启动时会询问是否导入现有配置。导入的原始文件在交由 Illithid 管理前会先备份。
+
+**不想用了怎么办?**
+退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。
+
+**为什么只支持 macOS?**
+密钥保存在 macOS 钥匙串中，因此目前只发布 macOS 版本。
+
+## 从源码构建
+
+需要 Node.js 22 或更高版本。
+
+```sh
+npm install
+npm run dev          # 热重载运行
+npm run build:mac    # 在 dist/ 生成 DMG
+```
+
+没有 Developer ID 证书时，可用 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac` 构建未签名版本。
+
+## 应用语言
+
+英语、韩语、日语、中文。
