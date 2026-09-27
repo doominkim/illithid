@@ -26,9 +26,8 @@ mac:
         - arm64
         - x64
   entitlementsInherit: build/entitlements.mac.plist
-  notarize: false
 dmg:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${arch}.${ext}
 linux:
   target:
     - AppImage
