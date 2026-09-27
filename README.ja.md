@@ -4,9 +4,9 @@
   <img src="build/icon.png" width="160" alt="Illithid アイコン">
   <h1>Illithid</h1>
   <p><b>すべての AI コーディングエージェントのための、ひとつのライブラリ。</b><br>
-  ルール、スキル、サブエージェント、MCP サーバーは一度書くだけ。Claude Code、Codex、OpenCode などへ Illithid が同期します。</p>
+  ルール、スキル、サブエージェント、MCP サーバーは一度書くだけ。Claude Code、Codex、OpenCode、Gemini CLI などへ Illithid が同期します。</p>
 
-  <p><sub>対応: Claude Code · Codex · OpenCode · Gemini CLI (予定)</sub></p>
+  <p><sub>対応: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="ダウンロード"></a>
@@ -39,7 +39,7 @@ brew install --cask doominkim/tap/illithid
 **新しいモデルやコーディングエージェントが出るたびに、ルールを作り直していませんか?**<br>
 **ルールを変えるたびに、すべてのエージェントの設定を手作業で直していませんか?**
 
-ツールごとに設定の置き場所が違います。`~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`。そのため変更のたびに同じ内容を何か所も直すことになり、どこかがずれていきます。
+ツールごとに設定の置き場所が違います。`~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`。そのため変更のたびに同じ内容を何か所も直すことになり、どこかがずれていきます。
 
 Illithid はそれをすべて 1 か所で管理します。ルールを一度変えればすべてのツールに反映され、新しいツールも今の設定のまま始められます。
 
@@ -49,7 +49,7 @@ Illithid はモデルを実行せず、あなたとエージェントの間に�
 
 ### ルールとスキルを全ツールに
 
-ルールを一度編集すれば、Claude Code、Codex、OpenCode のすべてに反映されます。特定のツールだけで無効にするのもワンクリックです。
+ルールを一度編集すれば、使っているすべてのツールに反映されます。特定のツールだけで無効にするのもワンクリックです。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
@@ -58,7 +58,7 @@ Illithid はモデルを実行せず、あなたとエージェントの間に�
 
 ### ツールごとに最適なモデルを使うサブエージェント
 
-ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
+ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md`、Gemini CLI の `.md`、GitHub Copilot の `.agent.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -76,7 +76,7 @@ HTTP でも stdio でも、MCP サーバーの追加は一度だけ。API キー
 
 ### すべてのセッションを検索
 
-Claude Code、Codex、OpenCode の過去の会話をひとつのリストで表示します。タイトルや本文全体を検索し、任意のメッセージへ移動し、ワンクリックで再開できます。
+Claude Code、Codex、OpenCode、Gemini CLI の過去の会話をひとつのリストで表示します。タイトルや本文全体を検索し、任意のメッセージへ移動し、ワンクリックで再開できます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
@@ -101,7 +101,7 @@ Claude Code、Codex、OpenCode の過去の会話をひとつのリストで表�
 
 ## 安全なデフォルト
 
-- 設定で **自動反映** をオンにするまで、ツールの設定ファイルには触れません。
+- **設定 → 使用中のツール** で選んだツールにだけ書き込み、反映の前にすべての変更をプレビューで表示します。
 - 置き換えたファイルや削除したファイルは `~/.config/illithid/backups/` に移すだけで、消去しません。
 - 古いバックアップは 30 日後にゴミ箱へ移します (期間は変更可能)。
 

@@ -4,9 +4,9 @@
   <img src="build/icon.png" width="160" alt="Illithid 아이콘">
   <h1>Illithid</h1>
   <p><b>모든 AI 코딩 에이전트를 위한 하나의 라이브러리.</b><br>
-  룰, 스킬, 서브에이전트, MCP 서버를 한 번만 작성하세요. Claude Code, Codex, OpenCode 등 각 툴에 Illithid가 맞춰 동기화합니다.</p>
+  룰, 스킬, 서브에이전트, MCP 서버를 한 번만 작성하세요. Claude Code, Codex, OpenCode, Gemini CLI 등 각 툴에 Illithid가 맞춰 동기화합니다.</p>
 
-  <p><sub>지원: Claude Code · Codex · OpenCode · Gemini CLI (예정)</sub></p>
+  <p><sub>지원: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="다운로드"></a>
@@ -39,7 +39,7 @@ brew install --cask doominkim/tap/illithid
 **새 모델이나 코딩 에이전트가 나올 때마다 규칙을 다시 만들고 계신가요?**<br>
 **규칙 하나 바꿀 때마다 모든 에이전트 설정을 일일이 고치고 계신가요?**
 
-툴마다 설정 위치가 다릅니다. `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`. 그래서 무언가 바꿀 때마다 같은 내용을 여러 곳에서 고쳐야 하고, 어느 한 곳이 어긋나기 쉽습니다.
+툴마다 설정 위치가 다릅니다. `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`, `~/.gemini/`, `~/.copilot/`. 그래서 무언가 바꿀 때마다 같은 내용을 여러 곳에서 고쳐야 하고, 어느 한 곳이 어긋나기 쉽습니다.
 
 Illithid는 이 모든 걸 한곳에서 관리합니다. 규칙을 한 번 고치면 모든 툴에 반영되고, 새 툴을 추가해도 지금 쓰는 설정 그대로 시작합니다.
 
@@ -49,7 +49,7 @@ Illithid는 모델을 실행하지 않고, 사용자와 에이전트 사이에 �
 
 ### 룰과 스킬을 모든 툴에
 
-룰을 한 번 고치면 Claude Code, Codex, OpenCode에 모두 반영됩니다. 특정 툴에서만 끄는 것도 클릭 한 번이면 됩니다.
+룰을 한 번 고치면 사용하는 모든 툴에 반영됩니다. 특정 툴에서만 끄는 것도 클릭 한 번이면 됩니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
@@ -58,7 +58,7 @@ Illithid는 모델을 실행하지 않고, 사용자와 에이전트 사이에 �
 
 ### 툴마다 맞는 모델을 쓰는 서브에이전트
 
-서브에이전트 정의 하나를 Claude `.md`, Codex `.toml`, OpenCode `.md`로 만들어 줍니다. 툴별 모델과 effort는 ID를 입력하지 않고 목록에서 고릅니다.
+서브에이전트 정의 하나를 Claude `.md`, Codex `.toml`, OpenCode `.md`, Gemini CLI `.md`, GitHub Copilot `.agent.md`로 만들어 줍니다. 툴별 모델과 effort는 ID를 입력하지 않고 목록에서 고릅니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -76,7 +76,7 @@ HTTP든 stdio든 MCP 서버는 한 번만 추가하면 됩니다. API 키는 mac
 
 ### 모든 세션을 검색
 
-Claude Code, Codex, OpenCode의 지난 대화를 한 목록에서 봅니다. 제목이나 내용 전체를 검색하고, 원하는 메시지로 바로 이동하고, 클릭 한 번으로 이어서 작업합니다.
+Claude Code, Codex, OpenCode, Gemini CLI의 지난 대화를 한 목록에서 봅니다. 제목이나 내용 전체를 검색하고, 원하는 메시지로 바로 이동하고, 클릭 한 번으로 이어서 작업합니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
@@ -101,7 +101,7 @@ Claude Code, Codex, OpenCode의 지난 대화를 한 목록에서 봅니다. 제
 
 ## 기본값은 안전하게
 
-- 설정에서 **자동 반영**을 켜기 전에는 툴 설정 파일을 건드리지 않습니다.
+- **설정 → 사용 중인 툴**에서 고른 툴에만 쓰고, 반영하기 전에 모든 변경을 미리보기로 보여줍니다.
 - 교체하거나 삭제한 파일은 `~/.config/illithid/backups/`로 옮길 뿐 지우지 않습니다.
 - 오래된 백업은 30일 뒤 휴지통으로 옮깁니다 (기간 변경 가능).
 

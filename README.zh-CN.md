@@ -4,9 +4,9 @@
   <img src="build/icon.png" width="160" alt="Illithid 图标">
   <h1>Illithid</h1>
   <p><b>一个库，管理所有 AI 编程智能体。</b><br>
-  规则、技能、子智能体和 MCP 服务器只需写一次。Illithid 会把它们同步到 Claude Code、Codex、OpenCode 等工具。</p>
+  规则、技能、子智能体和 MCP 服务器只需写一次。Illithid 会把它们同步到 Claude Code、Codex、OpenCode、Gemini CLI 等工具。</p>
 
-  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI (计划中)</sub></p>
+  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="下载"></a>
@@ -39,7 +39,7 @@ brew install --cask doominkim/tap/illithid
 **每出一个新模型或编程智能体，就要重写一遍规则?**<br>
 **每改一条规则，就要把所有智能体的配置挨个改一遍?**
 
-每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
+每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
 
 Illithid 把这一切集中在一个地方管理。规则改一次，所有工具同步生效；新增工具时，也能直接沿用你现有的配置。
 
@@ -49,7 +49,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 ### 规则和技能，全工具生效
 
-规则改一次，Claude Code、Codex、OpenCode 全部生效。也可以一键只在某个工具中关闭。
+规则改一次，你使用的所有工具都会生效。也可以一键只在某个工具中关闭。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
@@ -58,7 +58,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 ### 子智能体，每个工具用合适的模型
 
-一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml` 和 OpenCode 的 `.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
+一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml`、OpenCode 的 `.md`、Gemini CLI 的 `.md` 和 GitHub Copilot 的 `.agent.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -76,7 +76,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 ### 所有会话，均可搜索
 
-在一个列表中浏览 Claude Code、Codex、OpenCode 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
+在一个列表中浏览 Claude Code、Codex、OpenCode、Gemini CLI 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
@@ -101,7 +101,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 ## 默认安全
 
-- 在设置中开启 **自动同步** 之前，不会改动任何工具的配置文件。
+- 只写入你在 **设置 → 使用中的工具** 中选择的工具，应用前会在预览中列出所有改动。
 - 被替换或删除的文件只会移到 `~/.config/illithid/backups/`，不会被清除。
 - 旧备份在 30 天后移到废纸篓 (期限可调整)。
 

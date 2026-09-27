@@ -4,9 +4,9 @@
   <img src="build/icon.png" width="160" alt="Illithid icon">
   <h1>Illithid</h1>
   <p><b>One library for every AI coding agent.</b><br>
-  Write your rules, skills, subagents and MCP servers once. Illithid keeps them in sync across Claude Code, Codex, OpenCode and more.</p>
+  Write your rules, skills, subagents and MCP servers once. Illithid keeps them in sync across Claude Code, Codex, OpenCode, Gemini CLI and more.</p>
 
-  <p><sub>Supported: Claude Code · Codex · OpenCode · Gemini CLI (planned)</sub></p>
+  <p><sub>Supported: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="Download"></a>
@@ -39,7 +39,7 @@ Or download the DMG above.
 **Rewriting your rules every time a new model or coding agent comes out?**<br>
 **Updating every agent by hand whenever a rule changes?**
 
-Each tool keeps its settings somewhere different: `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`. So every change means editing the same thing in several places and hoping none of them drift.
+Each tool keeps its settings somewhere different: `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`, `~/.gemini/`, `~/.copilot/`. So every change means editing the same thing in several places and hoping none of them drift.
 
 Illithid manages it all from one place. Change a rule once and every tool gets it. Add a new tool and it starts with the setup you already have.
 
@@ -49,7 +49,7 @@ Illithid doesn't run models or sit between you and your agents. It only writes t
 
 ### Rules and skills, everywhere
 
-Edit a rule once and it lands in Claude Code, Codex and OpenCode. Turn any rule or skill off for a single tool with one click.
+Edit a rule once and it lands in every tool you use. Turn any rule or skill off for a single tool with one click.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
@@ -58,7 +58,7 @@ Edit a rule once and it lands in Claude Code, Codex and OpenCode. Turn any rule 
 
 ### Subagents with the right model per tool
 
-One subagent definition, rendered as a Claude `.md`, a Codex `.toml` and an OpenCode `.md`. Pick the model and effort for each tool from a list instead of typing IDs.
+One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCode `.md`, a Gemini CLI `.md` and a GitHub Copilot `.agent.md`. Pick the model and effort for each tool from a list instead of typing IDs.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -76,7 +76,7 @@ Add an MCP server once, over HTTP or stdio. API keys go into the macOS Keychain;
 
 ### Every session, searchable
 
-Browse past Claude Code, Codex and OpenCode conversations in one list. Search titles or full content, jump to any message, and resume with one click.
+Browse past Claude Code, Codex, OpenCode and Gemini CLI conversations in one list. Search titles or full content, jump to any message, and resume with one click.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
@@ -101,7 +101,7 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 
 ## Safe by default
 
-- Nothing touches your tool configs until you turn on **Auto apply** in Settings.
+- Illithid only writes to the tools you pick in **Settings → Tools in use**, and shows every change in a preview before applying it.
 - Replaced or deleted files are moved to `~/.config/illithid/backups/`, never erased.
 - Old backups go to the Trash after 30 days (configurable).
 
