@@ -18,14 +18,14 @@ const MENUS = ['rules', 'skills', 'mcp', 'agents', 'artifacts', 'sessions', 'mem
 const THEMES = ['light', 'dark'] as const
 type Menu = (typeof MENUS)[number]
 
-function put(root: string, rel: string, body: string): void {
+export function put(root: string, rel: string, body: string): void {
   const p = join(root, rel)
   mkdirSync(dirname(p), { recursive: true })
   writeFileSync(p, body)
 }
 
 // Only what the app needs; keeps real API keys in the environment out of the demo HOME
-const baseEnv = (home: string): Record<string, string> => ({
+export const baseEnv = (home: string): Record<string, string> => ({
   PATH: process.env.PATH ?? '/usr/bin:/bin',
   HOME: home,
   LANG: 'en_US.UTF-8',
@@ -34,7 +34,7 @@ const baseEnv = (home: string): Record<string, string> => ({
 
 const iso = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 60_000).toISOString()
 
-function buildDemoHome(home: string): void {
+export function buildDemoHome(home: string): void {
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }, null, 2) + '\n')
   put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }, null, 2) + '\n')
@@ -191,7 +191,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exitCode = 1
-})
+// Only run when executed directly (readme-demo.ts imports the demo HOME builder)
+if (require.main === module)
+  main().catch((e) => {
+    console.error(e)
+    process.exitCode = 1
+  })
