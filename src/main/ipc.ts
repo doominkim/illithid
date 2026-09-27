@@ -76,10 +76,14 @@ const MIME: Record<string, string> = {
   '.avif': 'image/avif'
 }
 
+/** Worker reads that resolve tool files or ${VAR} values and so need the login shell environment */
+const ENV_OPS: ReadonlySet<Op> = new Set<Op>(['status', 'syncPending', 'syncPreview', 'mcp'])
+
 /** Run synchronous scans on a worker thread so the main event loop is not blocked */
 async function inWorker<T>(op: Op, home: string, args: unknown[] = [], onProgress?: (p: unknown) => void): Promise<T> {
-  // Workers get a copy of process.env — wait for the login shell environment first
-  await shellEnvReady()
+  // Workers get a copy of process.env. Only reads that depend on it wait for the login shell environment,
+  // so lists (rules, skills, sessions, artifacts, search) show right away even when the shell is slow to start
+  if (ENV_OPS.has(op)) await shellEnvReady()
   return new Promise((resolve, reject) => {
     const w = createWorker({ workerData: { op, home, env: { ...process.env }, args } })
     let settled = false

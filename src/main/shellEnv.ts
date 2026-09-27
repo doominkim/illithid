@@ -4,8 +4,8 @@
  * "environment variable X is not set". Load the login shell's environment once at startup, like
  * terminals and editors do. Skipped when launched from a terminal (already inherited) and in test runs.
  */
-// Heavy zsh setups take a few seconds; the window is already up, only the first sync waits
-const TIMEOUT_MS = 10_000
+// Heavy zsh setups can take several seconds (10+ seen). Only sync and MCP reads wait, so allow a generous limit
+const TIMEOUT_MS = 30_000
 
 let ready: Promise<void> | null = null
 
