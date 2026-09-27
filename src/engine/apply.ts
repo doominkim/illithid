@@ -7,7 +7,9 @@ import { ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
 import { activeWorkspaceId } from './config'
 import { dropPending } from './pendingRetire'
 import { readState, writeState, type AppState } from './state'
-import { sha256 } from './text'
+import { blockBody, sha256 } from './text'
+import { MD_BEGIN, MD_END } from './targets/codexAgents'
+import { blockEdited } from './targets/geminiRules'
 import type { SecretBackend } from './secrets'
 import type { Env, FileChange, TargetId } from './types'
 import {
@@ -50,6 +52,8 @@ export interface ApplyResult {
   serverErrors?: Record<string, string>
   /** MCP targets: files holding the pre-removal definitions of servers removed from tool config (backups/deleted/<ts>/mcp/<tool>/<server>.json) */
   removedServerBackups?: string[]
+  /** geminiRules: where the tool-side edited block was saved before it was replaced */
+  blockBackup?: string
 }
 
 export interface ApplyOptions {
@@ -88,6 +92,21 @@ function backupRemovedServers(home: string, c: FileChange): string[] {
     out.push(p)
   }
   return out
+}
+
+/**
+ * geminiRules whose block was edited on the tool side (Gemini writes GEMINI.md itself): the previous block goes to
+ * backups/deleted/<ts>/gemini/GEMINI.block.md (0600) before it is replaced. null if nothing to keep
+ */
+function backupEditedBlock(home: string, c: FileChange, applied: string | undefined): string | null {
+  if (c.id !== 'geminiRules' || !blockEdited(c.before, applied)) return null
+  const body = blockBody(c.before, MD_BEGIN, MD_END)!
+  const ts = new Date().toISOString().replace(/[:.]/g, '-')
+  const p = join(deletedBackupRoot(home), ts, 'gemini', 'GEMINI.block.md')
+  mkdirSync(dirname(p), { recursive: true, mode: 0o700 })
+  writeFileSync(p, body.replace(/^\n/, ''), { mode: 0o600 })
+  chmodSync(p, 0o600)
+  return p
 }
 
 /** Targets re-checked once more right before writing (files the runtime writes often) */
@@ -185,8 +204,10 @@ export function apply(
     const restored = !!applied && c.beforeRegionHash !== applied.regionHash
     let backupPath: string | null = null
     let removedServerBackups: string[] = []
+    let blockBackup: string | null = null
     try {
       removedServerBackups = backupRemovedServers(home, c)
+      blockBackup = backupEditedBlock(home, c, applied?.regionHash)
       // If already backed up in this call, don't overwrite the original-content backup
       backupPath = ours !== undefined ? resolveWritePath(c.path) + BACKUP_SUFFIX : backup(c.path)
       atomicWrite(c.path, c.after, {
@@ -205,6 +226,7 @@ export function apply(
       status: 'written',
       ...(backupPath ? { backupPath } : {}),
       ...(removedServerBackups.length ? { removedServerBackups } : {}),
+      ...(blockBackup ? { blockBackup } : {}),
       ...(restored ? { restored: true, detail: 'restored owned region changed on the tool side from source' } : {})
     })
   }

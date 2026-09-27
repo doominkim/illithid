@@ -335,8 +335,11 @@ export const SKILL_OVERRIDE_TARGETS: readonly TargetDef[] = [
   opencodeSkillPermissions
 ]
 
-/** Tool → skill-disable settings target */
-export const SKILL_OVERRIDE_TARGET_OF: Readonly<Record<ToolId, TargetId>> = {
+/**
+ * Tool → skill-disable settings target. Gemini CLI has one (settings.json skills.disabled) but the app doesn't clear it yet —
+ * geminiMcp only warns about library skills listed there (read-only)
+ */
+export const SKILL_OVERRIDE_TARGET_OF: Readonly<Partial<Record<ToolId, TargetId>>> = {
   claude: 'claudeSkillOverrides',
   codex: 'codexSkillConfig',
   opencode: 'opencodeSkillPermissions'

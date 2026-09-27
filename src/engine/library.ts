@@ -19,6 +19,7 @@ import { dirname, isAbsolute, join, normalize, relative, sep } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import matter from 'gray-matter'
 import { activeWorkspaceId, libraryRoot } from './config'
+import { TOOL_IDS, type ToolId } from './toolIds'
 import { secretAccountsInWorkspaces } from './workspace'
 import { assertInsideLibrary, LibraryError, libraryRealRoot } from './libpath'
 import {
@@ -588,8 +589,8 @@ export function renameSkill(home: string, from: string, to: string): { name: str
 // ---------------------------------------------------------------- agents
 
 /** Agent tool keys (top-level frontmatter mappings) */
-export const AGENT_TOOLS = ['claude', 'codex', 'opencode'] as const
-export type AgentTool = (typeof AGENT_TOOLS)[number]
+export const AGENT_TOOLS = TOOL_IDS
+export type AgentTool = ToolId
 
 /** Model·effort for one tool. Absent = that tool's default */
 export interface AgentToolSettings {

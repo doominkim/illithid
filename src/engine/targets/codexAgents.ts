@@ -1,5 +1,6 @@
 import { isEnabled } from '../manifest'
 import { blockBodyMulti, outsideBlockMulti, removeBlockMulti, spliceBlockMulti, type MarkerPair } from '../text'
+import type { ToolId } from '../toolIds'
 import type { Sources, TargetDef } from '../types'
 
 /** App marker (M7d). The library location is left out of the text (config.libraryPath can change it) */
@@ -34,23 +35,38 @@ export const MD_HEADER =
   'This block is generated from `rules/*.md` and `memory/MEMORY.md` in the Illithid library.\n' +
   'To change it, edit the library and apply from Illithid.'
 
-/** Rule names enabled for Codex (all if there is no manifest) */
-export function codexRuleNames(sources: Sources): string[] {
-  return sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, 'codex')).map((x) => x.name)
+/** Rule names enabled for the tool (all if there is no manifest) */
+export function blockRuleNames(sources: Sources, tool: ToolId): string[] {
+  return sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool)).map((x) => x.name)
 }
 
-export function buildCodexAgentsBody(sources: Sources): string {
-  const parts = [MD_HEADER]
-  // Skip rules disabled for codex (all included if there is no manifest)
-  for (const r of sources.rules.filter((x) =>
-    isEnabled(sources.manifest, 'rules', x.name, 'codex')
-  )) {
+/** Rule names enabled for Codex (all if there is no manifest) */
+export function codexRuleNames(sources: Sources): string[] {
+  return blockRuleNames(sources, 'codex')
+}
+
+/** Marker block body for tools that get rules inlined (Codex AGENTS.md, Gemini GEMINI.md) */
+export function buildRulesBlockBody(sources: Sources, tool: ToolId, header = MD_HEADER): string {
+  const parts = [header]
+  // Skip rules disabled for the tool (all included if there is no manifest)
+  for (const r of sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool))) {
     parts.push(`<!-- rules/${r.name} -->\n` + r.text.trim())
   }
   if (sources.memoryIndex !== null) {
     parts.push('<!-- memory/MEMORY.md -->\n' + sources.memoryIndex.trim())
   }
   return parts.join('\n\n---\n\n')
+}
+
+export function buildCodexAgentsBody(sources: Sources): string {
+  return buildRulesBlockBody(sources, 'codex')
+}
+
+/** Rule and memory names inside a marker block (current or legacy markers) */
+export function rulesBlockItems(text: string): { rules: string[]; memory: boolean } {
+  const body = blockBodyMulti(text, ALL_MD_MARKERS) ?? ''
+  const rules = [...body.matchAll(/^<!-- rules\/(.+?) -->$/gm)].map((m) => m[1])
+  return { rules, memory: /^<!-- memory\/MEMORY\.md -->$/m.test(body) }
 }
 
 /** 1. ~/.codex/AGENTS.md — rules/*.md + memory/MEMORY.md concat (inside the markers only) */

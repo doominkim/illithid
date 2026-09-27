@@ -369,13 +369,23 @@ export function skillsReport(home: string, env: Env = process.env): SkillsReport
   const managed = readState(home).state.skills ?? {}
   const out: ToolSkills[] = []
   for (const t of tools(home)) {
-    if (t.skills.kind === 'symlinkDir') {
-      const ts = symlinkDirSkills(t.id, t.skills.dir, canonDir, canon)
-      for (const e of ts.entries) {
-        if (e.state === 'copy') e.managed = !!managed[t.id]?.[e.name]
+    switch (t.skills.kind) {
+      case 'symlinkDir': {
+        const ts = symlinkDirSkills(t.id, t.skills.dir, canonDir, canon)
+        for (const e of ts.entries) {
+          if (e.state === 'copy') e.managed = !!managed[t.id]?.[e.name]
+        }
+        out.push(ts)
+        break
       }
-      out.push(ts)
-    } else out.push(autoScanSkills(home, env, canonDir, canon))
+      case 'autoScan':
+        out.push(autoScanSkills(home, env, canonDir, canon))
+        break
+      default: {
+        const never: never = t.skills
+        throw new Error(`unknown skills kind ${String(never)}`)
+      }
+    }
   }
   return { canonicalDir: canonDir, canonical: canon, tools: out }
 }

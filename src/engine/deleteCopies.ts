@@ -8,7 +8,7 @@
  */
 import { cpSync, lstatSync, mkdirSync, readlinkSync, renameSync, rmSync, unlinkSync } from 'node:fs'
 import { basename, dirname, join, resolve, sep } from 'node:path'
-import type { ToolId } from './agents'
+import { tools, type ToolId } from './agents'
 import { agentToolDir } from './agentRender'
 import { planAgentSync } from './agentSync'
 import { appConfigDir } from './config'
@@ -105,7 +105,7 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
           refuse('notACandidate')
           continue
         }
-        const roots = [join(home, '.claude/skills'), join(home, '.codex/skills')]
+        const roots = tools(home).flatMap((t) => (t.skills.kind === 'symlinkDir' ? [t.skills.dir] : []))
         if (!roots.some((r) => inside(r, it.path)) || basename(it.path) !== it.name) {
           refuse('outOfScope')
           continue

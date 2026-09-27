@@ -71,12 +71,38 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
     )
   if (!view) return <Loading />
 
-  const byTool = (tool: ToolId): ApplyPreviewItem[] =>
-    view.items.filter((x) => x.tool === tool).sort((a, b) => ACTION_ORDER.indexOf(a.action) - ACTION_ORDER.indexOf(b.action) || a.name.localeCompare(b.name))
+  const byOrder = (a: ApplyPreviewItem, b: ApplyPreviewItem): number =>
+    ACTION_ORDER.indexOf(a.action) - ACTION_ORDER.indexOf(b.action) || a.name.localeCompare(b.name)
+  // Top-level rows only; detail rows (parent) are listed under their config file row
+  const byTool = (tool: ToolId): ApplyPreviewItem[] => view.items.filter((x) => x.tool === tool && !x.parent).sort(byOrder)
+  const childrenOf = (x: ApplyPreviewItem): ApplyPreviewItem[] =>
+    view.items.filter((c) => c.tool === x.tool && c.parent === x.path).sort(byOrder)
   const tools = TOOLS.filter(
-    (tool) => byTool(tool).length || view.importedChanged.some((x) => x.tool === tool) || view.notInitialized.some((x) => x.tool === tool)
+    (tool) =>
+      byTool(tool).length ||
+      view.importedChanged.some((x) => x.tool === tool) ||
+      view.notInitialized.some((x) => x.tool === tool) ||
+      view.libraryDirect.some((x) => x.tool === tool)
   )
-  const n = view.items.length
+  const n = view.items.filter((x) => !x.parent).length
+  const itemRow = (x: ApplyPreviewItem, child = false): React.JSX.Element => (
+    <ListRow
+      key={`${x.parent ?? ''}:${x.action}:${x.kind}:${x.path}:${x.name}`}
+      style={child ? { paddingLeft: 36 } : undefined}
+      title={x.name}
+      tags={
+        <>
+          <Badge variant="default" size="xs" fw={500} c="dimmed">
+            {t(`preview.kind.${x.kind}`)}
+          </Badge>
+          <Badge variant="light" color={ACTION_COLOR[x.action]} size="xs" fw={500} data-testid={`apply-preview-action-${x.action}`}>
+            {t(`preview.action.${x.action}`)}
+          </Badge>
+        </>
+      }
+      subtitle={x.kind === 'config' ? undefined : x.path}
+    />
+  )
 
   return (
     <Stack gap="md" data-testid="apply-preview">
@@ -110,9 +136,11 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                 <Text fw={600} size="md">
                   {TOOL_NAME[tool]}
                 </Text>
-                <Text size="sm" c="dimmed">
-                  {byTool(tool).length}
-                </Text>
+                {byTool(tool).length > 0 && (
+                  <Text size="sm" c="dimmed">
+                    {byTool(tool).length}
+                  </Text>
+                )}
               </Group>
               <ListCard>
                 {view.notInitialized
@@ -152,23 +180,25 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                       }
                     />
                   ))}
-                {byTool(tool).map((x) => (
-                  <ListRow
-                    key={`${x.action}:${x.kind}:${x.path}:${x.name}`}
-                    title={x.name}
-                    tags={
-                      <>
-                        <Badge variant="default" size="xs" fw={500} c="dimmed">
-                          {t(`preview.kind.${x.kind}`)}
-                        </Badge>
-                        <Badge variant="light" color={ACTION_COLOR[x.action]} size="xs" fw={500} data-testid={`apply-preview-action-${x.action}`}>
-                          {t(`preview.action.${x.action}`)}
-                        </Badge>
-                      </>
-                    }
-                    subtitle={x.kind === 'config' ? undefined : x.path}
-                  />
-                ))}
+                {byTool(tool).flatMap((x) => [itemRow(x), ...childrenOf(x).map((c) => itemRow(c, true))])}
+                {view.libraryDirect
+                  .filter((x) => x.tool === tool)
+                  .map((x) => (
+                    <ListRow
+                      key={`direct:${x.kind}:${x.name}`}
+                      title={x.name}
+                      tags={
+                        <>
+                          <Badge variant="default" size="xs" fw={500} c="dimmed">
+                            {t(`preview.kind.${x.kind}`)}
+                          </Badge>
+                          <Badge variant="light" color="gray" size="xs" fw={500} data-testid="apply-preview-library-direct">
+                            {t('preview.libraryDirect')}
+                          </Badge>
+                        </>
+                      }
+                    />
+                  ))}
               </ListCard>
             </Box>
           ))}
@@ -197,9 +227,25 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
 /** Apply preview dialog (sidebar sync button, backup restore, tool turned on in settings) */
 export function ApplyPreviewModal({ opened, onClose }: { opened: boolean; onClose: () => void }): React.JSX.Element {
   const { t } = useTranslation()
+  // Keep the body until the close transition ends, so the dialog never shrinks to an empty frame while closing
+  const [mounted, setMounted] = useState(false)
+  // Each opening gets a fresh body (fresh plan), even when reopened before the previous close finished
+  const [session, setSession] = useState({ n: 0, opened: false })
+  if (opened !== session.opened) setSession({ n: session.n + (opened ? 1 : 0), opened })
+  if (opened && !mounted) setMounted(true)
   return (
-    <Modal opened={opened} onClose={onClose} title={t('preview.title')} size="lg" centered radius="lg">
-      {opened && <ApplyPreviewBody cancelLabel={t('common.cancel')} onCancel={onClose} onDone={onClose} />}
+    // Above drawers and modals (default 200) so it works from an open item detail; below notifications (400)
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      onExitTransitionEnd={() => setMounted(false)}
+      title={t('preview.title')}
+      size="lg"
+      centered
+      radius="lg"
+      zIndex={300}
+    >
+      {mounted && <ApplyPreviewBody key={session.n} cancelLabel={t('common.cancel')} onCancel={onClose} onDone={onClose} />}
     </Modal>
   )
 }

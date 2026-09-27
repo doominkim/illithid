@@ -1,9 +1,8 @@
 import { join } from 'node:path'
 import { libraryRoot } from './config'
+import type { ToolId } from './toolIds'
 
-export type ToolId = 'claude' | 'codex' | 'opencode'
-
-export const TOOL_IDS: readonly ToolId[] = ['claude', 'codex', 'opencode']
+export { TOOL_IDS, type ToolId } from './toolIds'
 
 /** How shared rules reach each tool */
 export type RulesInjection =
@@ -28,7 +27,7 @@ export interface RosterSource {
 export interface ModelKeys {
   path: string
   format: 'json' | 'toml'
-  /** Top-level key name */
+  /** Key names. For JSON, `a.b` is the nested key b inside object a */
   keys: string[]
 }
 
@@ -58,6 +57,7 @@ export function tools(home: string): ToolInfo[] {
   const claudeSettings = join(home, '.claude/settings.json')
   const codexConfig = join(home, '.codex/config.toml')
   const opencodeConfig = join(home, '.config/opencode/opencode.json')
+  const geminiSettings = join(home, '.gemini/settings.json')
   return [
     {
       id: 'claude',
@@ -113,6 +113,19 @@ export function tools(home: string): ToolInfo[] {
         dirs: [join(home, '.config/opencode/agent'), join(home, '.config/opencode/agents')],
         ext: '.md',
         inline: { path: opencodeConfig, key: 'agent' }
+      }
+    },
+    {
+      id: 'gemini',
+      displayName: 'Gemini CLI',
+      configFile: geminiSettings,
+      // GEMINI.md @imports are limited to its project root (~/.gemini), so rules are inlined in a marker block
+      rules: { kind: 'markerBlock', path: join(home, '.gemini/GEMINI.md') },
+      skills: { kind: 'symlinkDir', dir: join(home, '.gemini/skills') },
+      models: { path: geminiSettings, format: 'json', keys: ['model.name'] },
+      roster: {
+        dirs: [join(home, '.gemini/agents')],
+        ext: '.md'
       }
     }
   ]

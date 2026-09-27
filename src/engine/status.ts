@@ -11,6 +11,7 @@ import { skillsReport, type SkillsReport, type ToolSkills } from './skills'
 import { planSkillSync, type SkillSyncItem } from './skillSync'
 import { toolsInUse } from './config'
 import { readState, type StateRead } from './state'
+import { MCP_TARGET_OF } from './targets'
 import { SKILL_OVERRIDE_TARGET_OF } from './targets/skillOverrides'
 import type { Env, FileChange, TargetId } from './types'
 
@@ -83,9 +84,9 @@ export interface StatusReport {
 
 /** Resource × tool → plan target */
 const TARGET_OF: Partial<Record<Resource, Partial<Record<ToolId, TargetId>>>> = {
-  rules: { codex: 'codexAgents', opencode: 'opencodeRules' },
+  rules: { codex: 'codexAgents', opencode: 'opencodeRules', gemini: 'geminiRules' },
   skills: { opencode: 'opencodeSkills' }, // withSkillOverride merges in the tool's own skill-disable settings
-  mcp: { claude: 'claudeMcp', codex: 'codexMcp', opencode: 'opencodeMcp' },
+  mcp: MCP_TARGET_OF,
   permissions: { claude: 'claudePermissions', codex: 'codexRules' }
 }
 
@@ -142,7 +143,7 @@ function syncActionState(action: string, reason: string | undefined): CellState 
     case 'retireImported':
       return 'needsSync'
     case 'skip':
-      return reason === 'sourceUnreadable' ? 'error' : null
+      return reason === 'sourceUnreadable' || reason === 'invalidName' ? 'error' : null
     default:
       return null
   }
@@ -274,9 +275,10 @@ export function statusReport(
         continue
       }
       const targetId = TARGET_OF[resource]?.[tool]
+      const overrideId = SKILL_OVERRIDE_TARGET_OF[tool]
       const overrideOf = (cell: StatusCell): StatusCell =>
-        resource === 'skills'
-          ? withSkillOverride(cell, byId.get(SKILL_OVERRIDE_TARGET_OF[tool]), sourcesError)
+        resource === 'skills' && overrideId
+          ? withSkillOverride(cell, byId.get(overrideId), sourcesError)
           : cell
       if (resource === 'rules' && tool === 'claude') cells.push(claudeRulesCell(home, ruleItems))
       else if (targetId) {

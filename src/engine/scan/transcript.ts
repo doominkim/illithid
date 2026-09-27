@@ -3,6 +3,7 @@
  * - Claude: ~/.claude/projects/<proj>/<id>.jsonl (readline)
  * - Codex:  ~/.codex/sessions/**\/rollout-*-<id>.jsonl (readline)
  * - OpenCode: ~/.local/share/opencode/opencode.db (message + part, readOnly)
+ * - Gemini: ~/.gemini/tmp/<project>/chats/session-<time>-<id8>.jsonl (records replayed like Gemini CLI: $set, $rewindTo)
  *
  * User requests (prompts) = only user messages actually typed by a person. isMeta, isSidechain, tool_result, system-reminder,
  * command output and injected text (AGENTS.md, environment_context, teammate-message, task-notification …) are excluded.
@@ -12,9 +13,10 @@ import { createReadStream, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import fg from 'fast-glob'
-import { clip, isoOrUndefined } from './common'
+import type { ToolId } from '../toolIds'
+import { clip, isoOrUndefined, readRange } from './common'
 
-export type TranscriptTool = 'claude' | 'codex' | 'opencode'
+export type TranscriptTool = ToolId
 
 export interface TranscriptMessage {
   /** Sequence number within the session (from 0; filtered items get no number) */
@@ -81,6 +83,19 @@ const INJECTED_PREFIX = [
   '<user_shell_command',
   '[Request interrupted'
 ]
+
+/** Gemini CLI injections into user messages (only filtered for Gemini sessions) */
+const GEMINI_INJECTED_PREFIX = ['<session_context', '<hook_context']
+
+export function isGeminiInjected(raw: string): boolean {
+  const t = raw.trim()
+  return GEMINI_INJECTED_PREFIX.some((p) => t.startsWith(p))
+}
+
+/** Gemini user text: injected context blocks are dropped, then the shared cleanup applies */
+export function cleanGeminiUserText(raw: string): string | undefined {
+  return isGeminiInjected(raw) ? undefined : cleanUserText(raw)
+}
 
 function stripTag(text: string, tag: string): string {
   return text.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}>`, 'g'), '')
@@ -409,6 +424,108 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
   }
 }
 
+// ---------------------------------------------------------------- Gemini
+
+/** First 8 chars of the session id are the file name suffix: session-<time>-<id8>.jsonl */
+function geminiFile(home: string, id: string): string | undefined {
+  const root = join(home, '.gemini/tmp')
+  if (!existsSync(root) || !/^[A-Za-z0-9_-]+$/.test(id)) return undefined
+  const files = fg.sync(`*/chats/session-*-${id.slice(0, 8)}.jsonl`, {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    suppressErrors: true
+  })
+  return files.find((f) => geminiHeaderId(f) === id)
+}
+
+function geminiHeaderId(path: string): string | undefined {
+  try {
+    const first = readRange(path, 0, 64 * 1024).split('\n', 1)[0]
+    const v = JSON.parse(first) as Json
+    return typeof v.sessionId === 'string' ? v.sessionId : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export interface GeminiConversation {
+  /** Header fields merged with every $set (sessionId, projectHash, startTime, lastUpdated, kind, summary …) */
+  meta: Json
+  /** Messages after replaying $set.messages and $rewindTo, in order */
+  messages: Json[]
+}
+
+const isMessage = (r: Json): boolean => typeof r.id === 'string'
+
+/**
+ * Replay a Gemini CLI session file the way Gemini loads it: message records by id (a later record with the same id replaces
+ * the earlier one in place), `$set` merges metadata (`$set.messages` replaces all messages), `$rewindTo` drops that message
+ * and everything after it (all messages if the id is unknown)
+ */
+export function replayGemini(records: Iterable<Json>): GeminiConversation {
+  let meta: Json = {}
+  const byId = new Map<string, Json>()
+  const addAll = (list: unknown): void => {
+    if (Array.isArray(list)) for (const m of list as Json[]) if (m && typeof m === 'object' && isMessage(m)) byId.set(m.id as string, m)
+  }
+  for (const r of records) {
+    if (typeof r.$rewindTo === 'string') {
+      let found = false
+      for (const id of [...byId.keys()]) {
+        if (id === r.$rewindTo) found = true
+        if (found) byId.delete(id)
+      }
+      if (!found) byId.clear()
+    } else if (isMessage(r)) byId.set(r.id as string, r)
+    else if (r.$set && typeof r.$set === 'object' && !Array.isArray(r.$set)) {
+      const set = r.$set as Json
+      if (Array.isArray(set.messages)) {
+        byId.clear()
+        addAll(set.messages)
+      }
+      meta = { ...meta, ...set }
+    } else if (typeof r.sessionId === 'string') {
+      meta = { ...meta, ...r }
+      addAll(r.messages)
+    }
+  }
+  delete meta.messages
+  return { meta, messages: [...byId.values()] }
+}
+
+/** Text of a Gemini content value (string or part list). Thought parts are skipped */
+export function geminiText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return (content as unknown[])
+    .map((p) => (typeof p === 'string' ? p : p && typeof p === 'object' && !(p as Json).thought && typeof (p as Json).text === 'string' ? ((p as Json).text as string) : ''))
+    .join('')
+}
+
+async function readJsonLines(path: string): Promise<Json[]> {
+  const out: Json[] = []
+  await eachJsonLine(path, (l) => out.push(l))
+  return out
+}
+
+export async function readGemini(path: string, c: Collector): Promise<void> {
+  const { messages } = replayGemini(await readJsonLines(path))
+  for (const m of messages) {
+    const at = isoOrUndefined(m.timestamp)
+    if (m.type === 'user') {
+      const text = cleanGeminiUserText(geminiText(m.content))
+      if (text) c.push('user', text, at)
+    } else if (m.type === 'gemini') {
+      const text = geminiText(m.content)
+      if (text.trim()) c.push('assistant', text, at)
+      if (Array.isArray(m.toolCalls))
+        for (const t of m.toolCalls as Json[])
+          if (t && typeof t === 'object') c.push('assistant', toolLine(String(t.name ?? t.displayName ?? 'tool'), t.args), at, 'tool')
+    }
+  }
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Transcript of a single session. Throws if the file is missing */
@@ -419,14 +536,32 @@ export async function readSessionTranscript(
   opts: TranscriptOptions = {}
 ): Promise<SessionTranscript> {
   const c = new Collector()
-  if (tool === 'claude') {
-    const f = claudeFile(home, id)
-    if (!f) throw new Error('session file not found')
-    await readClaude(f, c)
-  } else if (tool === 'codex') {
-    const f = codexFile(home, id)
-    if (!f) throw new Error('session file not found')
-    await readCodex(f, c)
-  } else readOpencode(home, id, c)
+  switch (tool) {
+    case 'claude': {
+      const f = claudeFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readClaude(f, c)
+      break
+    }
+    case 'codex': {
+      const f = codexFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readCodex(f, c)
+      break
+    }
+    case 'opencode':
+      readOpencode(home, id, c)
+      break
+    case 'gemini': {
+      const f = geminiFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readGemini(f, c)
+      break
+    }
+    default: {
+      const never: never = tool
+      throw new Error(`unknown tool ${String(never)}`)
+    }
+  }
   return c.result(opts)
 }

@@ -3,7 +3,7 @@
  *
  * Source kinds
  * - legacyLibrary   `~/.agents` (previous sync.mjs setup: rules/ skills/ sync/mcp.json sync/allowlist.json memory/)
- * - tool            Claude Code · Codex · OpenCode config and skill directories
+ * - tool            Claude Code · Codex · OpenCode · Gemini CLI config and skill directories
  * - managerLibrary  skill libraries of other manager apps (~/.skills-manager/skills, ~/.cc-switch/skills)
  *
  * - planImport is read-only. Candidate data never holds raw secret values — literals are replaced with ${KEY}
@@ -28,11 +28,11 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import { parse as parseToml } from 'smol-toml'
-import { agentToolPath } from './agentRender'
+import { agentToolDir, agentToolPath } from './agentRender'
 import { adoptAgentFiles } from './agentSync'
 import { adoptSkillCopies } from './skillSync'
 import { renderAgent } from './agentRender'
-import { TOOL_IDS, tilde, type ToolId } from './agents'
+import { TOOL_IDS, tilde, tools, type ToolId } from './agents'
 import { activeWorkspaceId, LEGACY_LIBRARY_DIR, libraryRoot } from './config'
 import {
   agentLibraryText,
@@ -69,7 +69,7 @@ import { readState, writeState } from './state'
 import { libraryPaths, readMcp } from './sources'
 import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
 import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
-import { mcpEntries, outsideBlockMulti, sha256 } from './text'
+import { mcpEntries, outsideBlockMulti, sha256, stripJsonComments } from './text'
 import type { Allowlist, AllowlistEntry, Env, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
@@ -78,7 +78,7 @@ export type ImportSourceKind = 'legacyLibrary' | 'tool' | 'managerLibrary'
 export type ImportKind = 'rule' | 'memory' | 'permissions' | 'skill' | 'mcp' | 'agent'
 
 export interface ImportSource {
-  /** legacy | tool:claude | tool:codex | tool:opencode | manager:skills-manager | manager:cc-switch */
+  /** legacy | tool:claude | tool:codex | tool:opencode | tool:gemini | manager:skills-manager | manager:cc-switch */
   id: string
   kind: ImportSourceKind
   label: string
@@ -120,6 +120,32 @@ export function listImportSources(home: string): ImportSource[] {
   const legacy = join(home, LEGACY_LIBRARY_DIR)
   const legacyIsLibrary = isDir(legacy) && sameDir(legacy, lib)
   const legacyHas = ['rules', 'skills', 'sync', 'memory'].some((d) => existsSync(join(legacy, d)))
+  const toolSources: Record<ToolId, Pick<ImportSource, 'label' | 'path' | 'available' | 'kinds'>> = {
+    claude: {
+      label: 'Claude Code (~/.claude, ~/.claude.json)',
+      path: join(home, '.claude'),
+      available: isDir(join(home, '.claude')) || existsSync(join(home, '.claude.json')),
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
+    },
+    codex: {
+      label: 'Codex (~/.codex)',
+      path: join(home, '.codex'),
+      available: isDir(join(home, '.codex')),
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
+    },
+    opencode: {
+      label: 'OpenCode (~/.config/opencode)',
+      path: join(home, '.config/opencode'),
+      available: isDir(join(home, '.config/opencode')),
+      kinds: ['rule', 'mcp', 'skill', 'agent']
+    },
+    gemini: {
+      label: 'Gemini CLI (~/.gemini)',
+      path: join(home, '.gemini'),
+      available: isDir(join(home, '.gemini')),
+      kinds: ['rule', 'mcp', 'skill', 'agent']
+    }
+  }
   const out: ImportSource[] = [
     {
       id: 'legacy',
@@ -130,30 +156,7 @@ export function listImportSources(home: string): ImportSource[] {
       kinds: ['rule', 'memory', 'permissions', 'mcp', 'skill'],
       ...(legacyIsLibrary ? { note: 'Same path as the current library, so not a source' } : {})
     },
-    {
-      id: 'tool:claude',
-      kind: 'tool',
-      label: 'Claude Code (~/.claude, ~/.claude.json)',
-      path: join(home, '.claude'),
-      available: isDir(join(home, '.claude')) || existsSync(join(home, '.claude.json')),
-      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
-    },
-    {
-      id: 'tool:codex',
-      kind: 'tool',
-      label: 'Codex (~/.codex)',
-      path: join(home, '.codex'),
-      available: isDir(join(home, '.codex')),
-      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
-    },
-    {
-      id: 'tool:opencode',
-      kind: 'tool',
-      label: 'OpenCode (~/.config/opencode)',
-      path: join(home, '.config/opencode'),
-      available: isDir(join(home, '.config/opencode')),
-      kinds: ['rule', 'mcp', 'skill', 'agent']
-    }
+    ...TOOL_IDS.map((tool): ImportSource => ({ id: `tool:${tool}`, kind: 'tool', ...toolSources[tool] }))
   ]
   for (const { id, rel } of OTHER_APP_SKILL_DIRS) {
     const p = join(home, rel)
@@ -172,7 +175,12 @@ export function listImportSources(home: string): ImportSource[] {
 // ---------------------------------------------------------------- Tool detection
 
 /** Executable names looked up on PATH per tool */
-export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = { claude: 'claude', codex: 'codex', opencode: 'opencode' }
+export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = {
+  claude: 'claude',
+  codex: 'codex',
+  opencode: 'opencode',
+  gemini: 'gemini'
+}
 
 export interface ToolDetection {
   tool: ToolId
@@ -260,7 +268,11 @@ export type Portability = 'ok' | 'warn' | 'toolOnly'
  * - toolMemory        tool auto memory (~/.claude/projects/<p>/memory, ~/.codex/memories)
  * - primaryAgent      a primary agent, not a subagent (OpenCode mode: primary)
  * - builtinAgent      tool built-in agent settings (OpenCode build·plan·general·explore inline overrides)
+ * - restrictedAgent   agent limited to certain tools or its own MCP servers (Gemini tools·mcpServers) — the library can't carry the
+ *                     limit, so importing it would widen what the agent may do
+ * - nameMismatch      agent's own name differs from its file name (Gemini registers the frontmatter name)
  * warn
+ * - toolNotes         tool instructions/notes text (outside the app markers in ~/.gemini/GEMINI.md) — review before sharing
  * - localPath         command/args contain an absolute path specific to this machine
  * - toolSpecificTools SKILL.md or agent instructions assume tools specific to one tool
  * - toolSpecificKeys  agent's tool-specific settings (tools, permissions, hooks, temperature, etc.) have no library equivalent and are dropped
@@ -278,7 +290,10 @@ export type PortabilityReason =
   | 'toolMemory'
   | 'primaryAgent'
   | 'builtinAgent'
+  | 'restrictedAgent'
+  | 'nameMismatch'
   | 'localPath'
+  | 'toolNotes'
   | 'toolSpecificTools'
   | 'toolSpecificKeys'
 
@@ -578,11 +593,14 @@ const TOOL_ONLY_REASONS: ReadonlySet<PortabilityReason> = new Set<PortabilityRea
   'toolInstructions',
   'toolMemory',
   'primaryAgent',
-  'builtinAgent'
+  'builtinAgent',
+  'restrictedAgent',
+  'nameMismatch'
 ])
 const REASON_ORDER: readonly PortabilityReason[] = [
   ...TOOL_ONLY_REASONS,
   'localPath',
+  'toolNotes',
   'toolSpecificTools',
   'toolSpecificKeys'
 ]
@@ -617,9 +635,15 @@ function mergeInto(target: PortabilityInfo, add: PortabilityInfo): void {
 }
 
 /** Tool config directories (relative to HOME) */
-const TOOL_DIRS = ['.codex', '.claude', '.config/opencode', '.local/share/opencode'] as const
+const TOOL_DIRS = ['.codex', '.claude', '.config/opencode', '.local/share/opencode', '.gemini'] as const
 /** Tool plugin paths */
-const TOOL_PLUGIN_DIRS = ['.codex/plugins', '.claude/plugins', '.config/opencode/plugin', '.config/opencode/plugins']
+const TOOL_PLUGIN_DIRS = [
+  '.codex/plugins',
+  '.claude/plugins',
+  '.config/opencode/plugin',
+  '.config/opencode/plugins',
+  '.gemini/extensions'
+]
 
 function expandHome(home: string, p: string): string {
   return p === '~' ? home : p.startsWith('~/') ? join(home, p.slice(2)) : p
@@ -736,7 +760,10 @@ export function skillPortability(
   return judge(r)
 }
 
-const INSTRUCTION_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'AGENT.md'])
+const INSTRUCTION_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'AGENT.md', 'GEMINI.md'])
+
+/** Rule candidate for the text outside the app markers in ~/.gemini/GEMINI.md (copied, never moved) */
+export const GEMINI_MD_RULE = 'gemini-md.md'
 
 /** Rule file verdict. name is the candidate name, path is the source file */
 export function rulePortability(ctx: PortabilityContext, name: string, path: string): PortabilityInfo {
@@ -744,6 +771,8 @@ export function rulePortability(ctx: PortabilityContext, name: string, path: str
   const r: PortabilityReason[] = []
   const base = path.split('/').pop() ?? ''
   if (name === 'codex-agents.md' && path === join(home, '.codex/AGENTS.md')) r.push('toolInstructions')
+  // GEMINI.md outside the markers: global instructions and Gemini memory-tool notes — importable, but review before sharing
+  else if (name === GEMINI_MD_RULE && path === join(home, '.gemini/GEMINI.md')) r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
@@ -828,13 +857,15 @@ const noEvalAgent = (): never => {
 }
 const AGENT_MATTER = { engines: { js: noEvalAgent, javascript: noEvalAgent } }
 
-/** Keys carried into library format (per tool). Other keys are dropped (toolSpecificKeys) */
-const AGENT_KEPT: Record<'claude' | 'codex' | 'opencodeFile' | 'opencodeInline', ReadonlySet<string>> = {
+/** Keys carried into library format (per tool agent file). Other keys are dropped (toolSpecificKeys) */
+const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   claude: new Set(['name', 'description', 'model', 'effort']),
   codex: new Set(['name', 'description', 'model', 'model_reasoning_effort', 'developer_instructions']),
-  opencodeFile: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
-  opencodeInline: new Set(['description', 'mode', 'model', 'reasoningEffort', 'prompt'])
+  opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
+  gemini: new Set(['name', 'description', 'model', 'kind'])
 }
+/** Keys carried over from OpenCode opencode.json `agent` inline definitions */
+const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set(['description', 'mode', 'model', 'reasoningEffort', 'prompt'])
 /** OpenCode built-in agent names (opencode.json agent.<name> is an override) */
 const OPENCODE_BUILTIN_AGENTS = new Set(['build', 'plan', 'general', 'explore'])
 
@@ -905,6 +936,59 @@ function droppedKeys(data: Json, kept: ReadonlySet<string>): string[] {
     .sort()
 }
 
+/** One tool agent file → library fields. Throws on parse failure */
+function agentRaw(tool: ToolId, name: string, text: string, reasons: PortabilityReason[]): AgentRaw {
+  switch (tool) {
+    case 'codex': {
+      const d = parseToml(text) as Json
+      return {
+        description: strOf(d.description) ?? '',
+        model: strOf(d.model),
+        effort: strOf(d.model_reasoning_effort),
+        body: agentBody(typeof d.developer_instructions === 'string' ? d.developer_instructions : ''),
+        dropped: droppedKeys(d, AGENT_KEPT.codex),
+        reasons
+      }
+    }
+    case 'gemini': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      // Remote (A2A) agents have no local instructions to carry over
+      if (strOf(d.kind) === 'remote') reasons.push('builtinAgent')
+      if (d.tools !== undefined || d.mcpServers !== undefined) reasons.push('restrictedAgent')
+      const own = strOf(d.name)
+      if (own !== undefined && own !== name) reasons.push('nameMismatch')
+      const model = strOf(d.model)
+      return {
+        description: strOf(d.description) ?? '',
+        // inherit = Gemini's default (the session model)
+        model: model === 'inherit' ? undefined : model,
+        body: agentBody(m.content),
+        dropped: droppedKeys(d, AGENT_KEPT.gemini),
+        reasons
+      }
+    }
+    case 'claude':
+    case 'opencode': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      if (tool === 'opencode' && strOf(d.mode) === 'primary') reasons.push('primaryAgent')
+      return {
+        description: strOf(d.description) ?? '',
+        model: strOf(d.model),
+        effort: strOf(tool === 'claude' ? d.effort : d.reasoningEffort),
+        body: agentBody(m.content),
+        dropped: droppedKeys(d, AGENT_KEPT[tool]),
+        reasons
+      }
+    }
+    default: {
+      const never: never = tool
+      throw new Error(`unknown tool ${String(never)}`)
+    }
+  }
+}
+
 /**
  * Scan one tool agent folder. Skips copies the app wrote (agents/<name> recorded in state.agents).
  * format: md (Claude·OpenCode) or toml (Codex)
@@ -918,7 +1002,7 @@ function scanAgentDir(
   managed: Record<string, unknown>
 ): void {
   if (!isDir(dir)) return
-  const ext = tool === 'codex' ? '.toml' : '.md'
+  const { ext } = agentToolDir(home, tool)
   let files: string[]
   try {
     files = readdirSync(dir).sort()
@@ -958,41 +1042,7 @@ function scanAgentDir(
       continue
     }
     try {
-      if (tool === 'codex') {
-        const d = parseToml(text) as Json
-        addAgent(
-          found,
-          tool,
-          name,
-          {
-            description: strOf(d.description) ?? '',
-            model: strOf(d.model),
-            effort: strOf(d.model_reasoning_effort),
-            body: agentBody(typeof d.developer_instructions === 'string' ? d.developer_instructions : ''),
-            dropped: droppedKeys(d, AGENT_KEPT.codex),
-            reasons
-          },
-          r
-        )
-      } else {
-        const m = matter(text, AGENT_MATTER)
-        const d = structuredClone(m.data) as Json
-        if (tool === 'opencode' && strOf(d.mode) === 'primary') reasons.push('primaryAgent')
-        addAgent(
-          found,
-          tool,
-          name,
-          {
-            description: strOf(d.description) ?? '',
-            model: strOf(d.model),
-            effort: strOf(tool === 'claude' ? d.effort : d.reasoningEffort),
-            body: agentBody(m.content),
-            dropped: droppedKeys(d, tool === 'claude' ? AGENT_KEPT.claude : AGENT_KEPT.opencodeFile),
-            reasons
-          },
-          r
-        )
-      }
+      addAgent(found, tool, name, agentRaw(tool, name, text, reasons), r)
     } catch {
       found.notes.push(`${tilde(home, path)} parse failed`)
     }
@@ -1016,11 +1066,10 @@ function opencodePrompt(home: string, configPath: string, v: unknown): { body: s
 function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: string): void {
   const managed = (readState(home).state.agents ?? {})[tool] ?? {}
   const base = { origin: 'tool' as const, sourceId, label: tool }
-  if (tool === 'claude') scanAgentDir(found, home, tool, join(home, '.claude/agents'), base, managed)
-  else if (tool === 'codex') scanAgentDir(found, home, tool, join(home, '.codex/agents'), base, managed)
-  else {
-    scanAgentDir(found, home, tool, join(home, '.config/opencode/agent'), base, {})
-    scanAgentDir(found, home, tool, join(home, '.config/opencode/agents'), base, managed)
+  // Only the folder the app writes holds app copies (managed); other source folders are all user files
+  const slot = agentToolDir(home, tool).dir
+  for (const dir of agentSourceDirs(home, tool)) scanAgentDir(found, home, tool, dir, base, dir === slot ? managed : {})
+  if (tool === 'opencode') {
     const cp = join(home, '.config/opencode/opencode.json')
     if (!existsSync(cp)) return
     const o = readJsonSafe(cp)
@@ -1031,7 +1080,7 @@ function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: st
       if (strOf(def.mode) === 'primary') reasons.push('primaryAgent')
       if (OPENCODE_BUILTIN_AGENTS.has(name)) reasons.push('builtinAgent')
       const pr = opencodePrompt(home, cp, def.prompt)
-      const dropped = droppedKeys(def, AGENT_KEPT.opencodeInline)
+      const dropped = droppedKeys(def, OPENCODE_INLINE_KEPT)
       if (pr.unresolved) dropped.push('prompt{file:}')
       addAgent(
         found,
@@ -1055,9 +1104,7 @@ export { importedBackupRoot }
 
 /** Per-tool agent source folders (originals there are switched to app-owned on the next sync) */
 function agentSourceDirs(home: string, tool: ToolId): string[] {
-  if (tool === 'claude') return [join(home, '.claude/agents')]
-  if (tool === 'codex') return [join(home, '.codex/agents')]
-  return [join(home, '.config/opencode/agent'), join(home, '.config/opencode/agents')]
+  return tools(home).find((t) => t.id === tool)!.roster.dirs
 }
 
 function pendingEntry(home: string, kind: PendingRetire['kind'], tool: ToolId, name: string, path: string): PendingRetire | null {
@@ -1080,7 +1127,7 @@ function agentRetirements(home: string, name: string, v: AgentVariant): { pendin
     }
     const tool = src.label as ToolId
     if (!TOOL_IDS.includes(tool)) continue
-    const ext = tool === 'codex' ? '.toml' : '.md'
+    const { ext } = agentToolDir(home, tool)
     const dir = dirname(src.path)
     if (!agentSourceDirs(home, tool).includes(dir) || basename(src.path) !== name + ext) continue
     let st: ReturnType<typeof lstatSync>
@@ -1134,9 +1181,23 @@ function ruleRetirements(home: string, name: string, v: FileVariant): { pending:
 
 /** Per-tool skill source folders */
 function skillSourceDirs(home: string, tool: ToolId): string[] {
-  if (tool === 'claude') return [join(home, '.claude/skills')]
-  if (tool === 'codex') return [join(home, '.codex/skills')]
-  return [join(home, '.config/opencode/skill'), join(home, '.config/opencode/skills')]
+  const t = tools(home).find((x) => x.id === tool)!
+  switch (t.skills.kind) {
+    case 'symlinkDir':
+      return [t.skills.dir]
+    case 'autoScan':
+      // The tool's own folders (the other roots belong to other tools or the library)
+      return [join(home, '.config/opencode/skill'), join(home, '.config/opencode/skills')]
+    default: {
+      const never: never = t.skills
+      throw new Error(`unknown skills kind ${String(never)}`)
+    }
+  }
+}
+
+/** Tools the app copies library skills into (the rest read the library directly) */
+function copiesSkills(home: string, tool: ToolId): boolean {
+  return tools(home).find((x) => x.id === tool)!.skills.kind === 'symlinkDir'
 }
 
 /**
@@ -1166,7 +1227,7 @@ function skillRetirements(home: string, name: string, v: SkillVariant): { pendin
       continue
     }
     if (!st.isDirectory() && !st.isSymbolicLink()) continue
-    if (tool !== 'opencode') {
+    if (copiesSkills(home, tool)) {
       if (st.isSymbolicLink()) {
         if (!out.converted.includes(tool)) out.converted.push(tool)
         continue
@@ -1191,6 +1252,20 @@ function skillRetirements(home: string, name: string, v: SkillVariant): { pendin
 function sourceToggles(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): boolean {
   try {
     enableOnlySourceTools(home, kind, name, sources)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The GEMINI.md text stays where it is (copied, not moved) and is Gemini's own notes, so the imported rule starts off for every
+ * tool — the user turns on only the tools that should get it (on for Gemini it would also be read twice)
+ */
+function geminiMdToggles(home: string, sources: ImportSourceRef[]): boolean {
+  if (!sources.some((s) => s.origin === 'tool' && s.label === 'gemini')) return sourceToggles(home, 'rules', GEMINI_MD_RULE, sources)
+  try {
+    for (const tool of MANIFEST_TOOLS.rules) setToggle(home, 'rules', GEMINI_MD_RULE, tool, false)
     return true
   } catch {
     return false
@@ -1364,6 +1439,47 @@ function convertOpencode(name: string, s: Json): Conv {
     return { server, c }
   }
   return null
+}
+
+/** Gemini `$VAR` → `${VAR}` (Gemini expands both in settings.json strings) */
+function fromGeminiRef(v: unknown): unknown {
+  return typeof v === 'string' ? v.replace(/\$([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_{])/g, '${$1}') : v
+}
+
+/**
+ * Gemini CLI mcpServers entry. httpUrl = streamable HTTP, url = SSE (moved to http with a warning).
+ * trust, cwd and tool filters have no library equivalent and are dropped with a warning
+ */
+function convertGemini(name: string, s: Json): Conv {
+  const c = new Converter(name)
+  let server: McpServer
+  if (typeof s.command === 'string') {
+    server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
+    if (isObj(s.env) && Object.keys(s.env).length)
+      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))]))
+  } else if (typeof s.httpUrl === 'string' || typeof s.url === 'string') {
+    if (typeof s.httpUrl !== 'string')
+      c.warnings.push('moved sse transport (url) to http — check that the server supports streamable http')
+    server = { transport: 'http', url: c.url(s.httpUrl ?? s.url) }
+    if (isObj(s.headers) && Object.keys(s.headers).length)
+      server.headers = Object.fromEntries(
+        Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, fromGeminiRef(v))])
+      )
+  } else return null
+  if (typeof s.timeout === 'number') server.timeoutMs = s.timeout
+  for (const k of ['trust', 'cwd', 'includeTools', 'excludeTools', 'authProviderType', 'oauth'])
+    if (s[k] !== undefined) c.warnings.push(`dropped ${k} (no library equivalent)`)
+  return { server, c }
+}
+
+/** Gemini settings.json (comments allowed, as Gemini reads it) → object. null if unreadable */
+function readGeminiSettings(path: string): Json | null {
+  try {
+    const v = JSON.parse(stripJsonComments(readFileSync(path, 'utf8'))) as unknown
+    return isObj(v) ? v : null
+  } catch {
+    return null
+  }
 }
 
 function convertCodex(name: string, s: Json): Conv {
@@ -1675,136 +1791,178 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
     found.mcp.set(name, list)
   }
 
-  if (tool === 'claude') {
-    const rulesDir = join(home, '.claude/rules')
-    if (isDir(rulesDir))
-      for (const f of readdirSync(rulesDir).sort()) {
-        const p = join(rulesDir, f)
-        if (f.endsWith('.md') && !f.startsWith('.') && lstatSync(p).isFile())
-          addFile(found.rules, f, p, ref(p), rulePortability(found.ctx, f, p))
-      }
-    const sp = join(home, '.claude/settings.json')
-    if (existsSync(sp)) {
-      const o = readJsonSafe(sp)
-      if (!o) found.notes.push(`${tilde(home, sp)} parse failed`)
-      else if (isObj(o.permissions)) {
-        const { allowlist, warnings } = parseClaudePermissions(o.permissions)
-        if (
-          allowlist.bash.length ||
-          allowlist.claudeOnly.allow.length ||
-          allowlist.claudeOnly.deny.length
-        )
-          found.permissions.push(permissionsVariant(allowlist, ref(sp), warnings))
-      }
-    }
-    const cp = join(home, '.claude.json')
-    if (existsSync(cp)) {
-      const o = readJsonSafe(cp)
-      if (!o) found.notes.push('~/.claude.json parse failed')
-      else if (isObj(o.mcpServers))
-        for (const [n, s] of Object.entries(o.mcpServers))
-          if (isObj(s)) addMcp(n, convertClaude(n, s), cp)
-    }
-    scanSkillDir(found, home, join(home, '.claude/skills'), {
-      origin: 'tool',
-      sourceId: src.id,
-      label: tool
-    })
-  }
-
-  if (tool === 'codex') {
-    const ap = join(home, '.codex/AGENTS.md')
-    if (existsSync(ap)) {
-      const outside = outsideBlockMulti(readFileSync(ap, 'utf8'), MD_ALL).trim()
-      if (outside) {
-        const name = 'codex-agents.md'
-        const id = short(sha256(outside))
-        const byId = found.rules.get(name) ?? new Map<string, FileVariant>()
-        byId.set(id, {
-          id,
-          path: ap,
-          bytes: Buffer.byteLength(outside),
-          sources: [ref(ap)],
-          ...rulePortability(found.ctx, name, ap)
-        })
-        found.rules.set(name, byId)
-        found.notes.push(
-          'codex-agents.md is the text outside the markers in ~/.codex/AGENTS.md (may be Codex-only text)'
-        )
-      }
-    }
-    const rp = join(home, '.codex/rules/default.rules')
-    if (existsSync(rp)) {
-      const bash = parseCodexRules(outsideBlockMulti(readFileSync(rp, 'utf8'), RULES_ALL))
-      if (bash.length)
-        found.permissions.push(
-          permissionsVariant({ bash, claudeOnly: { allow: [], deny: [] } }, ref(rp), [
-            'only prefix_rule lines outside default.rules markers — no Claude-only entries'
-          ])
-        )
-    }
-    const tp = join(home, '.codex/config.toml')
-    if (existsSync(tp)) {
-      try {
-        const o = parseToml(readFileSync(tp, 'utf8')) as Json
-        if (isObj(o.mcp_servers))
-          for (const [n, s] of Object.entries(o.mcp_servers))
-            if (isObj(s)) addMcp(n, convertCodex(n, s), tp)
-      } catch {
-        found.notes.push('~/.codex/config.toml parse failed')
-      }
-    }
-    scanSkillDir(found, home, join(home, '.codex/skills'), {
-      origin: 'tool',
-      sourceId: src.id,
-      label: tool
-    })
-  }
-
-  if (tool === 'opencode') {
-    const op = join(home, '.config/opencode/opencode.json')
-    if (existsSync(op)) {
-      const o = readJsonSafe(op)
-      if (!o) found.notes.push('~/.config/opencode/opencode.json parse failed')
-      else {
-        if (isObj(o.mcp))
-          for (const [n, s] of Object.entries(o.mcp))
-            if (isObj(s)) addMcp(n, convertOpencode(n, s), op)
-        if (Array.isArray(o.instructions)) {
-          let globs = 0
-          for (const x of o.instructions) {
-            if (typeof x !== 'string') continue
-            const abs = x.startsWith('~/') ? join(home, x.slice(2)) : x
-            if (abs.includes('*')) {
-              globs++
-              continue
-            }
-            if (
-              !isAbsolute(abs) ||
-              !abs.endsWith('.md') ||
-              !existsSync(abs) ||
-              !statSync(abs).isFile()
-            )
-              continue
-            if (within(lib, abs) || within(legacy, abs)) continue
-            const n = abs.split('/').pop()!
-            addFile(found.rules, n, abs, ref(abs), rulePortability(found.ctx, n, abs))
-          }
-          if (globs)
-            found.notes.push(`${globs} glob entries in opencode instructions are not turned into candidates`)
+  switch (tool) {
+    case 'claude': {
+      const rulesDir = join(home, '.claude/rules')
+      if (isDir(rulesDir))
+        for (const f of readdirSync(rulesDir).sort()) {
+          const p = join(rulesDir, f)
+          if (f.endsWith('.md') && !f.startsWith('.') && lstatSync(p).isFile())
+            addFile(found.rules, f, p, ref(p), rulePortability(found.ctx, f, p))
+        }
+      const sp = join(home, '.claude/settings.json')
+      if (existsSync(sp)) {
+        const o = readJsonSafe(sp)
+        if (!o) found.notes.push(`${tilde(home, sp)} parse failed`)
+        else if (isObj(o.permissions)) {
+          const { allowlist, warnings } = parseClaudePermissions(o.permissions)
+          if (
+            allowlist.bash.length ||
+            allowlist.claudeOnly.allow.length ||
+            allowlist.claudeOnly.deny.length
+          )
+            found.permissions.push(permissionsVariant(allowlist, ref(sp), warnings))
         }
       }
+      const cp = join(home, '.claude.json')
+      if (existsSync(cp)) {
+        const o = readJsonSafe(cp)
+        if (!o) found.notes.push('~/.claude.json parse failed')
+        else if (isObj(o.mcpServers))
+          for (const [n, s] of Object.entries(o.mcpServers))
+            if (isObj(s)) addMcp(n, convertClaude(n, s), cp)
+      }
+      scanSkillDir(found, home, join(home, '.claude/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
     }
-    scanSkillDir(found, home, join(home, '.config/opencode/skill'), {
-      origin: 'tool',
-      sourceId: src.id,
-      label: tool
-    })
-    scanSkillDir(found, home, join(home, '.config/opencode/skills'), {
-      origin: 'tool',
-      sourceId: src.id,
-      label: tool
-    })
+    case 'codex': {
+      const ap = join(home, '.codex/AGENTS.md')
+      if (existsSync(ap)) {
+        const outside = outsideBlockMulti(readFileSync(ap, 'utf8'), MD_ALL).trim()
+        if (outside) {
+          const name = 'codex-agents.md'
+          const id = short(sha256(outside))
+          const byId = found.rules.get(name) ?? new Map<string, FileVariant>()
+          byId.set(id, {
+            id,
+            path: ap,
+            bytes: Buffer.byteLength(outside),
+            sources: [ref(ap)],
+            ...rulePortability(found.ctx, name, ap)
+          })
+          found.rules.set(name, byId)
+          found.notes.push(
+            'codex-agents.md is the text outside the markers in ~/.codex/AGENTS.md (may be Codex-only text)'
+          )
+        }
+      }
+      const rp = join(home, '.codex/rules/default.rules')
+      if (existsSync(rp)) {
+        const bash = parseCodexRules(outsideBlockMulti(readFileSync(rp, 'utf8'), RULES_ALL))
+        if (bash.length)
+          found.permissions.push(
+            permissionsVariant({ bash, claudeOnly: { allow: [], deny: [] } }, ref(rp), [
+              'only prefix_rule lines outside default.rules markers — no Claude-only entries'
+            ])
+          )
+      }
+      const tp = join(home, '.codex/config.toml')
+      if (existsSync(tp)) {
+        try {
+          const o = parseToml(readFileSync(tp, 'utf8')) as Json
+          if (isObj(o.mcp_servers))
+            for (const [n, s] of Object.entries(o.mcp_servers))
+              if (isObj(s)) addMcp(n, convertCodex(n, s), tp)
+        } catch {
+          found.notes.push('~/.codex/config.toml parse failed')
+        }
+      }
+      scanSkillDir(found, home, join(home, '.codex/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
+    case 'opencode': {
+      const op = join(home, '.config/opencode/opencode.json')
+      if (existsSync(op)) {
+        const o = readJsonSafe(op)
+        if (!o) found.notes.push('~/.config/opencode/opencode.json parse failed')
+        else {
+          if (isObj(o.mcp))
+            for (const [n, s] of Object.entries(o.mcp))
+              if (isObj(s)) addMcp(n, convertOpencode(n, s), op)
+          if (Array.isArray(o.instructions)) {
+            let globs = 0
+            for (const x of o.instructions) {
+              if (typeof x !== 'string') continue
+              const abs = x.startsWith('~/') ? join(home, x.slice(2)) : x
+              if (abs.includes('*')) {
+                globs++
+                continue
+              }
+              if (
+                !isAbsolute(abs) ||
+                !abs.endsWith('.md') ||
+                !existsSync(abs) ||
+                !statSync(abs).isFile()
+              )
+                continue
+              if (within(lib, abs) || within(legacy, abs)) continue
+              const n = abs.split('/').pop()!
+              addFile(found.rules, n, abs, ref(abs), rulePortability(found.ctx, n, abs))
+            }
+            if (globs)
+              found.notes.push(`${globs} glob entries in opencode instructions are not turned into candidates`)
+          }
+        }
+      }
+      scanSkillDir(found, home, join(home, '.config/opencode/skill'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      scanSkillDir(found, home, join(home, '.config/opencode/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
+    case 'gemini': {
+      const gp = join(home, '.gemini/GEMINI.md')
+      if (existsSync(gp)) {
+        const outside = outsideBlockMulti(readFileSync(gp, 'utf8'), MD_ALL).trim()
+        if (outside) {
+          const id = short(sha256(outside))
+          const byId = found.rules.get(GEMINI_MD_RULE) ?? new Map<string, FileVariant>()
+          byId.set(id, {
+            id,
+            path: gp,
+            bytes: Buffer.byteLength(outside),
+            sources: [ref(gp)],
+            ...rulePortability(found.ctx, GEMINI_MD_RULE, gp)
+          })
+          found.rules.set(GEMINI_MD_RULE, byId)
+          found.notes.push(
+            `${GEMINI_MD_RULE} is the text outside the markers in ~/.gemini/GEMINI.md (may include Gemini memory-tool notes) — copied, the original stays`
+          )
+        }
+      }
+      const sp = join(home, '.gemini/settings.json')
+      if (existsSync(sp)) {
+        const o = readGeminiSettings(sp)
+        if (!o) found.notes.push('~/.gemini/settings.json parse failed')
+        else if (isObj(o.mcpServers))
+          for (const [n, s] of Object.entries(o.mcpServers))
+            if (isObj(s)) addMcp(n, convertGemini(n, s), sp)
+      }
+      scanSkillDir(found, home, join(home, '.gemini/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
+    default: {
+      const never: never = tool
+      throw new Error(`unknown tool ${String(never)}`)
+    }
   }
 }
 
@@ -2150,7 +2308,7 @@ export function applyImport(
       if (cand.kind === 'rule') {
         const v = variant as FileVariant
         const content =
-          cand.name === 'codex-agents.md'
+          cand.name === 'codex-agents.md' || cand.name === GEMINI_MD_RULE
             ? outsideBlockMulti(readFileSync(v.path, 'utf8'), MD_ALL).trim() + '\n'
             : readFileSync(v.path, 'utf8')
         let trashPath: string | undefined
@@ -2159,7 +2317,11 @@ export function applyImport(
           trashPath = trashLibraryPath(home, join(paths.rulesDir, cand.name)).trashPath
         }
         createRule(home, cand.name, content)
-        const togglesOk = exists || sourceToggles(home, 'rules', cand.name, v.sources)
+        const togglesOk =
+          exists ||
+          (cand.name === GEMINI_MD_RULE
+            ? geminiMdToggles(home, v.sources)
+            : sourceToggles(home, 'rules', cand.name, v.sources))
         const moved = ruleRetirements(home, cand.name, v)
         recordRetirements(home, moved.pending)
         const warnings = togglesOk ? [] : ['togglesNotSet']

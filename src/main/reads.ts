@@ -4,7 +4,6 @@
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parse as parseToml } from 'smol-toml'
 import {
   buildContext,
   canonicalPaths,
@@ -37,6 +36,9 @@ import {
   SKILL_OVERRIDE_TARGET_OF,
   statusReport,
   tilde,
+  MCP_TARGET_OF,
+  parseServerTable,
+  TOOL_IDS,
   type AgentSyncItem,
   type Env,
   type FileChange,
@@ -199,27 +201,7 @@ export function agents(home: string, env: Env): AgentsData {
 
 // ---------------------------------------------------------------- MCP
 
-const MCP_TARGETS: { tool: ToolId; id: TargetId }[] = [
-  { tool: 'claude', id: 'claudeMcp' },
-  { tool: 'codex', id: 'codexMcp' },
-  { tool: 'opencode', id: 'opencodeMcp' }
-]
-
-/** Target file's server table. {} if the file is empty, null on parse failure */
-function serversIn(id: TargetId, text: string): Record<string, unknown> | null {
-  if (!text.trim()) return {}
-  try {
-    const root =
-      id === 'codexMcp'
-        ? (parseToml(text) as Record<string, unknown>)
-        : (JSON.parse(text) as Record<string, unknown>)
-    const key = id === 'claudeMcp' ? 'mcpServers' : id === 'opencodeMcp' ? 'mcp' : 'mcp_servers'
-    const v = root?.[key]
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
-  } catch {
-    return null
-  }
-}
+const MCP_TARGETS: { tool: ToolId; id: TargetId }[] = TOOL_IDS.map((tool) => ({ tool, id: MCP_TARGET_OF[tool] }))
 
 const SECRET_NAME = /(key|token|secret|passw|bearer|auth|credential)/i
 const LONG_OPAQUE = /^[A-Za-z0-9_\-+=]{32,}$/
@@ -288,8 +270,8 @@ export function mcp(home: string, env: Env): McpData {
 
   const perTool = MCP_TARGETS.map(({ tool, id }) => {
     const c = changes.find((x) => x.id === id)
-    const before = c ? serversIn(id, c.before) : null
-    const after = c ? serversIn(id, c.after) : null
+    const before = c ? parseServerTable(id, c.before) : null
+    const after = c ? parseServerTable(id, c.after) : null
     return {
       tool,
       broken: !c || !!c.error || before === null || after === null,
@@ -357,7 +339,7 @@ async function searchIndex(
   const { sessions, errors } = scanSessions(home)
   const failed = new Set(errors.map((e) => e.tool))
   const s = await indexSessions(home, sessions, {
-    completeTools: (['claude', 'codex', 'opencode'] as const).filter((t) => !failed.has(t)),
+    completeTools: TOOL_IDS.filter((t) => !failed.has(t)),
     onProgress
   })
   return { sessions: s, docs: indexAllDocs(home) }
@@ -371,7 +353,7 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
       const [q, filters] = args as [unknown, SessionSearchFilters | undefined]
       const f = filters ?? {}
       return searchSessions(home, typeof q === 'string' ? q : '', {
-        ...(f.tool === 'claude' || f.tool === 'codex' || f.tool === 'opencode' ? { tool: f.tool } : {}),
+        ...((TOOL_IDS as readonly unknown[]).includes(f.tool) ? { tool: f.tool } : {}),
         ...(typeof f.project === 'string' && f.project ? { project: f.project } : {}),
         ...(f.role === 'user' || f.role === 'assistant' ? { role: f.role } : {})
       })

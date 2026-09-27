@@ -397,6 +397,7 @@ export function configView(home: string, fixture: boolean): ConfigView {
     libraryReady: st.ready,
     libraryLegacy: st.legacy,
     libraryEmpty: st.ready && libraryIsEmpty(home),
+    inUse: toolsInUse(home),
     ...(libraryStartError && !(libraryStartError.code === 'renamePending' && !renamePendingPaths(home).length)
       ? { libraryStartError }
       : {})
@@ -425,7 +426,7 @@ export function toolsInUseView(home: string, env: Env): ToolsInUseView {
   }
 }
 
-/** Save tools in use (null/undefined = unset → all tools). Config only; nothing is applied to tools here */
+/** Save tools in use (null/undefined = unset → the default tools). Config only; nothing is applied to tools here */
 export function toolsInUseSet(home: string, list: ToolId[] | null | undefined): void {
   if (list !== null && list !== undefined && !Array.isArray(list)) throw new ConfigError('toolsInUse must be an array')
   setToolsInUse(home, list ?? undefined)

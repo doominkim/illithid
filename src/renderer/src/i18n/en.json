@@ -74,7 +74,7 @@
     "new": "New rule",
     "nameHint": "Lowercase, digits, . _ - ; \".md\" is added if missing",
     "created": "Rule created",
-    "deleted": "Moved to .trash — syncing to tools",
+    "deleted": "Moved to .trash",
     "deleteTitle": "Delete rule",
     "deleteBody": "Move {{name}} to .trash.",
     "rename": "Rename",
@@ -85,7 +85,7 @@
     "new": "New skill",
     "nameHint": "Lowercase, digits, . _ -",
     "created": "Skill created",
-    "deleted": "Moved to .trash — syncing to tools",
+    "deleted": "Moved to .trash",
     "deleteTitle": "Delete skill",
     "deleteBody": "Move {{name}} to .trash.",
     "rename": "Rename",
@@ -109,8 +109,8 @@
     "key": "Key",
     "timeout": "Timeout (ms)",
     "warnings": "Warnings",
-    "saved": "MCP saved — syncing to tools",
-    "deleted": "MCP removed (kept in .trash) — syncing to tools",
+    "saved": "MCP saved",
+    "deleted": "MCP removed (kept in .trash)",
     "deleteTitle": "Delete MCP",
     "deleteBody": "Move {{name}} to .trash."
   },
@@ -122,7 +122,7 @@
     "search": "Search agents",
     "new": "New agent",
     "created": "Agent created",
-    "deleted": "Moved to .trash — syncing to tools",
+    "deleted": "Moved to .trash",
     "deleteTitle": "Delete agent",
     "deleteBody": "Move {{name}} to .trash.",
     "renamed": "Renamed",
@@ -193,7 +193,7 @@
     "name": "Illithid"
   },
   "toggles": {
-    "saved": "Toggle saved — syncing to tools"
+    "saved": "Toggle saved"
   },
   "sidebar": {
     "shortcut": "⌘K to search"
@@ -211,7 +211,7 @@
   "editor": {
     "lines": "{{n}} lines",
     "revert": "Revert",
-    "saved": "Saved — syncing to tools",
+    "saved": "Saved",
     "unsaved": "Unsaved"
   },
   "refused": {
@@ -275,7 +275,8 @@
       "toolOnly": "Tool-only",
       "localPath": "Local path",
       "toolSpecificTools": "Tool-specific tools",
-      "toolSpecificKeys": "Tool-only settings dropped"
+      "toolSpecificKeys": "Tool-only settings dropped",
+      "toolNotes": "Tool notes"
     },
     "adopted": "Adopted as app-managed",
     "userOwnedKept": "User file kept (not synced)",
@@ -337,8 +338,8 @@
     "new": "New note",
     "search": "Search memory files",
     "nameHint": "Relative path under memory/, e.g. feedback/report-tone.md",
-    "created": "Note created — syncing",
-    "deleted": "Moved to .trash — syncing",
+    "created": "Note created",
+    "deleted": "Moved to .trash",
     "deleteTitle": "Delete note",
     "deleteBody": "Move {{name}} to .trash.",
     "tabShared": "Shared",
@@ -407,7 +408,8 @@
       "agent": "agent",
       "config": "config file",
       "instruction": "instructions entry"
-    }
+    },
+    "libraryDirect": "Reads the library directly"
   },
   "onboarding": {
     "title": "Set up Illithid",

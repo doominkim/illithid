@@ -2,9 +2,12 @@
  * Apply preview: the current sync plan (planSyncAll) summarized per tool for the confirm dialog.
  * Read-only. No file contents leave this module — names, actions and display paths (~) only.
  */
+import { basename } from 'node:path'
 import {
   ALL_TARGETS,
   importedChangedOf,
+  isEnabled,
+  readManifest,
   keepImportedOriginal as keepOriginal,
   libraryExists,
   planSyncAll,
@@ -14,7 +17,8 @@ import {
   type ToolId
 } from '../engine'
 import { toolsInUse } from '../engine/config'
-import type { ApplyPreviewItem, ApplyPreviewView, ImportedKeepRequest } from '../shared/api'
+import { parseJsonObject } from '../engine/text'
+import type { ApplyPreviewItem, ApplyPreviewView, ImportedKeepRequest, LibraryDirectItem } from '../shared/api'
 import { notInitializedOf } from './writes'
 
 const TARGET_TOOL = new Map(ALL_TARGETS.map((t) => [t.id, t.tool]))
@@ -31,7 +35,8 @@ function planItems(p: SyncPlan): PlanItem[] {
 
 export function applyPreview(home: string, env: Env): ApplyPreviewView {
   const inUse = toolsInUse(home)
-  if (!libraryExists(home)) return { items: [], importedChanged: [], errors: [], notInitialized: [], libraryMissing: true, inUse }
+  if (!libraryExists(home))
+    return { items: [], importedChanged: [], errors: [], notInitialized: [], libraryDirect: [], libraryMissing: true, inUse }
   const p = planSyncAll(home, env)
   const items: ApplyPreviewItem[] = []
 
@@ -52,7 +57,12 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
       if (action === 'add') prev.action = 'add'
     } else files.set(c.path, { tool, kind: 'config', action, name: c.label, path: c.label })
   }
-  items.push(...files.values())
+  for (const [abs, f] of files) {
+    items.push(f)
+    // opencode.json instructions: which rules enter or leave (the file row alone does not say)
+    const c = p.targets.find((x) => x.id === 'opencodeRules' && x.path === abs && x.changed && !x.error)
+    if (c) items.push(...instructionDiff(home, c.before, c.after, f.path))
+  }
 
   // Rules, skills, agents. An imported original moved aside next to a copy of the same item reads as one "replace"
   const all = planItems(p)
@@ -87,7 +97,52 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     if (!merged.has(k)) items.push({ tool: r.tool, kind: r.kind, name: r.name, action: 'retire', path: tilde(home, r.path) })
 
   const importedChanged = importedChangedOf(p).map((x) => ({ ...x, path: tilde(home, x.path) }))
-  return { items, importedChanged, errors, notInitialized: notInitializedOf(p.targets), inUse }
+  return { items, importedChanged, errors, notInitialized: notInitializedOf(p.targets), libraryDirect: libraryDirect(home, inUse, items), inUse }
+}
+
+function instructionList(text: string): string[] {
+  try {
+    const list = parseJsonObject(text || '{}').instructions
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** Entries added to / removed from opencode.json instructions, as rule rows under the file row */
+function instructionDiff(home: string, before: string, after: string, parent: string): ApplyPreviewItem[] {
+  const a = instructionList(before)
+  const b = instructionList(after)
+  const row = (entry: string, action: 'add' | 'remove'): ApplyPreviewItem => ({
+    tool: 'opencode',
+    kind: 'rule',
+    action,
+    name: basename(entry),
+    path: entry.startsWith('/') ? tilde(home, entry) : entry,
+    parent
+  })
+  return [...b.filter((x) => !a.includes(x)).map((x) => row(x, 'add')), ...a.filter((x) => !b.includes(x)).map((x) => row(x, 'remove'))]
+}
+
+/**
+ * Rules and skills changing in this apply that OpenCode (in use, item on) reads straight from the library — nothing is
+ * written for OpenCode, so without this the preview looks like OpenCode was left out
+ */
+function libraryDirect(home: string, inUse: ToolId[], items: ApplyPreviewItem[]): LibraryDirectItem[] {
+  if (!inUse.includes('opencode')) return []
+  const mf = readManifest(home)
+  if (mf.error) return []
+  const listed = new Set(items.filter((x) => x.tool === 'opencode').map((x) => `${x.kind}:${x.name}`))
+  const out = new Map<string, LibraryDirectItem>()
+  for (const x of items) {
+    if (x.tool === 'opencode' || x.parent || (x.kind !== 'rule' && x.kind !== 'skill')) continue
+    if (x.action !== 'add' && x.action !== 'update' && x.action !== 'replace') continue
+    const k = `${x.kind}:${x.name}`
+    if (listed.has(k) || out.has(k)) continue
+    if (!isEnabled(mf.manifest, x.kind === 'rule' ? 'rules' : 'skills', x.name, 'opencode')) continue
+    out.set(k, { tool: 'opencode', kind: x.kind, name: x.name })
+  }
+  return [...out.values()]
 }
 
 /**

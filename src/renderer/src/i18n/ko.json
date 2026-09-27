@@ -74,7 +74,7 @@
     "new": "새 룰",
     "nameHint": "소문자·숫자·. _ - 만, .md 는 없으면 붙입니다",
     "created": "룰을 만들었습니다",
-    "deleted": ".trash 로 옮김 — 툴에 동기화",
+    "deleted": ".trash 로 옮김",
     "deleteTitle": "룰 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "rename": "이름 변경",
@@ -85,7 +85,7 @@
     "new": "새 스킬",
     "nameHint": "소문자·숫자·. _ -",
     "created": "스킬을 만들었습니다",
-    "deleted": ".trash 로 옮김 — 툴에 동기화",
+    "deleted": ".trash 로 옮김",
     "deleteTitle": "스킬 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "rename": "이름 변경",
@@ -109,8 +109,8 @@
     "key": "키",
     "timeout": "타임아웃 (ms)",
     "warnings": "경고",
-    "saved": "MCP 저장됨 — 툴에 동기화",
-    "deleted": "MCP 삭제 (.trash 보관) — 툴에 동기화",
+    "saved": "MCP 저장됨",
+    "deleted": "MCP 삭제 (.trash 보관)",
     "deleteTitle": "MCP 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다."
   },
@@ -122,7 +122,7 @@
     "search": "에이전트 검색",
     "new": "새 에이전트",
     "created": "에이전트를 만들었습니다",
-    "deleted": ".trash 로 옮김 — 툴에 동기화",
+    "deleted": ".trash 로 옮김",
     "deleteTitle": "에이전트 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "renamed": "이름을 바꿨습니다",
@@ -193,7 +193,7 @@
     "name": "Illithid"
   },
   "toggles": {
-    "saved": "토글 저장됨 — 툴에 동기화"
+    "saved": "토글 저장됨"
   },
   "sidebar": {
     "shortcut": "⌘K 로 검색"
@@ -211,7 +211,7 @@
   "editor": {
     "lines": "{{n}}줄",
     "revert": "되돌리기",
-    "saved": "저장됨 — 툴에 동기화",
+    "saved": "저장됨",
     "unsaved": "저장 안 됨"
   },
   "refused": {
@@ -275,7 +275,8 @@
       "toolOnly": "툴 전용",
       "localPath": "이 기기 경로",
       "toolSpecificTools": "툴 전용 도구",
-      "toolSpecificKeys": "툴 전용 설정 제외"
+      "toolSpecificKeys": "툴 전용 설정 제외",
+      "toolNotes": "툴 메모"
     },
     "adopted": "앱 소유로 채택",
     "userOwnedKept": "사용자 파일 유지 (동기화 안 함)",
@@ -337,8 +338,8 @@
     "new": "새 메모",
     "search": "메모리 파일 검색",
     "nameHint": "memory/ 아래 상대 경로. 예: feedback/report-tone.md",
-    "created": "메모 생성 — 동기화",
-    "deleted": ".trash 로 옮김 — 동기화",
+    "created": "메모 생성",
+    "deleted": ".trash 로 옮김",
     "deleteTitle": "메모 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "tabShared": "공용",
@@ -407,7 +408,8 @@
       "agent": "에이전트",
       "config": "설정 파일",
       "instruction": "instructions 항목"
-    }
+    },
+    "libraryDirect": "라이브러리를 직접 읽음"
   },
   "onboarding": {
     "title": "Illithid 시작하기",

@@ -3,6 +3,7 @@
  * - Claude   ~/.claude/agents/<name>.md          frontmatter name, description, model, effort + body
  * - Codex    ~/.codex/agents/<name>.toml         name·description·model·model_reasoning_effort·developer_instructions
  * - OpenCode ~/.config/opencode/agents/<name>.md frontmatter description, mode: subagent, model, reasoningEffort + body
+ * - Gemini   ~/.gemini/agents/<name>.md          frontmatter name, description, model + body (no effort setting)
  * Keys without a value are omitted (the tool's default applies). The name is the library file name.
  */
 import { join } from 'node:path'
@@ -19,7 +20,17 @@ export function agentToolDir(home: string, tool: ToolId): { dir: string; ext: '.
       return { dir: join(home, '.codex/agents'), ext: '.toml' }
     case 'opencode':
       return { dir: join(home, '.config/opencode/agents'), ext: '.md' }
+    case 'gemini':
+      return { dir: join(home, '.gemini/agents'), ext: '.md' }
   }
+}
+
+/** Gemini CLI agent names: lowercase letters, digits, `-` and `_` only (library names may also contain `.`) */
+export const GEMINI_AGENT_NAME_RE = /^[a-z0-9_-]+$/
+
+/** Whether the tool accepts the library name as an agent name */
+export function agentNameOk(tool: ToolId, name: string): boolean {
+  return tool !== 'gemini' || GEMINI_AGENT_NAME_RE.test(name)
 }
 
 export function agentToolPath(home: string, tool: ToolId, name: string): string {
@@ -60,6 +71,17 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
           ['mode', 'subagent'],
           ['model', t.model],
           ['reasoningEffort', t.effort]
+        ],
+        doc.body
+      )
+    case 'gemini':
+      if (!agentNameOk(tool, doc.name)) throw new Error(`${doc.name} is not a valid Gemini CLI agent name`)
+      // Without model Gemini uses the session model (inherit)
+      return mdDoc(
+        [
+          ['name', doc.name],
+          ['description', description],
+          ['model', t.model]
         ],
         doc.body
       )

@@ -17,7 +17,7 @@ export { syncAll, planSyncAll, pendingSyncCount, summarizeSync, realApplyAllowed
 export { keepImportedOriginal } from './pendingRetire'
 export type { SyncAllOptions, SyncAllResult, SyncPlan, SyncResults, SwitchLossItem, SwitchLossKind } from './sync'
 export { mcpEntries, sha256 } from './text'
-export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS } from './targets'
+export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS, MCP_TARGET_OF, MCP_TARGET_TOOL, parseServerTable } from './targets'
 export {
   skillOverrideHits,
   SKILL_OVERRIDE_TARGET_OF,

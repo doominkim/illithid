@@ -98,7 +98,9 @@ const MODES: Record<TargetId, number> = {
   opencodeSkills: 0o644,
   claudeSkillOverrides: 0o640, // same file as claudePermissions
   codexSkillConfig: 0o600, // same file as codexMcp
-  opencodeSkillPermissions: 0o644
+  opencodeSkillPermissions: 0o644,
+  geminiRules: 0o644, // not a default target
+  geminiMcp: 0o600 // not a default target
 }
 const rel = (id: TargetId): string => TARGETS.find((t) => t.id === id)!.rel
 

@@ -2,7 +2,8 @@
  * Per-tool model and effort choices for agent details (built into the app). Shared by renderer and engine — no dependencies.
  * Sources as of 2026-09-24: Claude = current lineup from the claude-api skill (aliases; Haiku 4.5 has no effort support) ·
  * Codex = ~/.codex/models_cache.json (codex 0.156.0, visibility=list, supported_reasoning_levels) ·
- * OpenCode = openai provider in ~/.cache/opencode/models.json + model/small_model in ~/.config/opencode/opencode.json.
+ * OpenCode = openai provider in ~/.cache/opencode/models.json + model/small_model in ~/.config/opencode/opencode.json ·
+ * Gemini CLI = aliases and model ids in the gemini-cli 0.60.0 bundle (2026-09-27; no effort setting).
  */
 import type { ToolId } from '../engine/agents'
 
@@ -56,6 +57,19 @@ export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
       { value: 'openai/gpt-5.3-codex-spark', label: 'openai/gpt-5.3-codex-spark' }
     ],
     efforts: ['low', 'medium', 'high', 'xhigh']
+  },
+  gemini: {
+    models: [
+      { value: 'auto', label: 'auto' },
+      { value: 'pro', label: 'pro' },
+      { value: 'flash', label: 'flash' },
+      { value: 'flash-lite', label: 'flash-lite' },
+      { value: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview' },
+      { value: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
+      { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
+      { value: 'inherit', label: 'inherit' }
+    ],
+    efforts: []
   }
 }
 

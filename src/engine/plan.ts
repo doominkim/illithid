@@ -41,12 +41,14 @@ export function buildContext(
   const st = readState(home).state
   const owned = st.owned
   const pendingRetire = activePending(home, st.pendingRetire)
+  const applied = Object.fromEntries(Object.entries(st.applied).map(([id, v]) => [id, v.regionHash]))
   return {
     sources,
     env,
     home,
     secrets: memoSecretBackend(secrets),
     ...(owned ? { owned } : {}),
+    ...(Object.keys(applied).length ? { applied } : {}),
     ...(pendingRetire.length ? { pendingRetire } : {})
   }
 }

@@ -200,3 +200,36 @@ export function removeBlockMulti(text: string, pairs: readonly MarkerPair[]): st
   if (!tail.trim()) return head + '\n'
   return head + '\n\n' + tail
 }
+
+/** Remove `//` and `/* *\/` comments outside strings (for reading JSON files their tool parses with comments allowed) */
+export function stripJsonComments(text: string): string {
+  let out = ''
+  let i = 0
+  let inString = false
+  while (i < text.length) {
+    const ch = text[i]
+    if (inString) {
+      out += ch
+      if (ch === '\\') {
+        out += text[i + 1] ?? ''
+        i += 2
+        continue
+      }
+      if (ch === '"') inString = false
+      i++
+    } else if (ch === '"') {
+      inString = true
+      out += ch
+      i++
+    } else if (ch === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++
+    } else if (ch === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2)
+      i = end === -1 ? text.length : end + 2
+    } else {
+      out += ch
+      i++
+    }
+  }
+  return out
+}

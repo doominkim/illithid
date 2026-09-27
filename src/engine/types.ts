@@ -81,6 +81,8 @@ export type ExtraTargetId =
   | 'claudeSkillOverrides'
   | 'codexSkillConfig'
   | 'opencodeSkillPermissions'
+  | 'geminiRules'
+  | 'geminiMcp'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 
@@ -138,6 +140,8 @@ export interface BuildContext {
   secrets?: SecretBackend
   /** Imported originals awaiting retirement (state.pendingRetire) */
   pendingRetire?: PendingRetire[]
+  /** Owned-region hash each target last wrote (state.applied) — tells tool-side edits from library changes */
+  applied?: Partial<Record<TargetId, string>>
 }
 
 export interface BuildResult {

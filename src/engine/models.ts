@@ -55,6 +55,20 @@ export function readConfigObject(
   }
 }
 
+/** Dotted JSON key path (`model.name` = key name inside object model) */
+function keyPath(key: string, format: 'json' | 'toml'): string[] {
+  return format === 'json' ? key.split('.') : [key]
+}
+
+function getPath(obj: Record<string, unknown>, path: string[]): unknown {
+  let cur: unknown = obj
+  for (const k of path) {
+    if (cur === null || typeof cur !== 'object' || Array.isArray(cur)) return undefined
+    cur = (cur as Record<string, unknown>)[k]
+  }
+  return cur
+}
+
 /** Read each tool's default model keys */
 export function readModels(home: string): ToolModels[] {
   return tools(home).map((t) => {
@@ -64,7 +78,7 @@ export function readModels(home: string): ToolModels[] {
     if ('error' in res) {
       return { ...base, values: keys.map((key) => ({ key, value: null })), error: res.error }
     }
-    return { ...base, values: keys.map((key) => ({ key, value: toDisplay(res.value[key]) })) }
+    return { ...base, values: keys.map((key) => ({ key, value: toDisplay(getPath(res.value, keyPath(key, format))) })) }
   })
 }
 
@@ -72,7 +86,8 @@ export function readModels(home: string): ToolModels[] {
 export const MODEL_KEYS: Readonly<Record<ToolId, readonly string[]>> = {
   claude: ['model', 'effortLevel'],
   codex: ['model', 'model_reasoning_effort'],
-  opencode: ['model', 'small_model']
+  opencode: ['model', 'small_model'],
+  gemini: ['model.name']
 }
 
 export interface SetModelResult {
@@ -87,14 +102,23 @@ export interface SetModelResult {
 
 export class SetModelError extends Error {}
 
-/** JSON: parse → change one key → keep existing indentation and trailing newline */
+/** JSON: parse → change one key (dotted path for nested keys; missing objects are created) → keep existing indentation and trailing newline */
 function setJsonKey(text: string, key: string, value: string): string {
   const res = JSON.parse(text) as unknown
   if (res === null || typeof res !== 'object' || Array.isArray(res)) {
     throw new SetModelError('top level is not an object')
   }
   const obj = res as Record<string, unknown>
-  obj[key] = value
+  const path = keyPath(key, 'json')
+  let cur = obj
+  for (const k of path.slice(0, -1)) {
+    const next = cur[k]
+    if (next === undefined) cur[k] = {}
+    else if (next === null || typeof next !== 'object' || Array.isArray(next))
+      throw new SetModelError(`${k} is not an object; not changing ${key}`)
+    cur = cur[k] as Record<string, unknown>
+  }
+  cur[path[path.length - 1]] = value
   const indent = /^[{[]\r?\n([ \t]+)\S/.exec(text)?.[1] ?? '  '
   const trailing = /\r?\n$/.exec(text)?.[0] ?? ''
   return JSON.stringify(obj, null, indent) + trailing
@@ -160,9 +184,10 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   } catch (e) {
     throw new SetModelError(e instanceof SetModelError ? e.message : safeParseError(e, format))
   }
-  const previous = toDisplay(prevObj[key])
+  const kp = keyPath(key, format)
+  const previous = toDisplay(getPath(prevObj, kp))
   const base = { tool, key, path, previous }
-  if (prevObj[key] === value) return { ...base, status: 'unchanged' }
+  if (getPath(prevObj, kp) === value) return { ...base, status: 'unchanged' }
 
   const after = format === 'toml' ? setTomlKey(before, key, value) : setJsonKey(before, key, value)
   let nextObj: Record<string, unknown>
@@ -171,10 +196,21 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   } catch (e) {
     throw new SetModelError(`validation of the edited result failed: ${safeParseError(e, format)}`)
   }
-  const others = new Set([...Object.keys(prevObj), ...Object.keys(nextObj)])
-  others.delete(key)
-  const same = [...others].every((k) => isDeepStrictEqual(prevObj[k], nextObj[k]))
-  if (nextObj[key] !== value || !same)
+  // Everything except the changed key must be identical (for a nested key: its parent object minus that key, and all other top-level keys)
+  const strip = (o: Record<string, unknown>): Record<string, unknown> => {
+    const c = structuredClone(o)
+    let cur: Record<string, unknown> | undefined = c
+    for (const k of kp.slice(0, -1)) {
+      const n: unknown = cur?.[k]
+      cur = n && typeof n === 'object' && !Array.isArray(n) ? (n as Record<string, unknown>) : undefined
+    }
+    if (cur) delete cur[kp[kp.length - 1]]
+    // A parent object the edit created (now empty) counts as unchanged
+    if (kp.length > 1 && o === nextObj && prevObj[kp[0]] === undefined) delete c[kp[0]]
+    return c
+  }
+  const same = isDeepStrictEqual(strip(prevObj), strip(nextObj))
+  if (getPath(nextObj, kp) !== value || !same)
     throw new SetModelError('validation of the edited result failed: other keys would change')
 
   const backupPath = backup(path)

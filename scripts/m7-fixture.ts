@@ -132,7 +132,8 @@ import {
   type FileChange,
   type ImportKind,
   type ImportSelection,
-  type McpServer
+  type McpServer,
+  type ToolId
 } from '../src/engine'
 import { deleteCandidates, mcpRead, mcpSave } from '../src/main/writes'
 import {
@@ -143,6 +144,7 @@ import {
   searchAll,
   htmlToText,
   readSessionTranscript,
+  cleanUserText,
   scanSessions,
   searchIndexPath,
   searchSessions
@@ -323,7 +325,11 @@ function realHomeProbe(): Map<string, string> {
     join(REAL_HOME, '.claude/agents'),
     join(REAL_HOME, '.codex/agents'),
     join(REAL_HOME, '.config/opencode/agents'),
-    join(REAL_HOME, '.config/opencode/agent')
+    join(REAL_HOME, '.config/opencode/agent'),
+    join(REAL_HOME, '.gemini/GEMINI.md'),
+    join(REAL_HOME, '.gemini/settings.json'),
+    join(REAL_HOME, '.gemini/skills'),
+    join(REAL_HOME, '.gemini/agents')
   ]
   // The app auto-creates the session content index (search.sqlite, -wal, -shm) in this folder — instead of the dir mtime,
   // compare entry names excluding the index files
@@ -2110,7 +2116,8 @@ async function run(): Promise<void> {
       bad.push('other server not applied')
     if (get(claudeS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(codexS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(ocS(), 'zz-sec-stdio', 'environment', 'API_KEY') !== E1)
       bad.push('previous entry of missing server not kept')
-    const mcpCells = statusReport(F, env, mem).cells.filter((cc) => cc.resource === 'mcp')
+    // Tools not in use (Gemini while toolsInUse is unset) have notApplicable cells
+    const mcpCells = statusReport(F, env, mem).cells.filter((cc) => cc.resource === 'mcp' && toolsInUse(F).includes(cc.tool))
     if (!mcpCells.length || mcpCells.some((cc) => cc.state !== 'error')) bad.push('status not error when missing')
     mem.set('zz-sec-stdio/env/API_KEY', E1)
     syncAll(F, env, { allowReal: true, secrets: mem })
@@ -4401,12 +4408,13 @@ async function run(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const wantToggles: [string, string][] = [
-        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false}'],
-        [tg('skills', 'pr-check'), '{"codex":false}'],
-        [tg('agents', 'helper'), '{"codex":false,"opencode":false}'],
-        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false}'],
-        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false}'],
-        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false}']
+        // Gemini is toggleable for every kind, so it is off too (skills: gemini joined claude/codex as a copy target)
+        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false}'],
+        [tg('skills', 'pr-check'), '{"codex":false,"gemini":false}'],
+        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false}'],
+        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false}'],
+        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false}'],
+        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false}']
       ]
       for (const [got, want] of wantToggles) if (got !== want) bad.push(`toggles ${got} ≠ ${want}`)
       // automatic apply off (libWrite path): plan only, nothing written — ~/.claude/rules keeps the original
@@ -4509,7 +4517,7 @@ async function run(): Promise<void> {
       if (p.skills.some((x) => x.tool !== 'claude') || p.agents.some((x) => x.tool !== 'claude')) bad.push('skill/agent plan for other tools')
       const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       if (!r.results) bad.push('sync refused')
-      for (const rel of ['.codex', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      for (const rel of ['.codex', '.config/opencode', '.gemini']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
       if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'x.md')) || !existsSync(join(H, '.claude/skills/sk/SKILL.md')) || !existsSync(join(H, '.claude/agents/ag.md')))
         bad.push('Claude copies missing')
       if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {}))) bad.push('Claude MCP missing')
@@ -4527,7 +4535,7 @@ async function run(): Promise<void> {
       writeConfig(H, { ...readConfig(H).config, toolsInUse: ['codex'] })
       if (errCode(() => trashClaudeMemory(H, 'x', 'y.md')) !== 'toolNotInUse') bad.push('Claude memory write not refused')
       if (planRuleSync(H).length) bad.push('Claude rule plan not empty')
-      // lenient config: a bad toolsInUse is ignored alone (= all tools), the rest of config survives
+      // lenient config: a bad toolsInUse is ignored alone (= the default tools, Gemini excluded), the rest of config survives
       writeJson(join(H, APP_CONFIG_DIR, 'config.json'), { version: 1, allowRealApply: true, toolsInUse: ['vim'] })
       const rc = readConfig(H)
       if (rc.error || rc.config.allowRealApply !== true || rc.config.toolsInUse !== undefined || toolsInUse(H).join() !== 'claude,codex,opencode')
@@ -4541,7 +4549,7 @@ async function run(): Promise<void> {
       const det = detectTools(H, { PATH: bin })
         .map((d) => `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`)
         .join(',')
-      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false') bad.push(`detectTools ${det}`)
+      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false') bad.push(`detectTools ${det}`)
       check(
         'af3. HAR-12 toolsInUse=[claude] — Codex/OpenCode get no files or folders, status notApplicable; setModel and Claude memory writes refused for tools not in use; bad toolsInUse ignored alone; detectTools',
         !bad.length,
@@ -4776,6 +4784,343 @@ async function run(): Promise<void> {
         'af4. HAR-12 pendingRetire per workspace — Sync in another workspace with a same-name rule leaves the original and the record; switching back retires it',
         !bad.length,
         bad.length ? bad.join('; ') : `record ${rec}; other workspace plan ${pOther}, original kept; back in default plan ${pBack}, original in backups/imported`
+      )
+    }
+  }
+
+  // ---- ag. HAR-17 Gemini CLI — off unless chosen (~/.gemini byte-identical), GEMINI.md block, settings.json mcpServers only, comments refused,
+  //          skills, agents, nested model.name, import from ~/.gemini, sessions ($set, $rewindTo, cwd, resume) and search
+  {
+    const envG: Env = { PATH: '' }
+    const memG = memorySecretBackend()
+    const gHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+      const H = makeFixture(prefix)
+      unlinkSync(join(H, '.agents'))
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
+      initLibrary(H)
+      return H
+    }
+    /** Every file under rel with its content hash (plus directories) — byte-level snapshot */
+    const tree = (H: string, rel: string): string => {
+      const p = join(H, rel)
+      if (!existsSync(p)) return 'absent'
+      return readdirSync(p, { recursive: true })
+        .map(String)
+        .sort()
+        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .join(',')
+    }
+    const G_OUTSIDE = '# My Gemini notes\n\n## Gemini Added Memories\n- Prefers short answers.\n'
+    const G_SETTINGS = JSON.stringify({ theme: 'Default', mcpServers: { mine: { command: 'my-server', trust: true } }, model: { name: 'pro' }, security: { auth: { selectedType: 'oauth-personal' } } }, null, 2) + '\n'
+    const G_COMMENTED = '{\n  // user comment\n  "theme": "Default",\n  "mcpServers": {}\n}\n'
+    const seedLibrary = (H: string): void => {
+      createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
+      createSkill(H, 'gsk', 'Gemini skill')
+      createAgent(H, 'helper', 'Helps')
+      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { gemini: { model: 'flash' }, claude: { model: 'haiku' } } })
+      createAgent(H, 'plain', 'No model')
+      createAgent(H, 'dot.agent', 'Dotted name')
+      upsertMcpServer(H, 'g-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, timeoutMs: 30000 })
+      upsertMcpServer(H, 'g-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
+    }
+
+    // ag1. Gemini not chosen — existing user (toolsInUse unset) and new user (explicit list without Gemini): ~/.gemini byte-identical
+    {
+      const bad: string[] = []
+      const gemFiles = {
+        '.gemini/GEMINI.md': G_OUTSIDE,
+        '.gemini/settings.json': G_SETTINGS,
+        '.gemini/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n\nOwn.\n',
+        '.gemini/agents/mine.md': '---\nname: mine\ndescription: Mine\n---\n\nMine.\n'
+      }
+      const cases: [string, ToolId[] | undefined][] = [
+        ['unset', undefined],
+        ['explicit', ['claude', 'codex', 'opencode']]
+      ]
+      for (const [label, inUse] of cases) {
+        const H = gHome(`illithid-m7-G1${label}-`, { ...gemFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
+        seedLibrary(H)
+        const g0 = tree(H, '.gemini')
+        const p = planSyncAll(H, envG, memG)
+        if (p.targets.some((c) => c.id.startsWith('gemini')) || p.skills.some((x) => x.tool === 'gemini') || p.agents.some((x) => x.tool === 'gemini'))
+          bad.push(`${label}: plan has Gemini items`)
+        const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+        if (!r.results) bad.push(`${label}: sync refused`)
+        if (tree(H, '.gemini') !== g0) bad.push(`${label}: ~/.gemini changed`)
+        if (statusReport(H, envG, memG).cells.some((c) => c.tool === 'gemini' && c.state !== 'notApplicable')) bad.push(`${label}: Gemini status cells`)
+        if (toolsInUse(H).includes('gemini')) bad.push(`${label}: Gemini in use`)
+        let refused = false
+        try {
+          setModel(H, 'gemini', 'model.name', 'flash')
+        } catch (e) {
+          refused = e instanceof SetModelError
+        }
+        if (!refused || tree(H, '.gemini') !== g0) bad.push(`${label}: setModel not refused`)
+        if (!existsSync(join(H, '.claude/agents/helper.md'))) bad.push(`${label}: other tools not synced`)
+      }
+      check(
+        'ag1. HAR-17 Gemini not chosen — toolsInUse unset and an explicit list without Gemini: no Gemini plan items, ~/.gemini byte-identical after approved Sync, status notApplicable, setModel refused',
+        !bad.length,
+        bad.length ? bad.join('; ') : '2 cases, ~/.gemini tree unchanged (GEMINI.md, settings.json, skills, agents), other tools synced'
+      )
+    }
+
+    // ag2. Gemini chosen — GEMINI.md block, settings.json mcpServers only, skills, agents, re-sync 0, comments/broken markers refused, created from scratch, model.name
+    {
+      const bad: string[] = []
+      // Same-name entries already in settings.json carry Gemini-only keys (tool filters, OAuth, trust) that must survive
+      const S2 = JSON.parse(G_SETTINGS) as Json
+      S2.mcpServers = {
+        ...(S2.mcpServers as Json),
+        'g-stdio': { command: 'old', excludeTools: ['delete_all'], trust: false },
+        'g-http': { httpUrl: 'https://old.example.com', oauth: { enabled: true, clientId: 'fixture' }, includeTools: ['read'] }
+      }
+      S2.skills = { disabled: ['gsk'] }
+      const S2_TEXT = JSON.stringify(S2, null, 2) + '\n'
+      const H = gHome('illithid-m7-G2-', { '.gemini/GEMINI.md': G_OUTSIDE, '.gemini/settings.json': S2_TEXT }, ['gemini'])
+      seedLibrary(H)
+      upsertMcpServer(H, 'g_under', { transport: 'stdio', command: 'u' })
+      const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      if (!r.results) bad.push('sync refused')
+      const mcpNotes = r.plan.targets.find((c) => c.id === 'geminiMcp')?.notes.join(' | ') ?? ''
+      for (const want of ['kept Gemini-only settings of g-stdio: trust, excludeTools', 'kept Gemini-only settings of g-http: includeTools, oauth', 'may be misread', 'g_under', 'skills.disabled', 'gsk'])
+        if (!mcpNotes.includes(want)) bad.push(`geminiMcp note lacks "${want}"`)
+      const gmd = read(join(H, '.gemini/GEMINI.md'))
+      const body = blockBody(gmd, MD_BEGIN, MD_END) ?? ''
+      if (!body.includes('<!-- rules/style.md -->') || !body.includes('Be brief.')) bad.push('rule not in GEMINI.md block')
+      if (!body.includes('add your own notes outside this block')) bad.push('block header lacks the outside-notes line')
+      if (!gmd.startsWith(G_OUTSIDE.trimEnd()) || outsideBlockMulti(gmd, [MD_MARKERS]).trim() !== G_OUTSIDE.trim()) bad.push('GEMINI.md outside text changed')
+      const before = S2
+      const after = readJson(join(H, '.gemini/settings.json'))
+      if (Object.keys(after).join() !== Object.keys(before).join()) bad.push(`settings key order ${Object.keys(after).join()}`)
+      for (const k of Object.keys(before)) if (k !== 'mcpServers' && JSON.stringify(after[k]) !== JSON.stringify(before[k])) bad.push(`settings ${k} changed`)
+      const ms = after.mcpServers as Json
+      if (JSON.stringify(ms.mine) !== JSON.stringify((before.mcpServers as Json).mine)) bad.push('user server changed')
+      const wantStdio = { command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, timeout: 30000, trust: false, excludeTools: ['delete_all'] }
+      const wantHttp = {
+        httpUrl: 'https://mcp.example.com/mcp',
+        headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' },
+        includeTools: ['read'],
+        oauth: { enabled: true, clientId: 'fixture' }
+      }
+      if (JSON.stringify(ms['g-stdio']) !== JSON.stringify(wantStdio)) bad.push(`stdio ${JSON.stringify(ms['g-stdio'])}`)
+      if (JSON.stringify(ms['g-http']) !== JSON.stringify(wantHttp)) bad.push(`http ${JSON.stringify(ms['g-http'])}`)
+      if ('trust' in (ms['g_under'] as Json) || ['g-stdio', 'g-http', 'g_under'].some((n) => 'url' in (ms[n] as Json))) bad.push('trust or url written')
+      if (dirContentHash(join(H, '.gemini/skills/gsk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'gsk')) || !readState(H).state.skills?.gemini?.gsk) bad.push('skill copy')
+      const helper = read(join(H, '.gemini/agents/helper.md'))
+      if (helper !== '---\nname: helper\ndescription: Helps\nmodel: flash\n---\n\nHelp out.\n' || helper !== renderAgent('gemini', readAgentDoc(H, 'helper'))) bad.push('helper render')
+      if (/^model:/m.test(read(join(H, '.gemini/agents/plain.md')))) bad.push('plain agent has a model line')
+      const dot = planSyncAll(H, envG, memG).agents.find((x) => x.tool === 'gemini' && x.name === 'dot.agent')
+      if (existsSync(join(H, '.gemini/agents/dot.agent.md')) || dot?.action !== 'skip' || dot.reason !== 'invalidName') bad.push(`dotted agent ${dot?.action}:${dot?.reason}`)
+      if (!existsSync(join(H, '.gemini/agents/dot.agent.md')) && !(r.results?.agents ?? []).some((x) => x.name === 'dot.agent' && x.status === 'skipped')) bad.push('dotted agent result')
+      if (existsSync(join(H, '.claude')) || existsSync(join(H, '.codex')) || existsSync(join(H, '.config/opencode'))) bad.push('other tools written')
+      const p2 = planSyncAll(H, envG, memG)
+      if (p2.targets.some((c) => c.changed || c.error) || p2.skills.some((x) => x.action !== 'inSync') || p2.agents.some((x) => x.action !== 'inSync' && x.name !== 'dot.agent'))
+        bad.push('re-plan not clean')
+      // Gemini edits inside the block (its memory tool / file edits) → previous block backed up, then restored from the library
+      const gp = join(H, '.gemini/GEMINI.md')
+      writeFileSync(gp, read(gp).replace('- Be brief.\n', '- Be brief.\n- GEMINI MEMORY: prefers tabs\n'))
+      const pd = planSyncAll(H, envG, memG).targets.find((c) => c.id === 'geminiRules')
+      if (!pd?.notes.some((n) => n.includes('edited outside Illithid'))) bad.push('no drift note')
+      const rd = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      const bk = rd.results?.targets.find((x) => x.id === 'geminiRules')?.blockBackup
+      if (!bk || !bk.endsWith('gemini/GEMINI.block.md') || !read(bk).includes('GEMINI MEMORY') || read(gp).includes('GEMINI MEMORY')) bad.push('edited block not backed up / restored')
+      if (planSyncAll(H, envG, memG).targets.find((c) => c.id === 'geminiRules')?.notes.some((n) => n.includes('edited outside'))) bad.push('drift note after restore')
+      // MCP toggle off for Gemini → the owned entry is removed, the user's stays
+      setToggle(H, 'mcp', 'g-http', 'gemini', false)
+      syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      const ms2 = readJson(join(H, '.gemini/settings.json')).mcpServers as Json
+      if ('g-http' in ms2 || !('mine' in ms2) || !('g-stdio' in ms2)) bad.push('toggle off')
+      // setModel: nested model.name, other keys and siblings kept
+      const sm = setModel(H, 'gemini', 'model.name', 'flash')
+      const af = readJson(join(H, '.gemini/settings.json'))
+      if (sm.previous !== 'pro' || (af.model as Json).name !== 'flash' || JSON.stringify(af.security) !== JSON.stringify(before.security)) bad.push('setModel nested')
+      // settings.json with comments → refused, byte-identical; broken marker → refused
+      writeFileSync(join(H, '.gemini/settings.json'), G_COMMENTED)
+      const brokenMd = G_OUTSIDE + '\n' + MD_BEGIN + '\nhalf a block\n'
+      writeFileSync(join(H, '.gemini/GEMINI.md'), brokenMd)
+      createRule(H, 'more.md', '# More\n')
+      const p3 = planSyncAll(H, envG, memG)
+      const cm = p3.targets.find((c) => c.id === 'geminiMcp')
+      const cr = p3.targets.find((c) => c.id === 'geminiRules')
+      if (!cm?.error?.includes('comments') || cm.changed) bad.push(`commented settings plan ${cm?.error}`)
+      if (!cr?.error?.includes('marker') || cr.changed) bad.push(`broken marker plan ${cr?.error}`)
+      syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      if (read(join(H, '.gemini/settings.json')) !== G_COMMENTED || read(join(H, '.gemini/GEMINI.md')) !== brokenMd) bad.push('refused file written')
+      let modelRefused = false
+      try {
+        setModel(H, 'gemini', 'model.name', 'pro')
+      } catch (e) {
+        modelRefused = e instanceof SetModelError
+      }
+      if (!modelRefused || read(join(H, '.gemini/settings.json')) !== G_COMMENTED) bad.push('setModel on commented settings not refused')
+      // new user who chose Gemini and has no ~/.gemini: both files created with our content only
+      const N = gHome('illithid-m7-G2n-', {}, ['gemini'])
+      seedLibrary(N)
+      syncAll(N, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      const ns = readJson(join(N, '.gemini/settings.json'))
+      if (Object.keys(ns).join() !== 'mcpServers' || !read(join(N, '.gemini/GEMINI.md')).startsWith(MD_BEGIN)) bad.push('fresh ~/.gemini files')
+      check(
+        'ag2. HAR-17 Gemini chosen — GEMINI.md block (outside text kept), settings.json mcpServers only (httpUrl, ${VAR} kept, no trust, key order kept), skills copied, agents rendered (model mapping, invalid name skipped), re-sync 0, toggle off, model.name, comments and broken markers refused, fresh files',
+        !bad.length,
+        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}; settings keys ${Object.keys(after).join(',')}; refused: geminiMcp (comments), geminiRules (broken marker)`
+      )
+    }
+
+    // ag3. import from ~/.gemini — candidates, conversion, source-only toggles, GEMINI.md text copied (off for Gemini), agent original retired by the approved Sync
+    {
+      const bad: string[] = []
+      const GAG = '---\nname: gag\ndescription: Gemini agent\nmodel: flash\ntemperature: 0.2\n---\n\nDo things.\n'
+      const H = gHome(
+        'illithid-m7-G3-',
+        {
+          '.gemini/GEMINI.md': G_OUTSIDE,
+          '.gemini/settings.json':
+            '{\n  // comments are fine for import\n  "mcpServers": {\n    "gs": { "command": "gsrv", "env": { "TOKEN": "$GS_TOKEN" }, "timeout": 5000, "trust": true },\n    "gh": { "httpUrl": "https://h.example.com/mcp", "headers": { "Authorization": "Bearer ${GH_TOKEN}" } },\n    "gsse": { "url": "https://s.example.com/sse" }\n  }\n}\n',
+          '.gemini/skills/gsk2/SKILL.md': '---\nname: gsk2\ndescription: From Gemini\n---\n\nG.\n',
+          '.gemini/agents/gag.md': GAG,
+          '.gemini/agents/remote.md': '---\nname: remote\nkind: remote\nagent_card_url: https://a.example.com/card\n---\n',
+          // Tool-limited agent and one whose own name differs from its file: importing would lose the limit / the name
+          '.gemini/agents/limited.md': '---\nname: limited\ndescription: Read only\ntools:\n  - read_file\n---\n\nOnly read.\n',
+          '.gemini/agents/foo.md': '---\nname: bar\ndescription: Renamed\n---\n\nBar.\n'
+        },
+        ['claude', 'gemini']
+      )
+      const g0 = tree(H, '.gemini')
+      const src = listImportSources(H).find((s) => s.id === 'tool:gemini')
+      if (!src?.available) bad.push('tool:gemini source')
+      const pl = planImport(H, 'tool:gemini')
+      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
+      if (names(pl.rules) !== 'gemini-md.md' || names(pl.mcp) !== 'gh,gs,gsse' || names(pl.skills) !== 'gsk2' || names(pl.agents) !== 'foo,gag,limited,remote') bad.push(`candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`)
+      const port = (n: string): string => pl.agents.find((a) => a.name === n)?.portability ?? '-'
+      if (['remote', 'limited', 'foo'].some((n) => port(n) !== 'toolOnly') || port('gag') !== 'warn') bad.push(`agent portability ${['remote', 'limited', 'foo', 'gag'].map(port).join(',')}`)
+      if (!pl.agents.find((a) => a.name === 'limited')?.reasons.includes('restrictedAgent') || !pl.agents.find((a) => a.name === 'foo')?.reasons.includes('nameMismatch')) bad.push('agent reasons')
+      if (pl.rules[0]?.portability !== 'warn' || pl.rules[0].reasons.join() !== 'toolNotes') bad.push(`gemini-md portability ${pl.rules[0]?.portability}:${pl.rules[0]?.reasons.join()}`)
+      const gs = pl.mcp.find((c) => c.name === 'gs')?.variants[0]
+      if (gs?.server.env?.TOKEN !== '${GS_TOKEN}' || gs.server.timeoutMs !== 5000 || !gs.warnings.some((w) => w.includes('trust'))) bad.push(`gs ${JSON.stringify(gs?.server)}`)
+      const gh = pl.mcp.find((c) => c.name === 'gh')?.variants[0]
+      if (gh?.server.transport !== 'http' || gh.server.url !== 'https://h.example.com/mcp' || gh.server.bearerEnv !== 'GH_TOKEN') bad.push(`gh ${JSON.stringify(gh?.server)}`)
+      if (!pl.mcp.find((c) => c.name === 'gsse')?.variants[0].warnings.some((w) => w.includes('sse'))) bad.push('sse warning')
+      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+      const ir = applyImport(H, sels, 'tool:gemini', { secrets: memG })
+      if (ir.some((x) => x.status !== 'imported')) bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
+      if (tree(H, '.gemini') !== g0) bad.push('import changed ~/.gemini')
+      if (readRule(H, 'gemini-md.md') !== G_OUTSIDE.trim() + '\n') bad.push('gemini-md.md content')
+      const mf = readManifest(H).manifest
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      const want: [string, string][] = [
+        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
+        [tg('skills', 'gsk2'), '{"claude":false,"codex":false}'],
+        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false}'],
+        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false}']
+      ]
+      for (const [got, w] of want) if (got !== w) bad.push(`toggles ${got} ≠ ${w}`)
+      const skillRes = ir.find((x) => x.kind === 'skill')
+      if (JSON.stringify(skillRes?.adopted) !== '["gemini"]') bad.push(`skill adopted ${JSON.stringify(skillRes?.adopted)}`)
+      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
+      if (pend !== 'agent:gemini:gag') bad.push(`pendingRetire ${pend}`)
+      if (readAgentDoc(H, 'gag').tools.gemini?.model !== 'flash') bad.push('agent model not under gemini')
+      const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
+      if (!r.results) bad.push('sync refused')
+      if (read(join(H, '.gemini/agents/gag.md')) !== renderAgent('gemini', readAgentDoc(H, 'gag'))) bad.push('agent not replaced by render')
+      const ib = readdirSync(importedBackupRoot(H)).map((ts) => join(importedBackupRoot(H), ts, 'gemini/agents/gag.md')).find((p) => existsSync(p))
+      if (!ib || read(ib) !== GAG) bad.push('agent original not in backups/imported')
+      if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
+      const gmd = read(join(H, '.gemini/GEMINI.md'))
+      if ((blockBody(gmd, MD_BEGIN, MD_END) ?? '').includes('rules/gemini-md.md') || !gmd.startsWith(G_OUTSIDE.trimEnd())) bad.push('GEMINI.md text duplicated into the block or moved')
+      if (existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'gemini-md.md'))) bad.push('gemini-md.md reached Claude while all its toggles are off')
+      if (read(join(H, '.gemini/settings.json')).indexOf('// comments are fine') < 0) bad.push('commented settings.json rewritten')
+      check(
+        'ag3. HAR-17 import from ~/.gemini — rule (GEMINI.md outside text, copied, warn toolNotes, all tools off), MCP (commented settings read, $VAR → ${VAR}, httpUrl → http, sse/trust warned), skill adopted, agent (model under gemini; remote, tool-limited and renamed agents toolOnly), source-only toggles, agent original retired by the approved Sync',
+        !bad.length,
+        bad.length ? bad.join('; ') : `imported ${ir.map((x) => x.name).join(',')}; pendingRetire agent:gemini:gag → backups/imported; settings.json with comments left as-is (geminiMcp refused)`
+      )
+    }
+
+    // ag4. sessions — $set/$rewindTo replay, cwd from .project_root or projects.json, resume command, transcript, search index
+    {
+      const bad: string[] = []
+      const H = makeFixture('illithid-m7-G4-')
+      const ln = (o: unknown): string => JSON.stringify(o) + '\n'
+      const A = 'abcd1234-1111-2222-3333-444455556666'
+      const B = 'bcde2345-1111-2222-3333-444455556666'
+      const C = 'cdef3456-1111-2222-3333-444455556666'
+      const D = 'defa4567-1111-2222-3333-444455556666'
+      const put = (rel: string, text: string): void => {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), text)
+      }
+      put('.gemini/tmp/proj/.project_root', '/work/proj\n')
+      put(
+        '.gemini/tmp/proj/chats/session-2026-09-20T10-00-abcd1234.jsonl',
+        ln({ sessionId: A, projectHash: 'h1', startTime: '2026-09-20T10:00:00.000Z', lastUpdated: '2026-09-20T10:00:00.000Z', kind: 'main' }) +
+          ln({ id: 'u0', timestamp: '2026-09-20T10:00:00.500Z', type: 'user', content: [{ text: '<session_context>\nworkspace info\n</session_context>' }] }) +
+          ln({ id: 'u1', timestamp: '2026-09-20T10:00:01.000Z', type: 'user', content: [{ text: 'first question zebra' }] }) +
+          ln({ id: 'g1', timestamp: '2026-09-20T10:00:02.000Z', type: 'gemini', content: [{ text: 'thinking', thought: true }, { text: 'answer one' }], toolCalls: [{ name: 'run_shell_command', args: { command: 'ls -la' } }] }) +
+          ln({ $set: { lastUpdated: '2026-09-20T10:00:02.000Z' } }) +
+          ln({ id: 'u2', timestamp: '2026-09-20T10:01:00.000Z', type: 'user', content: [{ text: 'second question' }] }) +
+          ln({ id: 'g2', timestamp: '2026-09-20T10:01:01.000Z', type: 'gemini', content: [{ text: 'rewound answer walrus' }] }) +
+          ln({ $rewindTo: 'u2' }) +
+          ln({ id: 'u3', timestamp: '2026-09-20T10:02:00.000Z', type: 'user', content: [{ text: 'third question' }] }) +
+          ln({ id: 'g3', timestamp: '2026-09-20T10:02:01.000Z', type: 'gemini', content: [{ text: 'answer three giraffe' }] }) +
+          ln({ id: 'i1', timestamp: '2026-09-20T10:02:02.000Z', type: 'info', content: [{ text: 'info line' }] }) +
+          ln({ $set: { lastUpdated: '2026-09-20T10:02:02.000Z' } })
+      )
+      put('.gemini/projects.json', JSON.stringify({ projects: { '/work/other dir': 'other' } }))
+      put(
+        '.gemini/tmp/other/chats/session-2026-09-21T09-00-bcde2345.jsonl',
+        ln({ sessionId: B, projectHash: 'h2', startTime: '2026-09-21T09:00:00.000Z', lastUpdated: '2026-09-21T09:00:00.000Z' }) +
+          ln({ id: 'x1', timestamp: '2026-09-21T09:00:01.000Z', type: 'user', content: [{ text: 'dropped by $set' }] }) +
+          ln({ $set: { messages: [{ id: 'y1', timestamp: '2026-09-21T09:00:02.000Z', type: 'user', content: 'kept question' }, { id: 'y2', timestamp: '2026-09-21T09:00:03.000Z', type: 'gemini', content: [{ text: 'kept answer' }] }], lastUpdated: '2026-09-21T09:00:03.000Z' } })
+      )
+      put(
+        '.gemini/tmp/other/chats/session-2026-09-21T09-05-cdef3456.jsonl',
+        ln({ sessionId: C, projectHash: 'h2', startTime: '2026-09-21T09:05:00.000Z', lastUpdated: '2026-09-21T09:05:00.000Z', kind: 'subagent' }) +
+          ln({ id: 's1', timestamp: '2026-09-21T09:05:01.000Z', type: 'user', content: [{ text: 'sub task' }] })
+      )
+      // Project root that isn't absolute → no resume command
+      put('.gemini/tmp/rel/.project_root', 'relative/dir\n')
+      put(
+        '.gemini/tmp/rel/chats/session-2026-09-19T08-00-defa4567.jsonl',
+        ln({ sessionId: D, projectHash: 'h3', startTime: '2026-09-19T08:00:00.000Z', lastUpdated: '2026-09-19T08:00:00.000Z', kind: 'main' }) +
+          ln({ id: 'd1', timestamp: '2026-09-19T08:00:01.000Z', type: 'user', content: [{ text: 'relative root' }] })
+      )
+      const g0 = tree(H, '.gemini')
+      const sc = scanSessions(H, ['gemini'])
+      const by = new Map(sc.sessions.map((s) => [s.id, s]))
+      const a = by.get(A)
+      const b = by.get(B)
+      const c = by.get(C)
+      if (sc.errors.length || sc.sessions.length !== 4) bad.push(`scan ${sc.sessions.length} errors ${sc.errors.length}`)
+      if (a?.title !== 'first question zebra' || a.cwd !== '/work/proj' || a.project !== 'proj' || a.updatedAt !== '2026-09-20T10:02:02.000Z' || a.resumeCommand !== `cd -- /work/proj && gemini --resume ${A}`)
+        bad.push(`A ${JSON.stringify(a)}`)
+      if (b?.title !== 'kept question' || b.cwd !== '/work/other dir' || b.resumeCommand !== `cd -- '/work/other dir' && gemini --resume ${B}`) bad.push(`B ${b?.title}|${b?.cwd}|${b?.resumeCommand}`)
+      if (!c || c.resumeCommand !== undefined) bad.push('subagent session resumable')
+      if (by.get(D)?.resumeCommand !== undefined || by.get(D)?.cwd !== 'relative/dir') bad.push('relative project root resumable')
+      // Gemini context blocks are filtered for Gemini only — other tools keep the shared cleanup rule
+      if (cleanUserText('<session_context>x</session_context>') === undefined) bad.push('session_context filtered for all tools')
+      if (sc.sessions.map((s) => s.id).join() !== [C, B, A, D].join()) bad.push('order (updatedAt desc)')
+      const tr = await readSessionTranscript(H, 'gemini', A)
+      const seq = tr.messages.map((m) => `${m.role}${m.kind === 'tool' ? ':tool' : ''}:${m.text}`).join('|')
+      if (seq !== 'user:first question zebra|assistant:answer one|assistant:tool:run_shell_command: ls -la|user:third question|assistant:answer three giraffe') bad.push(`transcript ${seq}`)
+      const trB = await readSessionTranscript(H, 'gemini', B)
+      if (trB.messages.map((m) => m.text).join('|') !== 'kept question|kept answer') bad.push('transcript $set.messages')
+      const dbPath = join(H, 'search-g.sqlite')
+      const ix = await indexSessions(H, scanSessions(H).sessions, { dbPath })
+      if (ix.failed || ix.indexed !== 4) bad.push(`index ${JSON.stringify(ix)}`)
+      const hit = searchSessions(H, 'giraffe', { dbPath }).results
+      if (hit.length !== 1 || hit[0].tool !== 'gemini' || hit[0].id !== A || hit[0].hits[0]?.idx !== 4) bad.push(`search ${JSON.stringify(hit.map((x) => [x.tool, x.id, x.hits[0]?.idx]))}`)
+      if (searchSessions(H, 'walrus', { dbPath }).results.length) bad.push('rewound message indexed')
+      if (searchSessions(H, 'zebra', { dbPath, tool: 'gemini' }).results.length !== 1) bad.push('tool filter')
+      if (tree(H, '.gemini') !== g0) bad.push('~/.gemini changed by reading')
+      check(
+        'ag4. HAR-17 Gemini sessions — $set/$rewindTo replay, thought parts skipped, cwd from .project_root then projects.json, quoted resume command (none for subagents), transcript and search index',
+        !bad.length,
+        bad.length ? bad.join('; ') : `4 sessions, transcript ${tr.total} messages, index ${ix.indexed} sessions, search hit idx 4, rewound text not indexed`
       )
     }
   }

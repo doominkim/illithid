@@ -43,10 +43,14 @@ export async function runWrite<T>(
     return null
   }
   if (opts.invalidate !== false) clearApiCache()
-  if (opts.success) notifications.show({ color: 'accent', message: opts.success, autoClose: 2000 })
+  const sync = 'sync' in r ? r.sync : undefined
+  // Auto apply off: the write stayed in the library — say so instead of implying the tools were updated
+  const libraryOnly = !!sync && !sync.wrote && !sync.refused
+  if (opts.success)
+    notifications.show({ color: 'accent', ...(libraryOnly ? { title: t('sync.savedOnly') } : {}), message: opts.success, autoClose: 2000 })
   // Auto-sync result after a library write
-  if ('sync' in r && r.sync) {
-    notifySync(r.sync)
+  if (sync) {
+    notifySync(sync)
     window.dispatchEvent(new Event(LIBRARY_CHANGED))
   }
   return r.value as T

@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import fg from 'fast-glob'
+import type { ToolId } from '../toolIds'
 import { clip, isoOrUndefined, readRange } from './common'
-import { titleText } from './transcript'
+import { geminiText, isGeminiInjected, replayGemini, titleText } from './transcript'
 
 export { readSessionTranscript, cleanUserText, titleText, toolLine } from './transcript'
 export type {
@@ -13,7 +14,7 @@ export type {
   TranscriptTool
 } from './transcript'
 
-export type SessionTool = 'claude' | 'codex' | 'opencode'
+export type SessionTool = ToolId
 
 export interface Session {
   id: string
@@ -48,11 +49,28 @@ const SAFE_ID = /^[A-Za-z0-9_-]+$/
 
 type Json = Record<string, unknown>
 
-function resumeCommand(tool: SessionTool, id: string): string | undefined {
+/** POSIX shell word: bare if it only has safe characters, otherwise single-quoted */
+function shellWord(s: string): string {
+  return /^[A-Za-z0-9_./+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`
+}
+
+function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | undefined {
   if (!SAFE_ID.test(id)) return undefined
-  if (tool === 'claude') return `claude --resume ${id}`
-  if (tool === 'codex') return `codex resume ${id}`
-  return `opencode -s ${id}`
+  switch (tool) {
+    case 'claude':
+      return `claude --resume ${id}`
+    case 'codex':
+      return `codex resume ${id}`
+    case 'opencode':
+      return `opencode -s ${id}`
+    case 'gemini':
+      // Gemini looks sessions up per project (the directory it runs in)
+      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && gemini --resume ${id}` : undefined
+    default: {
+      const never: never = tool
+      throw new Error(`unknown tool ${String(never)}`)
+    }
+  }
 }
 
 function projectOf(cwd: string | undefined): string | undefined {
@@ -339,6 +357,92 @@ function scanOpencode(home: string): Session[] {
   }
 }
 
+// ---------------------------------------------------------------- Gemini
+
+/** ~/.gemini/projects.json { projects: { "/abs/path": "slug" } } → slug → path */
+function geminiProjects(home: string): Map<string, string> {
+  const out = new Map<string, string>()
+  try {
+    const o = JSON.parse(readFileSync(join(home, '.gemini/projects.json'), 'utf8')) as Json
+    const p = o.projects as Json | undefined
+    if (p && typeof p === 'object' && !Array.isArray(p))
+      for (const [path, slug] of Object.entries(p)) if (typeof slug === 'string' && !out.has(slug)) out.set(slug, path)
+  } catch {
+    // No project map — cwd comes from .project_root only
+  }
+  return out
+}
+
+/** Project directory of tmp/<slug>: its .project_root file, else projects.json */
+function geminiCwd(root: string, slug: string, projects: Map<string, string>): string | undefined {
+  try {
+    const p = readFileSync(join(root, slug, '.project_root'), 'utf8').trim()
+    if (p) return p
+  } catch {
+    // Fall back to projects.json
+  }
+  return projects.get(slug)
+}
+
+function geminiFirstUserText(messages: Json[]): string | undefined {
+  for (const m of messages) {
+    if (m.type !== 'user') continue
+    const raw = geminiText(m.content)
+    const t = isGeminiInjected(raw) ? undefined : titleText(raw)
+    if (t) return t
+  }
+  return undefined
+}
+
+function scanGemini(home: string): Session[] {
+  const root = join(home, '.gemini/tmp')
+  if (!existsSync(root)) return []
+  const projects = geminiProjects(home)
+  const files = fg.sync('*/chats/session-*.jsonl', {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    followSymbolicLinks: false,
+    suppressErrors: true,
+    stats: true
+  })
+  const out: Session[] = []
+  for (const f of files) {
+    const size = f.stats?.size ?? 0
+    const mtime = f.stats?.mtime?.toISOString()
+    let head: Json[] = []
+    let tail: Json[] = []
+    try {
+      ;({ head, tail } = headTail(f.path, size))
+    } catch {
+      continue
+    }
+    // Small files are read whole (head === tail); large ones merge the header and the metadata updates found at both ends
+    const records = head === tail ? head : [...head, ...tail]
+    const { meta, messages } = replayGemini(records)
+    const id = str(meta.sessionId)
+    if (!id) continue
+    const slug = f.path.slice(root.length + 1).split('/')[0]
+    const cwd = geminiCwd(root, slug, projects)
+    const first = str(meta.summary) ? undefined : (geminiFirstUserText(messages) ?? geminiFirstUserText(replayGemini(head).messages))
+    const kind = str(meta.kind)
+    out.push({
+      id,
+      tool: 'gemini',
+      title: clip(str(meta.summary) ?? first ?? '', TITLE_MAX),
+      cwd,
+      project: projectOf(cwd),
+      startedAt: isoOrUndefined(meta.startTime) ?? firstTimestamp(head),
+      updatedAt: isoOrUndefined(meta.lastUpdated) ?? lastTimestamp(tail) ?? mtime,
+      ...(head === tail ? { messageCount: messages.filter((m) => m.type === 'user' || m.type === 'gemini').length } : {}),
+      path: f.path,
+      // Subagent transcripts can't be resumed
+      ...(kind === undefined || kind === 'main' ? { resumeCommand: resumeCommand('gemini', id, cwd) } : {})
+    })
+  }
+  return out
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Read-only scan. Sorted by updatedAt descending. Returns the rest even if one tool fails. */
@@ -346,7 +450,8 @@ export function scanSessions(home: string, tools?: SessionTool[]): SessionScanRe
   const scanners: Record<SessionTool, (h: string) => Session[]> = {
     claude: scanClaude,
     codex: scanCodex,
-    opencode: scanOpencode
+    opencode: scanOpencode,
+    gemini: scanGemini
   }
   const sessions: Session[] = []
   const errors: SessionScanResult['errors'] = []

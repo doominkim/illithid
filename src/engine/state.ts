@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ToolId } from './agents'
+import { TOOL_IDS, type ToolId } from './toolIds'
 import { appConfigDir } from './config'
 import type { PendingRetire } from './pendingRetire'
 import type { TargetId } from './types'
@@ -133,7 +133,7 @@ export function readState(home: string): StateRead {
       if (
         e &&
         ['rule', 'skill', 'agent', 'instruction'].includes(e.kind as string) &&
-        ['claude', 'codex', 'opencode'].includes(e.tool as string) &&
+        (TOOL_IDS as readonly unknown[]).includes(e.tool) &&
         typeof e.name === 'string' &&
         typeof e.path === 'string' &&
         typeof e.hash === 'string' &&

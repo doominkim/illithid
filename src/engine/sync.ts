@@ -13,8 +13,7 @@ import { apply, type ApplyResult } from './apply'
 import { deleteSyncCandidates, type DeleteRequest, type DeleteResult } from './deleteCopies'
 import { activeWorkspaceId, readConfig, withActiveWorkspace, workspaceIds } from './config'
 import type { ToolId } from './agents'
-import { blockBodyMulti } from './text'
-import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
+import { rulesBlockItems } from './targets/codexAgents'
 import { planAll } from './plan'
 import { applyRuleSync, planRuleSync, type RuleSyncItem, type RuleSyncResult } from './ruleSync'
 import {
@@ -291,12 +290,6 @@ const jsonOr = (text: string): Record<string, unknown> => {
 }
 
 /** `<!-- rules/x.md -->` / `<!-- memory/MEMORY.md -->` labels inside the AGENTS.md app block */
-function codexBlockItems(text: string): { rules: string[]; memory: boolean } {
-  const body = blockBodyMulti(text, [MD_MARKERS, ...LEGACY_MD_MARKERS]) ?? ''
-  const rules = [...body.matchAll(/^<!-- rules\/(.+?) -->$/gm)].map((m) => m[1])
-  return { rules, memory: /^<!-- memory\/MEMORY\.md -->$/m.test(body) }
-}
-
 function skillNamesIn(dir: string): string[] {
   try {
     return readdirSync(dir).filter((n) => !n.startsWith('.') && existsSync(`${dir}/${n}/SKILL.md`))
@@ -310,7 +303,7 @@ function skillNamesIn(dir: string): string[] {
  * Computes the post-switch sync plan (planSyncAll) for that workspace and counts only what exists on the tool side now but not after the plan:
  * - Rule/skill/agent copies = the plan's deleteCandidate (the Claude MEMORY.md copy counts as memory)
  * - MCP servers = server-name difference in target files before/after
- * - Rules/memory in the Codex AGENTS.md block, rules/memory in OpenCode instructions, skills in OpenCode skills.paths = name difference before/after
+ * - Rules/memory in the Codex AGENTS.md and Gemini GEMINI.md blocks, rules/memory in OpenCode instructions, skills in OpenCode skills.paths = name difference before/after
  * A name that also exists in the new workspace (content change only) is not counted as removed.
  */
 export function previewSwitch(
@@ -335,11 +328,12 @@ export function previewSwitch(
     if (mcpTool) {
       const after = toolServerDefs(c.id, c.after)
       for (const n of Object.keys(toolServerDefs(c.id, c.before))) if (!(n in after)) add('mcp', mcpTool, n)
-    } else if (c.id === 'codexAgents') {
-      const b = codexBlockItems(c.before)
-      const a = codexBlockItems(c.after)
-      for (const n of b.rules) if (!a.rules.includes(n)) add('rule', 'codex', n)
-      if (b.memory && !a.memory) add('memory', 'codex', 'MEMORY.md')
+    } else if (c.id === 'codexAgents' || c.id === 'geminiRules') {
+      const tool = c.id === 'codexAgents' ? 'codex' : 'gemini'
+      const b = rulesBlockItems(c.before)
+      const a = rulesBlockItems(c.after)
+      for (const n of b.rules) if (!a.rules.includes(n)) add('rule', tool, n)
+      if (b.memory && !a.memory) add('memory', tool, 'MEMORY.md')
     } else if (c.id === 'opencodeRules') {
       const list = (t: string): string[] => {
         const v = jsonOr(t).instructions

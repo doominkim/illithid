@@ -74,7 +74,7 @@
     "new": "新規ルール",
     "nameHint": "小文字・数字・. _ - のみ。.md は無ければ付きます",
     "created": "ルールを作成しました",
-    "deleted": ".trash に移動 — ツールに同期",
+    "deleted": ".trash に移動",
     "deleteTitle": "ルールを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "rename": "名前を変更",
@@ -85,7 +85,7 @@
     "new": "新規スキル",
     "nameHint": "小文字・数字・. _ -",
     "created": "スキルを作成しました",
-    "deleted": ".trash に移動 — ツールに同期",
+    "deleted": ".trash に移動",
     "deleteTitle": "スキルを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "rename": "名前を変更",
@@ -109,8 +109,8 @@
     "key": "キー",
     "timeout": "タイムアウト (ms)",
     "warnings": "警告",
-    "saved": "MCP を保存 — ツールに同期",
-    "deleted": "MCP 削除（.trash に保管）— ツールに同期",
+    "saved": "MCP を保存",
+    "deleted": "MCP 削除（.trash に保管）",
     "deleteTitle": "MCP を削除",
     "deleteBody": "{{name}} を .trash に移します。"
   },
@@ -122,7 +122,7 @@
     "search": "エージェントを検索",
     "new": "新規エージェント",
     "created": "エージェントを作成しました",
-    "deleted": ".trash に移動 — ツールに同期",
+    "deleted": ".trash に移動",
     "deleteTitle": "エージェントを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "renamed": "名前を変更しました",
@@ -193,7 +193,7 @@
     "name": "Illithid"
   },
   "toggles": {
-    "saved": "切替を保存 — ツールに同期"
+    "saved": "切替を保存"
   },
   "sidebar": {
     "shortcut": "⌘K で検索"
@@ -211,7 +211,7 @@
   "editor": {
     "lines": "{{n}} 行",
     "revert": "元に戻す",
-    "saved": "保存 — ツールに同期",
+    "saved": "保存",
     "unsaved": "未保存"
   },
   "refused": {
@@ -275,7 +275,8 @@
       "toolOnly": "ツール専用",
       "localPath": "この端末のパス",
       "toolSpecificTools": "ツール専用ツール",
-      "toolSpecificKeys": "ツール専用設定を除外"
+      "toolSpecificKeys": "ツール専用設定を除外",
+      "toolNotes": "ツールのメモ"
     },
     "adopted": "アプリ管理として採用",
     "userOwnedKept": "ユーザーファイルを維持（同期しない）",
@@ -337,8 +338,8 @@
     "new": "新規メモ",
     "search": "メモリファイルを検索",
     "nameHint": "memory/ 以下の相対パス。例: feedback/report-tone.md",
-    "created": "メモ作成 — 同期",
-    "deleted": ".trash に移動 — 同期",
+    "created": "メモ作成",
+    "deleted": ".trash に移動",
     "deleteTitle": "メモを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "tabShared": "共有",
@@ -407,7 +408,8 @@
       "agent": "エージェント",
       "config": "設定ファイル",
       "instruction": "instructions 項目"
-    }
+    },
+    "libraryDirect": "ライブラリを直接読み込み"
   },
   "onboarding": {
     "title": "Illithid をはじめる",

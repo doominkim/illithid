@@ -2,19 +2,21 @@
  * Session content index and search (node:sqlite + FTS5 trigram). Source session files are only read.
  * - Index file: <home>/.config/illithid/search.sqlite (recreated if deleted)
  * - Messages are parsed with the transcript.ts reader, so indexes match the transcript view (snippet → contents jump reuses them)
- * - Incremental: per session (mtime, size) — file stat for Claude/Codex, (time_updated, message count) for OpenCode. Only changed sessions are reinserted
+ * - Incremental: per session (mtime, size) — file stat for Claude/Codex/Gemini, (time_updated, message count) for OpenCode. Only changed sessions are reinserted
  * - Human (user) and AI (assistant) text only. Tool call summaries (kind 'tool') only with includeTools
  */
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { APP_CONFIG_DIR } from '../config'
+import { TOOL_IDS } from '../toolIds'
 import type { Session, SessionTool } from '../scan/sessions'
 import {
   Collector,
   openOpencodeDb,
   readClaude,
   readCodex,
+  readGemini,
   readOpencodeDb,
   type OpencodeDb,
   type TranscriptMessage
@@ -33,7 +35,7 @@ export interface IndexSessionsOptions extends IndexOptions {
   onProgress?: (p: { done: number; total: number }) => void
   /** Also index tool call summaries (default false). Changing it triggers a full reindex */
   includeTools?: boolean
-  /** Tools whose session list is complete — indexed sessions missing from the list are removed (default: all three) */
+  /** Tools whose session list is complete — indexed sessions missing from the list are removed (default: all tools) */
   completeTools?: SessionTool[]
 }
 
@@ -246,7 +248,7 @@ export async function indexSessions(
     const delSession = db.prepare('delete from sessions where sid = ?')
 
     // Sessions that disappeared
-    const complete = new Set<string>(opts.completeTools ?? ['claude', 'codex', 'opencode'])
+    const complete = new Set<string>(opts.completeTools ?? TOOL_IDS)
     const gone = [...existing.values()].filter((r) => complete.has(r.tool) && !seen.has(keyOf(r.tool, r.id)))
     if (gone.length) {
       db.exec('begin')
@@ -320,11 +322,24 @@ export async function indexSessions(
           n++
         }
         const c = new Collector(sink)
-        if (s.tool === 'claude') await readClaude(s.path, c)
-        else if (s.tool === 'codex') await readCodex(s.path, c)
-        else {
-          opencode ??= openOpencodeDb(home)
-          readOpencodeDb(opencode, s.id, c)
+        switch (s.tool) {
+          case 'claude':
+            await readClaude(s.path, c)
+            break
+          case 'codex':
+            await readCodex(s.path, c)
+            break
+          case 'opencode':
+            opencode ??= openOpencodeDb(home)
+            readOpencodeDb(opencode, s.id, c)
+            break
+          case 'gemini':
+            await readGemini(s.path, c)
+            break
+          default: {
+            const never: never = s.tool
+            throw new Error(`unknown tool ${String(never)}`)
+          }
         }
         finish.run(s.path, sig.mtime, sig.size, s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null, n, sid)
         db.exec('commit')

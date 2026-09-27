@@ -1,0 +1,161 @@
+import {
+  jsonSubKeysRegion,
+  mcpEntries,
+  parseJsonObject,
+  removeServers,
+  toggleNotes,
+  untouchedKeysSame
+} from '../text'
+import { isEnabled } from '../manifest'
+import { TargetError, type Env, type McpSource, type Sources, type TargetDef } from '../types'
+import { librarySkillNames } from './skillOverrides'
+import type { SecretBackend } from '../secrets'
+import { isServerError, renderHttpHeaders, renderValue } from './mcpRender'
+import {
+  disabledUnownedServers,
+  enabledServerNames,
+  mcpForTool,
+  ownedServerNames,
+  staleServerNames
+} from './toggles'
+
+type Json = Record<string, unknown>
+
+/**
+ * Gemini-only server keys the library can't express. Kept from the existing entry of the same name, since dropping them would
+ * widen tool access (includeTools/excludeTools), break sign-in (oauth, authProviderType, service account) or change trust
+ */
+export const GEMINI_KEPT_SERVER_KEYS = [
+  'trust',
+  'includeTools',
+  'excludeTools',
+  'oauth',
+  'authProviderType',
+  'targetAudience',
+  'targetServiceAccount',
+  'cwd',
+  'description'
+] as const
+
+/**
+ * Library servers → Gemini CLI mcpServers entries.
+ * - stdio → command/args/env (+ timeout in ms)
+ * - http  → httpUrl (+ headers). Gemini reads `url` as SSE, so streamable HTTP must be httpUrl
+ * ${VAR} is passed through — Gemini expands $VAR/${VAR} in settings.json strings itself. `trust` is never written.
+ * Servers whose secrets could not be resolved go into errors and are dropped from servers (existing entries stay)
+ */
+export function buildGeminiMcp(
+  mcp: McpSource,
+  settings: Json,
+  env: Env,
+  secrets?: SecretBackend,
+  errors: Record<string, string> = {},
+  /** Filled with server name → Gemini-only keys kept from the existing entry */
+  kept: Record<string, string[]> = {}
+): Json {
+  const next = structuredClone(settings)
+  const servers: Record<string, Json> = {}
+  const prev = (settings.mcpServers ?? {}) as Json
+  for (const [name, s] of mcpEntries(mcp)) {
+    try {
+      if (s.transport === 'stdio') {
+        const server: Json = { command: s.command, args: s.args ?? [] }
+        if (s.env) {
+          server.env = Object.fromEntries(
+            Object.entries(s.env).map(([k, v]) => [k, renderValue(v, 'claude', env, secrets)])
+          )
+        }
+        if (s.timeoutMs) server.timeout = s.timeoutMs
+        servers[name] = server
+      } else {
+        const server: Json = { httpUrl: s.url }
+        const headers = renderHttpHeaders(s, 'claude', env, secrets)
+        if (Object.keys(headers).length) server.headers = headers
+        if (s.timeoutMs) server.timeout = s.timeoutMs
+        servers[name] = server
+      }
+    } catch (e) {
+      if (!isServerError(e)) throw e
+      errors[name] = e.message
+    }
+  }
+  for (const [name, server] of Object.entries(servers)) {
+    const old = prev[name]
+    if (!old || typeof old !== 'object' || Array.isArray(old)) continue
+    const keys = GEMINI_KEPT_SERVER_KEYS.filter((k) => (old as Json)[k] !== undefined)
+    for (const k of keys) server[k] = structuredClone((old as Json)[k])
+    if (keys.length) kept[name] = keys
+  }
+  // Servers outside the SSOT (Gemini-only, extensions) are left alone. No empty table is added to a file that has none
+  const merged = { ...((settings.mcpServers as Json | undefined) ?? {}), ...servers }
+  if (settings.mcpServers !== undefined || Object.keys(merged).length) next.mcpServers = merged
+  return next
+}
+
+/**
+ * settings.json is read with comments allowed by Gemini (strip-json-comments). The app only edits plain JSON:
+ * anything else is refused rather than rewritten without the user's comments
+ */
+function parseSettings(text: string): Json {
+  try {
+    return parseJsonObject(text)
+  } catch (e) {
+    if (!(e instanceof TargetError)) throw e
+    throw new TargetError(`${e.message} — settings.json has comments or is not plain JSON; not written`)
+  }
+}
+
+/** Library skills on for Gemini that Gemini's own settings turn off (skills.enabled / skills.disabled) — warned, not changed */
+function disabledSkillNotes(settings: Json, sources: Sources): string[] {
+  const sk = settings.skills
+  if (!sk || typeof sk !== 'object' || Array.isArray(sk)) return []
+  const s = sk as Json
+  const on = librarySkillNames(sources).filter((n) => isEnabled(sources.manifest, 'skills', n, 'gemini'))
+  if (!on.length) return []
+  if (s.enabled === false) return ['skills.enabled is false in settings.json — Gemini loads no skills, including library ones']
+  const off = Array.isArray(s.disabled) ? on.filter((n) => (s.disabled as unknown[]).includes(n)) : []
+  return off.length ? [`library skills disabled by skills.disabled in settings.json (left as-is): ${off.join(', ')}`] : []
+}
+
+/** Serialize keeping the file's indentation and trailing newline */
+function toSettingsText(before: string, value: Json): string {
+  const indent = /^[{[]\r?\n([ \t]+)\S/.exec(before)?.[1] ?? '  '
+  return JSON.stringify(value, null, indent) + '\n'
+}
+
+/** ~/.gemini/settings.json — replaces only mcpServers (other keys and their order untouched) */
+export const geminiMcp: TargetDef = {
+  id: 'geminiMcp',
+  tool: 'gemini',
+  rel: '.gemini/settings.json',
+  // Plain user config (Gemini runs without it) — created with only our keys when Gemini is explicitly in use
+  optional: false,
+  createIfInUse: true,
+  seed: '{}\n',
+  region: (text, sources, ctx) =>
+    jsonSubKeysRegion(text, 'mcpServers', ownedServerNames(sources, 'gemini', ctx, 'geminiMcp')),
+  build(before, ctx) {
+    const { sources, env } = ctx
+    const settings = parseSettings(before)
+    const serverErrors: Record<string, string> = {}
+    const kept: Record<string, string[]> = {}
+    const next = buildGeminiMcp(mcpForTool(sources, 'gemini'), settings, env, ctx.secrets, serverErrors, kept)
+    const stale = staleServerNames(sources, 'gemini', ctx, 'geminiMcp')
+    removeServers(next, 'mcpServers', stale)
+    const after = JSON.stringify(next) === JSON.stringify(settings) ? before : toSettingsText(before, next)
+    const { count, same } = untouchedKeysSame(settings, next, 'mcpServers')
+    const notes = [`${count} keys other than mcpServers unchanged: ${same ? 'OK' : 'broken!'}`]
+    notes.push(...toggleNotes(stale, disabledUnownedServers(sources, 'gemini', ctx, 'geminiMcp')))
+    for (const [n, keys] of Object.entries(kept)) notes.push(`kept Gemini-only settings of ${n}: ${keys.join(', ')}`)
+    notes.push(...disabledSkillNotes(settings, sources))
+    // Gemini's policy engine splits MCP tool names (mcp_<server>_<tool>) at `_`, so such a server name may be misread
+    const underscored = enabledServerNames(sources, 'gemini').filter((n) => n.includes('_'))
+    if (underscored.length)
+      notes.push(`server names with "_" may be misread by Gemini's tool policy rules (mcp_<server>_<tool>): ${underscored.join(', ')}`)
+    const owned = enabledServerNames(sources, 'gemini')
+    const errs = Object.keys(serverErrors).length ? { serverErrors } : {}
+    return same
+      ? { after, notes, owned, ...errs }
+      : { after, notes, owned, ...errs, error: 'keys other than mcpServers changed' }
+  }
+}

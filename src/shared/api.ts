@@ -202,7 +202,7 @@ export interface McpData {
 /** App config view. Paths are for display (~) */
 /** Tools in use on this device (config.toolsInUse). Tools not in use get no writes at all */
 export interface ToolsInUseView {
-  /** Effective list (all tools while unset) */
+  /** Effective list (the default tools while unset) */
   inUse: ToolId[]
   /** false = config.toolsInUse not set yet (users from before the setting, or first run) */
   configured: boolean
@@ -228,6 +228,8 @@ export interface ConfigView {
   libraryLegacy: boolean
   /** Library exists but has no entries */
   libraryEmpty: boolean
+  /** Tools in use on this device (config.toolsInUse, or the default tools while unset) */
+  inUse: ToolId[]
   /**
    * Automatic library creation at app start did not happen.
    * renamePending: old-name paths remain, so not created (detail = those paths) · initFailed: creation failed (detail = reason)
@@ -573,6 +575,15 @@ export interface ApplyPreviewItem {
   name: string
   /** Display path (~) */
   path: string
+  /** Detail of a config file row (its path): e.g. a rule entering or leaving opencode.json — not counted separately */
+  parent?: string
+}
+
+/** Changed library item a tool reads straight from the library (OpenCode rules and skills) — nothing to write for it */
+export interface LibraryDirectItem {
+  tool: ToolId
+  kind: 'rule' | 'skill'
+  name: string
 }
 
 /** Imported original edited after import — sync leaves it in place */
@@ -591,6 +602,7 @@ export interface ApplyPreviewView {
   importedChanged: ImportedChangedItem[]
   errors: string[]
   notInitialized: NotInitializedView[]
+  libraryDirect: LibraryDirectItem[]
   libraryMissing?: boolean
   /** Tools in use (effective) */
   inUse: ToolId[]

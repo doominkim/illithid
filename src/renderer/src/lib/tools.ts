@@ -1,18 +1,24 @@
 import type { ToolId } from '../../../shared/api'
+import { MANIFEST_TOOLS, TOOL_IDS } from '../../../engine/toolIds'
 
-export const TOOLS: readonly ToolId[] = ['claude', 'codex', 'opencode']
+export const TOOLS: readonly ToolId[] = TOOL_IDS
+
+/** Tools whose skills can be toggled (OpenCode reads the library directly) */
+export const SKILL_TOGGLE_TOOLS: readonly ToolId[] = MANIFEST_TOOLS.skills
 
 export const TOOL_NAME: Record<ToolId, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
-  opencode: 'OpenCode'
+  opencode: 'OpenCode',
+  gemini: 'Gemini CLI'
 }
 
-/** Tool identity colors (pill and icon background). Orange, black, blue to avoid clashing with status colors */
+/** Tool identity colors (pill and icon background). Orange, black, blue, violet to avoid clashing with status colors */
 export const TOOL_COLOR: Record<ToolId, string> = {
   claude: '#D97757',
   codex: '#3F3F46',
-  opencode: '#3B82F6'
+  opencode: '#3B82F6',
+  gemini: '#8B5CF6'
 }
 
 /** Display state of a single tool pill */

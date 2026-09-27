@@ -74,7 +74,7 @@
     "new": "新建规则",
     "nameHint": "小写字母、数字、. _ -；缺少 .md 时自动添加",
     "created": "规则已创建",
-    "deleted": "已移至 .trash — 正在同步到工具",
+    "deleted": "已移至 .trash",
     "deleteTitle": "删除规则",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "rename": "重命名",
@@ -85,7 +85,7 @@
     "new": "新建技能",
     "nameHint": "小写字母、数字、. _ -",
     "created": "技能已创建",
-    "deleted": "已移至 .trash — 正在同步到工具",
+    "deleted": "已移至 .trash",
     "deleteTitle": "删除技能",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "rename": "重命名",
@@ -109,8 +109,8 @@
     "key": "键",
     "timeout": "超时 (ms)",
     "warnings": "警告",
-    "saved": "MCP 已保存 — 正在同步到工具",
-    "deleted": "MCP 已删除（保留在 .trash）— 正在同步到工具",
+    "saved": "MCP 已保存",
+    "deleted": "MCP 已删除（保留在 .trash）",
     "deleteTitle": "删除 MCP",
     "deleteBody": "将 {{name}} 移到 .trash。"
   },
@@ -122,7 +122,7 @@
     "search": "搜索代理",
     "new": "新建代理",
     "created": "代理已创建",
-    "deleted": "已移至 .trash — 正在同步到工具",
+    "deleted": "已移至 .trash",
     "deleteTitle": "删除代理",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "renamed": "已重命名",
@@ -193,7 +193,7 @@
     "name": "Illithid"
   },
   "toggles": {
-    "saved": "开关已保存 — 正在同步到工具"
+    "saved": "开关已保存"
   },
   "sidebar": {
     "shortcut": "⌘K 搜索"
@@ -211,7 +211,7 @@
   "editor": {
     "lines": "{{n}} 行",
     "revert": "还原",
-    "saved": "已保存 — 正在同步到工具",
+    "saved": "已保存",
     "unsaved": "未保存"
   },
   "refused": {
@@ -275,7 +275,8 @@
       "toolOnly": "工具专用",
       "localPath": "本机路径",
       "toolSpecificTools": "工具专用工具",
-      "toolSpecificKeys": "已丢弃工具专用设置"
+      "toolSpecificKeys": "已丢弃工具专用设置",
+      "toolNotes": "工具笔记"
     },
     "adopted": "已采用为应用管理",
     "userOwnedKept": "保留用户文件（不同步）",
@@ -337,8 +338,8 @@
     "new": "新建笔记",
     "search": "搜索记忆文件",
     "nameHint": "memory/ 下的相对路径，例如 feedback/report-tone.md",
-    "created": "笔记已创建 — 正在同步",
-    "deleted": "已移至 .trash — 正在同步",
+    "created": "笔记已创建",
+    "deleted": "已移至 .trash",
     "deleteTitle": "删除笔记",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "tabShared": "共享",
@@ -407,7 +408,8 @@
       "agent": "代理",
       "config": "配置文件",
       "instruction": "instructions 条目"
-    }
+    },
+    "libraryDirect": "直接读取库"
   },
   "onboarding": {
     "title": "开始使用 Illithid",

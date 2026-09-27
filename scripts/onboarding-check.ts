@@ -5,6 +5,8 @@
  * - Asserts: Codex/OpenCode folders were never created, the original rule was moved to backups/imported and
  *   replaced by the app copy, and the preview listed only Claude Code.
  * - Second scenario: ~/.claude.json missing while the library has an MCP server → yellow hint, not a sync error.
+ * - Third scenario: Claude + OpenCode in use, auto apply off — rule edit toast, preview over an open item detail,
+ *   OpenCode "reads the library directly" rows, and the rule rows under opencode.json after turning OpenCode off for a rule.
  * - Screenshots of each step go to SHOTS_DIR (default: a new temp dir), which is kept.
  *
  * Usage: npx electron-vite build && npx tsx scripts/onboarding-check.ts
@@ -13,6 +15,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Page } from 'playwright-core'
+import { syncAll } from '../src/engine'
 import { put } from './readme-shots'
 
 const ROOT = resolve(__dirname, '..')
@@ -84,6 +87,7 @@ async function firstRun(shots: string): Promise<RunResult> {
     check(await tid('onboarding-tool-claude').isChecked(), 'Claude Code prefilled')
     check(!(await tid('onboarding-tool-codex').isChecked()), 'Codex unchecked (not detected)')
     check(!(await tid('onboarding-tool-opencode').isChecked()), 'OpenCode unchecked (not detected)')
+    check(!(await tid('onboarding-tool-gemini').isChecked()), 'Gemini CLI unchecked (not detected)')
     await shot(page, 'tools')
 
     await tid('onboarding-tools-next').click()
@@ -108,7 +112,10 @@ async function firstRun(shots: string): Promise<RunResult> {
     await tid('onboarding-import-next').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await tid('apply-preview-claude').waitFor()
-    check(!(await tid('apply-preview-codex').count()) && !(await tid('apply-preview-opencode').count()), 'preview lists Claude Code only')
+    check(
+      !(await tid('apply-preview-codex').count()) && !(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-gemini').count()),
+      'preview lists Claude Code only'
+    )
     check((await tid('apply-preview-action-replace').count()) > 0, 'preview shows the rule replacement')
     await shot(page, 'preview')
 
@@ -118,6 +125,7 @@ async function firstRun(shots: string): Promise<RunResult> {
 
     check(!existsSync(join(home, '.codex')), '~/.codex not created')
     check(!existsSync(join(home, '.config/opencode')), '~/.config/opencode not created')
+    check(!existsSync(join(home, '.gemini')), '~/.gemini not created')
     check(!existsSync(join(home, '.claude/rules/my-rule.md')), 'original moved out of ~/.claude/rules')
     const copy = join(home, '.claude/rules/illithid/my-rule.md')
     check(existsSync(copy) && readFileSync(copy, 'utf8').includes('Keep answers short.'), 'app copy written to ~/.claude/rules/illithid')
@@ -204,13 +212,91 @@ async function notInitializedRun(shots: string): Promise<RunResult> {
   }
 }
 
+/** Scenario 3: preview details with Claude Code + OpenCode in use and auto apply off */
+async function previewDetailsRun(shots: string): Promise<RunResult> {
+  const home = '/Users/Shared/illithid-preview-details'
+  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  mkdirSync(home)
+  const userData = mkdtempSync(join(tmpdir(), 'illithid-preview-userdata-'))
+  const ws = '.illithid/workspaces/default'
+  put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
+  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
+  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude', 'opencode'] }) + '\n')
+  put(home, '.claude/settings.json', '{}\n')
+  put(home, '.claude.json', '{}\n')
+  put(home, '.config/opencode/opencode.json', '{}\n')
+  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  // Start from a synced state
+  syncAll(home, env, { allowReal: true, approvedOnce: true })
+
+  const failures: string[] = []
+  const check = (ok: boolean, what: string): void => {
+    if (!ok) failures.push(what)
+  }
+  const errors: string[] = []
+  const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => errors.push(e.message))
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(1280, 800)
+    })
+    await page.evaluate(() => localStorage.setItem('illithid-language', 'en'))
+    await page.reload()
+    const tid = (id: string): ReturnType<Page['locator']> => page.locator(`[data-testid="${id}"]`)
+    const card = page.locator('main [data-card]').filter({ hasText: 'style.md' }).first()
+    await card.waitFor({ timeout: 30_000 })
+
+    // 1. Edit the rule in the detail sheet: auto apply is off, so the toast must say library only
+    await card.click()
+    await tid('detail-sheet').waitFor()
+    await tid('tab-edit').click()
+    await page.locator('[data-testid="detail-sheet"] textarea').fill('# Style\n\n- Match the surrounding code.\n- Keep functions small.\n')
+    await tid('editor-save').click()
+    const toast = page.locator('.mantine-Notification-root').filter({ hasText: 'Saved to library only' })
+    await toast.first().waitFor({ timeout: 10_000 }).catch(() => {})
+    check((await toast.count()) > 0, 'rule save toast says library only')
+    check(!(await page.locator('.mantine-Notification-root').filter({ hasText: 'syncing' }).count()), 'no "syncing to tools" toast')
+
+    // 2 + 3. Preview on top of the open detail sheet; OpenCode listed as reading the library directly
+    await tid('sync-button').click()
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    await tid('apply-preview-library-direct').waitFor()
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: join(shots, 'details-1-preview-over-sheet.png') })
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    check(readFileSync(join(home, '.claude/rules/illithid/style.md'), 'utf8').includes('Keep functions small.'), 'apply clicked through the sheet reached Claude')
+
+    // 4. OpenCode off for the rule → opencode.json row with the rule leaving instructions
+    await page.keyboard.press('Escape')
+    await tid('detail-sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await card.locator('[aria-label="OpenCode"]').click()
+    await page.waitForTimeout(800)
+    await tid('sync-button').click()
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    await tid('apply-preview-opencode').waitFor()
+    check((await tid('apply-preview-opencode').getByText('style.md').count()) > 0, 'rule named under opencode.json')
+    check((await tid('apply-preview-opencode').locator('[data-testid="apply-preview-action-remove"]').count()) > 0, 'rule shown as removed')
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: join(shots, 'details-2-opencode-off.png') })
+    return { failures, errors }
+  } finally {
+    await app.close()
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const shots = process.env.SHOTS_DIR ?? mkdtempSync(join(tmpdir(), 'illithid-onboarding-shots-'))
   mkdirSync(shots, { recursive: true })
   const a = await firstRun(shots)
   const b = await notInitializedRun(shots)
-  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b }, null, 2))
-  if ([a, b].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
+  const c = await previewDetailsRun(shots)
+  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c }, null, 2))
+  if ([a, b, c].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
 }
 
 main().catch((e) => {

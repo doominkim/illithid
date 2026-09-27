@@ -1,7 +1,7 @@
 import { copyFileSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { TOOL_IDS, type ToolId } from './agents'
-import { agentToolDir, agentToolPath, renderAgent } from './agentRender'
+import { agentNameOk, agentToolDir, agentToolPath, renderAgent } from './agentRender'
 import { appConfigDir, toolsInUse } from './config'
 import { dropPending, importedBackupDest, importStamp, moveToImportedBackup, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { deliverFile } from './deliver'
@@ -18,7 +18,8 @@ import { ConcurrentChangeError } from './write'
  * - copy            missing on the tool side -> write the render output (creating the folder if needed)
  * - update          app-written file differs from the render output. drift=true means it was edited on the tool side — back up (outside the agent folder), then overwrite
  * - inSync          app-written file matches the render output (if stateStale, only the record is updated)
- * - skip            same-name file the app never wrote (userOwned), not a regular file (notRegularFile), or source unreadable (sourceUnreadable)
+ * - skip            same-name file the app never wrote (userOwned), not a regular file (notRegularFile), source unreadable (sourceUnreadable),
+ *                   or a name the tool rejects (invalidName — Gemini CLI allows only [a-z0-9_-])
  * - deleteCandidate app file removed from the library (removedFromLibrary) or disabled for that tool (disabled) -> display only (approval flow)
  * - replaceImported file (or link) the app never wrote that is an imported original (state.pendingRetire) still matching its import hash
  *                   -> moved to backups/imported, then the render output is written (changed since import: skip, reason=importedChanged)
@@ -77,7 +78,8 @@ function renderAll(home: string, names: string[]): Map<string, Map<ToolId, strin
   for (const name of names) {
     try {
       const doc = readAgentDoc(home, name)
-      out.set(name, new Map(TOOL_IDS.map((t) => [t, renderAgent(t, doc)])))
+      // Names a tool can't accept (agentNameOk) are left out of that tool's map
+      out.set(name, new Map(TOOL_IDS.filter((t) => agentNameOk(t, name)).map((t) => [t, renderAgent(t, doc)])))
     } catch {
       out.set(name, null)
     }
@@ -128,6 +130,10 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
             reason: 'disabled',
             currentHash: fileHash(path)
           })
+        continue
+      }
+      if (!agentNameOk(tool, name)) {
+        items.push({ ...base, action: 'skip', reason: 'invalidName' })
         continue
       }
       const content = rendered.get(name)?.get(tool)
@@ -375,7 +381,7 @@ export function adoptAgentFiles(home: string, name: string): { adopted: ToolId[]
   const doc = readAgentDoc(home, name)
   const state: AppState = { ...st.state, agents: { ...(st.state.agents ?? {}) } }
   for (const tool of toolsInUse(home)) {
-    if (!isEnabled(mf.manifest, 'agents', name, tool)) continue
+    if (!isEnabled(mf.manifest, 'agents', name, tool) || !agentNameOk(tool, name)) continue
     if (state.agents![tool]?.[name]) continue
     const path = agentToolPath(home, tool, name)
     if (pendingOf(home, state, 'agent', tool, name).some((p) => p.path === path)) continue

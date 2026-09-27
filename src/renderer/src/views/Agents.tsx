@@ -33,6 +33,7 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
+import { useToolsInUse } from '../lib/config'
 import { dotOfPills, pillFromCellState, TOOL_NAME, TOOLS, type PillMap } from '../lib/tools'
 import { useApi } from '../lib/useApi'
 
@@ -373,6 +374,7 @@ function ToolCard({
           allowDeselect={false}
           data-testid={`agent-model-${tool}`}
         />
+        {(MODEL_CATALOG[tool].efforts.length > 0 || value.effort) && (
         <Select
           label={t('agents.effort')}
           data={efforts}
@@ -386,6 +388,7 @@ function ToolCard({
           allowDeselect={false}
           data-testid={`agent-effort-${tool}`}
         />
+        )}
       </Stack>
     </Box>
   )
@@ -402,6 +405,7 @@ function AgentEditor({
   onRenamed: (to: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const shown = useToolsInUse()
   const [doc, setDoc] = useState<AgentDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [desc, setDesc] = useState('')
@@ -490,8 +494,8 @@ function AgentEditor({
         />
       </Box>
 
-      <SimpleGrid cols={{ base: 1, md: 3 }} spacing="md">
-        {TOOLS.map((tool) => (
+      <SimpleGrid cols={{ base: 1, md: Math.max(1, shown.length <= 3 ? shown.length : 2), xl: Math.max(1, shown.length) }} spacing="md">
+        {shown.map((tool) => (
           <ToolCard
             key={tool}
             tool={tool}

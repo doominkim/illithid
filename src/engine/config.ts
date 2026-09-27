@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
-import type { ToolId } from './agents'
+import { DEFAULT_TOOLS_IN_USE, TOOL_IDS, type ToolId } from './toolIds'
 import { atomicWrite } from './write'
 
 /** Artifact source setting (config.json format). root is an absolute path or starts with `~/` */
@@ -42,13 +42,13 @@ export interface AppConfig {
   backupRetention?: BackupRetention
   /**
    * Tools this device uses. Tools not listed get no writes at all (no files, no folders).
-   * All tools if absent (users from before this setting existed are unchanged)
+   * DEFAULT_TOOLS_IN_USE if absent (users from before this setting existed are unchanged; later tools stay off)
    */
   toolsInUse?: ToolId[]
 }
 
-/** Tools that toolsInUse accepts (same order as agents.TOOL_IDS — kept here so config has no runtime dependency on agents) */
-export const CONFIG_TOOL_IDS: readonly ToolId[] = ['claude', 'codex', 'opencode']
+/** Tools that toolsInUse accepts (= TOOL_IDS, in tool order) */
+export const CONFIG_TOOL_IDS: readonly ToolId[] = TOOL_IDS
 
 function isToolList(v: unknown): v is ToolId[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string' && (CONFIG_TOOL_IDS as readonly string[]).includes(x))
@@ -175,7 +175,7 @@ export function readConfig(home: string): ConfigRead {
     return { path, exists: true, config: defaultConfig(), error: 'JSON parse failed' }
   }
   // A malformed toolsInUse never resets the whole config: unknown ids are dropped (a newer app's tool, a typo); if nothing known
-  // is left of a non-empty list, or it isn't a list, the field alone is ignored (= all tools)
+  // is left of a non-empty list, or it isn't a list, the field alone is ignored (= DEFAULT_TOOLS_IN_USE)
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'toolsInUse' in raw && !isToolList((raw as Record<string, unknown>).toolsInUse)) {
     const { toolsInUse: bad, ...rest } = raw as Record<string, unknown>
     const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
@@ -186,17 +186,17 @@ export function readConfig(home: string): ConfigRead {
   return { path, exists: true, config: raw as AppConfig }
 }
 
-/** Tools in use on this device (config.toolsInUse, deduplicated in tool order). All tools if unset */
+/** Tools in use on this device (config.toolsInUse, deduplicated in tool order). DEFAULT_TOOLS_IN_USE if unset */
 export function toolsInUse(home: string): ToolId[] {
   const v = readConfig(home).config.toolsInUse
-  return v === undefined ? [...CONFIG_TOOL_IDS] : CONFIG_TOOL_IDS.filter((t) => v.includes(t))
+  return v === undefined ? [...DEFAULT_TOOLS_IN_USE] : CONFIG_TOOL_IDS.filter((t) => v.includes(t))
 }
 
 export function toolInUse(home: string, tool: ToolId): boolean {
   return toolsInUse(home).includes(tool)
 }
 
-/** Save toolsInUse (undefined removes the key = all tools). Other settings are kept. Returns the saved list */
+/** Save toolsInUse (undefined removes the key = DEFAULT_TOOLS_IN_USE). Other settings are kept. Returns the saved list */
 export function setToolsInUse(home: string, list: ToolId[] | undefined): ToolId[] {
   if (list !== undefined && !isToolList(list)) throw new ConfigError(`toolsInUse must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   const cur = readConfig(home)

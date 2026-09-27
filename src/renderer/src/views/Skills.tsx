@@ -20,11 +20,9 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
-import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { dotOfPills, pillFromCellState, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS, type PillMap } from '../lib/tools'
 import { useApi } from '../lib/useApi'
 
-/** Tools whose on/off can be toggled. OpenCode sees everything through the single library skills path */
-const TOGGLE_TOOLS: ToolId[] = ['claude', 'codex']
 
 interface Row {
   name: string

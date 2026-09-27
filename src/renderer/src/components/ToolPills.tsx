@@ -1,6 +1,7 @@
 import { Group, Loader, UnstyledButton } from '@mantine/core'
 import type { ToolId } from '../../../shared/api'
-import { TOOL_NAME, TOOLS, type PillMap } from '../lib/tools'
+import { useToolsInUse } from '../lib/config'
+import { TOOL_NAME, type PillMap } from '../lib/tools'
 import { ToolIcon } from './ToolIcon'
 
 interface Props {
@@ -13,11 +14,12 @@ interface Props {
   showNa?: boolean
 }
 
-/** Tool pill row: on opaque / off 40% / problem amber ring / pending dot */
+/** Tool pill row: on opaque / off 40% / problem amber ring / pending dot. Tools not in use on this device are not shown */
 export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: Props): React.JSX.Element {
+  const tools = useToolsInUse()
   return (
     <Group gap={6} wrap="nowrap">
-      {TOOLS.map((tool) => {
+      {tools.map((tool) => {
         const p = pills[tool]
         if (!p || (p.na && !showNa)) return null
         const icon =

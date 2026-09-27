@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ToolId } from './agents'
+import { MANIFEST_KINDS, MANIFEST_TOOLS, type ManifestKind, type ToolId } from './toolIds'
 import { libraryRoot } from './config'
 import { assertInsideLibrary } from './libpath'
 import { atomicWrite } from './write'
@@ -10,16 +10,7 @@ export const MANIFEST_FILE = 'illithid.json'
 /** on/off file names from previous app names (most recent first). Read/written only when the new file is missing (rename migration moves them) */
 export const LEGACY_MANIFEST_FILES = ['harnesssync.json', 'agent-console.json'] as const
 
-export type ManifestKind = 'rules' | 'skills' | 'mcp' | 'agents'
-export const MANIFEST_KINDS: readonly ManifestKind[] = ['rules', 'skills', 'mcp', 'agents']
-
-/** Tools that can be toggled per kind. OpenCode skills scan the library directly, so they aren't toggleable */
-export const MANIFEST_TOOLS: Readonly<Record<ManifestKind, readonly ToolId[]>> = {
-  rules: ['claude', 'codex', 'opencode'],
-  skills: ['claude', 'codex'],
-  mcp: ['claude', 'codex', 'opencode'],
-  agents: ['claude', 'codex', 'opencode']
-}
+export { MANIFEST_KINDS, MANIFEST_TOOLS, type ManifestKind }
 
 export type ToolToggles = Partial<Record<ToolId, boolean>>
 

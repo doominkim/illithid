@@ -61,7 +61,7 @@ Library (source of truth) = ~/${DEFAULT_LIBRARY_DIR} (change with config.library
 commands
   init             Create the library skeleton (rules/ skills/ mcps/ memory/ .gitignore). --home fixture only
                    --library <path> sets the location (saved to config), --git also runs git init
-  import-sources   List import sources (legacy, tool:claude, tool:codex, tool:opencode, manager:*) — read-only
+  import-sources   List import sources (legacy, tool:claude, tool:codex, tool:opencode, tool:gemini, manager:*) — read-only
   import [source]  Show import candidates from one source (rules·memory·permissions·MCP·skills). Omit for all tools and managers.
                    --apply adds conflict-free candidates to the library (--home fixture only).
                    source=legacy --apply moves all of ~/.agents at once (importAllFromLegacy)
@@ -77,7 +77,7 @@ commands
   config           Show app config (~/${APP_CONFIG_DIR}/config.json)·library location·on/off summary
   toggle <kind> <name> <tool> on|off
                    Save on/off to the library ${MANIFEST_FILE} (--home fixture only; apply writes to tools)
-                   kind: rules|skills|mcp|agents, tool: claude|codex|opencode
+                   kind: rules|skills|mcp|agents, tool: claude|codex|opencode|gemini
   rename-migrate   Plan moving old app-name paths (${LEGACY_APP_LIBRARY_DIRS.map((d) => '~/' + d).join(', ')},
                    ${LEGACY_APP_CONFIG_DIRS.map((d) => '~/' + d).join(', ')}) → new paths.
                    Run with --apply. On the real HOME it runs only together with --i-understand
@@ -813,7 +813,7 @@ function runToggle(home: string, homeExplicit: boolean, json: boolean, args: str
   const [kind, name, tool, state] = args
   if (args.length !== 4 || (state !== 'on' && state !== 'off'))
     throw new Error(
-      'usage: toggle <rules|skills|mcp|agents> <name> <claude|codex|opencode> on|off --home <dir>'
+      'usage: toggle <rules|skills|mcp|agents> <name> <claude|codex|opencode|gemini> on|off --home <dir>'
     )
   if (!(MANIFEST_KINDS as readonly string[]).includes(kind))
     throw new Error(`kind must be ${MANIFEST_KINDS.join('|')}`)
