@@ -95,6 +95,7 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 - **Memory**: review Claude's auto-memory, promote useful entries to the shared library, trash the rest.
 - **Git backup**: push the library to a private repo and restore any snapshot.
 - **Import**: bring in the rules, skills, subagents and MCP servers you already have.
+- **Market**: search skills.sh skills, MCP registry servers and awesome-copilot rules, and install them into the library.
 
 ## Safe by default
 
@@ -105,7 +106,7 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 ## FAQ
 
 **Does my code or prompts go through Illithid?**
-No. Illithid never talks to any model API. It edits local config files and reads local session logs. The only network access is Git backup, and only if you connect a remote.
+No. Illithid never talks to any model API. It edits local config files and reads local session logs. Network access is limited to Git backup (only if you connect a remote) and the Market, which talks to skills.sh, the official MCP registry and GitHub. You can turn the Market off in Settings.
 
 **Will it overwrite my existing setup?**
 On first run Illithid offers to import what you have. Imported originals are backed up before Illithid takes them over.
