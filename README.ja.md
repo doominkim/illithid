@@ -21,10 +21,7 @@
   </p>
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/rules-dark.png">
-  <img src="docs/screenshots/rules-light.png" alt="Claude Code、Codex、OpenCode に同期されたルール">
-</picture>
+<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="デモ: ルールを編集して 5 つのツールにプレビュー・反映、スキルと MCP サーバーを 1 つのツールだけで無効化、セッションで過去の依頼を確認"></p>
 
 ## インストール
 

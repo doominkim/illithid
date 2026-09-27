@@ -85,12 +85,13 @@ async function reveal(page: Page, target: Locator): Promise<void> {
 }
 
 /** Sidebar Sync → apply preview (pause on the per-tool list) → Apply */
-async function applyViaPreview(page: Page, tools: string[], hold: number): Promise<void> {
+async function applyViaPreview(page: Page, tools: string[], hold: number, focus?: string): Promise<void> {
   await waitState(page, 'pending')
   await clickSlow(page, page.locator('[data-testid="sync-button"]'), 300)
   await page.waitForSelector('[data-testid="apply-preview"]')
   for (const tool of tools) await page.waitForSelector(`[data-testid="apply-preview-${tool}"]`)
-  await moveTo(page, page.locator(`[data-testid="apply-preview-${tools[tools.length - 1]}"]`))
+  const target = focus ? `[data-testid="apply-preview"] [data-testid="${focus}"]` : `[data-testid="apply-preview-${tools[tools.length - 1]}"]`
+  await moveTo(page, page.locator(target).first())
   await page.waitForTimeout(hold)
   const apply = page.locator('[data-testid="apply-preview-apply"]')
   await reveal(page, apply)
@@ -129,11 +130,12 @@ function offTargets(home: string): { skill: boolean; mcp: boolean } {
 }
 
 /** Click one tool icon on a card → Sync → preview for that tool → Apply */
-async function toggleOff(page: Page, card: string, tool: string, hold: number): Promise<void> {
+async function toggleOff(page: Page, card: string, tool: string, hold: number, focus = 'apply-preview-action-remove'): Promise<void> {
+  // Rest on the Remove row under the tool (skill copy / MCP server entry)
   const pill = page.locator(`main [data-card="${card}"] [data-tool="${tool}"]`)
   await clickSlow(page, pill, 300)
   await page.waitForFunction((sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false, `main [data-card="${card}"] [data-tool="${tool}"]`, { timeout: 10_000 })
-  await applyViaPreview(page, [tool], hold)
+  await applyViaPreview(page, [tool], hold, focus)
 }
 
 async function sequence(page: Page, home: string): Promise<Record<string, boolean>> {
@@ -180,7 +182,7 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   await server.waitFor()
   await moveTo(page, server.locator('[data-tool="claude"]'))
   await page.waitForTimeout(400)
-  await toggleOff(page, MCP, MCP_OFF, 900)
+  await toggleOff(page, MCP, MCP_OFF, 1500, `apply-preview-mcp-${MCP_OFF}-${MCP}-remove`)
   await page.waitForTimeout(400)
 
   // 4. Sessions: open one and walk its requests in Contents

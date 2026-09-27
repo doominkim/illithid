@@ -21,10 +21,7 @@
   </p>
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/rules-dark.png">
-  <img src="docs/screenshots/rules-light.png" alt="Claude Code, Codex, OpenCode에 동기화된 룰">
-</picture>
+<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="데모: 룰을 고쳐 5개 툴에 미리보기 후 반영, 스킬과 MCP 서버를 한 툴에서만 끄기, 세션에서 지난 요청 확인"></p>
 
 ## 설치
 

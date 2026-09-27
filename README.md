@@ -21,10 +21,7 @@
   </p>
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/rules-dark.png">
-  <img src="docs/screenshots/rules-light.png" alt="Rules synced to Claude Code, Codex and OpenCode">
-</picture>
+<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="Demo: edit a rule, preview and apply it to five tools, turn a skill and an MCP server off for one tool, review past requests in a session"></p>
 
 ## Install
 

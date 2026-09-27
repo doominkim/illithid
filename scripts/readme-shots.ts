@@ -5,6 +5,7 @@
  * - Writes docs/screenshots/<menu>-<theme>.png
  *
  * Usage: npx electron-vite build && npx tsx scripts/readme-shots.ts
+ *        SHOTS_TOOLS=all … for all five tools (Gemini CLI, GitHub Copilot and the richer session set)
  */
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -230,7 +231,20 @@ async function selectItem(page: Page, menu: Menu): Promise<void> {
     const card = (await cards.filter({ hasText: name }).count()) ? cards.filter({ hasText: name }).first() : cards.first()
     if (await card.count()) await card.click()
   }
-  if (menu === 'agents') await pick('reviewer')
+  if (menu === 'agents') {
+    await pick('reviewer')
+    // Scroll the detail so every per-tool card (the last one is GitHub Copilot) fits in the 800px window
+    const last = page.getByText('GitHub Copilot', { exact: true }).last()
+    if (await last.waitFor({ timeout: 10_000 }).then(() => true, () => false)) {
+      await last.evaluate((el) => {
+        const card = el.closest('.ac-card') ?? el
+        card.scrollIntoView({ block: 'end' })
+      })
+      await page.waitForTimeout(200)
+    }
+  } else if (menu === 'rules') await pick('20-git.md')
+  else if (menu === 'skills') await pick('code-review')
+  else if (menu === 'mcp') await pick('playwright')
   else if (menu === 'artifacts' || menu === 'sessions') {
     const links = main.locator('.mantine-NavLink-root')
     const first = menu === 'artifacts' ? links.filter({ hasText: 'API latency' }).first() : links.first()
@@ -246,7 +260,7 @@ async function main(): Promise<void> {
   if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-demo-userdata-'))
-  buildDemoHome(home)
+  buildDemoHome(home, process.env.SHOTS_TOOLS === 'all' ? { tools: 'all' } : {})
   const r = syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
   const failed = [
     ...(r.results?.targets ?? []).filter((x) => x.status === 'skipped'),

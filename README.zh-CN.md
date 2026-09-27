@@ -21,10 +21,7 @@
   </p>
 </div>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/rules-dark.png">
-  <img src="docs/screenshots/rules-light.png" alt="同步到 Claude Code、Codex、OpenCode 的规则">
-</picture>
+<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="演示: 编辑规则并预览后应用到 5 个工具，只在一个工具中关闭技能和 MCP 服务器，在会话中查看过去的请求"></p>
 
 ## 安装
 
