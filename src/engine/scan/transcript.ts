@@ -558,6 +558,8 @@ export async function readSessionTranscript(
       await readGemini(f, c)
       break
     }
+    case 'copilot':
+      throw new Error('Copilot sessions are not supported yet')
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)

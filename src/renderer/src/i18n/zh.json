@@ -39,7 +39,8 @@
     "cleanupNothing": "没有可清理的备份",
     "cleanupDone": "已将 {{count}} 项 ({{size}}) 移到废纸篓",
     "cleanupFailed": "备份清理失败: {{count}} 项",
-    "tools": "使用中的工具"
+    "tools": "使用中的工具",
+    "copilotDoubleLoad": "与 Claude Code 同时使用时，VS Code 可能会重复加载规则、技能和代理。"
   },
   "common": {
     "loading": "加载中…",
@@ -187,7 +188,8 @@
       "noAppCopy": "应用副本尚未写入 — 保留原文件",
       "originalGone": "原文件已不存在"
     },
-    "notInitialized": "请先运行一次 {{tool}}，然后重新应用"
+    "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
+    "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件"
   },
   "app": {
     "name": "Illithid"

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { copilotHomeOverride } from './agents'
 import { readConfig, toolsInUse } from './config'
 import { activePending } from './pendingRetire'
 import { defaultSecretBackend, memoSecretBackend, type SecretBackend } from './secrets'
@@ -62,6 +63,18 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
 
   const exists = existsSync(path)
   const seed = t.seed ?? ''
+  const override = t.tool === 'copilot' ? copilotHomeOverride(home, ctx.env) : null
+  if (override)
+    return {
+      ...base,
+      before: exists ? readFileSync(path, 'utf8') : '',
+      after: exists ? readFileSync(path, 'utf8') : '',
+      changed: false,
+      notes: [`COPILOT_HOME is set to another folder — Copilot doesn't read ~/.copilot, so nothing is written`],
+      skip: 'copilotHomeOverride',
+      beforeRegionHash: null,
+      afterRegionHash: null
+    }
   if (!exists) {
     // Missing file: only matters if the library has something for it (a build from the seed yields an owned region)
     let has = true

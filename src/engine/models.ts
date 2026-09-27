@@ -74,6 +74,7 @@ export function readModels(home: string): ToolModels[] {
   return tools(home).map((t) => {
     const { path, format, keys } = t.models
     const base = { tool: t.id, displayName: t.displayName, path }
+    if (!keys.length) return { ...base, values: [] }
     const res = readConfigObject(path, format)
     if ('error' in res) {
       return { ...base, values: keys.map((key) => ({ key, value: null })), error: res.error }
@@ -87,7 +88,8 @@ export const MODEL_KEYS: Readonly<Record<ToolId, readonly string[]>> = {
   claude: ['model', 'effortLevel'],
   codex: ['model', 'model_reasoning_effort'],
   opencode: ['model', 'small_model'],
-  gemini: ['model.name']
+  gemini: ['model.name'],
+  copilot: []
 }
 
 export interface SetModelResult {

@@ -3,7 +3,9 @@
  * Sources as of 2026-09-24: Claude = current lineup from the claude-api skill (aliases; Haiku 4.5 has no effort support) ·
  * Codex = ~/.codex/models_cache.json (codex 0.156.0, visibility=list, supported_reasoning_levels) ·
  * OpenCode = openai provider in ~/.cache/opencode/models.json + model/small_model in ~/.config/opencode/opencode.json ·
- * Gemini CLI = aliases and model ids in the gemini-cli 0.60.0 bundle (2026-09-27; no effort setting).
+ * Gemini CLI = aliases and model ids in the gemini-cli 0.60.0 bundle (2026-09-27; no effort setting) ·
+ * GitHub Copilot = agent `model` ids from the Copilot CLI changelog and the VS Code Copilot extension bundle (2026-09-27; efforts
+ * low/medium/high). Only used for agent files — the default model is not managed.
  */
 import type { ToolId } from '../engine/agents'
 
@@ -70,6 +72,17 @@ export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
       { value: 'inherit', label: 'inherit' }
     ],
     efforts: []
+  },
+  copilot: {
+    models: [
+      { value: 'auto', label: 'auto' },
+      { value: 'claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
+      { value: 'claude-opus-4.8', label: 'claude-opus-4.8' },
+      { value: 'gpt-5.5', label: 'gpt-5.5' },
+      { value: 'gpt-5.4', label: 'gpt-5.4' },
+      { value: 'gpt-5.3-codex', label: 'gpt-5.3-codex' }
+    ],
+    efforts: ['low', 'medium', 'high']
   }
 }
 

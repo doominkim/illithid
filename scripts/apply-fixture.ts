@@ -100,7 +100,8 @@ const MODES: Record<TargetId, number> = {
   codexSkillConfig: 0o600, // same file as codexMcp
   opencodeSkillPermissions: 0o644,
   geminiRules: 0o644, // not a default target
-  geminiMcp: 0o600 // not a default target
+  geminiMcp: 0o600, // not a default target
+  copilotMcp: 0o600 // not a default target
 }
 const rel = (id: TargetId): string => TARGETS.find((t) => t.id === id)!.rel
 

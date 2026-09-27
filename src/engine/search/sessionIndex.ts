@@ -336,6 +336,8 @@ export async function indexSessions(
           case 'gemini':
             await readGemini(s.path, c)
             break
+          case 'copilot':
+            throw new Error('Copilot sessions are not supported yet')
           default: {
             const never: never = s.tool
             throw new Error(`unknown tool ${String(never)}`)

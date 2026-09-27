@@ -27,7 +27,7 @@ type PlanItem = { kind: 'rule' | 'skill' | 'agent'; tool: ToolId; name: string; 
 
 function planItems(p: SyncPlan): PlanItem[] {
   return [
-    ...p.rules.map((x) => ({ kind: 'rule' as const, tool: 'claude' as const, name: x.name, action: x.action, path: x.path, reason: x.reason })),
+    ...p.rules.map((x) => ({ kind: 'rule' as const, tool: x.tool ?? ('claude' as const), name: x.name, action: x.action, path: x.path, reason: x.reason })),
     ...p.skills.map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, action: x.action, path: x.path, reason: x.reason })),
     ...p.agents.map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, action: x.action, path: x.path, reason: x.reason }))
   ]

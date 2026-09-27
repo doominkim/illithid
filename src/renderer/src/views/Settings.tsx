@@ -76,9 +76,16 @@ function ToolsInUse(): React.JSX.Element {
         <Group key={tool} justify="space-between" wrap="nowrap" gap="lg" py={6}>
           <Group gap={8} wrap="nowrap">
             <ToolIcon tool={tool} size={18} />
-            <Text size="md" fw={500}>
-              {TOOL_NAME[tool]}
-            </Text>
+            <Box>
+              <Text size="md" fw={500}>
+                {TOOL_NAME[tool]}
+              </Text>
+              {tool === 'copilot' && (
+                <Text size="xs" c="dimmed">
+                  {t('settings.copilotDoubleLoad')}
+                </Text>
+              )}
+            </Box>
           </Group>
           <Switch size="md" checked={!!view?.inUse.includes(tool)} disabled={!view || busy} onChange={(e) => void set(tool, e.currentTarget.checked)} data-testid={`tool-in-use-${tool}`} />
         </Group>

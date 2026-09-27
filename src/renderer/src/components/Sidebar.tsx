@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { type Menu, PRIMARY, useNav } from '../lib/nav'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME } from '../lib/tools'
+import type { ToolId } from '../../../shared/api'
 import { WorkspaceBar } from './WorkspaceBar'
 
 const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
@@ -60,15 +61,18 @@ function NavItem({
 function NotInitializedHint(): React.JSX.Element | null {
   const { t } = useTranslation()
   const { status } = useSync()
-  const tools = [...new Set((status?.notInitialized ?? []).map((x) => x.tool))]
-  if (!tools.length) return null
+  const hints = [...new Set((status?.notInitialized ?? []).map((x) => `${x.tool}:${x.reason ?? 'notInitialized'}`))]
+  if (!hints.length) return null
   return (
     <Stack gap={2} mt={-4} mb={10} px={4} data-testid="sync-not-initialized">
-      {tools.map((tool) => (
-        <Text key={tool} size="xs" c="yellow.8">
-          {t('sync.notInitialized', { tool: TOOL_NAME[tool] })}
-        </Text>
-      ))}
+      {hints.map((h) => {
+        const [tool, key] = h.split(':') as [ToolId, string]
+        return (
+          <Text key={h} size="xs" c="yellow.8">
+            {t(`sync.${key}`, { tool: TOOL_NAME[tool] })}
+          </Text>
+        )
+      })}
     </Stack>
   )
 }

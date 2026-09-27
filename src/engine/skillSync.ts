@@ -11,7 +11,7 @@ import {
   unlinkSync
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { canonicalPaths, tools, type ToolId } from './agents'
+import { canonicalPaths, copilotHomeOverride, tools, type ToolId } from './agents'
 import { appConfigDir, toolInUse, toolsInUse } from './config'
 import {
   activePending,
@@ -103,10 +103,12 @@ export interface SkillSyncOptions {
 }
 
 /** Tool skill directories the app copies into (Claude, Codex) — tools in use only */
-function symlinkDirs(home: string): Map<ToolId, string> {
+function symlinkDirs(home: string, env?: Env): Map<ToolId, string> {
   const m = new Map<ToolId, string>()
   const inUse = toolsInUse(home)
   for (const t of tools(home)) if (t.skills.kind === 'symlinkDir' && inUse.includes(t.id)) m.set(t.id, t.skills.dir)
+  // With env given: no Copilot copies while COPILOT_HOME points elsewhere (copilotHomeOverride)
+  if (env && copilotHomeOverride(home, env)) m.delete('copilot')
   return m
 }
 
@@ -133,7 +135,6 @@ function lstatOrNull(p: string): ReturnType<typeof lstatSync> | null {
 
 /** Copy plan. Read-only */
 export function planSkillSync(home: string, _env: Env = process.env): SkillSyncItem[] {
-  void _env
   const canonDir = canonicalPaths(home).skills
   const canon = canonicalSkills(home)
   const canonSet = new Set(canon)
@@ -143,7 +144,7 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const items: SkillSyncItem[] = []
 
-  for (const [tool, dir] of symlinkDirs(home)) {
+  for (const [tool, dir] of symlinkDirs(home, _env)) {
     const managed = managedAll[tool] ?? {}
     for (const name of canon) {
       const path = join(dir, name)
@@ -300,7 +301,7 @@ export function applySkillSync(
   opts: SkillSyncOptions = {}
 ): SkillSyncResult[] {
   const canonDir = canonicalPaths(home).skills
-  const dirs = symlinkDirs(home)
+  const dirs = symlinkDirs(home, env)
   const st = readState(home)
   const results: SkillSyncResult[] = []
   const out = (

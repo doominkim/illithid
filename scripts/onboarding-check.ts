@@ -88,6 +88,7 @@ async function firstRun(shots: string): Promise<RunResult> {
     check(!(await tid('onboarding-tool-codex').isChecked()), 'Codex unchecked (not detected)')
     check(!(await tid('onboarding-tool-opencode').isChecked()), 'OpenCode unchecked (not detected)')
     check(!(await tid('onboarding-tool-gemini').isChecked()), 'Gemini CLI unchecked (not detected)')
+    check(!(await tid('onboarding-tool-copilot').isChecked()), 'GitHub Copilot unchecked (not detected)')
     await shot(page, 'tools')
 
     await tid('onboarding-tools-next').click()
@@ -113,7 +114,7 @@ async function firstRun(shots: string): Promise<RunResult> {
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await tid('apply-preview-claude').waitFor()
     check(
-      !(await tid('apply-preview-codex').count()) && !(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-gemini').count()),
+      !(await tid('apply-preview-codex').count()) && !(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-gemini').count()) && !(await tid('apply-preview-copilot').count()),
       'preview lists Claude Code only'
     )
     check((await tid('apply-preview-action-replace').count()) > 0, 'preview shows the rule replacement')
@@ -126,6 +127,7 @@ async function firstRun(shots: string): Promise<RunResult> {
     check(!existsSync(join(home, '.codex')), '~/.codex not created')
     check(!existsSync(join(home, '.config/opencode')), '~/.config/opencode not created')
     check(!existsSync(join(home, '.gemini')), '~/.gemini not created')
+    check(!existsSync(join(home, '.copilot')), '~/.copilot not created')
     check(!existsSync(join(home, '.claude/rules/my-rule.md')), 'original moved out of ~/.claude/rules')
     const copy = join(home, '.claude/rules/illithid/my-rule.md')
     check(existsSync(copy) && readFileSync(copy, 'utf8').includes('Keep answers short.'), 'app copy written to ~/.claude/rules/illithid')

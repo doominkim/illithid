@@ -35,7 +35,7 @@ export function useSyncFailures(): (kind: 'rule' | 'skill' | 'agent', name: stri
     const bad = new Set<string>()
     const failed = (x: { status: string; reason?: string }): boolean =>
       x.status === 'failed' || (x.status === 'refused' && x.reason !== 'changedSinceCheck')
-    for (const x of status?.rules ?? []) if (failed(x)) bad.add(`rule:claude:${x.name}`)
+    for (const x of status?.rules ?? []) if (failed(x)) bad.add(`rule:${x.tool ?? 'claude'}:${x.name}`)
     for (const x of status?.skills ?? []) if (failed(x)) bad.add(`skill:${x.tool}:${x.name}`)
     for (const x of status?.agents ?? []) if (failed(x)) bad.add(`agent:${x.tool}:${x.name}`)
     return (kind: 'rule' | 'skill' | 'agent', name: string, tool: ToolId): boolean =>

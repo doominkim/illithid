@@ -324,11 +324,13 @@ export interface SyncStatusView {
   notInitialized: NotInitializedView[]
 }
 
-/** A tool file skipped because the tool has not created it yet (FileChange.skip = toolNotInitialized) */
+/** A tool file skipped because the tool has not created it yet (FileChange.skip = toolNotInitialized) or COPILOT_HOME points elsewhere */
 export interface NotInitializedView {
   tool: ToolId
   /** Display path (~) */
   label: string
+  /** Why the file is left alone instead of the tool's first run: COPILOT_HOME points somewhere other than ~/.copilot */
+  reason?: 'copilotHomeOverride'
 }
 
 export interface DeleteCandidateRequest {

@@ -329,7 +329,11 @@ function realHomeProbe(): Map<string, string> {
     join(REAL_HOME, '.gemini/GEMINI.md'),
     join(REAL_HOME, '.gemini/settings.json'),
     join(REAL_HOME, '.gemini/skills'),
-    join(REAL_HOME, '.gemini/agents')
+    join(REAL_HOME, '.gemini/agents'),
+    join(REAL_HOME, '.copilot/mcp-config.json'),
+    join(REAL_HOME, '.copilot/instructions'),
+    join(REAL_HOME, '.copilot/skills'),
+    join(REAL_HOME, '.copilot/agents')
   ]
   // The app auto-creates the session content index (search.sqlite, -wal, -shm) in this folder — instead of the dir mtime,
   // compare entry names excluding the index files
@@ -4408,13 +4412,13 @@ async function run(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const wantToggles: [string, string][] = [
-        // Gemini is toggleable for every kind, so it is off too (skills: gemini joined claude/codex as a copy target)
-        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false}'],
-        [tg('skills', 'pr-check'), '{"codex":false,"gemini":false}'],
-        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false}'],
-        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false}'],
-        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false}'],
-        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false}']
+        // Gemini and Copilot are toggleable for every kind, so they are off too (skills: both joined claude/codex as copy targets)
+        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
+        [tg('skills', 'pr-check'), '{"codex":false,"gemini":false,"copilot":false}'],
+        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
+        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
+        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false,"copilot":false}'],
+        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false,"copilot":false}']
       ]
       for (const [got, want] of wantToggles) if (got !== want) bad.push(`toggles ${got} ≠ ${want}`)
       // automatic apply off (libWrite path): plan only, nothing written — ~/.claude/rules keeps the original
@@ -4549,7 +4553,7 @@ async function run(): Promise<void> {
       const det = detectTools(H, { PATH: bin })
         .map((d) => `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`)
         .join(',')
-      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false') bad.push(`detectTools ${det}`)
+      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false,copilot:-:-:false') bad.push(`detectTools ${det}`)
       check(
         'af3. HAR-12 toolsInUse=[claude] — Codex/OpenCode get no files or folders, status notApplicable; setModel and Claude memory writes refused for tools not in use; bad toolsInUse ignored alone; detectTools',
         !bad.length,
@@ -5013,10 +5017,10 @@ async function run(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const want: [string, string][] = [
-        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
-        [tg('skills', 'gsk2'), '{"claude":false,"codex":false}'],
-        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false}'],
-        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false}']
+        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
+        [tg('skills', 'gsk2'), '{"claude":false,"codex":false,"copilot":false}'],
+        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false,"copilot":false}'],
+        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false,"copilot":false}']
       ]
       for (const [got, w] of want) if (got !== w) bad.push(`toggles ${got} ≠ ${w}`)
       const skillRes = ir.find((x) => x.kind === 'skill')
@@ -5121,6 +5125,244 @@ async function run(): Promise<void> {
         'ag4. HAR-17 Gemini sessions — $set/$rewindTo replay, thought parts skipped, cwd from .project_root then projects.json, quoted resume command (none for subagents), transcript and search index',
         !bad.length,
         bad.length ? bad.join('; ') : `4 sessions, transcript ${tr.total} messages, index ${ix.indexed} sessions, search hit idx 4, rewound text not indexed`
+      )
+    }
+  }
+
+  // ---- ah. HAR-20 GitHub Copilot — off unless chosen (~/.copilot byte-identical), instructions/illithid copies, mcp-config.json
+  //          mcpServers only (Copilot-only keys kept, secrets resolved, comments refused), skills, .agent.md, config/settings untouched, import
+  {
+    const envC: Env = { PATH: '' }
+    const memC = memorySecretBackend()
+    const cHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+      const H = makeFixture(prefix)
+      unlinkSync(join(H, '.agents'))
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
+      initLibrary(H)
+      return H
+    }
+    const ctree = (H: string, rel: string): string => {
+      const p = join(H, rel)
+      if (!existsSync(p)) return 'absent'
+      return readdirSync(p, { recursive: true })
+        .map(String)
+        .sort()
+        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .join(',')
+    }
+    const C_CONFIG = '{\n  "firstLaunchAt": "2026-09-01T00:00:00.000Z"\n}\n'
+    const C_SETTINGS = '{\n  "theme": "dark"\n}\n'
+    const C_USER_INS = '# Mine\n\n- Personal rule.\n'
+    const C_MCP = JSON.stringify({ mcpServers: { mine: { type: 'stdio', command: 'my-server', tools: ['*'] } }, extra: { keep: true } }, null, 2) + '\n'
+    const copilotFiles = {
+      '.copilot/config.json': C_CONFIG,
+      '.copilot/settings.json': C_SETTINGS,
+      '.copilot/mcp-config.json': C_MCP,
+      '.copilot/instructions/user.instructions.md': C_USER_INS,
+      '.copilot/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n\nOwn.\n',
+      '.copilot/agents/mine.agent.md': '---\nname: mine\ndescription: Mine\n---\n\nMine.\n'
+    }
+    const seedC = (H: string): void => {
+      createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
+      createRule(H, 'extra.md', '# Extra\n')
+      mkdirSync(libraryPaths(H).memoryDir, { recursive: true })
+      writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n\n- [Note](notes/a.md) — a note\n')
+      createSkill(H, 'csk', 'Copilot skill')
+      createAgent(H, 'helper', 'Helps')
+      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { copilot: { model: 'gpt-5.5', effort: 'high' } } })
+      createAgent(H, 'plain', 'No model')
+      upsertMcpServer(H, 'c-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } })
+      upsertMcpServer(H, 'c-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
+      upsertMcpServer(H, 'c-sec', { transport: 'stdio', command: 'sec', env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' } }, { secrets: memC })
+    }
+
+    // ah1. not chosen — toolsInUse unset and an explicit list without Copilot: ~/.copilot byte-identical
+    {
+      const bad: string[] = []
+      for (const [label, inUse] of [['unset', undefined], ['explicit', ['claude', 'codex', 'opencode', 'gemini']]] as [string, ToolId[] | undefined][]) {
+        const H = cHome(`illithid-m7-C1${label}-`, { ...copilotFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
+        seedC(H)
+        const c0 = ctree(H, '.copilot')
+        const p = planSyncAll(H, envC, memC)
+        if (p.targets.some((c) => c.id === 'copilotMcp') || [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'copilot')) bad.push(`${label}: plan has Copilot items`)
+        const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (!r.results) bad.push(`${label}: sync refused`)
+        if (ctree(H, '.copilot') !== c0) bad.push(`${label}: ~/.copilot changed`)
+        if (statusReport(H, envC, memC).cells.some((c) => c.tool === 'copilot' && c.state !== 'notApplicable')) bad.push(`${label}: Copilot status cells`)
+        if (!existsSync(join(H, '.claude/agents/helper.md'))) bad.push(`${label}: other tools not synced`)
+      }
+      check(
+        'ah1. HAR-20 Copilot not chosen — toolsInUse unset and an explicit list without Copilot: no Copilot plan items, ~/.copilot byte-identical after approved Sync, status notApplicable',
+        !bad.length,
+        bad.length ? bad.join('; ') : '2 cases, ~/.copilot tree unchanged (config.json, settings.json, mcp-config.json, instructions, skills, agents)'
+      )
+    }
+
+    // ah2. chosen — owned regions only, user files kept, comments refused, config/settings untouched, re-sync 0, rule off → delete candidate
+    {
+      const bad: string[] = []
+      const M2 = JSON.parse(C_MCP) as Json
+      M2.mcpServers = { ...(M2.mcpServers as Json), 'c-stdio': { type: 'stdio', command: 'old', tools: ['read'], timeout: 5000, oauthClientId: 'fixture' } }
+      const H = cHome(
+        'illithid-m7-C2-',
+        { ...copilotFiles, '.copilot/mcp-config.json': JSON.stringify(M2, null, 2) + '\n', '.copilot/instructions/illithid/stray.instructions.md': '# stray\n' },
+        ['copilot']
+      )
+      seedC(H)
+      const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (!r.results) bad.push('sync refused')
+      const ins = join(H, '.copilot/instructions')
+      const mem = read(join(ins, 'illithid/MEMORY.instructions.md'))
+      // Copilot applies *.instructions.md automatically only with applyTo (or description) — the copy gets applyTo: "**"
+      if (read(join(ins, 'illithid/style.instructions.md')) !== '---\napplyTo: "**"\n---\n\n' + readRule(H, 'style.md')) bad.push('rule copy')
+      if (!mem.startsWith('---\napplyTo: "**"\n---\n\n')) bad.push('memory copy applyTo')
+      if (!mem.includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory index copy (absolute links)')
+      if (read(join(ins, 'user.instructions.md')) !== C_USER_INS || read(join(ins, 'illithid/stray.instructions.md')) !== '# stray\n') bad.push('user instructions touched')
+      if (!readState(H).state.toolRules?.copilot?.['style.md'] || readState(H).state.rules) bad.push('state: Copilot copies must be in toolRules, Claude rules untouched')
+      const after = readJson(join(H, '.copilot/mcp-config.json'))
+      if (Object.keys(after).join() !== 'mcpServers,extra' || JSON.stringify(after.extra) !== JSON.stringify(M2.extra)) bad.push('mcp-config other keys')
+      const ms = after.mcpServers as Json
+      const want: Record<string, unknown> = {
+        mine: (M2.mcpServers as Json).mine,
+        'c-stdio': { type: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, tools: ['read'], oauthClientId: 'fixture', timeout: 5000 },
+        'c-http': { type: 'http', url: 'https://mcp.example.com/mcp', headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' } }
+      }
+      for (const [n, w] of Object.entries(want)) if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
+      if ((ms['c-sec'] as Json | undefined)?.env === undefined || ((ms['c-sec'] as Json).env as Json).API_TOKEN !== 'sk-fixture-literal-1234567890abcdef') bad.push('secret not resolved')
+      if (!r.plan.targets.find((c) => c.id === 'copilotMcp')?.notes.some((n) => n.includes('kept Copilot-only settings of c-stdio: tools, oauthClientId, timeout'))) bad.push('kept-keys note')
+      if (dirContentHash(join(H, '.copilot/skills/csk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'csk'))) bad.push('skill copy')
+      if (read(join(H, '.copilot/skills/own/SKILL.md')) !== copilotFiles['.copilot/skills/own/SKILL.md'] || read(join(H, '.copilot/agents/mine.agent.md')) !== copilotFiles['.copilot/agents/mine.agent.md']) bad.push('user skill/agent touched')
+      const helper = read(join(H, '.copilot/agents/helper.agent.md'))
+      if (helper !== '---\nname: helper\ndescription: Helps\nmodel: gpt-5.5\nreasoning-effort: high\n---\n\nHelp out.\n' || helper !== renderAgent('copilot', readAgentDoc(H, 'helper'))) bad.push('helper render')
+      if (/^(model|reasoning-effort):/m.test(read(join(H, '.copilot/agents/plain.agent.md')))) bad.push('plain agent has model/effort')
+      if (read(join(H, '.copilot/config.json')) !== C_CONFIG || read(join(H, '.copilot/settings.json')) !== C_SETTINGS) bad.push('config.json/settings.json changed')
+      for (const rel of ['.claude', '.codex', '.gemini', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      const p2 = planSyncAll(H, envC, memC)
+      const busy = [...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id), ...[...p2.rules, ...p2.skills, ...p2.agents].filter((x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')).map((x) => `${x.name}:${x.action}`)]
+      if (busy.length) bad.push(`re-plan ${busy.join(',')}`)
+      const cells = statusReport(H, envC, memC).cells.filter((c) => c.tool === 'copilot')
+      if (cells.find((c) => c.resource === 'rules')?.state !== 'synced' || cells.find((c) => c.resource === 'models')?.state !== 'notApplicable') bad.push('status cells')
+      // rule turned off for Copilot only → the approved Sync deletes the Copilot copy (result done on the Copilot row)
+      setToggle(H, 'rules', 'extra.md', 'copilot', false)
+      const dc = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'copilot' && x.action === 'deleteCandidate')
+      if (dc?.name !== 'extra.md') bad.push('no delete candidate')
+      const rx = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const dres = rx.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`).join(',')
+      if (dres !== 'copilot:extra.md:done' || existsSync(join(ins, 'illithid/extra.instructions.md')) || readState(H).state.toolRules?.copilot?.['extra.md'])
+        bad.push(`copilot-only delete ${dres}`)
+      // with Claude also in use, removing the library MEMORY.md deletes both copies, each result on its own row
+      writeConfig(H, { ...readConfig(H).config, toolsInUse: ['claude', 'copilot'] })
+      mkdirSync(join(H, '.claude'), { recursive: true })
+      writeFileSync(join(H, '.claude/settings.json'), '{}\n')
+      writeFileSync(join(H, '.claude.json'), '{}\n')
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md'))) bad.push('Claude MEMORY copy missing')
+      unlinkSync(libraryPaths(H).memoryIndex)
+      const rm = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const mres = rm.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`).sort().join(',')
+      if (mres !== 'claude:MEMORY.md:done,copilot:MEMORY.md:done' || existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md')) || existsSync(join(ins, 'illithid/MEMORY.instructions.md')))
+        bad.push(`MEMORY delete ${mres}`)
+      // a user <name>.md in ~/.copilot/agents is also loaded by Copilot → the app copy is not written (userOwned)
+      createAgent(H, 'twin', 'Twin')
+      writeFileSync(join(H, '.copilot/agents/twin.md'), '---\nname: twin\ndescription: Mine\n---\n\nMine.\n')
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const tw = planSyncAll(H, envC, memC).agents.find((x) => x.tool === 'copilot' && x.name === 'twin')
+      if (existsSync(join(H, '.copilot/agents/twin.agent.md')) || tw?.action !== 'skip' || tw.reason !== 'userOwned') bad.push(`twin agent ${tw?.action}:${tw?.reason}`)
+      // COPILOT_HOME elsewhere → Copilot files are left alone (skip copilotHomeOverride, nothing written)
+      const envO: Env = { ...envC, COPILOT_HOME: join(H, 'elsewhere') }
+      createRule(H, 'later.md', '# Later\n')
+      const po = planSyncAll(H, envO, memC)
+      if (po.targets.find((c) => c.id === 'copilotMcp')?.skip !== 'copilotHomeOverride' || [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'copilot'))
+        bad.push('COPILOT_HOME override plan')
+      syncAll(H, envO, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (existsSync(join(ins, 'illithid/later.instructions.md')) || existsSync(join(H, 'elsewhere'))) bad.push('written despite COPILOT_HOME override')
+      if (planSyncAll(H, { ...envC, COPILOT_HOME: join(H, '.copilot') }, memC).targets.find((c) => c.id === 'copilotMcp')?.skip) bad.push('COPILOT_HOME = ~/.copilot treated as override')
+      // comments refused, byte-identical
+      const commented = '{\n  // mine\n  "mcpServers": {}\n}\n'
+      writeFileSync(join(H, '.copilot/mcp-config.json'), commented)
+      const cm = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'copilotMcp')
+      if (!cm?.error?.includes('comments')) bad.push(`commented plan ${cm?.error}`)
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (read(join(H, '.copilot/mcp-config.json')) !== commented) bad.push('commented mcp-config.json written')
+      check(
+        'ah2. HAR-20 Copilot chosen — instructions/illithid copies (memory index, user files kept, toolRules state), mcp-config.json mcpServers only (Copilot-only keys kept, ${VAR} kept, secret resolved), skills, .agent.md (model, reasoning-effort), config.json/settings.json untouched, re-sync 0, delete candidate, comments refused',
+        !bad.length,
+        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}; rules ${r.plan.rules.map((x) => x.name).join(',')}`
+      )
+    }
+
+    // ah3. import from ~/.copilot — instructions (scoped → toolOnly), copilot-instructions.md copied (warn, all off), MCP, skill, agents, pendingRetire
+    {
+      const bad: string[] = []
+      const CAG = '---\nname: cag\ndescription: Copilot agent\nmodel: gpt-5.5\nreasoning-effort: medium\ntarget: vscode\n---\n\nDo it.\n'
+      const H = cHome(
+        'illithid-m7-C3-',
+        {
+          '.copilot/config.json': C_CONFIG,
+          '.copilot/instructions/team.instructions.md': '# Team\n\n- Tabs.\n',
+          '.copilot/instructions/scoped.instructions.md': '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n',
+          '.copilot/copilot-instructions.md': '# My Copilot notes\n',
+          '.copilot/mcp-config.json': '{\n  // comments are fine for import\n  "mcpServers": {\n    "c1": { "type": "local", "command": "x", "env": { "T": "$TOK" }, "tools": ["*"] },\n    "c2": { "type": "http", "url": "https://c.example.com/mcp", "headers": { "Authorization": "Bearer ${C_TOKEN}" } }\n  }\n}\n',
+          '.copilot/skills/csk2/SKILL.md': '---\nname: csk2\ndescription: From Copilot\n---\n\nC.\n',
+          '.copilot/agents/cag.agent.md': CAG,
+          '.copilot/agents/lim.agent.md': '---\nname: lim\ndescription: Limited\ntools: ["read"]\n---\n\nRead.\n'
+        },
+        ['copilot']
+      )
+      const c0 = ctree(H, '.copilot')
+      if (!listImportSources(H).find((s) => s.id === 'tool:copilot')?.available) bad.push('tool:copilot source')
+      const pl = planImport(H, 'tool:copilot')
+      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
+      if (names(pl.rules) !== 'copilot-instructions.md,scoped.md,team.md' || names(pl.mcp) !== 'c1,c2' || names(pl.skills) !== 'csk2' || names(pl.agents) !== 'cag,lim')
+        bad.push(`candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`)
+      const port = (xs: { name: string; portability: string; reasons: string[] }[], n: string): string => {
+        const c = xs.find((x) => x.name === n)
+        return c ? `${c.portability}:${c.reasons.join('+')}` : '-'
+      }
+      const got = [port(pl.rules, 'team.md'), port(pl.rules, 'scoped.md'), port(pl.rules, 'copilot-instructions.md'), port(pl.agents, 'cag'), port(pl.agents, 'lim')].join(' ')
+      if (got !== 'ok: toolOnly:projectScoped warn:toolNotes warn:toolSpecificKeys toolOnly:restrictedAgent+toolSpecificKeys') bad.push(`portability ${got}`)
+      const c1 = pl.mcp.find((c) => c.name === 'c1')?.variants[0]
+      if (c1?.server.env?.T !== '${TOK}' || !c1.warnings.some((w) => w.includes('tools'))) bad.push(`c1 ${JSON.stringify(c1?.server)}`)
+      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+      const ir = applyImport(H, sels, 'tool:copilot', { secrets: memC })
+      if (ir.some((x) => x.status !== 'imported')) bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
+      if (ctree(H, '.copilot') !== c0) bad.push('import changed ~/.copilot')
+      const mf = readManifest(H).manifest
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      for (const [g, w] of [
+        [tg('rules', 'team.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
+        [tg('rules', 'copilot-instructions.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
+        [tg('skills', 'csk2'), '{"claude":false,"codex":false,"gemini":false}'],
+        [tg('agents', 'cag'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
+        [tg('mcp', 'c1'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}']
+      ])
+        if (g !== w) bad.push(`toggles ${g} ≠ ${w}`)
+      if (readAgentDoc(H, 'cag').tools.copilot?.effort !== 'medium') bad.push('agent effort not under copilot')
+      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
+      if (pend !== 'agent:copilot:cag,rule:copilot:team.md') bad.push(`pendingRetire ${pend}`)
+      const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (!r.results) bad.push('sync refused')
+      const imp = (rel: string): string | null => {
+        const root = importedBackupRoot(H)
+        if (!existsSync(root)) return null
+        const hit = readdirSync(root).map((ts) => join(root, ts, rel)).find((p) => existsSync(p))
+        return hit ? read(hit) : null
+      }
+      if (existsSync(join(H, '.copilot/instructions/team.instructions.md')) || imp('copilot/instructions/team.instructions.md') !== '# Team\n\n- Tabs.\n') bad.push('instructions original not retired')
+      if (read(join(H, '.copilot/instructions/illithid/team.instructions.md')) !== '---\napplyTo: "**"\n---\n\n# Team\n\n- Tabs.\n') bad.push('instructions copy')
+      if (read(join(H, '.copilot/agents/cag.agent.md')) !== renderAgent('copilot', readAgentDoc(H, 'cag')) || imp('copilot/agents/cag.agent.md') !== CAG) bad.push('agent not replaced')
+      if (read(join(H, '.copilot/copilot-instructions.md')) !== '# My Copilot notes\n' || existsSync(join(H, '.copilot/instructions/illithid/copilot-instructions.instructions.md'))) bad.push('copilot-instructions.md moved or copied back')
+      if (read(join(H, '.copilot/instructions/scoped.instructions.md')) !== '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n') bad.push('scoped instructions touched')
+      if (read(join(H, '.copilot/config.json')) !== C_CONFIG) bad.push('config.json changed')
+      if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
+      check(
+        'ah3. HAR-20 import from ~/.copilot — instructions (applyTo-scoped toolOnly), copilot-instructions.md copied (warn, all tools off), MCP ($VAR → ${VAR}, tool filters warned), skill, agents (effort under copilot, tool-limited toolOnly), source-only toggles, originals retired by the approved Sync',
+        !bad.length,
+        bad.length ? bad.join('; ') : `imported ${ir.map((x) => x.name).join(',')}; retired rule:copilot:team.md, agent:copilot:cag`
       )
     }
   }

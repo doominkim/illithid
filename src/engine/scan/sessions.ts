@@ -63,6 +63,9 @@ function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | un
       return `codex resume ${id}`
     case 'opencode':
       return `opencode -s ${id}`
+    case 'copilot':
+      // Copilot sessions are not scanned yet (~/.copilot/session-state format unverified)
+      return undefined
     case 'gemini':
       // Gemini looks sessions up per project (the directory it runs in)
       return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && gemini --resume ${id}` : undefined
@@ -451,7 +454,9 @@ export function scanSessions(home: string, tools?: SessionTool[]): SessionScanRe
     claude: scanClaude,
     codex: scanCodex,
     opencode: scanOpencode,
-    gemini: scanGemini
+    gemini: scanGemini,
+    // ~/.copilot/session-state format is unverified (no local samples) — not scanned yet
+    copilot: () => []
   }
   const sessions: Session[] = []
   const errors: SessionScanResult['errors'] = []

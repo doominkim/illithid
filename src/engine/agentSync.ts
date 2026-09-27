@@ -1,7 +1,7 @@
 import { copyFileSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { TOOL_IDS, type ToolId } from './agents'
-import { agentNameOk, agentToolDir, agentToolPath, renderAgent } from './agentRender'
+import { copilotHomeOverride, TOOL_IDS, type ToolId } from './agents'
+import { agentExts, agentNameOk, agentToolDir, agentToolPath, renderAgent } from './agentRender'
 import { appConfigDir, toolsInUse } from './config'
 import { dropPending, importedBackupDest, importStamp, moveToImportedBackup, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { deliverFile } from './deliver'
@@ -89,7 +89,6 @@ function renderAll(home: string, names: string[]): Map<string, Map<ToolId, strin
 
 /** Plan. Read-only */
 export function planAgentSync(home: string, _env: Env = process.env): AgentSyncItem[] {
-  void _env
   const mf = readManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const agentsDir = libraryPaths(home).agentsDir
@@ -100,7 +99,10 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
   const managedAll = appState.agents ?? {}
   const items: AgentSyncItem[] = []
 
+  // No Copilot files while COPILOT_HOME points elsewhere (copilotHomeOverride)
+  const override = copilotHomeOverride(home, _env)
   for (const tool of toolsInUse(home)) {
+    if (tool === 'copilot' && override) continue
     const managed = managedAll[tool] ?? {}
     for (const name of names) {
       const path = agentToolPath(home, tool, name)
@@ -139,6 +141,17 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
       const content = rendered.get(name)?.get(tool)
       if (content === undefined) {
         items.push({ ...base, action: 'skip', reason: 'sourceUnreadable' })
+        continue
+      }
+      // A user file the tool also loads under this name (Copilot `<name>.md`) — writing ours would load the agent twice.
+      // An imported original awaiting retirement doesn't count (it moves once the app file is in place)
+      const twin = agentExts(tool)
+        .slice(1)
+        .map((e) => join(dirname(path), name + e))
+        .find((p) => lstatOrNull(p) && !pending.some((x) => x.path === p && retireHash(p) === x.hash))
+      if (twin) {
+        if (regular && managed[name]) items.push({ ...base, action: 'deleteCandidate', reason: 'userFileSameName', currentHash: fileHash(path) })
+        else items.push({ ...base, action: 'skip', reason: 'userOwned', path: twin })
         continue
       }
       const sourceHash = sha256(content)

@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { libraryRoot } from './config'
 import type { ToolId } from './toolIds'
 
@@ -9,6 +9,8 @@ export type RulesInjection =
   | { kind: 'symlink'; path: string; target: string }
   | { kind: 'markerBlock'; path: string }
   | { kind: 'instructionsGlob'; path: string; key: 'instructions'; glob: string }
+  /** Each rule copied as its own file into an app-owned folder (ruleSync) */
+  | { kind: 'copyDir'; dir: string }
 
 /** How skills become visible to each tool */
 export type SkillsInjection =
@@ -19,7 +21,7 @@ export type SkillsInjection =
 export interface RosterSource {
   /** Agent definition directory (skipped if missing) */
   dirs: string[]
-  ext: '.md' | '.toml'
+  ext: '.md' | '.toml' | '.agent.md'
   /** Definitions stored inside the config file (OpenCode opencode.json `agent`) */
   inline?: { path: string; key: string }
 }
@@ -27,7 +29,7 @@ export interface RosterSource {
 export interface ModelKeys {
   path: string
   format: 'json' | 'toml'
-  /** Key names. For JSON, `a.b` is the nested key b inside object a */
+  /** Key names. For JSON, `a.b` is the nested key b inside object a. Empty = no default model setting the app manages */
   keys: string[]
 }
 
@@ -58,6 +60,7 @@ export function tools(home: string): ToolInfo[] {
   const codexConfig = join(home, '.codex/config.toml')
   const opencodeConfig = join(home, '.config/opencode/opencode.json')
   const geminiSettings = join(home, '.gemini/settings.json')
+  const copilotMcp = join(home, '.copilot/mcp-config.json')
   return [
     {
       id: 'claude',
@@ -127,8 +130,33 @@ export function tools(home: string): ToolInfo[] {
         dirs: [join(home, '.gemini/agents')],
         ext: '.md'
       }
+    },
+    {
+      id: 'copilot',
+      displayName: 'GitHub Copilot',
+      // ~/.copilot is read by Copilot CLI and VS Code Copilot. config.json there is the CLI's own state — never written
+      configFile: copilotMcp,
+      rules: { kind: 'copyDir', dir: join(home, '.copilot/instructions/illithid') },
+      skills: { kind: 'symlinkDir', dir: join(home, '.copilot/skills') },
+      // The default model key is not documented for ~/.copilot — not managed
+      models: { path: join(home, '.copilot/settings.json'), format: 'json', keys: [] },
+      roster: {
+        dirs: [join(home, '.copilot/agents')],
+        ext: '.agent.md'
+      }
     }
   ]
+}
+
+/**
+ * COPILOT_HOME pointing somewhere other than ~/.copilot (absolute path), else null. The app only writes ~/.copilot, which Copilot
+ * wouldn't read then — so Copilot writes are skipped (skip=copilotHomeOverride) instead
+ */
+export function copilotHomeOverride(home: string, env: Record<string, string | undefined>): string | null {
+  const v = env.COPILOT_HOME?.trim()
+  if (!v) return null
+  const abs = resolve(v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v))
+  return abs === join(home, '.copilot') ? null : abs
 }
 
 export function tool(home: string, id: ToolId): ToolInfo {

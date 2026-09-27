@@ -11,7 +11,7 @@ import {
   unlinkSync
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { canonicalPaths, tilde } from './agents'
+import { canonicalPaths, copilotHomeOverride, tilde } from './agents'
 import { toolInUse } from './config'
 import { dropPending, importStamp, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { libraryPaths } from './sources'
@@ -96,6 +96,9 @@ export type RuleSyncAction =
   'copy' | 'update' | 'inSync' | 'skip' | 'deleteCandidate' | 'replaceLink' | 'migrateLegacyDir' | 'retireImported'
 
 export interface RuleSyncItem {
+  /** Tool whose rule copy this is. Absent = Claude (`~/.claude/rules/illithid/`); copilot = `~/.copilot/instructions/illithid/` */
+  tool?: CopyRuleTool
+  /** Library rule name (MEMORY.md for the memory index) */
   name: string
   action: RuleSyncAction
   /** Tool-side path */
@@ -118,6 +121,7 @@ export interface RuleSyncItem {
 }
 
 export interface RuleSyncResult {
+  tool?: CopyRuleTool
   name: string
   action: RuleSyncAction
   status: 'done' | 'unchanged' | 'skipped' | 'pendingApproval' | 'refused' | 'failed'
@@ -191,8 +195,12 @@ function planLegacyDir(
   return { ok: true, entries, plans }
 }
 
-/** Plan. Read-only */
-export function planRuleSync(home: string, _env: Env = process.env): RuleSyncItem[] {
+/** Plan (Claude copies, then Copilot copies). Read-only */
+export function planRuleSync(home: string, env: Env = process.env): RuleSyncItem[] {
+  return [...planClaudeRules(home, env), ...planCopyRules(home, 'copilot', env)]
+}
+
+function planClaudeRules(home: string, _env: Env = process.env): RuleSyncItem[] {
   void _env
   if (!toolInUse(home, 'claude')) return []
   const rulesDir = canonicalPaths(home).rules
@@ -385,7 +393,7 @@ export function applyRuleSync(
     status: RuleSyncResult['status'],
     extra: Partial<RuleSyncResult> = {}
   ): void => {
-    results.push({ name: it.name, action: it.action, status, path: it.path, ...extra })
+    results.push({ ...(it.tool ? { tool: it.tool } : {}), name: it.name, action: it.action, status, path: it.path, ...extra })
   }
   if (st.error) {
     for (const it of items) out(it, 'refused', { reason: 'stateError' })
@@ -396,10 +404,12 @@ export function applyRuleSync(
     state.rules![name] = { contentHash, at: new Date().toISOString() }
     writeState(home, state)
   }
+  const copyItems = items.filter((it) => it.tool !== undefined)
+  items = items.filter((it) => it.tool === undefined)
   for (const it of items) {
     if (it.action === 'migrateLegacyDir') results.push(migrateLegacyDir(home, it, state.rules!))
   }
-  const fresh = planRuleSync(home, env)
+  const fresh = planClaudeRules(home, env)
 
   for (const it of items) {
     if (it.action === 'migrateLegacyDir' || it.action === 'retireImported') continue
@@ -517,6 +527,7 @@ export function applyRuleSync(
       out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
     }
   }
+  if (copyItems.length) results.push(...applyCopyRules(home, env, 'copilot', copyItems.filter((it) => it.tool === 'copilot')))
   return results
 }
 
@@ -526,4 +537,218 @@ export function restoreLegacyRulesLink(home: string, previousLink: string): bool
   if (lstatOrNull(legacyLink)) return false
   symlinkSync(previousLink, legacyLink)
   return true
+}
+
+// ---------------------------------------------------------------- Rule copies of other tools (Copilot)
+
+/** Tools whose rules are copied file by file. undefined (absent) = Claude, handled above */
+export type CopyRuleTool = 'copilot'
+
+/** App-owned folder the tool reads rules from */
+export function copyRulesDir(home: string, tool: CopyRuleTool): string {
+  switch (tool) {
+    case 'copilot':
+      return join(home, '.copilot/instructions', CLAUDE_RULES_DIR)
+  }
+}
+
+/** Library rule name → file name in the tool folder (Copilot reads `*.instructions.md`; no frontmatter = applies everywhere) */
+export function copyRuleFile(tool: CopyRuleTool, name: string): string {
+  switch (tool) {
+    case 'copilot':
+      return name.replace(/\.md$/, '') + '.instructions.md'
+  }
+}
+
+/**
+ * Copy content for the tool. Copilot applies an *.instructions.md automatically only if its frontmatter has applyTo (or
+ * description) — without either it is attach-only — so `applyTo: "**"` is added unless the rule already sets applyTo
+ */
+export function copyRuleContent(tool: CopyRuleTool, text: string): string {
+  switch (tool) {
+    case 'copilot': {
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(text)
+      if (!fm) return `---\napplyTo: "**"\n---\n\n${text}`
+      if (/^applyTo\s*:/m.test(fm[1])) return text
+      return text.replace(/^---(\r?\n)/, (m, eol: string) => `${m}applyTo: "**"${eol}`)
+    }
+  }
+}
+
+/**
+ * Copy plan for one tool (same actions as Claude's, without the link and old-folder migration). App-owned copies are recorded in
+ * state.toolRules[tool]; other files in the folder are user-owned (skip). Empty when the tool is not in use.
+ */
+function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem[] {
+  if (!toolInUse(home, tool) || (tool === 'copilot' && copilotHomeOverride(home, env))) return []
+  const rulesDir = canonicalPaths(home).rules
+  const dir = copyRulesDir(home, tool)
+  const mf = readManifest(home)
+  if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
+  const appState = readState(home).state
+  const managed = appState.toolRules?.[tool] ?? {}
+  const items: RuleSyncItem[] = []
+  const names = existsSync(rulesDir)
+    ? readdirSync(rulesDir)
+        .filter((f) => f.endsWith('.md') && !f.startsWith('.'))
+        .sort()
+    : []
+  const sources = new Map<string, string>()
+  for (const n of names) if (isEnabled(mf.manifest, 'rules', n, tool)) sources.set(n, join(rulesDir, n))
+  const memIndex = libraryPaths(home).memoryIndex
+  if (!names.includes(CLAUDE_MEMORY_RULE) && lstatOrNull(memIndex)?.isFile()) sources.set(CLAUDE_MEMORY_RULE, memIndex)
+
+  for (const name of [...sources.keys()].sort()) {
+    const path = join(dir, copyRuleFile(tool, name))
+    const source = sources.get(name)!
+    for (const p of pendingOf(home, appState, 'rule', tool, name)) {
+      const currentHash = retireHash(p.path)
+      if (currentHash === null) continue
+      items.push({
+        tool,
+        name,
+        action: currentHash === p.hash ? 'retireImported' : 'skip',
+        path: p.path,
+        source: path,
+        currentHash,
+        ...(currentHash === p.hash ? {} : { reason: retireSkipReason(currentHash) })
+      })
+    }
+    const sourceHash = sha256(copyRuleContent(tool, sourceContent(home, name, source)))
+    const base = { tool, name, path, source, sourceHash }
+    const shape = deliveredShape(path, source)
+    if (shape.kind === 'absent') items.push({ ...base, action: 'copy' })
+    else if (!shapeMatches(shape) || (shape.kind === 'copy' && shape.isDir))
+      items.push({ ...base, action: 'skip', reason: 'notRegularFile' })
+    else {
+      const currentHash = fileHash(path)
+      const rec = managed[name]
+      if (!rec) items.push({ ...base, action: 'skip', currentHash, reason: 'userOwned', sameContent: currentHash === sourceHash })
+      else if (currentHash === sourceHash)
+        items.push({ ...base, action: 'inSync', currentHash, ...(rec.contentHash !== currentHash ? { stateStale: true } : {}) })
+      else items.push({ ...base, action: 'update', currentHash, ...(rec.contentHash !== currentHash ? { drift: true } : {}) })
+    }
+  }
+  for (const name of Object.keys(managed).sort()) {
+    if (sources.has(name)) continue
+    const path = join(dir, copyRuleFile(tool, name))
+    const st = lstatOrNull(path)
+    if (st?.isFile() && !st.isSymbolicLink())
+      items.push({
+        tool,
+        name,
+        action: 'deleteCandidate',
+        path,
+        source: join(rulesDir, name),
+        currentHash: fileHash(path),
+        reason: names.includes(name) ? 'disabled' : 'removedFromLibrary'
+      })
+  }
+  return items
+}
+
+/** Run one tool's copy items (same checks as Claude: each item must match a fresh plan). Imported originals move last */
+function applyCopyRules(home: string, env: Env, tool: CopyRuleTool, items: RuleSyncItem[]): RuleSyncResult[] {
+  const results: RuleSyncResult[] = []
+  const out = (it: RuleSyncItem, status: RuleSyncResult['status'], extra: Partial<RuleSyncResult> = {}): void => {
+    results.push({ tool, name: it.name, action: it.action, status, path: it.path, ...extra })
+  }
+  const st = readState(home)
+  if (st.error) {
+    for (const it of items) out(it, 'refused', { reason: 'stateError' })
+    return results
+  }
+  const dir = copyRulesDir(home, tool)
+  const rulesDir = canonicalPaths(home).rules
+  const state: AppState = { ...st.state, toolRules: { ...(st.state.toolRules ?? {}) } }
+  const record = (name: string, contentHash: string): void => {
+    state.toolRules![tool] = { ...(state.toolRules![tool] ?? {}), [name]: { contentHash, at: new Date().toISOString() } }
+    writeState(home, state)
+  }
+  const fresh = planCopyRules(home, tool, env)
+  for (const it of items) {
+    if (it.action === 'retireImported') continue
+    if (it.action === 'skip') {
+      out(it, 'skipped', { reason: it.reason ?? 'skip' })
+      continue
+    }
+    if (it.action === 'deleteCandidate') {
+      out(it, 'pendingApproval', { reason: 'Deletion goes through a separate approval flow' })
+      continue
+    }
+    if (
+      !['copy', 'update', 'inSync'].includes(it.action) ||
+      !it.name.endsWith('.md') ||
+      it.name.includes('/') ||
+      it.name.startsWith('.') ||
+      resolve(it.path) !== join(dir, copyRuleFile(tool, it.name)) ||
+      (resolve(it.source) !== join(rulesDir, it.name) &&
+        !(it.name === CLAUDE_MEMORY_RULE && resolve(it.source) === libraryPaths(home).memoryIndex))
+    ) {
+      out(it, 'refused', { reason: 'outOfScope' })
+      continue
+    }
+    const f = fresh.find((x) => x.name === it.name && x.action === it.action && x.path === it.path)
+    if (!f || (it.sourceHash !== undefined && f.sourceHash !== it.sourceHash) || (it.currentHash !== undefined && f.currentHash !== it.currentHash)) {
+      out(it, 'refused', { reason: 'changedSinceCheck' })
+      continue
+    }
+    if (f.action === 'inSync') {
+      if (f.stateStale) {
+        record(f.name, f.currentHash!)
+        out(it, 'done', { reason: 'stateRefreshed' })
+      } else out(it, 'unchanged')
+      continue
+    }
+    try {
+      const content = copyRuleContent(tool, sourceContent(home, f.name, f.source))
+      if (sha256(content) !== f.sourceHash) {
+        out(it, 'refused', { reason: 'changedSinceCheck' })
+        continue
+      }
+      const backupPath = f.drift ? backup(f.path) : null
+      mkdirSync(dir, { recursive: true, mode: 0o755 })
+      deliverFile(f.source, f.path, content, { mode: 0o644, expectHash: f.action === 'copy' ? null : f.currentHash! })
+      record(f.name, f.sourceHash!)
+      out(it, 'done', { ...(backupPath ? { backupPath } : {}), ...(f.drift ? { reason: 'restored' } : {}) })
+    } catch (e) {
+      if (e instanceof ConcurrentChangeError) out(it, 'refused', { reason: 'changedSinceCheck' })
+      else out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+    }
+  }
+  const ts = importStamp()
+  for (const it of items) {
+    if (it.action !== 'retireImported') continue
+    const p = pendingOf(home, state, 'rule', tool, it.name).find((x) => resolve(x.path) === resolve(it.path))
+    // Originals live in the tool's instructions folder, outside the app-owned one
+    const root = dirname(dir)
+    if (!resolve(it.path).startsWith(root + '/') || resolve(it.path).startsWith(dir + '/')) {
+      out(it, 'refused', { reason: 'outOfScope' })
+      continue
+    }
+    if (!p || p.hash !== it.currentHash) {
+      out(it, 'refused', { reason: 'changedSinceCheck' })
+      continue
+    }
+    const copy = join(dir, copyRuleFile(tool, it.name))
+    const rec = state.toolRules![tool]?.[it.name]
+    const copySt = lstatOrNull(copy)
+    if (!rec || !copySt?.isFile() || copySt.isSymbolicLink() || fileHash(copy) !== rec.contentHash) {
+      out(it, 'skipped', { reason: 'noAppCopy' })
+      continue
+    }
+    try {
+      const r = retireOriginal(home, p, ts)
+      if (r.status === 'changed' || r.status === 'unreadable') {
+        out(it, 'skipped', { reason: r.status === 'changed' ? 'importedChanged' : 'unreadable' })
+        continue
+      }
+      dropPending(state, [p])
+      writeState(home, state)
+      out(it, r.status === 'moved' ? 'done' : 'unchanged', r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' })
+    } catch (e) {
+      out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+    }
+  }
+  return results
 }

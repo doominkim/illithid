@@ -12,7 +12,7 @@ import { tools, type ToolId } from './agents'
 import { agentToolDir } from './agentRender'
 import { planAgentSync } from './agentSync'
 import { appConfigDir } from './config'
-import { claudeRulesPaths, planRuleSync } from './ruleSync'
+import { claudeRulesPaths, copyRuleFile, copyRulesDir, planRuleSync } from './ruleSync'
 import { dirContentHash } from './skills'
 import { planSkillSync } from './skillSync'
 import { readState, writeState } from './state'
@@ -167,12 +167,16 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
         }
       } else if (req.kind === 'rule') {
         rulePlan ??= planRuleSync(home, env)
-        const it = rulePlan.find((x) => x.action === 'deleteCandidate' && x.name === req.name && x.path === req.path)
+        const it = rulePlan.find(
+          (x) => x.action === 'deleteCandidate' && x.tool === req.tool && x.name === req.name && x.path === req.path
+        )
         if (!it) {
           refuse('notACandidate')
           continue
         }
-        if (!inside(claudeRulesPaths(home).dir, it.path) || basename(it.path) !== it.name) {
+        const dir = it.tool ? copyRulesDir(home, it.tool) : claudeRulesPaths(home).dir
+        const file = it.tool ? copyRuleFile(it.tool, it.name) : it.name
+        if (!inside(dir, it.path) || basename(it.path) !== file) {
           refuse('outOfScope')
           continue
         }
@@ -181,11 +185,12 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
           refuse('changedSinceCheck')
           continue
         }
-        const backup = join(backupRoot, 'rules', it.name)
+        const backup = it.tool ? join(backupRoot, 'rules', it.tool, file) : join(backupRoot, 'rules', it.name)
         moveDir(it.path, backup)
         results.push({ ...base, status: 'deleted', backupPath: backup })
-        if (state.rules?.[it.name]) {
-          delete state.rules[it.name]
+        const records = it.tool ? state.toolRules?.[it.tool] : state.rules
+        if (records?.[it.name]) {
+          delete records[it.name]
           stateDirty = true
         }
       } else {

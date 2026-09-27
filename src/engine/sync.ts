@@ -178,7 +178,7 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
   const reqs: DeleteRequest[] = [
     ...plan.rules
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'rule' as const, name: x.name, path: x.path, currentHash: x.currentHash })),
+      .map((x) => ({ kind: 'rule' as const, ...(x.tool ? { tool: x.tool } : {}), name: x.name, path: x.path, currentHash: x.currentHash })),
     ...plan.skills
       .filter((x) => x.action === 'deleteCandidate')
       .map((x) => ({
@@ -219,7 +219,7 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
         ...(d.backupPath ? { backupPath: d.backupPath } : {})
       } as R
     })
-  results.rules = merge(results.rules, 'rule', () => undefined)
+  results.rules = merge(results.rules, 'rule', (r) => r.tool)
   results.skills = merge(results.skills, 'skill', (r) => r.tool)
   results.agents = merge(results.agents, 'agent', (r) => r.tool)
 }
@@ -236,7 +236,7 @@ export interface ImportedChange {
 /** Imported originals changed since import, from a plan: rule/skill/agent skip(importedChanged) + opencode.json instructions entries */
 export function importedChangedOf(p: SyncPlan): ImportedChange[] {
   return [
-    ...p.rules.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'rule' as const, tool: 'claude' as const, name: x.name, path: x.path })),
+    ...p.rules.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'rule' as const, tool: x.tool ?? ('claude' as const), name: x.name, path: x.path })),
     ...p.skills.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path })),
     ...p.agents.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path })),
     ...p.targets.flatMap((c) => (c.error ? [] : (c.importedChanged ?? []).map((r) => ({ kind: r.kind, tool: r.tool, name: r.name, path: r.path }))))
@@ -319,7 +319,7 @@ export function previewSwitch(
     if (!out.some((x) => x.kind === kind && x.tool === tool && x.name === name)) out.push({ kind, tool, name })
   }
   for (const r of p.rules)
-    if (r.action === 'deleteCandidate') add(r.name === 'MEMORY.md' ? 'memory' : 'rule', 'claude', r.name)
+    if (r.action === 'deleteCandidate') add(r.name === 'MEMORY.md' ? 'memory' : 'rule', r.tool ?? 'claude', r.name)
   for (const r of p.skills) if (r.action === 'deleteCandidate') add('skill', r.tool, r.name)
   for (const r of p.agents) if (r.action === 'deleteCandidate') add('agent', r.tool, r.name)
   for (const c of p.targets) {

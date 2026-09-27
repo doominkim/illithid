@@ -151,7 +151,7 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                       title={x.label}
                       tags={
                         <Badge variant="light" color="yellow" size="xs" fw={500} data-testid="apply-preview-not-initialized">
-                          {t('sync.notInitialized', { tool: TOOL_NAME[tool] })}
+                          {t(`sync.${x.reason ?? 'notInitialized'}`, { tool: TOOL_NAME[tool] })}
                         </Badge>
                       }
                     />

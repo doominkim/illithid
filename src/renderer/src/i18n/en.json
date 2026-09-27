@@ -39,7 +39,8 @@
     "cleanupNothing": "Nothing to clean up",
     "cleanupDone": "Moved {{count}} items ({{size}}) to the Trash",
     "cleanupFailed": "Backup cleanup failed: {{count}} items",
-    "tools": "Tools in use"
+    "tools": "Tools in use",
+    "copilotDoubleLoad": "With Claude Code also in use, VS Code may load rules, skills and agents twice."
   },
   "common": {
     "loading": "Loading…",
@@ -187,7 +188,8 @@
       "noAppCopy": "App copy not written yet — original left in place",
       "originalGone": "Original no longer exists"
     },
-    "notInitialized": "Run {{tool}} once, then apply again"
+    "notInitialized": "Run {{tool}} once, then apply again",
+    "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written"
   },
   "app": {
     "name": "Illithid"

@@ -3,7 +3,7 @@
  *
  * Source kinds
  * - legacyLibrary   `~/.agents` (previous sync.mjs setup: rules/ skills/ sync/mcp.json sync/allowlist.json memory/)
- * - tool            Claude Code · Codex · OpenCode · Gemini CLI config and skill directories
+ * - tool            Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot config and skill directories
  * - managerLibrary  skill libraries of other manager apps (~/.skills-manager/skills, ~/.cc-switch/skills)
  *
  * - planImport is read-only. Candidate data never holds raw secret values — literals are replaced with ${KEY}
@@ -28,7 +28,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import { parse as parseToml } from 'smol-toml'
-import { agentToolDir, agentToolPath } from './agentRender'
+import { agentNameOfFile, agentToolDir, agentToolPath } from './agentRender'
 import { adoptAgentFiles } from './agentSync'
 import { adoptSkillCopies } from './skillSync'
 import { renderAgent } from './agentRender'
@@ -78,7 +78,7 @@ export type ImportSourceKind = 'legacyLibrary' | 'tool' | 'managerLibrary'
 export type ImportKind = 'rule' | 'memory' | 'permissions' | 'skill' | 'mcp' | 'agent'
 
 export interface ImportSource {
-  /** legacy | tool:claude | tool:codex | tool:opencode | tool:gemini | manager:skills-manager | manager:cc-switch */
+  /** legacy | tool:<tool id> | manager:skills-manager | manager:cc-switch */
   id: string
   kind: ImportSourceKind
   label: string
@@ -144,6 +144,12 @@ export function listImportSources(home: string): ImportSource[] {
       path: join(home, '.gemini'),
       available: isDir(join(home, '.gemini')),
       kinds: ['rule', 'mcp', 'skill', 'agent']
+    },
+    copilot: {
+      label: 'GitHub Copilot (~/.copilot)',
+      path: join(home, '.copilot'),
+      available: isDir(join(home, '.copilot')),
+      kinds: ['rule', 'mcp', 'skill', 'agent']
     }
   }
   const out: ImportSource[] = [
@@ -179,7 +185,8 @@ export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = {
   claude: 'claude',
   codex: 'codex',
   opencode: 'opencode',
-  gemini: 'gemini'
+  gemini: 'gemini',
+  copilot: 'copilot'
 }
 
 export interface ToolDetection {
@@ -635,7 +642,7 @@ function mergeInto(target: PortabilityInfo, add: PortabilityInfo): void {
 }
 
 /** Tool config directories (relative to HOME) */
-const TOOL_DIRS = ['.codex', '.claude', '.config/opencode', '.local/share/opencode', '.gemini'] as const
+const TOOL_DIRS = ['.codex', '.claude', '.config/opencode', '.local/share/opencode', '.gemini', '.copilot'] as const
 /** Tool plugin paths */
 const TOOL_PLUGIN_DIRS = [
   '.codex/plugins',
@@ -764,6 +771,10 @@ const INSTRUCTION_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'AGENT.md', 'GEMINI
 
 /** Rule candidate for the text outside the app markers in ~/.gemini/GEMINI.md (copied, never moved) */
 export const GEMINI_MD_RULE = 'gemini-md.md'
+/** Rule candidate for ~/.copilot/copilot-instructions.md (copied, never moved) */
+export const COPILOT_MD_RULE = 'copilot-instructions.md'
+/** Tool notes files imported as rules: copied only, all tools start off */
+const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([GEMINI_MD_RULE, COPILOT_MD_RULE])
 
 /** Rule file verdict. name is the candidate name, path is the source file */
 export function rulePortability(ctx: PortabilityContext, name: string, path: string): PortabilityInfo {
@@ -773,6 +784,7 @@ export function rulePortability(ctx: PortabilityContext, name: string, path: str
   if (name === 'codex-agents.md' && path === join(home, '.codex/AGENTS.md')) r.push('toolInstructions')
   // GEMINI.md outside the markers: global instructions and Gemini memory-tool notes — importable, but review before sharing
   else if (name === GEMINI_MD_RULE && path === join(home, '.gemini/GEMINI.md')) r.push('toolNotes')
+  else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md')) r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
@@ -862,7 +874,8 @@ const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   claude: new Set(['name', 'description', 'model', 'effort']),
   codex: new Set(['name', 'description', 'model', 'model_reasoning_effort', 'developer_instructions']),
   opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
-  gemini: new Set(['name', 'description', 'model', 'kind'])
+  gemini: new Set(['name', 'description', 'model', 'kind']),
+  copilot: new Set(['name', 'description', 'model', 'reasoning-effort'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
 const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set(['description', 'mode', 'model', 'reasoningEffort', 'prompt'])
@@ -968,6 +981,22 @@ function agentRaw(tool: ToolId, name: string, text: string, reasons: Portability
         reasons
       }
     }
+    case 'copilot': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      // Tool and MCP limits can't be carried by the library — importing would widen what the agent may do
+      if (d.tools !== undefined || d['mcp-servers'] !== undefined || d.mcpServers !== undefined) reasons.push('restrictedAgent')
+      const own = strOf(d.name)
+      if (own !== undefined && own !== name) reasons.push('nameMismatch')
+      return {
+        description: strOf(d.description) ?? '',
+        model: strOf(d.model),
+        effort: strOf(d['reasoning-effort']),
+        body: agentBody(m.content),
+        dropped: droppedKeys(d, AGENT_KEPT.copilot),
+        reasons
+      }
+    }
     case 'claude':
     case 'opencode': {
       const m = matter(text, AGENT_MATTER)
@@ -1002,7 +1031,6 @@ function scanAgentDir(
   managed: Record<string, unknown>
 ): void {
   if (!isDir(dir)) return
-  const { ext } = agentToolDir(home, tool)
   let files: string[]
   try {
     files = readdirSync(dir).sort()
@@ -1012,8 +1040,8 @@ function scanAgentDir(
   }
   const libReal = realOrNull(libraryPaths(home).agentsDir)
   for (const f of files) {
-    if (!f.endsWith(ext) || f.startsWith('.')) continue
-    const name = f.slice(0, -ext.length)
+    const name = agentNameOfFile(tool, f)
+    if (name === null) continue
     const path = join(dir, f)
     let st: ReturnType<typeof lstatSync>
     try {
@@ -1127,9 +1155,8 @@ function agentRetirements(home: string, name: string, v: AgentVariant): { pendin
     }
     const tool = src.label as ToolId
     if (!TOOL_IDS.includes(tool)) continue
-    const { ext } = agentToolDir(home, tool)
     const dir = dirname(src.path)
-    if (!agentSourceDirs(home, tool).includes(dir) || basename(src.path) !== name + ext) continue
+    if (!agentSourceDirs(home, tool).includes(dir) || agentNameOfFile(tool, basename(src.path)) !== name) continue
     let st: ReturnType<typeof lstatSync>
     try {
       st = lstatSync(src.path)
@@ -1164,7 +1191,14 @@ function ruleRetirements(home: string, name: string, v: FileVariant): { pending:
     if (src.origin !== 'tool') continue
     let e: PendingRetire | null = null
     if (src.label === 'opencode') e = pendingEntry(home, 'instruction', 'opencode', name, src.path)
-    else if (src.label === 'claude' && src.path === claudeRule) {
+    else if (src.label === 'copilot' && src.path.endsWith('.instructions.md') && within(join(home, '.copilot/instructions'), src.path)) {
+      try {
+        if (!lstatSync(src.path).isFile()) continue
+      } catch {
+        continue
+      }
+      e = pendingEntry(home, 'rule', 'copilot', name, src.path)
+    } else if (src.label === 'claude' && src.path === claudeRule) {
       try {
         if (!lstatSync(src.path).isFile()) continue
       } catch {
@@ -1259,13 +1293,14 @@ function sourceToggles(home: string, kind: ManifestKind, name: string, sources: 
 }
 
 /**
- * The GEMINI.md text stays where it is (copied, not moved) and is Gemini's own notes, so the imported rule starts off for every
- * tool — the user turns on only the tools that should get it (on for Gemini it would also be read twice)
+ * Tool notes (GEMINI.md outside the markers, copilot-instructions.md) stay where they are (copied, not moved) and are the tool's own
+ * text, so the imported rule starts off for every tool — the user turns on only the tools that should get it (on for the source
+ * tool it would also be read twice)
  */
-function geminiMdToggles(home: string, sources: ImportSourceRef[]): boolean {
-  if (!sources.some((s) => s.origin === 'tool' && s.label === 'gemini')) return sourceToggles(home, 'rules', GEMINI_MD_RULE, sources)
+function toolNotesToggles(home: string, name: string, sources: ImportSourceRef[]): boolean {
+  if (!sources.some((s) => s.origin === 'tool')) return sourceToggles(home, 'rules', name, sources)
   try {
-    for (const tool of MANIFEST_TOOLS.rules) setToggle(home, 'rules', GEMINI_MD_RULE, tool, false)
+    for (const tool of MANIFEST_TOOLS.rules) setToggle(home, 'rules', name, tool, false)
     return true
   } catch {
     return false
@@ -1468,6 +1503,29 @@ function convertGemini(name: string, s: Json): Conv {
   } else return null
   if (typeof s.timeout === 'number') server.timeoutMs = s.timeout
   for (const k of ['trust', 'cwd', 'includeTools', 'excludeTools', 'authProviderType', 'oauth'])
+    if (s[k] !== undefined) c.warnings.push(`dropped ${k} (no library equivalent)`)
+  return { server, c }
+}
+
+/**
+ * Copilot mcp-config.json entry. type local/stdio → stdio, http/sse → http (sse warned). Copilot-only keys (tool filters, OAuth,
+ * timeouts) have no library equivalent and are dropped with a warning — sync keeps them on the same-name entry
+ */
+function convertCopilot(name: string, s: Json): Conv {
+  const c = new Converter(name)
+  let server: McpServer
+  const type = s.type ?? (typeof s.command === 'string' ? 'stdio' : 'http')
+  if ((type === 'stdio' || type === 'local') && typeof s.command === 'string') {
+    server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
+    if (isObj(s.env) && Object.keys(s.env).length)
+      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))]))
+  } else if ((type === 'http' || type === 'sse') && typeof s.url === 'string') {
+    if (type === 'sse') c.warnings.push('moved sse transport to http — check that the server supports streamable http')
+    server = { transport: 'http', url: c.url(s.url) }
+    if (isObj(s.headers) && Object.keys(s.headers).length)
+      server.headers = Object.fromEntries(Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, fromGeminiRef(v))]))
+  } else return null
+  for (const k of ['cwd', 'tools', 'deferTools', 'oauthClientId', 'oauthClientSecret', 'auth', 'timeout', 'taskSupport', 'slowConnectionThresholdMs'])
     if (s[k] !== undefined) c.warnings.push(`dropped ${k} (no library equivalent)`)
   return { server, c }
 }
@@ -1959,6 +2017,56 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       })
       break
     }
+    case 'copilot': {
+      // instructions/**/*.instructions.md outside the app folder → rules (<name>.md); an applyTo other than all files is scoped
+      const ir = join(home, '.copilot/instructions')
+      const walk = (d: string): void => {
+        let names: string[]
+        try {
+          names = readdirSync(d).sort()
+        } catch {
+          return
+        }
+        for (const n of names) {
+          const p = join(d, n)
+          if (n.startsWith('.') || p === join(ir, 'illithid')) continue
+          const st = lstatSync(p)
+          if (st.isDirectory()) walk(p)
+          else if (st.isFile() && n.endsWith('.instructions.md')) {
+            const name = n.slice(0, -'.instructions.md'.length) + '.md'
+            let scoped = false
+            try {
+              const at = (matter(readFileSync(p, 'utf8'), AGENT_MATTER).data as Json).applyTo
+              scoped = at !== undefined && !(typeof at === 'string' && ['**', '**/*'].includes(at.trim()))
+            } catch {
+              scoped = true
+            }
+            const info = rulePortability(found.ctx, name, p)
+            addFile(found.rules, name, p, ref(p), scoped ? judge([...info.reasons, 'projectScoped']) : info)
+          }
+        }
+      }
+      walk(ir)
+      const cp = join(home, '.copilot/copilot-instructions.md')
+      if (existsSync(cp) && lstatSync(cp).isFile()) {
+        addFile(found.rules, COPILOT_MD_RULE, cp, ref(cp), rulePortability(found.ctx, COPILOT_MD_RULE, cp))
+        found.notes.push(`${COPILOT_MD_RULE} is ~/.copilot/copilot-instructions.md — copied, the original stays`)
+      }
+      const mp = join(home, '.copilot/mcp-config.json')
+      if (existsSync(mp)) {
+        const o = readGeminiSettings(mp)
+        if (!o) found.notes.push('~/.copilot/mcp-config.json parse failed')
+        else if (isObj(o.mcpServers))
+          for (const [n, s] of Object.entries(o.mcpServers))
+            if (isObj(s)) addMcp(n, convertCopilot(n, s), mp)
+      }
+      scanSkillDir(found, home, join(home, '.copilot/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -2319,8 +2427,8 @@ export function applyImport(
         createRule(home, cand.name, content)
         const togglesOk =
           exists ||
-          (cand.name === GEMINI_MD_RULE
-            ? geminiMdToggles(home, v.sources)
+          (TOOL_NOTES_RULES.has(cand.name) && v.sources.some((x) => x.origin === 'tool' && (x.label === 'gemini' || x.label === 'copilot'))
+            ? toolNotesToggles(home, cand.name, v.sources)
             : sourceToggles(home, 'rules', cand.name, v.sources))
         const moved = ruleRetirements(home, cand.name, v)
         recordRetirements(home, moved.pending)

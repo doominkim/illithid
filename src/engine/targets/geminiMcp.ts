@@ -79,13 +79,7 @@ export function buildGeminiMcp(
       errors[name] = e.message
     }
   }
-  for (const [name, server] of Object.entries(servers)) {
-    const old = prev[name]
-    if (!old || typeof old !== 'object' || Array.isArray(old)) continue
-    const keys = GEMINI_KEPT_SERVER_KEYS.filter((k) => (old as Json)[k] !== undefined)
-    for (const k of keys) server[k] = structuredClone((old as Json)[k])
-    if (keys.length) kept[name] = keys
-  }
+  Object.assign(kept, keepToolOnlyKeys(servers, prev, GEMINI_KEPT_SERVER_KEYS))
   // Servers outside the SSOT (Gemini-only, extensions) are left alone. No empty table is added to a file that has none
   const merged = { ...((settings.mcpServers as Json | undefined) ?? {}), ...servers }
   if (settings.mcpServers !== undefined || Object.keys(merged).length) next.mcpServers = merged
@@ -93,16 +87,29 @@ export function buildGeminiMcp(
 }
 
 /**
- * settings.json is read with comments allowed by Gemini (strip-json-comments). The app only edits plain JSON:
+ * JSON config its tool reads with comments allowed (Gemini settings.json, Copilot mcp-config.json). The app only edits plain JSON:
  * anything else is refused rather than rewritten without the user's comments
  */
-function parseSettings(text: string): Json {
+export function parsePlainJsonConfig(text: string, file: string): Json {
   try {
     return parseJsonObject(text)
   } catch (e) {
     if (!(e instanceof TargetError)) throw e
-    throw new TargetError(`${e.message} — settings.json has comments or is not plain JSON; not written`)
+    throw new TargetError(`${e.message} — ${file} has comments or is not plain JSON; not written`)
   }
+}
+
+/** Keep same-name entries' tool-only keys (listed in keys) in the rendered servers. Returns server name → kept keys */
+export function keepToolOnlyKeys(servers: Record<string, Json>, prev: Json, keys: readonly string[]): Record<string, string[]> {
+  const kept: Record<string, string[]> = {}
+  for (const [name, server] of Object.entries(servers)) {
+    const old = prev[name]
+    if (!old || typeof old !== 'object' || Array.isArray(old)) continue
+    const hit = keys.filter((k) => (old as Json)[k] !== undefined)
+    for (const k of hit) server[k] = structuredClone((old as Json)[k])
+    if (hit.length) kept[name] = hit
+  }
+  return kept
 }
 
 /** Library skills on for Gemini that Gemini's own settings turn off (skills.enabled / skills.disabled) — warned, not changed */
@@ -118,7 +125,7 @@ function disabledSkillNotes(settings: Json, sources: Sources): string[] {
 }
 
 /** Serialize keeping the file's indentation and trailing newline */
-function toSettingsText(before: string, value: Json): string {
+export function toSettingsText(before: string, value: Json): string {
   const indent = /^[{[]\r?\n([ \t]+)\S/.exec(before)?.[1] ?? '  '
   return JSON.stringify(value, null, indent) + '\n'
 }
@@ -136,7 +143,7 @@ export const geminiMcp: TargetDef = {
     jsonSubKeysRegion(text, 'mcpServers', ownedServerNames(sources, 'gemini', ctx, 'geminiMcp')),
   build(before, ctx) {
     const { sources, env } = ctx
-    const settings = parseSettings(before)
+    const settings = parsePlainJsonConfig(before, 'settings.json')
     const serverErrors: Record<string, string> = {}
     const kept: Record<string, string[]> = {}
     const next = buildGeminiMcp(mcpForTool(sources, 'gemini'), settings, env, ctx.secrets, serverErrors, kept)

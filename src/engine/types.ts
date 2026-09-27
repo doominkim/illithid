@@ -83,6 +83,7 @@ export type ExtraTargetId =
   | 'opencodeSkillPermissions'
   | 'geminiRules'
   | 'geminiMcp'
+  | 'copilotMcp'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 
@@ -120,8 +121,9 @@ export interface FileChange {
    * The file does not exist and is left alone (changed=false, no error):
    * - nothingToWrite      the library has nothing for this target — not an error, nothing to show
    * - toolNotInitialized  there is content, but the file is one the tool creates itself on first run (~/.claude.json) — run the tool once
+   * - copilotHomeOverride COPILOT_HOME points elsewhere, so Copilot wouldn't read ~/.copilot — no Copilot file is written
    */
-  skip?: 'nothingToWrite' | 'toolNotInitialized'
+  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]
 }

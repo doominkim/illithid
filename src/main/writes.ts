@@ -314,7 +314,7 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
   const doneDelete = (kind: string, tool: string | undefined, name: string): boolean =>
     !!r.results &&
     [
-      ...r.results.rules.map((x) => ({ k: 'rule', t: undefined as string | undefined, x })),
+      ...r.results.rules.map((x) => ({ k: 'rule', t: x.tool as string | undefined, x })),
       ...r.results.skills.map((x) => ({ k: 'skill', t: x.tool as string | undefined, x })),
       ...r.results.agents.map((x) => ({ k: 'agent', t: x.tool as string | undefined, x }))
     ].some((e) => e.k === kind && e.t === tool && e.x.name === name && e.x.action === 'deleteCandidate' && e.x.status === 'done')
@@ -324,7 +324,7 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
       .map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash, currentLink: x.currentLink })),
     ...r.plan.rules
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'rule' as const, name: x.name, path: x.path, currentHash: x.currentHash })),
+      .map((x) => ({ kind: 'rule' as const, ...(x.tool ? { tool: x.tool } : {}), name: x.name, path: x.path, currentHash: x.currentHash })),
     ...r.plan.agents
       .filter((x) => x.action === 'deleteCandidate')
       .map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash }))
@@ -349,12 +349,14 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
 
 const TARGET_TOOL = new Map(ALL_TARGETS.map((t) => [t.id, t.tool]))
 
-/** Plan targets skipped because the tool has not created its file yet (one entry per file). nothingToWrite is not shown */
+/** Plan targets skipped because the tool has not created its file yet, or COPILOT_HOME points elsewhere (one entry per file). nothingToWrite is not shown */
 export function notInitializedOf(changes: SyncAllResult['plan']['targets']): NotInitializedView[] {
   const out = new Map<string, NotInitializedView>()
   for (const c of changes) {
     const tool = TARGET_TOOL.get(c.id)
-    if (c.skip === 'toolNotInitialized' && tool && !out.has(c.path)) out.set(c.path, { tool, label: c.label })
+    if (!tool || out.has(c.path)) continue
+    if (c.skip === 'toolNotInitialized') out.set(c.path, { tool, label: c.label })
+    else if (c.skip === 'copilotHomeOverride') out.set(c.path, { tool, label: c.label, reason: 'copilotHomeOverride' })
   }
   return [...out.values()]
 }

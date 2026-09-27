@@ -10,15 +10,17 @@ export const TOOL_NAME: Record<ToolId, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
   opencode: 'OpenCode',
-  gemini: 'Gemini CLI'
+  gemini: 'Gemini CLI',
+  copilot: 'GitHub Copilot'
 }
 
-/** Tool identity colors (pill and icon background). Orange, black, blue, violet to avoid clashing with status colors */
+/** Tool identity colors (pill and icon background). Orange, black, blue, violet, slate to avoid clashing with status colors */
 export const TOOL_COLOR: Record<ToolId, string> = {
   claude: '#D97757',
   codex: '#3F3F46',
   opencode: '#3B82F6',
-  gemini: '#8B5CF6'
+  gemini: '#8B5CF6',
+  copilot: '#64748B'
 }
 
 /** Display state of a single tool pill */

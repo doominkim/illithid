@@ -37,6 +37,7 @@ export type ApplySkipReason =
   | 'writeFailed'
   | 'nothingToWrite'
   | 'toolNotInitialized'
+  | 'copilotHomeOverride'
 
 export interface ApplyResult {
   id: TargetId

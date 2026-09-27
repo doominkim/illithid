@@ -6,6 +6,7 @@ import { claudePermissions } from './claudePermissions'
 import { codexAgents } from './codexAgents'
 import { codexMcp } from './codexMcp'
 import { codexRules } from './codexRules'
+import { copilotMcp } from './copilotMcp'
 import { geminiMcp } from './geminiMcp'
 import { geminiRules } from './geminiRules'
 import { opencodeMcp } from './opencodeMcp'
@@ -32,7 +33,8 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   opencodeSkills,
   ...SKILL_OVERRIDE_TARGETS,
   geminiRules,
-  geminiMcp
+  geminiMcp,
+  copilotMcp
 ]
 
 /** All targets. Targets writing the same file come later */
@@ -45,7 +47,8 @@ export const MCP_TARGET_OF: Readonly<Record<ToolId, TargetId>> = {
   claude: 'claudeMcp',
   codex: 'codexMcp',
   opencode: 'opencodeMcp',
-  gemini: 'geminiMcp'
+  gemini: 'geminiMcp',
+  copilot: 'copilotMcp'
 }
 
 /** MCP target id -> tool */
@@ -58,7 +61,8 @@ const MCP_TABLE: Readonly<Record<ToolId, { format: 'json' | 'toml'; key: string 
   claude: { format: 'json', key: 'mcpServers' },
   codex: { format: 'toml', key: 'mcp_servers' },
   opencode: { format: 'json', key: 'mcp' },
-  gemini: { format: 'json', key: 'mcpServers' }
+  gemini: { format: 'json', key: 'mcpServers' },
+  copilot: { format: 'json', key: 'mcpServers' }
 }
 
 /**

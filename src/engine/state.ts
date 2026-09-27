@@ -43,6 +43,11 @@ export interface AppState {
   owned?: Partial<Record<TargetId, string[]>>
   /** App-owned Claude rule copies (file name -> record). Files not listed here are user-owned */
   rules?: Record<string, RuleCopyEntry>
+  /**
+   * App-owned rule copies of tools other than Claude (library rule name -> record; hash = written content), e.g. Copilot
+   * `instructions/illithid/<name>.instructions.md`. Claude's stay in `rules`. Files not listed here are user-owned
+   */
+  toolRules?: Partial<Record<ToolId, Record<string, RuleCopyEntry>>>
   /** App-owned agent files per tool (library name -> record, hash = render output). Files not listed here are user-owned */
   agents?: Partial<Record<ToolId, Record<string, RuleCopyEntry>>>
   /** Imported tool-side originals the next approved sync replaces with the app copy (pendingRetire.ts) */
@@ -115,6 +120,20 @@ export function readState(home: string): StateRead {
     if (e && typeof e.contentHash === 'string' && typeof e.at === 'string')
       rules[name] = { contentHash: e.contentHash, at: e.at }
   }
+  const byTool = (raw: unknown): Partial<Record<ToolId, Record<string, RuleCopyEntry>>> => {
+    const out: Partial<Record<ToolId, Record<string, RuleCopyEntry>>> = {}
+    for (const [tool, byName] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
+      if (!byName || typeof byName !== 'object') continue
+      const m: Record<string, RuleCopyEntry> = {}
+      for (const [name, v] of Object.entries(byName as Record<string, unknown>)) {
+        const e = v as Record<string, unknown> | null
+        if (e && typeof e.contentHash === 'string' && typeof e.at === 'string') m[name] = { contentHash: e.contentHash, at: e.at }
+      }
+      out[tool as ToolId] = m
+    }
+    return out
+  }
+  const toolRules = byTool(o.toolRules)
   const agents: NonNullable<AppState['agents']> = {}
   for (const [tool, byName] of Object.entries((o.agents ?? {}) as Record<string, unknown>)) {
     if (!byName || typeof byName !== 'object') continue
@@ -159,6 +178,7 @@ export function readState(home: string): StateRead {
       ...(Object.keys(skills).length ? { skills } : {}),
       ...(Object.keys(owned).length ? { owned } : {}),
       ...(Object.keys(rules).length ? { rules } : {}),
+      ...(Object.keys(toolRules).length ? { toolRules } : {}),
       ...(Object.keys(agents).length ? { agents } : {}),
       ...(pendingRetire.length ? { pendingRetire } : {})
     }

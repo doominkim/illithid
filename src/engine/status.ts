@@ -5,7 +5,7 @@ import { agentToolDir } from './agentRender'
 import { readModels, type ToolModels } from './models'
 import { planAll } from './plan'
 import type { SecretBackend } from './secrets'
-import { claudeRulesPaths, planRuleSync, type RuleSyncItem } from './ruleSync'
+import { claudeRulesPaths, copyRulesDir, planRuleSync, type CopyRuleTool, type RuleSyncItem } from './ruleSync'
 import { readRoster, type Roster } from './roster'
 import { skillsReport, type SkillsReport, type ToolSkills } from './skills'
 import { planSkillSync, type SkillSyncItem } from './skillSync'
@@ -109,6 +109,7 @@ function changeCell(
   }
   const target = c.id
   if (c.skip === 'nothingToWrite') return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — nothing to write` }
+  if (c.skip === 'copilotHomeOverride') return { ...base, target, state: 'notApplicable', detail: c.notes[0] ?? 'COPILOT_HOME override' }
   if (c.skip === 'toolNotInitialized')
     return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — run the tool once so it creates it` }
   if (c.error) {
@@ -159,11 +160,12 @@ function countActions(items: { action: string; reason?: string }[]): string {
 }
 
 /** Claude rules: based on copy sync (~/.claude/rules/illithid). needsSync if the shared symlink remains */
-function claudeRulesCell(home: string, items: RuleSyncItem[] | Error): StatusCell {
+function claudeRulesCell(home: string, all: RuleSyncItem[] | Error): StatusCell {
   const base = { resource: 'rules' as const, tool: 'claude' as const }
   const where = tilde(home, claudeRulesPaths(home).dir)
-  if (items instanceof Error)
-    return { ...base, state: 'error', detail: `${where}: ${items.message}` }
+  if (all instanceof Error)
+    return { ...base, state: 'error', detail: `${where}: ${all.message}` }
+  const items = all.filter((i) => i.tool === undefined)
   const link = items.find((i) => i.action === 'replaceLink')
   const detail = `${where} (copy sync): ${countActions(items) || 'no items'}${
     link ? ` — symlink ${tilde(home, link.path)} remains (removed after approval)` : ''
@@ -207,6 +209,16 @@ function agentsCell(home: string, tool: ToolId, items: AgentSyncItem[] | Error):
   const states = mine
     .map((i) => syncActionState(i.action, i.reason))
     .filter((s): s is CellState => s !== null)
+  return { ...base, state: worst(states), detail: `${where} (copy sync): ${countActions(mine) || 'no items'}` }
+}
+
+/** Rule copies of other tools (Copilot instructions/illithid) */
+function copyRulesCell(home: string, tool: CopyRuleTool, all: RuleSyncItem[] | Error): StatusCell {
+  const base = { resource: 'rules' as const, tool }
+  const where = tilde(home, copyRulesDir(home, tool))
+  if (all instanceof Error) return { ...base, state: 'error', detail: `${where}: ${all.message}` }
+  const mine = all.filter((i) => i.tool === tool)
+  const states = mine.map((i) => syncActionState(i.action, i.reason)).filter((s): s is CellState => s !== null)
   return { ...base, state: worst(states), detail: `${where} (copy sync): ${countActions(mine) || 'no items'}` }
 }
 
@@ -281,6 +293,7 @@ export function statusReport(
           ? withSkillOverride(cell, byId.get(overrideId), sourcesError)
           : cell
       if (resource === 'rules' && tool === 'claude') cells.push(claudeRulesCell(home, ruleItems))
+      else if (resource === 'rules' && tool === 'copilot') cells.push(copyRulesCell(home, tool, ruleItems))
       else if (targetId) {
         cells.push(overrideOf(changeCell(resource, tool, byId.get(targetId), sourcesError)))
       } else if (resource === 'skills') {
@@ -296,7 +309,9 @@ export function statusReport(
       } else if (resource === 'models') {
         const m = models.find((x) => x.tool === tool)!
         cells.push(
-          m.error
+          !m.values.length
+            ? { resource, tool, state: 'notApplicable', detail: 'default model not managed' }
+            : m.error
             ? { resource, tool, state: 'error', detail: `${tilde(home, m.path)}: ${m.error}` }
             : {
                 resource,

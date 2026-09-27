@@ -39,7 +39,8 @@
     "cleanupNothing": "整理するバックアップなし",
     "cleanupDone": "{{count}} 件 ({{size}}) をゴミ箱に移動しました",
     "cleanupFailed": "バックアップ整理に失敗: {{count}} 件",
-    "tools": "使用中のツール"
+    "tools": "使用中のツール",
+    "copilotDoubleLoad": "Claude Code と併用すると、VS Code でルール・スキル・エージェントが二重に読み込まれることがあります。"
   },
   "common": {
     "loading": "読み込み中…",
@@ -187,7 +188,8 @@
       "noAppCopy": "アプリのコピーが未作成 — 元ファイルを維持",
       "originalGone": "元ファイルがありません"
     },
-    "notInitialized": "{{tool}} を一度起動してから再度反映してください"
+    "notInitialized": "{{tool}} を一度起動してから再度反映してください",
+    "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません"
   },
   "app": {
     "name": "Illithid"
