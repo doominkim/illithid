@@ -17,6 +17,7 @@ import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
+import { UsagePanel } from '../components/UsagePanel'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
@@ -189,6 +190,7 @@ function Mcp(): React.JSX.Element {
               busy={pending.of(current.name)}
               testId="mcp-detail-tools"
             />
+            <UsagePanel kind="mcp" name={current.name} />
             <Tabs defaultValue="fields" variant="pills" keepMounted={false}>
               <Tabs.List>
                 <Tabs.Tab value="fields">{t('detail.fields')}</Tabs.Tab>

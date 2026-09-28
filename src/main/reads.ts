@@ -47,7 +47,8 @@ import {
   type SkillSyncItem,
   type TargetId,
   type ToolId,
-  marketLiveOrigins
+  marketLiveOrigins,
+  usageOf
 } from '../engine'
 import type {
   AgentsData,
@@ -344,6 +345,7 @@ export type Op =
   | 'searchIndex'
   | 'searchSessions'
   | 'searchStatus'
+  | 'usage'
   | 'searchDocs'
   | 'searchAll'
   | 'backupCleanupPlan'
@@ -380,6 +382,11 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     }
     case 'searchStatus':
       return indexStatus(home)
+    case 'usage': {
+      const [kind, name] = args
+      if ((kind !== 'skill' && kind !== 'mcp') || typeof name !== 'string' || !name) return null
+      return usageOf(home, kind, name)
+    }
     case 'searchDocs': {
       const [q, filters] = args as [unknown, DocSearchFilters | undefined]
       const f = filters ?? {}

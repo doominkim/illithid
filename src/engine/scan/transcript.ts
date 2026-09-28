@@ -190,8 +190,22 @@ export function toolLine(name: string, input: unknown): string {
 
 // ---------------------------------------------------------------- Shared collector
 
+/** A tool call seen while reading a transcript (for usage stats). Input is passed through, never stored by the index */
+export interface ToolCall {
+  name: string
+  input: unknown
+  /** Codex: `mcp__<server>` for MCP tools */
+  namespace?: string
+  model?: string
+  at?: string
+  /** Codex: turn counter (a new turn_context starts a new turn) */
+  turn?: number
+}
+
 /** Message collector. With a sink, messages are passed through instead of accumulated (streaming for indexing) */
 export class Collector {
+  /** Optional tool-call hook (usage stats) */
+  onCall?: (call: ToolCall) => void
   messages: TranscriptMessage[] = []
   prompts: TranscriptPrompt[] = []
   /** Messages received so far = next index */
@@ -237,7 +251,7 @@ export class Collector {
   }
 }
 
-async function eachJsonLine(path: string, fn: (line: Json) => void): Promise<void> {
+export async function eachJsonLine(path: string, fn: (line: Json) => void): Promise<void> {
   const rl = createInterface({
     input: createReadStream(path, { encoding: 'utf8' }),
     crlfDelay: Infinity
@@ -267,24 +281,35 @@ function claudeFile(home: string, id: string): string | undefined {
   })[0]
 }
 
+/** `/name` typed by the user: `<command-name>/name</command-name>` in the user message (only the name is used) */
+const COMMAND_RE = /<command-name>\/?([A-Za-z0-9][A-Za-z0-9:._-]{0,127})<\/command-name>/
+
 export async function readClaude(path: string, c: Collector): Promise<void> {
+  let model: string | undefined
   await eachJsonLine(path, (l) => {
     const m = l.message as Json | undefined
     const at = isoOrUndefined(l.timestamp)
     if (l.type === 'user' && m?.role === 'user') {
       if (l.isMeta || l.isSidechain) return
+      if (c.onCall) {
+        const raw = typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')
+        const cmd = COMMAND_RE.exec(raw)
+        if (cmd) c.onCall({ name: 'SlashCommand', input: { command: cmd[1] }, model, at })
+      }
       const text = userTextOf(m.content)
       if (text) c.push('user', text, at)
       return
     }
     if (l.type === 'assistant' && m?.role === 'assistant' && Array.isArray(m.content)) {
       if (l.isSidechain) return
+      if (typeof m.model === 'string') model = m.model
       const texts: string[] = []
       for (const b of m.content as Json[]) {
         if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) texts.push(b.text)
         else if (b.type === 'tool_use') {
           if (texts.length) c.push('assistant', texts.splice(0).join('\n\n'), at)
           c.push('assistant', toolLine(String(b.name ?? 'tool'), b.input), at, 'tool')
+          c.onCall?.({ name: String(b.name ?? ''), input: b.input, model: typeof m.model === 'string' ? m.model : undefined, at })
         }
       }
       if (texts.length) c.push('assistant', texts.join('\n\n'), at)
@@ -315,7 +340,15 @@ function codexArgs(v: unknown): unknown {
 }
 
 export async function readCodex(path: string, c: Collector): Promise<void> {
+  let model: string | undefined
+  let turn = 0
   await eachJsonLine(path, (l) => {
+    if (l.type === 'turn_context') {
+      const tc = l.payload as Json | undefined
+      if (typeof tc?.model === 'string') model = tc.model
+      turn++
+      return
+    }
     if (l.type !== 'response_item') return
     const p = l.payload as Json | undefined
     if (!p) return
@@ -339,6 +372,7 @@ export async function readCodex(path: string, c: Collector): Promise<void> {
       const name = String(p.name ?? (p.type === 'local_shell_call' ? 'shell' : 'tool'))
       const input = codexArgs(p.arguments ?? p.input ?? p.action)
       c.push('assistant', toolLine(name, input), at, 'tool')
+      c.onCall?.({ name, input, namespace: typeof p.namespace === 'string' ? p.namespace : undefined, model, at, turn })
     }
   })
 }
@@ -418,6 +452,7 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
           at,
           'tool'
         )
+        c.onCall?.({ name: String(part.tool ?? ''), input: state?.input, model: typeof data.modelID === 'string' ? data.modelID : undefined, at })
       }
     }
     if (texts.length) c.push(role, texts.join('\n\n'), at)
@@ -521,7 +556,10 @@ export async function readGemini(path: string, c: Collector): Promise<void> {
       if (text.trim()) c.push('assistant', text, at)
       if (Array.isArray(m.toolCalls))
         for (const t of m.toolCalls as Json[])
-          if (t && typeof t === 'object') c.push('assistant', toolLine(String(t.name ?? t.displayName ?? 'tool'), t.args), at, 'tool')
+          if (t && typeof t === 'object') {
+            c.push('assistant', toolLine(String(t.name ?? t.displayName ?? 'tool'), t.args), at, 'tool')
+            c.onCall?.({ name: String(t.name ?? ''), input: t.args, model: typeof m.model === 'string' ? m.model : undefined, at })
+          }
     }
   }
 }

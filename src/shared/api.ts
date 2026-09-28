@@ -39,6 +39,7 @@ import type {
 } from '../engine'
 
 import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
+import type { UsageKind, UsageStats } from '../engine'
 import type {
   AuditPartner,
   MarketInstallChoice,
@@ -521,6 +522,9 @@ export interface MarketInstallOptions {
   ref?: string
 }
 
+/** Skill / MCP usage from local session logs */
+export type { UsageKind, UsageStats } from '../engine'
+
 export interface MarketBulkResult {
   installed: { id: string; name: string }[]
   /** reason: installed · exists · needsInput · unsupported · rateLimited · MarketError code */
@@ -555,6 +559,8 @@ export interface Api {
   marketSearch(kind: MarketKind, q: string, cursor?: string): Promise<WriteResult<MarketSearchView>>
   marketDetail(kind: MarketKind, id: string): Promise<WriteResult<MarketDetailView>>
   marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
+  /** Skill or MCP call counts from local session logs, by model, tool and day. null = not indexed yet (an index run starts) */
+  usage(kind: UsageKind, name: string): Promise<UsageStats | null>
   /** Install several items with default names/options; one sync at the end */
   marketInstallMany(kind: MarketKind, ids: string[]): Promise<WriteResult<MarketBulkResult> | Refused>
   marketUpdates(): Promise<WriteResult<{ updates: MarketUpdate[]; failed: string[] }>>
@@ -734,6 +740,7 @@ export const CHANNELS = [
   'marketSearch',
   'marketDetail',
   'marketInstall',
+  'usage',
   'marketInstallMany',
   'marketUpdates',
   'marketUpdate',

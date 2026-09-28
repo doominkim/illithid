@@ -21,6 +21,7 @@ import {
   type OpencodeDb,
   type TranscriptMessage
 } from '../scan/transcript'
+import { claudeSubagentFiles, claudeSubagentStat, ensureUsage, readClaudeSubagentCalls, UsageCounter } from './usage'
 
 const SCHEMA_VERSION = '2'
 const SNIPPET_SIDE = 60
@@ -131,6 +132,7 @@ export function openDb(path: string): DatabaseSync {
   if (ver !== SCHEMA_VERSION) {
     db.exec(`
       drop table if exists messages;
+      drop table if exists usage;
       drop table if exists msg;
       drop table if exists sessions;
       drop table if exists meta;
@@ -160,6 +162,20 @@ export function openDb(path: string): DatabaseSync {
       create virtual table messages using fts5(text, tokenize = 'trigram');
     `)
     db.prepare(`insert into meta(key, value) values ('schema', ?)`).run(SCHEMA_VERSION)
+  }
+  return db
+}
+
+/**
+ * Open the index for a read without creating or migrating anything: undefined when the file is missing or was written by
+ * another schema version (reads must never wipe the index — only an index run migrates)
+ */
+export function openDbForRead(path: string): DatabaseSync | undefined {
+  if (!existsSync(path)) return undefined
+  const db = new (sqlite().DatabaseSync)(path, { timeout: 5000 })
+  if (!tableExists(db, 'meta') || metaGet(db, 'schema') !== SCHEMA_VERSION) {
+    db.close()
+    return undefined
   }
   return db
 }
@@ -202,6 +218,11 @@ function signature(s: Session): { mtime: number; size: number } | undefined {
   }
   try {
     const st = statSync(s.path)
+    // Claude subagent transcripts live next to the session and feed usage stats: their changes count too
+    if (s.tool === 'claude') {
+      const sub = claudeSubagentStat(s.path)
+      return { mtime: Math.max(Math.floor(st.mtimeMs), sub.mtime), size: st.size + sub.size }
+    }
     return { mtime: Math.floor(st.mtimeMs), size: st.size }
   } catch {
     return undefined
@@ -223,9 +244,19 @@ export async function indexSessions(
   let opencode: OpencodeDb | undefined
   try {
     // Reindex everything if includeTools changed
+    // A new (or migrated) usage table needs every session read once more — in one transaction so an interrupted
+    // upgrade can't leave an empty table marked current
+    db.exec('begin')
+    try {
+      if (ensureUsage(db)) db.exec('update sessions set mtime = -1')
+      db.exec('commit')
+    } catch (e) {
+      db.exec('rollback')
+      throw e
+    }
     const prevTools = metaGet(db, 'includeTools')
     if (prevTools !== undefined && prevTools !== String(includeTools)) {
-      db.exec('delete from messages; delete from msg; delete from sessions;')
+      db.exec('delete from messages; delete from msg; delete from sessions; delete from usage;')
     }
     if (prevTools !== String(includeTools)) metaSet(db, 'includeTools', String(includeTools))
 
@@ -246,6 +277,8 @@ export async function indexSessions(
     const delMessages = db.prepare('delete from messages where rowid in (select mid from msg where sid = ?)')
     const delMsg = db.prepare('delete from msg where sid = ?')
     const delSession = db.prepare('delete from sessions where sid = ?')
+    const delUsage = db.prepare('delete from usage where sid = ?')
+    const insUsage = db.prepare('insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)')
 
     // Sessions that disappeared
     const complete = new Set<string>(opts.completeTools ?? TOOL_IDS)
@@ -256,6 +289,7 @@ export async function indexSessions(
         for (const r of gone) {
           delMessages.run(r.sid)
           delMsg.run(r.sid)
+          delUsage.run(r.sid)
           delSession.run(r.sid)
         }
         db.exec('commit')
@@ -322,9 +356,17 @@ export async function indexSessions(
           n++
         }
         const c = new Collector(sink)
+        const usage = new UsageCounter(s.tool, s.updatedAt)
+        c.onCall = (call) => usage.add(call)
         switch (s.tool) {
           case 'claude':
             await readClaude(s.path, c)
+            for (const f of claudeSubagentFiles(s.path))
+              try {
+                await readClaudeSubagentCalls(f, (call) => usage.add(call))
+              } catch {
+                // an unreadable or vanished subagent file must not fail the whole session
+              }
             break
           case 'codex':
             await readCodex(s.path, c)
@@ -343,6 +385,8 @@ export async function indexSessions(
             throw new Error(`unknown tool ${String(never)}`)
           }
         }
+        delUsage.run(sid)
+        for (const u of usage.rows.values()) insUsage.run(sid, s.tool, u.kind, u.name, u.model, u.day, u.n)
         finish.run(s.path, sig.mtime, sig.size, s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null, n, sid)
         db.exec('commit')
         indexed++

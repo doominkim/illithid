@@ -490,5 +490,17 @@
       "tooLarge": "大きすぎます",
       "changed": "変更あり"
     }
+  },
+  "usage": {
+    "title": "使用量",
+    "summary": "直近 {{days}} 日 {{recent}} · 合計 {{total}}",
+    "daily": "直近 {{days}} 日",
+    "byModel": "モデル別",
+    "byTool": "ツール別",
+    "calls": "呼び出し",
+    "others": "その他",
+    "none": "ローカルのセッション記録に呼び出しなし",
+    "indexing": "セッション記録を読み込み中…",
+    "since": "{{day}} から"
   }
 }

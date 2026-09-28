@@ -490,5 +490,17 @@
       "tooLarge": "过大",
       "changed": "已变更"
     }
+  },
+  "usage": {
+    "title": "使用量",
+    "summary": "最近 {{days}} 天 {{recent}} · 共 {{total}}",
+    "daily": "最近 {{days}} 天",
+    "byModel": "按模型",
+    "byTool": "按工具",
+    "calls": "调用",
+    "others": "其他",
+    "none": "本地会话记录中没有调用",
+    "indexing": "正在读取会话记录…",
+    "since": "自 {{day}} 起"
   }
 }

@@ -29,6 +29,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { join } from 'node:path'
+import { UsageCounter } from '../src/engine/search/usage'
 import matter from 'gray-matter'
 import { unzipSync, zipSync } from 'fflate'
 import { parse as parseToml } from 'smol-toml'
@@ -138,6 +139,7 @@ import {
 import { configView, deleteCandidates, mcpRead, mcpSave, toolsInUseView } from '../src/main/writes'
 import {
   indexSessions,
+  usageOf,
   indexStatus,
   indexAllDocs,
   searchDocs,
@@ -4839,6 +4841,156 @@ async function run(): Promise<void> {
       bad.length
         ? bad.join('; ')
         : `sessions 3, messages ${r1.inserted}, ${hitN} verified hits with idx and highlight match, 7 tool strings 0 hits, re-run changes 0 and file hash identical, edit 1, OpenCode 1, delete 1 applied`
+    )
+  }
+
+  // ---- ac2. usage stats — Skill/MCP calls by tool, model and day from all four readers, Claude subagents, Codex once per turn, OpenCode prefix, incremental, delete, no arguments stored
+  {
+    const bad: string[] = []
+    const U = makeFixture('illithid-m7-U-')
+    const jl = (xs: unknown[]): string => xs.map((x) => JSON.stringify(x)).join('\n') + '\n'
+    const cid = '33333333-aaaa-4bbb-8ccc-000000000003'
+    const cdir = join(U, '.claude/projects/-tmp-u')
+    mkdirSync(join(cdir, cid, 'subagents'), { recursive: true })
+    const ca = (model: string, ts: string, blocks: Json[]): Json => ({ type: 'assistant', sessionId: cid, timestamp: ts, message: { role: 'assistant', model, content: blocks } })
+    const claudeMain = join(cdir, `${cid}.jsonl`)
+    writeFileSync(
+      claudeMain,
+      jl([
+        { type: 'user', sessionId: cid, cwd: '/tmp/u', timestamp: '2026-09-20T01:00:00Z', message: { role: 'user', content: 'hi' } },
+        { type: 'user', sessionId: cid, timestamp: '2026-09-20T01:30:00Z', message: { role: 'user', content: '<command-message>docx</command-message>\n<command-name>/docx</command-name>' } },
+        ca('claude-opus-5', '2026-09-20T01:00:01Z', [
+          { type: 'tool_use', name: 'Skill', input: { skill: 'pdf', args: 'USAGEARGSECRET' } },
+          { type: 'tool_use', name: 'mcp__kaneo__get_task', input: { taskId: 'USAGEARGSECRET' } }
+        ]),
+        ca('claude-sonnet-5', '2026-09-21T01:00:00Z', [{ type: 'tool_use', name: 'mcp__kaneo__list', input: {} }])
+      ])
+    )
+    writeFileSync(
+      join(cdir, cid, 'subagents', 'agent-a.jsonl'),
+      jl([{ type: 'assistant', isSidechain: true, timestamp: '2026-09-20T02:00:00Z', message: { role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'tool_use', name: 'mcp__kaneo__x', input: {} }] } }])
+    )
+    const xid = '44444444-aaaa-4bbb-8ccc-000000000004'
+    const xdir = join(U, '.codex/sessions/2026/09/22')
+    mkdirSync(xdir, { recursive: true })
+    const ri = (payload: Json, ts: string): Json => ({ type: 'response_item', timestamp: ts, payload })
+    writeFileSync(
+      join(xdir, `rollout-2026-09-22T00-00-00-${xid}.jsonl`),
+      jl([
+        { type: 'session_meta', timestamp: '2026-09-22T00:00:00Z', payload: { id: xid, cwd: '/tmp/x', timestamp: '2026-09-22T00:00:00Z' } },
+        { type: 'turn_context', timestamp: '2026-09-22T00:00:01Z', payload: { model: 'gpt-5.5' } },
+        ri({ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'q' }] }, '2026-09-22T00:00:01Z'),
+        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'cat ~/.agents/skills/pdf/SKILL.md' }) }, '2026-09-22T00:00:02Z'),
+        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'sed -n 1,50p ~/.agents/skills/pdf/SKILL.md' }) }, '2026-09-22T00:00:03Z'),
+        ri({ type: 'function_call', name: 'save_issue', namespace: 'mcp__linear', arguments: '{}' }, '2026-09-22T00:00:04Z'),
+        ri({ type: 'function_call', name: 'search', namespace: 'mcp__brave_search', arguments: '{}' }, '2026-09-22T00:00:05Z'),
+        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: "sed -i 's/a/b/' ~/.agents/skills/pdf/SKILL.md" }) }, '2026-09-22T00:00:06Z'),
+        ri({ type: 'custom_tool_call', name: 'apply_patch', input: '*** Update File: skills/xlsx/SKILL.md' }, '2026-09-22T00:00:07Z'),
+        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'type C:\\Users\\a\\.agents\\skills\\docx\\SKILL.md' }) }, '2026-09-22T00:00:08Z'),
+        { type: 'turn_context', timestamp: '2026-09-22T00:01:00Z', payload: { model: 'gpt-6' } },
+        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'cat skills/pdf/SKILL.md' }) }, '2026-09-22T00:01:01Z')
+      ])
+    )
+    const ocDir = join(U, '.local/share/opencode')
+    mkdirSync(ocDir, { recursive: true })
+    const { DatabaseSync: Db } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+    const oc = new Db(join(ocDir, 'opencode.db'))
+    oc.exec(`create table session(id text primary key, title text, directory text, parent_id text, time_created integer, time_updated integer);
+      create table message(id text primary key, session_id text, time_created integer, data text);
+      create table part(id text primary key, message_id text, time_created integer, data text);`)
+    const T0 = Date.parse('2026-09-23T00:00:00Z')
+    oc.prepare('insert into session values (?, ?, ?, null, ?, ?)').run('ses_u1', 'u', '/tmp/o', T0, T0 + 3)
+    oc.prepare('insert into message values (?, ?, ?, ?)').run('m1', 'ses_u1', T0 + 1, JSON.stringify({ role: 'user', time: { created: T0 + 1 } }))
+    oc.prepare('insert into message values (?, ?, ?, ?)').run('m2', 'ses_u1', T0 + 2, JSON.stringify({ role: 'assistant', modelID: 'kimi-k2', time: { created: T0 + 2 } }))
+    ;[
+      { type: 'tool', tool: 'skill', state: { input: { name: 'pdf' } } },
+      { type: 'tool', tool: 'brave-search_brave_web_search', state: { input: { q: 'USAGEARGSECRET' } } },
+      { type: 'tool', tool: 'bash', state: { input: { command: 'ls' } } }
+    ].forEach((p, i) => oc.prepare('insert into part values (?, ?, ?, ?)').run(`m2_p${i}`, 'm2', T0 + 2 + i, JSON.stringify(p)))
+    oc.close()
+
+    const now = Date.parse('2026-09-24T12:00:00Z')
+    const EMPTY: NonNullable<ReturnType<typeof usageOf>> = { total: -1, recent: 0, days: 0, byModel: [], byTool: [], daily: [], dailyByModel: { models: [], others: false, days: [] } }
+    if (usageOf(U, 'skill', 'pdf', { now }) !== null) bad.push('no index should read as null')
+    const r1 = await indexSessions(U, scanSessions(U).sessions)
+    if (r1.failed) bad.push(`index failed ${r1.failed}`)
+    const pdf = (usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY)
+    const kaneo = (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY)
+    const linear = (usageOf(U, 'mcp', 'linear', { now }) ?? EMPTY)
+    const brave = (usageOf(U, 'mcp', 'brave-search', { now }) ?? EMPTY)
+    const brav = (usageOf(U, 'mcp', 'brave', { now }) ?? EMPTY)
+    const tools = (u: { byTool: { tool: string; n: number }[] }): string => u.byTool.map((x) => `${x.tool}:${x.n}`).join(',')
+    // pdf: Claude 1 + Codex 2 (turn 1 read twice = 1, turn 2 = 1) + OpenCode 1
+    if (pdf.total !== 4 || tools(pdf) !== 'codex:2,claude:1,opencode:1') bad.push(`pdf ${pdf.total} ${tools(pdf)}`)
+    if (pdf.byModel.map((m) => m.model).sort().join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2') bad.push(`pdf models ${JSON.stringify(pdf.byModel)}`)
+    // kaneo: main 2 + subagent 1 (haiku)
+    if (kaneo.total !== 3 || !kaneo.byModel.some((m) => m.model === 'claude-haiku-4-5')) bad.push(`kaneo ${JSON.stringify(kaneo.byModel)}`)
+    // brave-search: OpenCode prefix 1 + Codex normalized namespace mcp__brave_search 1
+    if (linear.total !== 1 || brave.total !== 2 || brav.total !== 0) bad.push(`linear ${linear.total} brave ${brave.total} brav ${brav.total}`)
+    const docx = usageOf(U, 'skill', 'docx', { now }) ?? EMPTY
+    const xlsx = usageOf(U, 'skill', 'xlsx', { now }) ?? EMPTY
+    // docx: Claude /docx typed + Codex Windows path; xlsx: only edited via apply_patch → 0
+    if (docx.total !== 2 || xlsx.total !== 0) bad.push(`docx ${docx.total} xlsx ${xlsx.total}`)
+    if (pdf.daily.length !== 30 || pdf.recent !== 4 || pdf.since !== '2026-09-20') bad.push(`daily ${pdf.daily.length} recent ${pdf.recent} since ${pdf.since}`)
+    // per-model daily lines: every model of the period, sums match the daily totals
+    const dm = pdf.dailyByModel
+    const lineSum = dm.days.reduce((a, d) => a + d.n.reduce((x, y) => x + y, 0), 0)
+    if (dm.models.slice().sort().join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2' || dm.others || lineSum !== pdf.recent || dm.days.length !== 30)
+      bad.push(`dailyByModel ${JSON.stringify(dm.models)} others ${dm.others} sum ${lineSum}`)
+    const { DatabaseSync: Db2 } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+    const udb = new Db2(searchIndexPath(U))
+    const usageText = JSON.stringify(udb.prepare('select * from usage').all())
+    udb.close()
+    if (usageText.includes('USAGEARGSECRET')) bad.push('arguments stored in usage')
+    // incremental: re-run writes nothing; new subagent file re-reads that session only
+    const r2 = await indexSessions(U, scanSessions(U).sessions)
+    if (r2.indexed !== 0) bad.push(`re-run indexed ${r2.indexed}`)
+    writeFileSync(
+      join(cdir, cid, 'subagents', 'agent-b.jsonl'),
+      jl([{ type: 'assistant', isSidechain: true, timestamp: '2026-09-21T02:00:00Z', message: { role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'tool_use', name: 'mcp__kaneo__y', input: {} }] } }])
+    )
+    const r3 = await indexSessions(U, scanSessions(U).sessions)
+    if (r3.indexed !== 1 || (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4) bad.push(`subagent change indexed ${r3.indexed} kaneo ${(usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total}`)
+    // DST: 30 unique calendar days across a clock change
+    {
+      const tz = process.env.TZ
+      process.env.TZ = 'America/New_York'
+      try {
+        for (const at of ['2026-11-03T04:30:00Z', '2026-03-09T05:30:00Z']) {
+          const d = (usageOf(U, 'skill', 'pdf', { now: Date.parse(at) }) ?? EMPTY).daily.map((x) => x.day)
+          if (new Set(d).size !== 30) bad.push(`DST ${at} ${new Set(d).size} unique days`)
+        }
+      } finally {
+        if (tz === undefined) delete process.env.TZ
+        else process.env.TZ = tz
+      }
+    }
+    // upgrade: an index built before usage existed reads every session once, then nothing
+    {
+      const { DatabaseSync: Db3 } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+      const d3 = new Db3(searchIndexPath(U))
+      d3.exec(`drop table usage; delete from meta where key = 'usageSchema'`)
+      d3.close()
+      if (usageOf(U, 'skill', 'pdf', { now }) !== null) bad.push('missing usage table should read as null')
+      const up1 = await indexSessions(U, scanSessions(U).sessions)
+      const up2 = await indexSessions(U, scanSessions(U).sessions)
+      if (up1.indexed !== 3 || up2.indexed !== 0 || (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4) bad.push(`upgrade ${up1.indexed}/${up2.indexed}`)
+    }
+    // delete: Claude session gone → its usage gone
+    rmSync(claudeMain)
+    await indexSessions(U, scanSessions(U).sessions)
+    if ((usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 0 || (usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY).total !== 3) bad.push('delete did not remove usage')
+    // Gemini (no local sample): activate_skill and <server>__<tool> by rule
+    const g = new UsageCounter('gemini', '2026-09-24T00:00:00Z')
+    g.add({ name: 'activate_skill', input: { name: 'pdf' }, model: 'gemini-2.5-pro', at: '2026-09-24T00:00:00Z' })
+    g.add({ name: 'kaneo__get_task', input: {}, model: 'gemini-2.5-pro' })
+    g.add({ name: 'run_shell_command', input: { command: 'ls' } })
+    const grows = [...g.rows.values()].map((r) => `${r.kind}:${r.name}:${r.model}:${r.n}`).sort().join(',')
+    if (grows !== 'mcp:kaneo:gemini-2.5-pro:1,skill:pdf:gemini-2.5-pro:1') bad.push(`gemini ${grows}`)
+    check(
+      'ac2. usage stats — Claude (incl. subagents), Codex (namespace, SKILL.md once per turn), OpenCode (skill, server_ prefix), models, days, incremental, delete, no arguments stored',
+      !bad.length,
+      bad.length ? bad.join('; ') : 'pdf 4 (codex 2, claude 1, opencode 1; sed -i / apply_patch not counted), docx 2 (/docx, Windows path), kaneo 3→4 with subagents, brave-search 2 (Codex brave_search), null before index, upgrade reads once, delete removes usage'
     )
   }
 

@@ -490,5 +490,17 @@
       "tooLarge": "너무 큼",
       "changed": "변경됨"
     }
+  },
+  "usage": {
+    "title": "사용량",
+    "summary": "최근 {{days}}일 {{recent}} · 전체 {{total}}",
+    "daily": "최근 {{days}}일",
+    "byModel": "모델별",
+    "byTool": "툴별",
+    "calls": "호출",
+    "others": "기타",
+    "none": "로컬 세션 기록에 호출 없음",
+    "indexing": "세션 기록 읽는 중…",
+    "since": "{{day}}부터"
   }
 }

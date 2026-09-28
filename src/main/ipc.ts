@@ -232,6 +232,12 @@ export function registerIpc(): void {
     },
     sessionSearch: (q, filters) => inWorker('searchSessions', home, [str(q), filters ?? {}]),
     sessionIndexStatus: () => searchIndexView(),
+    // null = nothing indexed yet (fresh install or upgrade): start an index run; the panel reloads when it finishes
+    usage: async (kind, name) => {
+      const r = await inWorker('usage', home, [kind, name])
+      if (r === null) runSearchIndex()
+      return r
+    },
     docSearch: (q, filters) => inWorker('searchDocs', home, [str(q), filters ?? {}]),
     searchAll: (q) => inWorker('searchAll', home, [str(q)]),
     sessionTranscript: async (tool, id, opts): Promise<TranscriptView> => {

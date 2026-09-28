@@ -17,6 +17,7 @@ import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
+import { UsagePanel } from '../components/UsagePanel'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
@@ -221,6 +222,7 @@ function Skills(): React.JSX.Element {
               busy={pending.of(current.name)}
               testId="skill-detail-tools"
             />
+            <UsagePanel kind="skill" name={current.name} />
             <SkillEditor
               key={current.name}
               name={current.name}

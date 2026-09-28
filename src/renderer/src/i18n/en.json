@@ -490,5 +490,17 @@
       "tooLarge": "too large",
       "changed": "changed"
     }
+  },
+  "usage": {
+    "title": "Usage",
+    "summary": "{{recent}} in {{days}} days · {{total}} total",
+    "daily": "Last {{days}} days",
+    "byModel": "By model",
+    "byTool": "By tool",
+    "calls": "Calls",
+    "others": "Others",
+    "none": "No calls in local session logs",
+    "indexing": "Reading session logs…",
+    "since": "Since {{day}}"
   }
 }
