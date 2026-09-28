@@ -29,7 +29,7 @@ export function UpdateDialog({
           )}
           {u.command ? (
             <Stack gap={6}>
-              <Text size="sm">Installed with Homebrew. Run this in a terminal:</Text>
+              <Text size="sm">Installed with Homebrew. Update opens Terminal and runs:</Text>
               <Group gap="xs" wrap="nowrap">
                 <Code block style={{ flex: 1 }}>
                   {u.command}
@@ -62,7 +62,7 @@ export function UpdateDialog({
                   }}
                   data-testid="update-terminal"
                 >
-                  Open in Terminal
+                  Update
                 </Button>
               )}
               {!u.command && (

@@ -14,6 +14,7 @@ import { BREW_UPGRADE, compareVersions, installKind, latestUpdate } from '../eng
 import type { UpdateView } from '../shared/api'
 
 const FIRST_DELAY_MS = 10_000
+const APP_BUNDLE_ID = 'com.illithid.app'
 const INTERVAL_MS = 24 * 60 * 60 * 1000
 const fetchFn: FetchFn = (url, init) => fetch(url, init)
 
@@ -73,13 +74,22 @@ export function startUpdateCheck(home: string): void {
 }
 
 /**
- * Homebrew installs: open Terminal running the upgrade command. A .command file is opened rather than scripting Terminal,
- * so no automation permission is asked. The command is the fixed BREW_UPGRADE, nothing from the release
+ * Homebrew installs: open Terminal running the upgrade, then quit so the running copy isn't the old version. The script waits for
+ * the app to exit, upgrades, and opens the new version. A .command file is opened rather than scripting Terminal, so no
+ * automation permission is asked. The commands are fixed here, nothing comes from the release
  */
 export async function openUpgradeInTerminal(): Promise<void> {
   const file = join(tmpdir(), 'illithid-upgrade.command')
-  writeFileSync(file, `#!/bin/zsh -l\n${BREW_UPGRADE}\n`)
+  const script = [
+    '#!/bin/zsh -l',
+    '# Wait up to 30s for Illithid to quit',
+    'for i in {1..60}; do pgrep -xq Illithid || break; sleep 0.5; done',
+    `${BREW_UPGRADE} && open -b ${APP_BUNDLE_ID}`,
+    ''
+  ].join('\n')
+  writeFileSync(file, script)
   chmodSync(file, 0o755)
   const err = await shell.openPath(file)
   if (err) throw new Error(err)
+  setTimeout(() => app.quit(), 500)
 }
