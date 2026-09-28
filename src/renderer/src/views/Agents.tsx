@@ -51,6 +51,9 @@ const DEFAULT = '__default__'
 
 function Agents(): React.JSX.Element {
   const { t } = useTranslation()
+  // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
+  const inUse = useToolsInUse()
+  const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
   const reload = useReload()
   const { data, error } = useApi('agents', () => window.api.agents())
@@ -100,7 +103,7 @@ function Agents(): React.JSX.Element {
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
-    for (const tool of TOOLS)
+    for (const tool of cardTools)
       if (enabled(name, tool) !== on) await runWrite(window.api.toggle('agents', name, tool, on))
     reload()
   }
@@ -184,8 +187,8 @@ function Agents(): React.JSX.Element {
               name={r.name}
               description={r.description}
               dot={dotOfPills(r.pills)}
-              switchChecked={TOOLS.every((tool) => enabled(r.name, tool))}
-              switchIndeterminate={TOOLS.some((tool) => enabled(r.name, tool))}
+              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
+              switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
               footerRight={
                 <ToolPills

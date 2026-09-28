@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Badge, Box, Button, Code, Stack, Tabs } from '@mantine/core'
 import { Download, Globe, Plus, Terminal, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useToolsInUse } from '../lib/config'
 import { MASK, type McpEditView, type McpServer, type McpServerView, type ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
@@ -28,6 +29,9 @@ const NEW = '__new__'
 
 function Mcp(): React.JSX.Element {
   const { t } = useTranslation()
+  // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
+  const inUse = useToolsInUse()
+  const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
   const reload = useReload()
   const { data, error } = useApi('mcp', () => window.api.mcp())
@@ -58,7 +62,7 @@ function Mcp(): React.JSX.Element {
     reload()
   }
   const toggleAll = async (s: McpServerView, on: boolean): Promise<void> => {
-    for (const tool of TOOLS) if (enabled(s.name, tool) !== on) await runWrite(window.api.toggle('mcp', s.name, tool, on))
+    for (const tool of cardTools) if (enabled(s.name, tool) !== on) await runWrite(window.api.toggle('mcp', s.name, tool, on))
     reload()
   }
   const save = async (name: string, def: McpServer): Promise<{ warnings: string[] } | null> => {
@@ -128,8 +132,8 @@ function Mcp(): React.JSX.Element {
                 badges={transportTag(s)}
                 description={endpoint(s) || none}
                 dot={dotOfPills(p)}
-                switchChecked={TOOLS.every((tool) => enabled(s.name, tool))}
-                switchIndeterminate={TOOLS.some((tool) => enabled(s.name, tool))}
+                switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))}
+                switchIndeterminate={cardTools.some((tool) => enabled(s.name, tool))}
                 onSwitch={(v) => void toggleAll(s, v)}
                 footerRight={<ToolPills pills={p} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
                 selected={s.name === selected}

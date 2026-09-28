@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge, Box, Button, Group, Modal, Stack, Tabs, TextInput } from '@mantine/core'
 import { Download, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useToolsInUse } from '../lib/config'
 import type { ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
@@ -42,6 +43,9 @@ function cardTitle(name: string, text: string): string {
 
 function Rules(): React.JSX.Element {
   const { t } = useTranslation()
+  // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
+  const inUse = useToolsInUse()
+  const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
   const reload = useReload()
   const rules = useApi('rules', () => window.api.rules())
@@ -94,7 +98,7 @@ function Rules(): React.JSX.Element {
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
-    for (const tool of TOOLS) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('rules', name, tool, on), { invalidate: true })
+    for (const tool of cardTools) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('rules', name, tool, on), { invalidate: true })
     reload()
   }
   const save = async (name: string, text: string): Promise<boolean> => {
@@ -177,8 +181,8 @@ function Rules(): React.JSX.Element {
               name={f.name}
               description={cardTitle(f.name, f.text)}
               dot={dotOfPills(pillsOf(f.name))}
-              switchChecked={TOOLS.every((tool) => enabled(f.name, tool))}
-              switchIndeterminate={TOOLS.some((tool) => enabled(f.name, tool))}
+              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(f.name, tool))}
+              switchIndeterminate={cardTools.some((tool) => enabled(f.name, tool))}
               onSwitch={(v) => void toggleAll(f.name, v)}
               footerLeft={
                 <Badge variant="default" size="xs" fw={500} c="dimmed">

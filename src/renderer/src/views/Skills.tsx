@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box, Button, Group, Modal, Select, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
 import { Download, FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useToolsInUse } from '../lib/config'
 import type { SkillDoc, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
@@ -34,6 +35,9 @@ interface Row {
 
 function Skills(): React.JSX.Element {
   const { t } = useTranslation()
+  // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
+  const inUse = useToolsInUse()
+  const cardTools = TOGGLE_TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
   const reload = useReload()
   const { data, error } = useApi('skills', () => window.api.skills())
@@ -85,7 +89,7 @@ function Skills(): React.JSX.Element {
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
-    for (const tool of TOGGLE_TOOLS) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('skills', name, tool, on))
+    for (const tool of cardTools) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('skills', name, tool, on))
     reload()
   }
   const create = async (): Promise<void> => {
@@ -158,8 +162,8 @@ function Skills(): React.JSX.Element {
               name={r.name}
               description={r.description}
               dot={dotOfPills(r.pills)}
-              switchChecked={TOGGLE_TOOLS.every((tool) => enabled(r.name, tool))}
-              switchIndeterminate={TOGGLE_TOOLS.some((tool) => enabled(r.name, tool))}
+              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
+              switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
               footerRight={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
               selected={r.name === selected}
