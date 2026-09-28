@@ -41,21 +41,23 @@ export function onUpdateChange(f: (v: UpdateView | null) => void): void {
   listeners.push(f)
 }
 
-/** One check. Never throws (offline, rate limits: the next check tries again) */
-export async function checkForUpdate(home: string): Promise<UpdateView | null> {
+/** One check. Automatic checks never throw (offline, rate limits: the next check tries again); Check now does */
+export async function checkForUpdate(home: string, explicit = false): Promise<UpdateView | null> {
   const cfg = readConfig(home).config
-  if (cfg.updateCheck === false) {
+  // Check now in Settings runs even with automatic checks off, and shows a skipped version too
+  if (cfg.updateCheck === false && !explicit) {
     publish(null)
     return null
   }
   try {
     const u = await latestUpdate(fetchFn, currentVersion())
-    const skipped = !!u && !!cfg.updateSkip && compareVersions(u.version, cfg.updateSkip) <= 0
+    const skipped = !explicit && !!u && !!cfg.updateSkip && compareVersions(u.version, cfg.updateSkip) <= 0
     const forced = process.env['ILLITHID_UPDATE_INSTALL']
     const install = !app.isPackaged && (forced === 'brew' || forced === 'dmg') ? forced : installKind()
     publish(u && !skipped ? { ...u, current: currentVersion(), install, command: install === 'brew' ? BREW_UPGRADE : null } : null)
-  } catch {
-    // keep the previous result
+  } catch (e) {
+    // keep the previous result; Check now reports the failure
+    if (explicit) throw e
   }
   return available
 }

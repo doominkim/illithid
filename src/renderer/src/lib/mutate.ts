@@ -62,6 +62,9 @@ export const LIBRARY_CHANGED = 'illithid:libraryChanged'
 /** Menu bar item asked to switch workspace (detail = workspace id); the workspace picker runs its usual confirmation */
 export const WORKSPACE_SWITCH_REQUEST = 'illithid:workspaceSwitchRequest'
 
+/** Settings asked to show the update notice (after Check now found a newer version) */
+export const UPDATE_NOTICE_REQUEST = 'illithid:updateNoticeRequest'
+
 /** Skip reasons worth telling the user about after an apply (imported originals left in place) */
 const NOTICE_REASONS = new Set(['importedChanged', 'noAppCopy'])
 

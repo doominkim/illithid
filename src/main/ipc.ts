@@ -300,8 +300,9 @@ export function registerIpc(): void {
     },
     detectTools: async () => detectTools(home, await envNow()),
     traySet: async (state) => updateTray(state as TrayState),
+    appVersion: async () => app.getVersion(),
     updateStatus: async () => updateAvailable(),
-    updateCheckNow: async () => checkForUpdate(home),
+    updateCheckNow: async () => checkForUpdate(home, true),
     updateOpenTerminal: async () => {
       try {
         await openUpgradeInTerminal()

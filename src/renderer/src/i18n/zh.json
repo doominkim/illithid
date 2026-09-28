@@ -46,7 +46,12 @@
     "grokWithClaude": "也会读取为 Claude Code 开启的技能、MCP 和代理",
     "grokReadsClaude": "也会读取现有的 Claude Code 设置",
     "updates": "更新",
-    "updateCheck": "检查新版本"
+    "updateCheck": "检查新版本",
+    "version": "版本 {{version}}",
+    "checkNow": "立即检查",
+    "upToDate": "已是最新版本",
+    "updateAvailable": "{{version}} 可用",
+    "checkFailed": "无法检查更新。请检查网络连接后重试。"
   },
   "common": {
     "loading": "加载中…",

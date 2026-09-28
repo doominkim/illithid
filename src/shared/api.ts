@@ -622,6 +622,8 @@ export interface Api {
   traySet(state: TrayState): Promise<void>
   /** Menu bar item clicks. Returns an unsubscribe function */
   onTrayAction(cb: (a: TrayAction) => void): () => void
+  /** Running app version */
+  appVersion(): Promise<string>
   /** Newer release found by the last check (null = none) */
   updateStatus(): Promise<UpdateView | null>
   /** Check now (Settings) */
@@ -868,6 +870,7 @@ export const CHANNELS = [
   'backupCleanupPreview',
   'backupCleanupRun',
   'traySet',
+  'appVersion',
   'updateStatus',
   'updateCheckNow',
   'updateSkip',

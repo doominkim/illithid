@@ -46,7 +46,12 @@
     "grokWithClaude": "Also reads the skills, MCP servers and agents on for Claude Code",
     "grokReadsClaude": "Also reads your existing Claude Code settings",
     "updates": "Updates",
-    "updateCheck": "Check for new versions"
+    "updateCheck": "Check for new versions",
+    "version": "Version {{version}}",
+    "checkNow": "Check now",
+    "upToDate": "You have the latest version",
+    "updateAvailable": "{{version}} available",
+    "checkFailed": "Couldn't check for updates. Check your connection and try again."
   },
   "common": {
     "loading": "Loading…",

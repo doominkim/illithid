@@ -9,12 +9,12 @@ import { useReload } from '../components/ReloadButton'
 import { LANGUAGES, Language, setLanguage } from '../i18n'
 import { useConfig } from '../lib/config'
 import { fmtSize } from '../lib/format'
-import { LIBRARY_CHANGED, runWrite } from '../lib/mutate'
+import { LIBRARY_CHANGED, runWrite, UPDATE_NOTICE_REQUEST } from '../lib/mutate'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { ToolIcon } from '../components/ToolIcon'
 import { claudeCombos, ToolComboDialog } from '../components/ToolComboDialog'
-import type { ToolId, ToolsInUseView } from '../../../shared/api'
+import type { ToolId, ToolsInUseView, UpdateView } from '../../../shared/api'
 import { DEFAULT_TOOLS_IN_USE } from '../../../engine/toolIds'
 
 function Section({ title, children, right }: { title: string; children: React.ReactNode; right?: React.ReactNode }): React.JSX.Element {
@@ -152,6 +152,51 @@ function ToolsInUse(): React.JSX.Element {
 const RETENTION_DEFAULT = { enabled: true, days: 30, keepRollback: 3 }
 
 /** Backup cleanup: settings are saved immediately (numbers on blur); "clean up now" confirms with the planned count and size */
+/** Running version, a newer one if known, and Check now (opens the update notice or says it's up to date) */
+function AppVersion(): React.JSX.Element {
+  const { t } = useTranslation()
+  const [version, setVersion] = useState('')
+  const [update, setUpdate] = useState<UpdateView | null>(null)
+  const [checking, setChecking] = useState(false)
+  useEffect(() => {
+    window.api.appVersion().then(setVersion, () => {})
+    window.api.updateStatus().then(setUpdate, () => {})
+    return window.api.onUpdateEvent(setUpdate)
+  }, [])
+  const check = async (): Promise<void> => {
+    setChecking(true)
+    let v: UpdateView | null
+    try {
+      v = await window.api.updateCheckNow()
+    } catch {
+      setChecking(false)
+      notifications.show({ color: 'red', message: t('settings.checkFailed') })
+      return
+    }
+    setChecking(false)
+    setUpdate(v)
+    if (v) window.dispatchEvent(new CustomEvent(UPDATE_NOTICE_REQUEST, { detail: v }))
+    else notifications.show({ color: 'accent', message: t('settings.upToDate'), autoClose: 2500 })
+  }
+  return (
+    <Row
+      label={t('settings.version', { version })}
+      hint={
+        update ? (
+          <Badge variant="light" color="accent" size="sm" fw={500} data-testid="update-available">
+            {t('settings.updateAvailable', { version: update.version })}
+          </Badge>
+        ) : undefined
+      }
+      control={
+        <Button size="xs" variant="default" loading={checking} onClick={() => void check()} data-testid="update-check-now">
+          {t('settings.checkNow')}
+        </Button>
+      }
+    />
+  )
+}
+
 function BackupCleanup(): React.JSX.Element {
   const { t } = useTranslation()
   const { config, refresh } = useConfig()
@@ -332,12 +377,13 @@ function Settings(): React.JSX.Element {
               disabled={!config || saving === 'update'}
               onChange={(e) => {
                 const on = e.currentTarget.checked
-                void save({ updateCheck: on ? undefined : false }, 'update').then(() => window.api.updateCheckNow())
+                void save({ updateCheck: on ? undefined : false }, 'update')
               }}
               data-testid="update-check"
             />
           }
         />
+        <AppVersion />
       </Section>
 
       <Section

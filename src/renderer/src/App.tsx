@@ -36,7 +36,7 @@ import Onboarding from './views/Onboarding'
 import { ApplyPreviewModal } from './components/ApplyPreviewModal'
 import { UpdateDialog } from './components/UpdateDialog'
 import { SyncContext } from './lib/sync'
-import { LIBRARY_CHANGED, notifySync, WORKSPACE_SWITCH_REQUEST } from './lib/mutate'
+import { LIBRARY_CHANGED, notifySync, UPDATE_NOTICE_REQUEST, WORKSPACE_SWITCH_REQUEST } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
 
 export type { Menu }
@@ -230,7 +230,18 @@ function App(): React.JSX.Element {
       setUpdateOpen(true)
     }
     window.api.updateStatus().then(show, () => {})
-    return window.api.onUpdateEvent(show)
+    const open = (e: Event): void => {
+      const v = (e as CustomEvent<UpdateView>).detail
+      setUpdate(v)
+      updateShown.current = v.version
+      setUpdateOpen(true)
+    }
+    window.addEventListener(UPDATE_NOTICE_REQUEST, open)
+    const off = window.api.onUpdateEvent(show)
+    return () => {
+      window.removeEventListener(UPDATE_NOTICE_REQUEST, open)
+      off()
+    }
   }, [])
   const skipUpdate = useCallback(async (version: string): Promise<void> => {
     setUpdateOpen(false)

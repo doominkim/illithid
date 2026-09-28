@@ -46,7 +46,12 @@
     "grokWithClaude": "Claude Code 에 켠 스킬·MCP·에이전트도 함께 읽음",
     "grokReadsClaude": "기존 Claude Code 설정도 함께 읽음",
     "updates": "업데이트",
-    "updateCheck": "새 버전 확인"
+    "updateCheck": "새 버전 확인",
+    "version": "버전 {{version}}",
+    "checkNow": "지금 확인",
+    "upToDate": "최신 버전이에요",
+    "updateAvailable": "{{version}} 사용 가능",
+    "checkFailed": "업데이트를 확인하지 못했어요. 연결을 확인하고 다시 시도하세요."
   },
   "common": {
     "loading": "불러오는 중…",
