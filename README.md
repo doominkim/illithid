@@ -6,7 +6,7 @@
   <p><b>One library for every AI coding agent.</b><br>
   Write your rules, skills, subagents and MCP servers once. Illithid keeps them in sync across Claude Code, Codex, OpenCode, Gemini CLI and more.</p>
 
-  <p><sub>Supported: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
+  <p><sub>Supported: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="Download"></a>
@@ -21,7 +21,7 @@
   </p>
 </div>
 
-<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="Demo: edit a rule, preview and apply it to five tools, turn a skill and an MCP server off for one tool, review past requests in a session"></p>
+<p align="center"><img src="docs/demo/rules.gif" width="960" alt="Demo: edit a rule, preview the change and apply it to five tools"></p>
 
 ## Install
 
@@ -36,7 +36,7 @@ Or download the DMG above.
 **Rewriting your rules every time a new model or coding agent comes out?**<br>
 **Updating every agent by hand whenever a rule changes?**
 
-Each tool keeps its settings somewhere different: `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`, `~/.gemini/`, `~/.copilot/`. So every change means editing the same thing in several places and hoping none of them drift.
+Each tool keeps its settings somewhere different: `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`, `~/.gemini/`, `~/.copilot/`, `~/.grok/`. So every change means editing the same thing in several places and hoping none of them drift.
 
 Illithid manages it all from one place. Change a rule once and every tool gets it. Add a new tool and it starts with the setup you already have.
 
@@ -48,14 +48,11 @@ Illithid doesn't run models or sit between you and your agents. It only writes t
 
 Edit a rule once and it lands in every tool you use. Turn any rule or skill off for a single tool with one click.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
-  <img src="docs/screenshots/skills-light.png" alt="Skills">
-</picture>
+<p align="center"><img src="docs/demo/skills.gif" width="960" alt="Turning a skill off for Gemini CLI only"></p>
 
 ### Subagents with the right model per tool
 
-One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCode `.md`, a Gemini CLI `.md` and a GitHub Copilot `.agent.md`. Pick the model and effort for each tool from a list instead of typing IDs.
+One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCode `.md`, a Gemini CLI `.md`, a GitHub Copilot `.agent.md` and a Grok CLI `.md`. Pick the model and effort for each tool from a list instead of typing IDs.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -66,19 +63,27 @@ One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCod
 
 Add an MCP server once, over HTTP or stdio. API keys go into the macOS Keychain; the library only stores a reference.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/mcp-dark.png">
-  <img src="docs/screenshots/mcp-light.png" alt="MCP servers">
-</picture>
+Open a skill or server to see how often your agents called it in the last 30 days, by model and by tool. Counted from local session logs.
+
+<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="Turning an MCP server off for GitHub Copilot, then its usage by model"></p>
+
+### Market
+
+Search skills.sh skills, MCP registry servers and awesome-copilot rules, check the ones you want and install them into the library. Installed items carry a Market tag.
+
+<p align="center"><img src="docs/demo/market.gif" width="960" alt="Installing two skills from the Market"></p>
 
 ### Every session, searchable
 
-Browse past Claude Code, Codex, OpenCode and Gemini CLI conversations in one list. Search titles or full content, jump to any message, and resume with one click.
+Browse past Claude Code, Codex, OpenCode, Gemini CLI and Grok CLI conversations in one list. Search titles or full content, jump to any message, and resume with one click.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
-  <img src="docs/screenshots/sessions-light.png" alt="Sessions">
-</picture>
+<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="Walking through the requests of a past session"></p>
+
+### Pick your tools
+
+Turn tools on or off in **Settings → Tools in use**. Turning one off removes Illithid's copies from it once you confirm the preview; your own files stay. Grok CLI and GitHub Copilot also read Claude Code's files, so Illithid asks whether to use both before turning them on together.
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Turning Grok CLI on next to Claude Code, then previewing what leaves Codex when it is turned off"></p>
 
 ### Artifacts in one place
 
@@ -95,7 +100,6 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 - **Memory**: review Claude's auto-memory, promote useful entries to the shared library, trash the rest.
 - **Git backup**: push the library to a private repo and restore any snapshot.
 - **Import**: bring in the rules, skills, subagents and MCP servers you already have.
-- **Market**: search skills.sh skills, MCP registry servers and awesome-copilot rules, and install them into the library.
 
 ## Safe by default
 
@@ -112,7 +116,7 @@ No. Illithid never talks to any model API. It edits local config files and reads
 On first run Illithid offers to import what you have. Imported originals are backed up before Illithid takes them over.
 
 **How do I stop using it?**
-Quit the app and uninstall. The files it wrote are plain rules, skills and config entries, so your tools keep working.
+Quit the app and uninstall. The files it wrote are plain rules, skills and config entries, so your tools keep working. To stop syncing one tool, turn it off in Settings; the preview shows what Illithid removes from it.
 
 **Why macOS only?**
 Secrets are stored in the macOS Keychain, so only macOS builds are published for now.

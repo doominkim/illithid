@@ -6,7 +6,7 @@
   <p><b>一个库，管理所有 AI 编程智能体。</b><br>
   规则、技能、子智能体和 MCP 服务器只需写一次。Illithid 会把它们同步到 Claude Code、Codex、OpenCode、Gemini CLI 等工具。</p>
 
-  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
+  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="下载"></a>
@@ -21,7 +21,7 @@
   </p>
 </div>
 
-<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="演示: 编辑规则并预览后应用到 5 个工具，只在一个工具中关闭技能和 MCP 服务器，在会话中查看过去的请求"></p>
+<p align="center"><img src="docs/demo/rules.gif" width="960" alt="演示: 编辑规则并预览后应用到 5 个工具"></p>
 
 ## 安装
 
@@ -36,7 +36,7 @@ brew install --cask doominkim/tap/illithid
 **每出一个新模型或编程智能体，就要重写一遍规则?**<br>
 **每改一条规则，就要把所有智能体的配置挨个改一遍?**
 
-每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
+每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`、`~/.grok/`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
 
 Illithid 把这一切集中在一个地方管理。规则改一次，所有工具同步生效；新增工具时，也能直接沿用你现有的配置。
 
@@ -48,14 +48,11 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 规则改一次，你使用的所有工具都会生效。也可以一键只在某个工具中关闭。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
-  <img src="docs/screenshots/skills-light.png" alt="技能">
-</picture>
+<p align="center"><img src="docs/demo/skills.gif" width="960" alt="只在 Gemini CLI 中关闭一个技能"></p>
 
 ### 子智能体，每个工具用合适的模型
 
-一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml`、OpenCode 的 `.md`、Gemini CLI 的 `.md` 和 GitHub Copilot 的 `.agent.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
+一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml`、OpenCode 的 `.md`、Gemini CLI 的 `.md`、GitHub Copilot 的 `.agent.md` 和 Grok CLI 的 `.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -66,19 +63,27 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 无论 HTTP 还是 stdio，MCP 服务器只需添加一次。API 密钥保存在 macOS 钥匙串中，库里只保留引用。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/mcp-dark.png">
-  <img src="docs/screenshots/mcp-light.png" alt="MCP 服务器">
-</picture>
+打开技能或服务器，可查看最近 30 天智能体调用它的次数，按模型和工具统计。数据来自本地会话记录。
+
+<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="只在 GitHub Copilot 中关闭 MCP 服务器，并查看按模型统计的调用"></p>
+
+### 市场
+
+搜索 skills.sh 技能、MCP 注册表服务器和 awesome-copilot 规则，勾选需要的项目并安装到库中。安装的项目会带有市场标签。
+
+<p align="center"><img src="docs/demo/market.gif" width="960" alt="从市场安装两个技能"></p>
 
 ### 所有会话，均可搜索
 
-在一个列表中浏览 Claude Code、Codex、OpenCode、Gemini CLI 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
+在一个列表中浏览 Claude Code、Codex、OpenCode、Gemini CLI、Grok CLI 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
-  <img src="docs/screenshots/sessions-light.png" alt="会话">
-</picture>
+<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="浏览过去会话中的请求"></p>
+
+### 选择要用的工具
+
+在 **设置 → 使用中的工具** 中开关工具。关闭某个工具时，确认预览后 Illithid 会从该工具中清理它放入的副本，你自己的文件保持不变。Grok CLI 和 GitHub Copilot 也会读取 Claude Code 的文件，因此同时开启时会先询问是否两者都用。
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="与 Claude Code 一起开启 Grok CLI，再预览关闭 Codex 时会清理的项目"></p>
 
 ### 产出物集中管理
 
@@ -95,7 +100,6 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 - **记忆**: 审阅 Claude 的自动记忆，有用的条目提升到共享库，其余移到废纸篓。
 - **Git 备份**: 把库推送到私有仓库，并可恢复到任意快照。
 - **导入**: 导入你已在使用的规则、技能、子智能体和 MCP 服务器。
-- **市场**: 搜索 skills.sh 技能、MCP 注册表服务器和 awesome-copilot 规则，并安装到库中。
 
 ## 默认安全
 
@@ -112,7 +116,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 首次启动时会询问是否导入现有配置。导入的原始文件在交由 Illithid 管理前会先备份。
 
 **不想用了怎么办?**
-退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。
+退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。如果只想停止同步某个工具，在设置中关闭它即可，预览会列出将被清理的项目。
 
 **为什么只支持 macOS?**
 密钥保存在 macOS 钥匙串中，因此目前只发布 macOS 版本。

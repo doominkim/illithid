@@ -6,7 +6,7 @@
   <p><b>すべての AI コーディングエージェントのための、ひとつのライブラリ。</b><br>
   ルール、スキル、サブエージェント、MCP サーバーは一度書くだけ。Claude Code、Codex、OpenCode、Gemini CLI などへ Illithid が同期します。</p>
 
-  <p><sub>対応: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot</sub></p>
+  <p><sub>対応: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="ダウンロード"></a>
@@ -21,7 +21,7 @@
   </p>
 </div>
 
-<p align="center"><img src="docs/demo/illithid-demo.gif" width="960" alt="デモ: ルールを編集して 5 つのツールにプレビュー・反映、スキルと MCP サーバーを 1 つのツールだけで無効化、セッションで過去の依頼を確認"></p>
+<p align="center"><img src="docs/demo/rules.gif" width="960" alt="デモ: ルールを編集して 5 つのツールにプレビュー・反映"></p>
 
 ## インストール
 
@@ -36,7 +36,7 @@ brew install --cask doominkim/tap/illithid
 **新しいモデルやコーディングエージェントが出るたびに、ルールを作り直していませんか?**<br>
 **ルールを変えるたびに、すべてのエージェントの設定を手作業で直していませんか?**
 
-ツールごとに設定の置き場所が違います。`~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`。そのため変更のたびに同じ内容を何か所も直すことになり、どこかがずれていきます。
+ツールごとに設定の置き場所が違います。`~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`、`~/.grok/`。そのため変更のたびに同じ内容を何か所も直すことになり、どこかがずれていきます。
 
 Illithid はそれをすべて 1 か所で管理します。ルールを一度変えればすべてのツールに反映され、新しいツールも今の設定のまま始められます。
 
@@ -48,14 +48,11 @@ Illithid はモデルを実行せず、あなたとエージェントの間に�
 
 ルールを一度編集すれば、使っているすべてのツールに反映されます。特定のツールだけで無効にするのもワンクリックです。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/skills-dark.png">
-  <img src="docs/screenshots/skills-light.png" alt="スキル">
-</picture>
+<p align="center"><img src="docs/demo/skills.gif" width="960" alt="スキルを Gemini CLI だけで無効化"></p>
 
 ### ツールごとに最適なモデルを使うサブエージェント
 
-ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md`、Gemini CLI の `.md`、GitHub Copilot の `.agent.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
+ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md`、Gemini CLI の `.md`、GitHub Copilot の `.agent.md`、Grok CLI の `.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
@@ -66,19 +63,27 @@ Illithid はモデルを実行せず、あなたとエージェントの間に�
 
 HTTP でも stdio でも、MCP サーバーの追加は一度だけ。API キーは macOS キーチェーンに保存され、ライブラリには参照だけが残ります。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/mcp-dark.png">
-  <img src="docs/screenshots/mcp-light.png" alt="MCP サーバー">
-</picture>
+スキルやサーバーを開くと、直近 30 日にエージェントが呼び出した回数をモデル別・ツール別に表示します。ローカルのセッションログから数えます。
+
+<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="MCP サーバーを GitHub Copilot だけで無効化し、モデル別の利用状況を表示"></p>
+
+### マーケット
+
+skills.sh のスキル、MCP レジストリのサーバー、awesome-copilot のルールを検索し、チェックした項目をライブラリにインストールします。インストールした項目にはマーケットのタグが付きます。
+
+<p align="center"><img src="docs/demo/market.gif" width="960" alt="マーケットからスキルを 2 つインストール"></p>
 
 ### すべてのセッションを検索
 
-Claude Code、Codex、OpenCode、Gemini CLI の過去の会話をひとつのリストで表示します。タイトルや本文全体を検索し、任意のメッセージへ移動し、ワンクリックで再開できます。
+Claude Code、Codex、OpenCode、Gemini CLI、Grok CLI の過去の会話をひとつのリストで表示します。タイトルや本文全体を検索し、任意のメッセージへ移動し、ワンクリックで再開できます。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
-  <img src="docs/screenshots/sessions-light.png" alt="セッション">
-</picture>
+<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="過去のセッションの依頼をたどる"></p>
+
+### 使うツールを選ぶ
+
+**設定 → 使用中のツール** でツールをオン・オフします。オフにすると、プレビューを確認したあと Illithid が置いたコピーをそのツールから片付けます。自分で作ったファイルはそのままです。Grok CLI と GitHub Copilot は Claude Code のファイルも読むため、一緒にオンにするときは両方使うか先に確認します。
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Claude Code と一緒に Grok CLI をオンにし、Codex をオフにするときに片付く項目をプレビュー"></p>
 
 ### 成果物をひとまとめに
 
@@ -95,7 +100,6 @@ Claude Code、Codex、OpenCode、Gemini CLI の過去の会話をひとつのリ
 - **メモリ**: Claude の自動メモリを見直し、役立つ項目は共有ライブラリへ、残りはゴミ箱へ。
 - **Git バックアップ**: ライブラリを非公開リポジトリに push し、任意のスナップショットに戻せます。
 - **インポート**: すでに使っているルール、スキル、サブエージェント、MCP サーバーを取り込みます。
-- **マーケット**: skills.sh のスキル、MCP レジストリのサーバー、awesome-copilot のルールを検索してライブラリにインストールします。
 
 ## 安全なデフォルト
 
@@ -112,7 +116,7 @@ Claude Code、Codex、OpenCode、Gemini CLI の過去の会話をひとつのリ
 初回起動時に、今の設定をインポートするか確認します。インポートした元のファイルは、Illithid が管理を始める前にバックアップされます。
 
 **使うのをやめるには?**
-アプリを終了してアンインストールするだけです。Illithid が書いたのは普通のルール、スキル、設定項目なので、各ツールはそのまま動きます。
+アプリを終了してアンインストールするだけです。Illithid が書いたのは普通のルール、スキル、設定項目なので、各ツールはそのまま動きます。1 つのツールだけ同期をやめるには、設定でそのツールをオフにします。片付く項目はプレビューに表示されます。
 
 **なぜ macOS だけ?**
 シークレットを macOS キーチェーンに保存するため、現在は macOS 版のみ配布しています。

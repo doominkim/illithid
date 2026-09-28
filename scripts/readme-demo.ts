@@ -2,8 +2,11 @@
  * README demo video from a demo HOME (never the real one).
  * - Reuses the readme-shots demo HOME with all five tools, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
  * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
- * - Sequence: rule edit (all five tools) → skill off for Gemini → MCP server off for Copilot → a session's requests in Contents.
- * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes docs/demo/illithid-demo.{mp4,gif}.
+ * - Scenes, each cut into its own GIF (docs/demo/<scene>.gif): rules (edit → all five tools), skills (off for Gemini),
+ *   mcp (off for Copilot, then the usage chart), market (install two skills), sessions (a session's requests), tools
+ *   (Grok CLI on → the Claude combo dialog → apply; Codex off → the preview lists what leaves, cancelled).
+ * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes the full
+ *   docs/demo/illithid-demo.mp4 and the per-scene GIFs. The market scene uses the network (public GET APIs).
  *
  * Usage: npx electron-vite build && npx tsx scripts/readme-demo.ts
  */
@@ -14,7 +17,7 @@ import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator, type Page } from 'playwright-core'
 import { syncAll } from '../src/engine'
 import { MD_BEGIN, MD_END } from '../src/engine/targets/codexAgents'
-import { baseEnv, buildDemoHome } from './readme-shots'
+import { baseEnv, buildDemoHome, put } from './readme-shots'
 
 const ROOT = resolve(__dirname, '..')
 const OUT_DIR = join(ROOT, 'docs/demo')
@@ -138,11 +141,26 @@ async function toggleOff(page: Page, card: string, tool: string, hold: number, f
   await applyViaPreview(page, [tool], hold, focus)
 }
 
+/** Scene boundaries in seconds from the video start */
+const SCENES: { name: string; from: number; to: number }[] = []
+let T0 = 0
+const at = (): number => (Date.now() - T0) / 1000
+async function scene(page: Page, name: string, run: () => Promise<void>): Promise<void> {
+  const from = at()
+  await run()
+  await page.waitForTimeout(600)
+  SCENES.push({ name, from, to: at() })
+}
+
 async function sequence(page: Page, home: string): Promise<Record<string, boolean>> {
   const main = page.locator('main')
   await page.waitForTimeout(800)
+  let before: Record<string, string> = {}
+  let afterSave: Record<string, string> = {}
+  let offBefore = { skill: false, mcp: false }
 
   // 1. Rules: one edit → Sync → preview for all five tools → Apply
+  await scene(page, 'rules', async () => {
   const card = main.locator(`[data-card="${RULE}"]`)
   await moveTo(page, card.locator('[data-tool="copilot"]'))
   await page.waitForTimeout(500)
@@ -157,35 +175,72 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   }, ANCHOR)
   await page.keyboard.type(ADDED, { delay: 45 })
   await page.waitForTimeout(400)
-  const before = toolFiles(home)
+  before = toolFiles(home)
   await clickSlow(page, page.locator('[data-testid="editor-save"]'), 300)
   await waitState(page, 'pending')
   await page.waitForTimeout(800)
-  const afterSave = toolFiles(home)
+  afterSave = toolFiles(home)
   await applyViaPreview(page, ['claude', 'codex', 'opencode', 'gemini', 'copilot'], 1500)
   await page.waitForTimeout(700)
   await page.keyboard.press('Escape')
+  })
 
   // 2. Skills: turn one skill off for Gemini
-  const offBefore = offTargets(home)
+  offBefore = offTargets(home)
   await clickSlow(page, page.locator('[data-menu="skills"]'), 300)
   await waitLoaded(page)
   await main.locator(`[data-card="${SKILL}"]`).waitFor()
-  await page.waitForTimeout(300)
-  await toggleOff(page, SKILL, SKILL_OFF, 900)
-  await page.waitForTimeout(400)
+  await scene(page, 'skills', async () => {
+    await page.waitForTimeout(300)
+    await toggleOff(page, SKILL, SKILL_OFF, 900)
+  })
 
-  // 3. MCP: server cards with per-tool icons → turn one server off for Copilot
+  // 3. MCP: server cards with per-tool icons → turn one server off for Copilot → the server's usage by model
   await clickSlow(page, page.locator('[data-menu="mcp"]'), 300)
   await waitLoaded(page)
   const server = main.locator(`[data-card="${MCP}"]`)
   await server.waitFor()
-  await moveTo(page, server.locator('[data-tool="claude"]'))
-  await page.waitForTimeout(400)
-  await toggleOff(page, MCP, MCP_OFF, 1500, `apply-preview-mcp-${MCP_OFF}-${MCP}-remove`)
-  await page.waitForTimeout(400)
+  await scene(page, 'mcp', async () => {
+    await moveTo(page, server.locator('[data-tool="claude"]'))
+    await page.waitForTimeout(400)
+    await toggleOff(page, MCP, MCP_OFF, 1500, `apply-preview-mcp-${MCP_OFF}-${MCP}-remove`)
+    await page.waitForTimeout(400)
+    // Open the detail from the card's name corner (the center holds the pills and switch)
+    const card = await server.boundingBox()
+    if (card) {
+      await page.mouse.move(card.x + 60, card.y + 22, { steps: 15 })
+      await page.waitForTimeout(300)
+      await page.mouse.click(card.x + 60, card.y + 22)
+    }
+    const chart = page.locator('[data-testid="usage-panel"] .recharts-wrapper').first()
+    await chart.waitFor({ timeout: 30_000 })
+    await reveal(page, chart)
+    await moveTo(page, chart)
+    const box = await chart.boundingBox()
+    if (box) for (const fx of [0.55, 0.75, 0.9]) {
+      await page.mouse.move(box.x + box.width * fx, box.y + box.height * 0.45, { steps: 15 })
+      await page.waitForTimeout(700)
+    }
+    await page.keyboard.press('Escape')
+  })
 
-  // 4. Sessions: open one and walk its requests in Contents
+  // 4. Market: two popular skills checked → installed → the Market badge on the Skills page
+  await scene(page, 'market', async () => {
+    await clickSlow(page, page.locator('[data-menu="market"]'), 300)
+    const picks = main.locator('[data-testid="market-pick"]')
+    await picks.nth(1).waitFor({ timeout: 60_000 })
+    await page.waitForTimeout(600)
+    for (const i of [0, 1]) await clickSlow(page, picks.nth(i), 400)
+    await clickSlow(page, main.locator('[data-testid="market-install-picked"]'), 300)
+    await page.waitForFunction(() => document.body.innerText.includes('Installed'), undefined, { timeout: 90_000 }).catch(() => {})
+    await page.waitForTimeout(1200)
+    await clickSlow(page, page.locator('[data-menu="skills"]'), 600)
+    await waitLoaded(page)
+    await page.waitForTimeout(1500)
+  })
+
+  // 5. Sessions: open one and walk its requests in Contents
+  await scene(page, 'sessions', async () => {
   await clickSlow(page, page.locator('[data-menu="sessions"]'), 300)
   await waitLoaded(page)
   const rows = main.locator('.mantine-NavLink-root')
@@ -200,8 +255,37 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   for (const i of [1, 2]) if ((await items.count()) > i) await clickSlow(page, items.nth(i), 1000)
   await moveTo(page, main.locator('[data-testid="resume-copy"]'))
   await page.waitForTimeout(1000)
+  })
 
   const offAfter = offTargets(home)
+
+  // 6. Tools: Grok CLI on → the Claude combo dialog → Use both → apply; Codex off → the preview lists what leaves → Cancel
+  await scene(page, 'tools', async () => {
+    await clickSlow(page, page.locator('[data-menu="settings"]'), 500)
+    const grok = page.locator('[data-testid="tool-in-use-grok"]')
+    await grok.waitFor()
+    await moveTo(page, grok)
+    await page.waitForTimeout(400)
+    await grok.click({ force: true })
+    const both = page.locator('[data-testid="combo-both"]')
+    await both.waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(2200)
+    await clickSlow(page, both, 300)
+    await page.waitForSelector('[data-testid="apply-preview-grok"]', { timeout: 30_000 })
+    await moveTo(page, page.locator('[data-testid="apply-preview-grok"]'))
+    await page.waitForTimeout(1500)
+    await clickSlow(page, page.locator('[data-testid="apply-preview-apply"]'), 300)
+    await page.locator('[data-testid="apply-preview"]').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {})
+    await page.waitForTimeout(2500)
+    const codex = page.locator('[data-testid="tool-in-use-codex"]')
+    await moveTo(page, codex)
+    await codex.click({ force: true })
+    await page.waitForSelector('[data-testid="apply-preview-codex"]', { timeout: 30_000 })
+    await moveTo(page, page.locator('[data-testid="apply-preview-codex"]'))
+    await page.waitForTimeout(2000)
+    await clickSlow(page, page.locator('[data-testid="apply-preview-cancel"]'), 600)
+  })
+
   return {
     toolsUnchangedAfterSave: same(before, afterSave),
     skillPresentBefore: offBefore.skill,
@@ -241,15 +325,36 @@ function verifyOnDisk(home: string): Record<string, boolean> {
 
 function encode(raw: string, trim: number, duration: number): void {
   const mp4 = join(OUT_DIR, 'illithid-demo.mp4')
-  const gif = join(OUT_DIR, 'illithid-demo.gif')
   const cut = ['-ss', trim.toFixed(2), '-t', duration.toFixed(2), '-i', raw]
   execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=1280:-2:flags=lanczos,setpts=PTS-STARTPTS', '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-output_ts_offset', '0', '-an', mp4])
-  // Palette GIF; drop fps until it fits under 8 MB
-  for (const fps of [12, 10, 8]) {
-    const vf = `fps=${fps},scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`
-    execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', vf, gif])
-    if (statSync(gif).size < 8 * 1024 * 1024) break
+  // One palette GIF per scene; drop fps until each fits under 6 MB
+  for (const sc of SCENES) {
+    const gif = join(OUT_DIR, `${sc.name}.gif`)
+    const part = ['-ss', sc.from.toFixed(2), '-t', (sc.to - sc.from).toFixed(2), '-i', raw]
+    for (const fps of [12, 10, 8]) {
+      const vf = `fps=${fps},scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`
+      execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...part, '-vf', vf, gif])
+      if (statSync(gif).size < 6 * 1024 * 1024) break
+    }
   }
+}
+
+/** Calls in a demo session over the last 30 days so the MCP detail has a usage chart (Claude and Codex, several models) */
+function seedUsage(home: string): void {
+  const sid = 'aaaaaaaa-0000-4000-8000-00000000u5a9'
+  const lines: unknown[] = [{ type: 'user', sessionId: sid, cwd: '/Users/Shared/alex/shop-web', timestamp: new Date(Date.now() - 31 * 86_400_000).toISOString(), message: { role: 'user', content: 'Check the checkout page in the browser.' } }]
+  const models = ['claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1']
+  for (let d = 0; d < 30; d++) {
+    const n = [0, 1, 3, 2, 0, 4, 1, 2][d % 8] + (d > 22 ? 2 : 0)
+    for (let i = 0; i < n; i++)
+      lines.push({ type: 'assistant', sessionId: sid, timestamp: new Date(Date.now() - d * 86_400_000 - i * 60_000).toISOString(), message: { role: 'assistant', model: models[(d + i) % 3], content: [{ type: 'tool_use', name: `mcp__${MCP}__browser_navigate`, input: {} }] } })
+  }
+  put(home, `.claude/projects/-Users-Shared-alex-shop-web/${sid}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  const xid = '01a0e700-0000-7000-8000-00000000u5a9'
+  const xl: unknown[] = [{ type: 'session_meta', timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(), payload: { id: xid, cwd: '/Users/Shared/alex/shop-web' } }, { type: 'turn_context', payload: { model: 'gpt-5.6-sol' } }, { type: 'response_item', timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(), payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Smoke-test the signup flow in the browser.' }] } }]
+  for (let d = 0; d < 20; d++)
+    if (d % 3 !== 1) xl.push({ type: 'response_item', timestamp: new Date(Date.now() - d * 86_400_000).toISOString(), payload: { type: 'function_call', name: 'browser_navigate', namespace: `mcp__${MCP}`, arguments: '{}' } })
+  put(home, `.codex/sessions/2026/09/08/rollout-2026-09-08T10-00-00-${xid}.jsonl`, xl.map((l) => JSON.stringify(l)).join('\n') + '\n')
 }
 
 async function main(): Promise<void> {
@@ -262,6 +367,7 @@ async function main(): Promise<void> {
   let ok = false
   try {
     buildDemoHome(home, { tools: 'all' })
+    seedUsage(home)
     syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
     // Auto apply off: saves stay in the library until Apply in the preview
     const configPath = join(home, '.config/illithid/config.json')
@@ -277,6 +383,7 @@ async function main(): Promise<void> {
     try {
       const page = await app.firstWindow()
       const t0 = Date.now()
+      T0 = t0
       page.on('pageerror', (e) => errors.push(e.message))
       await app.evaluate(({ BrowserWindow }, s) => {
         BrowserWindow.getAllWindows()[0]?.setContentSize(s.width, s.height)
