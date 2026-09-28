@@ -59,7 +59,7 @@ export const claudePermissions: TargetDef = {
     }
     const settings = parseJsonObject(before)
     const next = buildClaudePermissions(sources.allowlist, sources.mcp, settings)
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const { count, same } = untouchedKeysSame(settings, next, 'permissions')
     const notes = [`${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`]
     return same ? { after, notes } : { after, notes, error: 'keys other than permissions changed' }

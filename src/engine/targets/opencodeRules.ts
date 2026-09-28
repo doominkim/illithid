@@ -147,7 +147,7 @@ export const opencodeRules: TargetDef = {
     const list = imported.list
     const owned = ownedSet(sources, ctx)
     next[KEY] = rebuildInstructions(list, enabled, owned)
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const kept = list.filter((x) => !(typeof x === 'string' && owned.has(x))).length
     const legacyHit = list.filter(
       (x) => typeof x === 'string' && legacyRuleGlobs(sources, ctx.home).includes(x)

@@ -51,7 +51,20 @@ export function mcpEntries(mcp: McpSource): [string, McpServer][] {
 }
 
 /** Shared serialization for JSON targets */
-export function toJsonText(value: unknown): string {
+/**
+ * JSON text for a target file. With the current text: unchanged content keeps it byte for byte, and a file saved without a
+ * trailing newline stays that way (Claude Code rewrites ~/.claude.json without one — adding it would look like a change
+ * on every check)
+ */
+export function toJsonText(value: unknown, before?: string | null): string {
+  if (typeof before === 'string' && before) {
+    try {
+      if (JSON.stringify(JSON.parse(before)) === JSON.stringify(value)) return before
+    } catch {
+      // not JSON: rewrite
+    }
+    return JSON.stringify(value, null, 2) + (before.endsWith('\n') ? '\n' : '')
+  }
   return JSON.stringify(value, null, 2) + '\n'
 }
 

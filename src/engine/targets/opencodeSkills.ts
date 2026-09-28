@@ -86,7 +86,7 @@ export const opencodeSkills: TargetDef = {
       else delete skills[SUB]
       if (Object.keys(skills).length) next[KEY] = skills
       else delete next[KEY]
-      const after = toJsonText(next)
+      const after = toJsonText(next, before)
       const { count, same } = untouchedKeysSame(config, next, KEY)
       notes.push(`0 library skills — removed ${removedN} app-owned paths, kept ${rest.length} non-owned entries`)
       notes.push(`${count} keys other than ${KEY} unchanged: ${same ? 'OK' : 'broken!'}`)
@@ -103,7 +103,7 @@ export const opencodeSkills: TargetDef = {
     if (!placed) out.unshift(want)
     skills[SUB] = out
     next[KEY] = skills
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const kept = out.length - 1
     const { count, same } = untouchedKeysSame(config, next, KEY)
     notes.push(`${KEY}.${SUB}: 1 library skills path (app-owned), ${kept} non-owned entries kept`)

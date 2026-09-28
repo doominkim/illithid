@@ -46,6 +46,7 @@ import {
   type TargetId
 } from '../src/engine'
 import { TARGETS } from '../src/engine/targets'
+import { toJsonText } from '../src/engine/text'
 import {
   APP_CONFIG_DIR,
   DEFAULT_LIBRARY_DIR,
@@ -773,6 +774,21 @@ function run(): void {
         ? `changed ${changed.length}: ${changed.map((p) => p.replace(REAL_HOME, '~')).join(', ')}`
         : `${realBefore.size} paths (5 targets, 6 bak, state, 3 skill dirs, mcp.json, ~/.illithid, app config dir) unchanged`
     )
+  }
+
+  // k. JSON targets follow the file on disk: same content keeps the bytes, no trailing newline stays without one
+  {
+    const doc = { mcpServers: { a: { command: 'x' } }, projects: { p: 1 } }
+    const compact = JSON.stringify(doc)
+    const noNl = JSON.stringify(doc, null, 2)
+    const changed = { ...doc, mcpServers: { a: { command: 'y' } } }
+    const ok =
+      toJsonText(doc, compact) === compact &&
+      toJsonText(doc, noNl) === noNl &&
+      toJsonText(changed, noNl) === JSON.stringify(changed, null, 2) &&
+      toJsonText(changed, noNl + '\n') === JSON.stringify(changed, null, 2) + '\n' &&
+      toJsonText(changed) === JSON.stringify(changed, null, 2) + '\n'
+    check('k. JSON targets keep unchanged text and the file\'s trailing-newline style', ok, ok ? 'ok' : 'mismatch')
   }
 }
 

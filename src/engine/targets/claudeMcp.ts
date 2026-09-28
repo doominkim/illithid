@@ -81,7 +81,7 @@ export const claudeMcp: TargetDef = {
     )
     const stale = staleServerNames(sources, 'claude', ctx, 'claudeMcp')
     removeServers(next, 'mcpServers', stale)
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const { count, same } = untouchedKeysSame(state, next, 'mcpServers')
     const notes = [`${count} keys other than mcpServers unchanged: ${same ? 'OK' : 'broken!'}`]
     notes.push(...toggleNotes(stale, disabledUnownedServers(sources, 'claude', ctx, 'claudeMcp')))

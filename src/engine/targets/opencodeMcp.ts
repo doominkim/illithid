@@ -88,7 +88,7 @@ export const opencodeMcp: TargetDef = {
     )
     const stale = staleServerNames(sources, 'opencode', ctx, 'opencodeMcp')
     removeServers(next, 'mcp', stale)
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const { count, same } = untouchedKeysSame(config, next, 'mcp')
     const notes = [`${count} keys other than mcp unchanged: ${same ? 'OK' : 'broken!'}`]
     notes.push(

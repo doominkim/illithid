@@ -88,7 +88,7 @@ export const claudeSkillOverrides: TargetDef = {
     for (const k of hits) delete so[k]
     if (Object.keys(so).length) next[CLAUDE_KEY] = so
     else delete next[CLAUDE_KEY]
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const kept = Object.keys(so).length
     const rest = untouchedKeysSame(settings, next, CLAUDE_KEY)
     const keptSame = Object.entries(so).every(([k, v]) =>
@@ -310,7 +310,7 @@ export const opencodeSkillPermissions: TargetDef = {
     else delete perm[OC_SUB]
     if (Object.keys(perm).length) next[OC_KEY] = perm
     else delete next[OC_KEY]
-    const after = toJsonText(next)
+    const after = toJsonText(next, before)
     const rest = untouchedKeysSame(config, next, OC_KEY)
     const origPerm = config[OC_KEY] as Json
     const permSame = Object.keys(origPerm)
