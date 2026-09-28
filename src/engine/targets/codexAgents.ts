@@ -1,3 +1,4 @@
+import { tilde } from '../agents'
 import { isEnabled } from '../manifest'
 import { blockBodyMulti, outsideBlockMulti, removeBlockMulti, spliceBlockMulti, type MarkerPair } from '../text'
 import type { ToolId } from '../toolIds'
@@ -28,7 +29,7 @@ export const LEGACY_MD_MARKERS: readonly MarkerPair[] = [
   [LEGACY_APP_MD_BEGIN, LEGACY_APP_MD_END],
   [LEGACY_MD_BEGIN, LEGACY_MD_END]
 ]
-const ALL_MD_MARKERS: readonly MarkerPair[] = [MD_MARKERS, ...LEGACY_MD_MARKERS]
+export const ALL_MD_MARKERS: readonly MarkerPair[] = [MD_MARKERS, ...LEGACY_MD_MARKERS]
 
 /** First paragraph of the block (notice) */
 export const MD_HEADER =
@@ -45,9 +46,15 @@ export function codexRuleNames(sources: Sources): string[] {
   return blockRuleNames(sources, 'codex')
 }
 
+/** Where to edit instead (library root in ~ form when home is known): agents asked to change a rule edit the source */
+export function blockSourceLine(sources: Sources, home?: string): string {
+  const root = home ? tilde(home, sources.agentsDir) : sources.agentsDir
+  return `Edit the sources, not this block: \`${root}/rules/<name>.md\` and \`${root}/memory/MEMORY.md\`. Edits here are replaced on the next sync.`
+}
+
 /** Marker block body for tools that get rules inlined (Codex AGENTS.md, Gemini GEMINI.md) */
-export function buildRulesBlockBody(sources: Sources, tool: ToolId, header = MD_HEADER): string {
-  const parts = [header]
+export function buildRulesBlockBody(sources: Sources, tool: ToolId, header = MD_HEADER, home?: string): string {
+  const parts = [`${header}\n${blockSourceLine(sources, home)}`]
   // Skip rules disabled for the tool (all included if there is no manifest)
   for (const r of sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool))) {
     parts.push(`<!-- rules/${r.name} -->\n` + r.text.trim())
@@ -58,8 +65,8 @@ export function buildRulesBlockBody(sources: Sources, tool: ToolId, header = MD_
   return parts.join('\n\n---\n\n')
 }
 
-export function buildCodexAgentsBody(sources: Sources): string {
-  return buildRulesBlockBody(sources, 'codex')
+export function buildCodexAgentsBody(sources: Sources, home?: string): string {
+  return buildRulesBlockBody(sources, 'codex', MD_HEADER, home)
 }
 
 /** Rule and memory names inside a marker block (current or legacy markers) */
@@ -76,7 +83,7 @@ export const codexAgents: TargetDef = {
   rel: '.codex/AGENTS.md',
   optional: true,
   region: (text) => blockBodyMulti(text, ALL_MD_MARKERS),
-  build(before, { sources }) {
+  build(before, { sources, home }) {
     // With no rules or memory to write, don't create a block and remove any previously written one
     if (!codexRuleNames(sources).length && sources.memoryIndex === null) {
       const after = removeBlockMulti(before, ALL_MD_MARKERS)
@@ -89,7 +96,7 @@ export const codexAgents: TargetDef = {
       before,
       MD_MARKERS,
       LEGACY_MD_MARKERS,
-      buildCodexAgentsBody(sources)
+      buildCodexAgentsBody(sources, home)
     )
     const outside = outsideBlockMulti(after, ALL_MD_MARKERS).trim()
     const notes = [`kept outside markers: ${outside.length} chars (Codex-only text)`]

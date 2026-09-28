@@ -50,13 +50,33 @@ export function claudeMemoryContent(text: string, memoryDir: string): string {
   })
 }
 
-/** Rule source content (converted content for the memory index) */
+/**
+ * First line of every rule copy (after YAML frontmatter): the library file to edit instead. An agent asked to change a rule opens
+ * the copy, sees this and edits the source, which then reaches every tool
+ */
+export const SOURCE_NOTE_PREFIX = '<!-- Illithid copy. Edit the source instead: '
+const SOURCE_NOTE_RE = /^<!-- Illithid copy\. Edit the source instead: .* -->\r?\n/m
+const FRONTMATTER_RE = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/
+
+export function withSourceNote(text: string, sourceTilde: string): string {
+  const note = `${SOURCE_NOTE_PREFIX}${sourceTilde} -->\n`
+  const fm = FRONTMATTER_RE.exec(text)
+  if (!fm) return note + text
+  const head = fm[0].endsWith('\n') ? fm[0] : fm[0] + '\n'
+  return head + note + text.slice(fm[0].length)
+}
+
+/** Copy text without the source note (first one only) */
+export function stripSourceNote(text: string): string {
+  return text.replace(SOURCE_NOTE_RE, '')
+}
+
+/** Rule source content as copied: converted links for the memory index, plus the source note */
 function sourceContent(home: string, name: string, source: string): string {
   const text = readFileSync(source, 'utf8')
   const lp = libraryPaths(home)
-  return name === CLAUDE_MEMORY_RULE && resolve(source) === lp.memoryIndex
-    ? claudeMemoryContent(text, lp.memoryDir)
-    : text
+  const body = name === CLAUDE_MEMORY_RULE && resolve(source) === lp.memoryIndex ? claudeMemoryContent(text, lp.memoryDir) : text
+  return withSourceNote(body, tilde(home, source))
 }
 
 export function claudeRulesPaths(home: string): {

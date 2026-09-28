@@ -43,7 +43,7 @@ export const geminiRules: TargetDef = {
         notes: [after === before ? '0 rules/memory — block not written' : '0 rules/memory — previous block removed']
       }
     }
-    const after = spliceBlockMulti(before, MD_MARKERS, [], buildRulesBlockBody(sources, 'gemini', GEMINI_MD_HEADER))
+    const after = spliceBlockMulti(before, MD_MARKERS, [], buildRulesBlockBody(sources, 'gemini', GEMINI_MD_HEADER, ctx.home))
     const outside = outsideBlock(after, MD_BEGIN, MD_END).trim()
     const notes = [`kept outside markers: ${outside.length} chars (Gemini-only text)`]
     if (blockEdited(before, ctx.applied?.geminiRules) && after !== before)

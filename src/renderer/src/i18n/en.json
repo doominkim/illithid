@@ -429,7 +429,10 @@
       "mcp": "MCP server"
     },
     "libraryDirect": "Reads the library directly",
-    "planChanged": "The changes were updated since you opened this. Review them again, then apply."
+    "planChanged": "The changes were updated since you opened this. Review them again, then apply.",
+    "editedIn": "Edited in {{tool}}",
+    "keepEdited": "Keep this version",
+    "keptEdited": "Saved to the library"
   },
   "onboarding": {
     "title": "Set up Illithid",

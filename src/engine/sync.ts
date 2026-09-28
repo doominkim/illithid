@@ -13,7 +13,7 @@ import { apply, type ApplyResult } from './apply'
 import { deleteSyncCandidates, type DeleteRequest, type DeleteResult } from './deleteCopies'
 import { activeWorkspaceId, clearToolsRetiring, readConfig, toolsRetiring, withActiveWorkspace, workspaceIds } from './config'
 import type { ToolId } from './agents'
-import { rulesBlockItems } from './targets/codexAgents'
+import { MD_MARKERS, rulesBlockItems } from './targets/codexAgents'
 import { planAll } from './plan'
 import { applyRuleSync, planRuleSync, type RuleSyncItem, type RuleSyncResult } from './ruleSync'
 import {
@@ -27,7 +27,7 @@ import { libraryExists } from './sources'
 import { activePending, dropPending, retireHash, type RetireKind } from './pendingRetire'
 import { readState, writeState } from './state'
 import { ALL_TARGET_IDS, ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
-import { sha256 } from './text'
+import { blockBodyMulti, sha256 } from './text'
 import type { Env, FileChange } from './types'
 
 export interface SyncAllOptions {
@@ -201,6 +201,22 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
   if (done.length) clearToolsRetiring(home, done)
 }
 
+/**
+ * Rules-block targets (Codex AGENTS.md, Gemini GEMINI.md) whose current-marker block changed since the app last wrote it.
+ * Blocks under earlier markers (previous app names) are replaced as usual
+ */
+function editedBlockTargets(home: string, plan: SyncPlan): Set<string> {
+  const applied = readState(home).state.applied
+  const out = new Set<string>()
+  for (const id of ['codexAgents', 'geminiRules'] as const) {
+    const c = plan.targets.find((x) => x.id === id)
+    const rec = applied[id]
+    const body = c ? blockBodyMulti(c.before, [MD_MARKERS]) : null
+    if (c?.changed && rec && body !== null && sha256(body) !== rec.regionHash) out.add(id)
+  }
+  return out
+}
+
 export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllResult {
   if (!libraryExists(home)) {
     return {
@@ -214,9 +230,17 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   if (!opts.approvedOnce && !realApplyAllowed(home)) return { libraryExists: true, plan, refused: 'realHomeNotAllowed' }
   if (opts.expectFingerprint !== undefined && opts.expectFingerprint !== planFingerprint(plan))
     return { libraryExists: true, plan, refused: 'planChanged' }
+  // Automatic syncs leave rules edited on the tool side (drifted copies, edited Codex/Gemini blocks) for the preview, where the
+  // user keeps the tool's version or restores the library's; an approved apply restores
+  const held = opts.approvedOnce ? new Set<string>() : editedBlockTargets(home, plan)
   const results: SyncResults = {
-    targets: apply(home, env, [...ALL_TARGET_IDS], opts.secrets ? { secrets: opts.secrets } : {}),
-    rules: applyRuleSync(home, env, plan.rules, { allowLinkRemoval: !!opts.allowLinkRemoval }),
+    targets: apply(home, env, ALL_TARGET_IDS.filter((id) => !held.has(id)), opts.secrets ? { secrets: opts.secrets } : {}),
+    rules: applyRuleSync(
+      home,
+      env,
+      opts.approvedOnce ? plan.rules : plan.rules.filter((x) => !(x.action === 'update' && x.drift)),
+      { allowLinkRemoval: !!opts.allowLinkRemoval }
+    ),
     skills: applySkillSync(home, env, plan.skills),
     agents: applyAgentSync(home, env, plan.agents)
   }

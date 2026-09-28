@@ -185,7 +185,8 @@ import {
   LEGACY_APP_LIBRARY_DIRS,
   workspacesRoot
 } from '../src/engine/config'
-import { CLAUDE_RULES_DIR, LEGACY_CLAUDE_RULES_DIRS } from '../src/engine/ruleSync'
+import { CLAUDE_RULES_DIR, LEGACY_CLAUDE_RULES_DIRS, SOURCE_NOTE_PREFIX, stripSourceNote } from '../src/engine/ruleSync'
+import { adoptEditedRule, editedRules } from '../src/engine/editedRules'
 import { LEGACY_MANIFEST_FILES } from '../src/engine/manifest'
 import { BACKUP_SUFFIX, LEGACY_BACKUP_SUFFIXES } from '../src/engine/write'
 import {
@@ -854,7 +855,7 @@ async function toolSteps(): Promise<void> {
       const ins = join(H, '.copilot/instructions')
       const mem = read(join(ins, 'illithid/MEMORY.instructions.md'))
       // Copilot applies *.instructions.md automatically only with applyTo (or description) — the copy gets applyTo: "**"
-      if (read(join(ins, 'illithid/style.instructions.md')) !== '---\napplyTo: "**"\n---\n\n' + readRule(H, 'style.md')) bad.push('rule copy')
+      if (stripSourceNote(read(join(ins, 'illithid/style.instructions.md'))) !== '---\napplyTo: "**"\n---\n\n' + readRule(H, 'style.md')) bad.push('rule copy')
       if (!mem.startsWith('---\napplyTo: "**"\n---\n\n')) bad.push('memory copy applyTo')
       if (!mem.includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory index copy (absolute links)')
       if (read(join(ins, 'user.instructions.md')) !== C_USER_INS || read(join(ins, 'illithid/stray.instructions.md')) !== '# stray\n') bad.push('user instructions touched')
@@ -989,7 +990,7 @@ async function toolSteps(): Promise<void> {
         return hit ? read(hit) : null
       }
       if (existsSync(join(H, '.copilot/instructions/team.instructions.md')) || imp('copilot/instructions/team.instructions.md') !== '# Team\n\n- Tabs.\n') bad.push('instructions original not retired')
-      if (read(join(H, '.copilot/instructions/illithid/team.instructions.md')) !== '---\napplyTo: "**"\n---\n\n# Team\n\n- Tabs.\n') bad.push('instructions copy')
+      if (stripSourceNote(read(join(H, '.copilot/instructions/illithid/team.instructions.md'))) !== '---\napplyTo: "**"\n---\n\n# Team\n\n- Tabs.\n') bad.push('instructions copy')
       if (read(join(H, '.copilot/agents/cag.agent.md')) !== renderAgent('copilot', readAgentDoc(H, 'cag')) || imp('copilot/agents/cag.agent.md') !== CAG) bad.push('agent not replaced')
       if (read(join(H, '.copilot/copilot-instructions.md')) !== '# My Copilot notes\n' || existsSync(join(H, '.copilot/instructions/illithid/copilot-instructions.instructions.md'))) bad.push('copilot-instructions.md moved or copied back')
       if (read(join(H, '.copilot/instructions/scoped.instructions.md')) !== '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n') bad.push('scoped instructions touched')
@@ -1095,7 +1096,7 @@ async function toolSteps(): Promise<void> {
       const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
       if (!r.results) bad.push('sync refused')
       const rd = join(H, '.grok/rules')
-      if (read(join(rd, 'style.md')) !== readRule(H, 'style.md')) bad.push('rule copy')
+      if (stripSourceNote(read(join(rd, 'style.md'))) !== readRule(H, 'style.md')) bad.push('rule copy')
       if (!read(join(rd, 'illithid-memory.md')).includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory copy')
       if (read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']) bad.push('user rule touched')
       if (!readState(H).state.toolRules?.grok?.['style.md']) bad.push('toolRules.grok state')
@@ -1295,6 +1296,65 @@ async function toolSteps(): Promise<void> {
         'ak. tool off removes its app copies — Claude off: rules/skills/agents copies and owned ~/.claude.json servers removed, user files and other tools kept, retiring cleared; Grok off: rules copies and config.toml block removed; back on restores',
         !bad.length,
         bad.length ? bad.join('; ') : 'Claude and Grok retired cleanly, restored on re-enable'
+      )
+    }
+
+    // ---- ak3. rule copies say where the source is; rules edited on the tool side (copy or Codex/Gemini block section) are held by
+    // automatic syncs, listed as edited, and "keep this version" saves them to the library so every tool gets them
+    {
+      const bad: string[] = []
+      const envK: Env = { PATH: '' }
+      const memK = memorySecretBackend()
+      const H = makeFixture('illithid-m7-K5-')
+      unlinkSync(join(H, '.agents'))
+      for (const [rel, body] of Object.entries({ '.codex/AGENTS.md': '# mine\n', '.gemini/GEMINI.md': '', '.copilot/config.json': '{}\n' })) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      writeConfig(H, { version: 1, toolsInUse: ['claude', 'codex', 'gemini', 'copilot'], allowRealApply: true })
+      initLibrary(H)
+      createRule(H, 'style.md', '# Style\n\n- Tabs.\n')
+      createRule(H, 'scoped.md', '---\npaths: ["src/**"]\n---\n# Scoped\n')
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      const claudeCopy = (n: string): string => read(join(H, '.claude/rules', CLAUDE_RULES_DIR, n))
+      const src = (n: string): string => `~/.illithid/workspaces/default/rules/${n}`
+      if (!claudeCopy('style.md').startsWith(`${SOURCE_NOTE_PREFIX}${src('style.md')} -->\n# Style`)) bad.push(`note ${JSON.stringify(claudeCopy('style.md'))}`)
+      if (!claudeCopy('scoped.md').startsWith(`---\npaths: ["src/**"]\n---\n${SOURCE_NOTE_PREFIX}`)) bad.push(`frontmatter ${JSON.stringify(claudeCopy('scoped.md'))}`)
+      if (!read(join(H, '.codex/AGENTS.md')).includes('Edit the sources, not this block: `~/.illithid/workspaces/default/rules/<name>.md`')) bad.push('codex block source line')
+      const cop = read(join(H, '.copilot/instructions/illithid/style.instructions.md'))
+      if (!cop.startsWith(`---\napplyTo: "**"\n---\n\n${SOURCE_NOTE_PREFIX}`)) bad.push(`copilot ${JSON.stringify(cop)}`)
+      if (editedRules(H, envK).length) bad.push('edited before any edit')
+      // an agent edits the Claude copy, the Copilot copy and the Codex block section
+      const cp = join(H, '.claude/rules', CLAUDE_RULES_DIR, 'style.md')
+      writeFileSync(cp, claudeCopy('style.md').replace('- Tabs.', '- Spaces, two.'))
+      const pp = join(H, '.copilot/instructions/illithid/scoped.instructions.md')
+      writeFileSync(pp, read(pp).replace('# Scoped', '# Scoped\n- Only src.'))
+      const ap = join(H, '.codex/AGENTS.md')
+      writeFileSync(ap, read(ap).replace('# Scoped', '# Scoped from Codex'))
+      const snap = [read(cp), read(pp), read(ap)]
+      syncAll(H, envK, { allowReal: true, secrets: memK })
+      if (read(cp) !== snap[0] || read(pp) !== snap[1] || read(ap) !== snap[2]) bad.push('automatic sync overwrote tool-side edits')
+      const ed = editedRules(H, envK).map((e) => `${e.tool}:${e.name}:${e.where}`).sort()
+      if (ed.join() !== 'claude:style.md:copy,codex:scoped.md:block,copilot:scoped.md:copy') bad.push(`edited ${ed}`)
+      if (pendingSyncCount(H, envK, memK) === 0) bad.push('edits not pending')
+      // keep the Claude version of style.md: library gets it without the note, every tool follows after an approved apply
+      adoptEditedRule(H, envK, 'claude', 'style.md')
+      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, two.\n') bad.push(`adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
+      // keep the Copilot version of scoped.md: applyTo added by the app is taken back out, the source frontmatter stays
+      adoptEditedRule(H, envK, 'copilot', 'scoped.md')
+      if (readRule(H, 'scoped.md') !== '---\npaths: ["src/**"]\n---\n# Scoped\n- Only src.\n') bad.push(`copilot adopted ${JSON.stringify(readRule(H, 'scoped.md'))}`)
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      if (!read(ap).includes('- Spaces, two.') || !read(ap).includes('- Only src.') || read(ap).includes('Scoped from Codex')) bad.push('codex block after adopt')
+      if (!read(join(H, '.gemini/GEMINI.md')).includes('- Spaces, two.')) bad.push('gemini after adopt')
+      if (editedRules(H, envK).length || pendingSyncCount(H, envK, memK) !== 0) bad.push(`left ${JSON.stringify(editedRules(H, envK))}`)
+      // Codex block section adopted
+      writeFileSync(ap, read(ap).replace('- Spaces, two.', '- Spaces, four.'))
+      adoptEditedRule(H, envK, 'codex', 'style.md')
+      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, four.\n') bad.push(`codex adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
+      check(
+        'ak3. rule copies carry the source path (after frontmatter; Codex/Gemini block line); tool-side edits held by automatic sync and listed; keep saves them to the library (note and added applyTo removed) and every tool follows',
+        !bad.length,
+        bad.length ? bad.join('; ') : 'notes, hold, 3 edits listed, adopted from Claude/Copilot/Codex, synced everywhere'
       )
     }
 
@@ -1740,10 +1800,16 @@ async function run(): Promise<void> {
       }
     )
     if (before.some((x) => x !== 'needsSync')) bad.push(`status before restore ${before.join(',')}`)
-    const r = syncAll(F, env, { allowReal: true })
-    const t = r.results!.targets
+    // Automatic sync leaves the edited rule copy and Codex block for the preview; the edited rule is listed there
+    const r0 = syncAll(F, env, { allowReal: true })
+    if (sha(read(ap)) !== snaps.ap || sha(read(rp)) !== snaps.rp) bad.push('automatic sync overwrote tool-side rule edits')
+    const edited = editedRules(F, env)
+    if (!edited.some((e) => e.tool === 'claude' && e.name === legacyRules[0] && e.where === 'copy' && e.text.endsWith('fixture rule edit\n')))
+      bad.push(`edited ${JSON.stringify(edited.map((e) => [e.tool, e.name, e.where]))}`)
+    const r = syncAll(F, env, { allowReal: true, approvedOnce: true })
+    // Permissions and skills aren't held: the automatic sync already restored them
     for (const id of ['claudePermissions', 'codexAgents']) {
-      const x = t.find((y) => y.id === id)
+      const x = (id === 'claudePermissions' ? r0 : r).results!.targets.find((y) => y.id === id)
       if (x?.status !== 'written' || !x.restored) bad.push(`${id} ${x?.status}/${x?.restored}`)
     }
     if (
@@ -1761,8 +1827,8 @@ async function run(): Promise<void> {
       sha(read(rr.backupPath)) !== snaps.rp
     )
       bad.push(`rule restore ${rr?.status}/${rr?.reason}`)
-    if (read(rp) !== readRule(F, legacyRules[0])) bad.push('rule content not restored')
-    const sr = r.results!.skills.find((x) => x.tool === 'claude' && x.name === K)
+    if (stripSourceNote(read(rp)) !== readRule(F, legacyRules[0])) bad.push('rule content not restored')
+    const sr = r0.results!.skills.find((x) => x.tool === 'claude' && x.name === K)
     const bak = skillBackupPath(F, 'claude', K)
     if (
       sr?.status !== 'done' ||
@@ -1782,7 +1848,7 @@ async function run(): Promise<void> {
     if (after.some((x) => x !== 'synced')) bad.push(`status after restore ${after.join(',')}`)
     if (changedOrError(planAll(F, env)).length) bad.push('re-plan changes after restore')
     check(
-      'c. external edits on the tool side (permissions, AGENTS.md, rule copy, skill copy) → sync restores from source and backs up',
+      'c. external edits on the tool side (permissions, AGENTS.md, rule copy, skill copy) → automatic sync keeps rule edits for the preview (listed as edited); approved sync restores from source and backs up',
       !bad.length,
       bad.length
         ? bad.join('; ')
@@ -4379,7 +4445,7 @@ async function run(): Promise<void> {
     const item = (n: string): { action?: string; status?: string } => rs.results!.rules.find((x) => x.name === n) ?? {}
     if (item(B).action !== 'copy' || item(B).status !== 'done') bad.push(`new name ${item(B).action}/${item(B).status}`)
     if (item(A).action !== 'deleteCandidate' || item(A).status !== 'done') bad.push(`old name ${item(A).action}/${item(A).status}`)
-    if (existsSync(join(cdir, A)) || read(join(cdir, B)) !== read(join(rules, B))) bad.push('claude copy')
+    if (existsSync(join(cdir, A)) || stripSourceNote(read(join(cdir, B))) !== read(join(rules, B))) bad.push('claude copy')
     const bk = deletedBackup(F, `rules/${A}`)
     if (!bk || read(bk) !== aBytes) bad.push('old name backup bytes')
     const oc = ocOf()
@@ -4441,7 +4507,7 @@ async function run(): Promise<void> {
     const p2 = pendingSyncCount(F, env)
     if (!once.results) bad.push(`one-time apply refused ${once.refused ?? ''}`)
     if (p2 !== 0) bad.push(`pending after one-time apply ${p2}`)
-    if (!existsSync(join(cdir, R)) || read(join(cdir, R)) !== '# zz pending\n') bad.push('no claude copy')
+    if (!existsSync(join(cdir, R)) || stripSourceNote(read(join(cdir, R))) !== '# zz pending\n') bad.push('no claude copy')
     if (readConfig(F).config.allowRealApply !== false) bad.push('one-time apply changed settings')
     const s1 = snap()
     pendingSyncCount(F, env)
@@ -5690,7 +5756,7 @@ async function run(): Promise<void> {
       if (failed.length) bad.push(`sync failures ${failed.map((x) => `${x.name}:${x.reason}`).join(',')}`)
       const rulesTop = readdirSync(join(H, '.claude/rules')).sort().join(',')
       if (rulesTop !== CLAUDE_RULES_DIR) bad.push(`~/.claude/rules = ${rulesTop} (duplicate or missing)`)
-      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== RULE) bad.push('app rule copy')
+      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE) bad.push('app rule copy')
       if (importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('rule original not in backups/imported')
       if (read(join(H, '.claude/agents/helper.md')) !== renderAgent('claude', readAgentDoc(H, 'helper'))) bad.push('agent not replaced by render')
       if (importedFile(H, 'claude/agents/helper.md') !== AGENT) bad.push('agent original not in backups/imported')
@@ -6027,14 +6093,14 @@ async function run(): Promise<void> {
       if (pOther.includes('retireImported') || pOther.includes('importedChanged')) bad.push(`other-workspace plan ${pOther}`)
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       if (read(join(H, '.claude/rules/team-style.md')) !== RULE || existsSync(importedBackupRoot(H))) bad.push('original swapped from another workspace')
-      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== OTHER) bad.push('other-workspace app copy')
+      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== OTHER) bad.push('other-workspace app copy')
       if ((readState(H).state.pendingRetire ?? []).length !== 1) bad.push('record dropped in another workspace')
       switchWorkspace(H, 'default')
       const pBack = planSyncAll(H, envH, memH).rules.map((x) => `${x.name}:${x.action}`).join(',')
       if (!pBack.includes('team-style.md:retireImported')) bad.push(`plan after switching back ${pBack}`)
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       if (existsSync(join(H, '.claude/rules/team-style.md')) || importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('original not retired after switching back')
-      if (read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md')) !== RULE) bad.push('default app copy')
+      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE) bad.push('default app copy')
       if (readState(H).state.pendingRetire?.length) bad.push('record left after switching back')
       check(
         'af4. HAR-12 pendingRetire per workspace — Sync in another workspace with a same-name rule leaves the original and the record; switching back retires it',

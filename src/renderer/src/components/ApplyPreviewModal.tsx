@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Badge, Box, Button, Group, Modal, Stack, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import type { ApplyPreviewAction, ApplyPreviewItem, ApplyPreviewView, ImportedChangedItem, ToolId } from '../../../shared/api'
-import { runWrite } from '../lib/mutate'
+import type { ApplyPreviewAction, ApplyPreviewItem, ApplyPreviewView, EditedRuleItem, ImportedChangedItem, ToolId } from '../../../shared/api'
+import { LIBRARY_CHANGED, runWrite } from '../lib/mutate'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { Loading } from './Layout'
@@ -57,6 +57,17 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
     if (r !== null) load()
   }
 
+  // A rule an agent edited in a tool: save that version to the library (it then reaches every tool) instead of restoring
+  const keepEdited = async (x: EditedRuleItem): Promise<void> => {
+    setKeeping(`edited:${x.tool}:${x.name}`)
+    const r = await runWrite(window.api.editedRuleKeep(x.tool, x.name), { success: t('preview.keptEdited') })
+    setKeeping(null)
+    if (r !== null) {
+      window.dispatchEvent(new Event(LIBRARY_CHANGED))
+      load()
+    }
+  }
+
   const apply = async (): Promise<void> => {
     if (!view?.fingerprint) return
     setBusy(true)
@@ -87,6 +98,7 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
     (tool) =>
       byTool(tool).length ||
       view.importedChanged.some((x) => x.tool === tool) ||
+      view.edited.some((x) => x.tool === tool) ||
       view.notInitialized.some((x) => x.tool === tool) ||
       view.libraryDirect.some((x) => x.tool === tool)
   )
@@ -170,6 +182,36 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                         <Badge variant="light" color="yellow" size="xs" fw={500} data-testid="apply-preview-not-initialized">
                           {t(`sync.${x.reason ?? 'notInitialized'}`, { tool: TOOL_NAME[tool] })}
                         </Badge>
+                      }
+                    />
+                  ))}
+                {view.edited
+                  .filter((x) => x.tool === tool)
+                  .map((x) => (
+                    <ListRow
+                      key={`edited:${x.name}`}
+                      title={x.name}
+                      tags={
+                        <>
+                          <Badge variant="default" size="xs" fw={500} c="dimmed">
+                            {t('preview.kind.rule')}
+                          </Badge>
+                          <Badge variant="light" color="yellow" size="xs" fw={500} data-testid="apply-preview-edited">
+                            {t('preview.editedIn', { tool: TOOL_NAME[tool] })}
+                          </Badge>
+                        </>
+                      }
+                      subtitle={x.path}
+                      right={
+                        <Button
+                          size="compact-xs"
+                          variant="default"
+                          loading={keeping === `edited:${x.tool}:${x.name}`}
+                          onClick={() => void keepEdited(x)}
+                          data-testid={`apply-preview-keep-edited-${x.tool}-${x.name}`}
+                        >
+                          {t('preview.keepEdited')}
+                        </Button>
                       }
                     />
                   ))}

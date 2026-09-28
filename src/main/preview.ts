@@ -17,6 +17,7 @@ import {
   type SyncPlan,
   type ToolId
 } from '../engine'
+import { editedRules } from '../engine/editedRules'
 import { toolsInUse } from '../engine/config'
 import { parseJsonObject } from '../engine/text'
 import type { ApplyPreviewItem, ApplyPreviewView, ImportedKeepRequest, LibraryDirectItem } from '../shared/api'
@@ -37,7 +38,7 @@ function planItems(p: SyncPlan): PlanItem[] {
 export function applyPreview(home: string, env: Env): ApplyPreviewView {
   const inUse = toolsInUse(home)
   if (!libraryExists(home))
-    return { items: [], importedChanged: [], errors: [], notInitialized: [], libraryDirect: [], libraryMissing: true, inUse }
+    return { items: [], importedChanged: [], errors: [], notInitialized: [], libraryDirect: [], edited: [], libraryMissing: true, inUse }
   const p = planSyncAll(home, env)
   const items: ApplyPreviewItem[] = []
 
@@ -107,6 +108,7 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     errors,
     notInitialized: notInitializedOf(p.targets),
     libraryDirect: libraryDirect(home, inUse, items),
+    edited: editedRules(home, env).map((e) => ({ tool: e.tool, name: e.name, path: tilde(home, e.path), where: e.where })),
     inUse,
     fingerprint: planFingerprint(p)
   }

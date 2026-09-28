@@ -429,7 +429,10 @@
       "mcp": "MCP 服务器"
     },
     "libraryDirect": "直接读取库",
-    "planChanged": "打开后变更内容已更新。请重新确认后再应用。"
+    "planChanged": "打开后变更内容已更新。请重新确认后再应用。",
+    "editedIn": "已在 {{tool}} 中修改",
+    "keepEdited": "保留此版本",
+    "keptEdited": "已保存到库"
   },
   "onboarding": {
     "title": "开始使用 Illithid",

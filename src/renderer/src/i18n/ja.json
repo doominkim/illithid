@@ -429,7 +429,10 @@
       "mcp": "MCP サーバー"
     },
     "libraryDirect": "ライブラリを直接読み込み",
-    "planChanged": "表示後に変更内容が更新されました。もう一度確認してから反映してください。"
+    "planChanged": "表示後に変更内容が更新されました。もう一度確認してから反映してください。",
+    "editedIn": "{{tool}} で編集済み",
+    "keepEdited": "この版を残す",
+    "keptEdited": "ライブラリに保存しました"
   },
   "onboarding": {
     "title": "Illithid をはじめる",

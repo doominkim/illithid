@@ -55,6 +55,7 @@ import type {
 } from '../shared/api'
 import type { Op } from './reads'
 import * as W from './writes'
+import { adoptEditedRule } from '../engine/editedRules'
 import { keepImportedOriginal } from './preview'
 import { shellEnvReady } from './shellEnv'
 import { marketHandlers } from './market'
@@ -464,6 +465,15 @@ export function registerIpc(): void {
       return W.wrap(() =>
         keepImportedOriginal(home, env, { kind: req.kind as never, tool: req.tool as ToolId, path: str(req.path) })
       )
+    },
+    editedRuleKeep: async (tool, name) => {
+      const g = W.libGate(home)
+      if (g) return g
+      const env = await envNow()
+      W.markSelfWrite()
+      const r = W.wrap(() => adoptEditedRule(home, env, tool as ToolId, str(name)))
+      W.markSelfWrite()
+      return r
     },
     deleteCandidates: async (items) => {
       const env = await envNow()

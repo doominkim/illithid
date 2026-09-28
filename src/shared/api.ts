@@ -688,6 +688,8 @@ export interface Api {
   syncPreview(): Promise<ApplyPreviewView>
   /** Keep an imported original that changed since import and stop replacing it */
   importedKeep(item: ImportedKeepRequest): Promise<WriteResult | Refused>
+  /** Save a rule's tool-side version into the library (it then reaches every tool) */
+  editedRuleKeep(tool: ToolId, name: string): Promise<WriteResult | Refused>
   deleteCandidates(items: DeleteCandidateRequest[]): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
   modelSet(tool: ToolId, key: string, value: string): Promise<WriteResult<SetModelResult> | Refused>
   // ---- backup (available=false / notAvailable until the engine is ready)
@@ -747,12 +749,23 @@ export interface ImportedChangedItem {
 
 export type ImportedKeepRequest = Pick<ImportedChangedItem, 'kind' | 'tool' | 'path'>
 
+/** A rule edited in a tool (its copy, or its section of the Codex/Gemini block) — Apply restores the library's version */
+export interface EditedRuleItem {
+  tool: ToolId
+  name: string
+  /** Display path (~) */
+  path: string
+  where: 'copy' | 'block'
+}
+
 export interface ApplyPreviewView {
   items: ApplyPreviewItem[]
   importedChanged: ImportedChangedItem[]
   errors: string[]
   notInitialized: NotInitializedView[]
   libraryDirect: LibraryDirectItem[]
+  /** Rules edited on the tool side */
+  edited: EditedRuleItem[]
   libraryMissing?: boolean
   /** Tools in use (effective) */
   inUse: ToolId[]
@@ -841,6 +854,7 @@ export const CHANNELS = [
   'syncApplyOnce',
   'syncPreview',
   'importedKeep',
+  'editedRuleKeep',
   'deleteCandidates',
   'modelSet',
   'backupStatus',
