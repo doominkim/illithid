@@ -12,9 +12,19 @@ cd "$(dirname "$0")/.."
 npm version "$VERSION" --no-git-tag-version >/dev/null
 APPLE_KEYCHAIN_PROFILE=$PROFILE npm run build:mac
 
-for dmg in dist/illithid-arm64.dmg dist/illithid-x64.dmg; do
+DMGS=(dist/illithid-arm64.dmg dist/illithid-x64.dmg)
+
+# Both DMGs go to Apple at once (each wait is minutes); logs land next to them
+for dmg in $DMGS; do
+  xcrun notarytool submit "$dmg" --keychain-profile "$PROFILE" --wait > "$dmg.notary.log" 2>&1 &
+done
+wait
+
+for dmg in $DMGS; do
   echo "== $dmg"
-  xcrun notarytool submit "$dmg" --keychain-profile "$PROFILE" --wait | grep -E "status:" | tail -1
+  grep -E "status:" "$dmg.notary.log" | tail -1
+  grep -qE "status: Accepted" "$dmg.notary.log" || { echo "notarization failed, see $dmg.notary.log" >&2; exit 1; }
+  rm -f "$dmg.notary.log"
   xcrun stapler staple "$dmg" | tail -1
   mp=$(hdiutil attach -nobrowse -readonly "$dmg" | grep -o '/Volumes/.*' | tail -1)
   spctl -a -vv -t exec "$mp/Illithid.app" 2>&1 | head -2
