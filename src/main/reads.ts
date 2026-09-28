@@ -295,7 +295,9 @@ export function mcp(home: string, env: Env): McpData {
     const after = c ? parseServerTable(id, c.after) : null
     return {
       tool,
-      broken: !c || !!c.error || before === null || after === null,
+      // No plan for a tool that isn't in use (plan() leaves it out): not applicable, not an error
+      unused: !c,
+      broken: !!c && (!!c.error || before === null || after === null),
       before,
       after,
       serverErrors: c?.serverErrors ?? {}
@@ -303,6 +305,7 @@ export function mcp(home: string, env: Env): McpData {
   })
 
   const stateOf = (t: (typeof perTool)[number], name: string): McpToolState => {
+    if (t.unused) return 'notApplicable'
     if (t.broken || t.serverErrors[name]) return 'error'
     const b = t.before![name]
     const a = t.after![name]

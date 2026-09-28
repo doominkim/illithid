@@ -168,7 +168,7 @@ import {
 import { memoryPortability, rulePortability } from '../src/engine/importer'
 import { MASK } from '../src/shared/api'
 import { serverChanges, TARGETS } from '../src/engine/targets'
-import { skills as readsSkills } from '../src/main/reads'
+import { mcp as readsMcp, skills as readsSkills } from '../src/main/reads'
 import { applyPreview } from '../src/main/preview'
 import {
   applyBackupCleanup,
@@ -1355,6 +1355,27 @@ async function toolSteps(): Promise<void> {
         'ak3. rule copies carry the source path (after frontmatter; Codex/Gemini block line); tool-side edits held by automatic sync and listed; keep saves them to the library (note and added applyTo removed) and every tool follows',
         !bad.length,
         bad.length ? bad.join('; ') : 'notes, hold, 3 edits listed, adopted from Claude/Copilot/Codex, synced everywhere'
+      )
+    }
+
+    // ---- ak4. MCP view: tools not in use show as not applicable, never as errors (a red dot on every server)
+    {
+      const envK: Env = { PATH: '' }
+      const memK = memorySecretBackend()
+      const H = makeFixture('illithid-m7-K6-')
+      unlinkSync(join(H, '.agents'))
+      mkdirSync(join(H, '.claude'), { recursive: true })
+      writeFileSync(join(H, '.claude.json'), '{}\n')
+      writeConfig(H, { version: 1, toolsInUse: ['claude'] })
+      initLibrary(H)
+      upsertMcpServer(H, 'k-srv', { transport: 'stdio', command: 'npx', args: ['k'] })
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      const tools = readsMcp(H, envK).servers.find((x) => x.name === 'k-srv')?.tools ?? {}
+      const others = Object.entries(tools).filter(([t]) => t !== 'claude')
+      check(
+        'ak4. MCP view — tools not in use are notApplicable (no error dot), the tool in use is synced',
+        tools.claude === 'synced' && others.length > 0 && others.every(([, v]) => v === 'notApplicable'),
+        JSON.stringify(tools)
       )
     }
 
