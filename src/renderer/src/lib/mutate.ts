@@ -59,6 +59,9 @@ export async function runWrite<T>(
 /** Library write succeeded (to recount pending applies) */
 export const LIBRARY_CHANGED = 'illithid:libraryChanged'
 
+/** Menu bar item asked to switch workspace (detail = workspace id); the workspace picker runs its usual confirmation */
+export const WORKSPACE_SWITCH_REQUEST = 'illithid:workspaceSwitchRequest'
+
 /** Skip reasons worth telling the user about after an apply (imported originals left in place) */
 const NOTICE_REASONS = new Set(['importedChanged', 'noAppCopy'])
 

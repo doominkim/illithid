@@ -271,6 +271,16 @@ export interface WorkspaceView {
   active: boolean
 }
 
+/** Menu bar item state, pushed by the renderer */
+export interface TrayState {
+  pending: number
+  failed: number
+  workspaces: WorkspaceView[]
+}
+
+/** Menu bar item clicks the renderer handles (main shows the window first) */
+export type TrayAction = { kind: 'settings' } | { kind: 'workspace'; id: string }
+
 export interface WorkspaceExportResult {
   /** Saved file (~ form) */
   path: string
@@ -595,6 +605,10 @@ export interface Api {
   workspaceImport(): Promise<WriteResult<WorkspaceImportView | null>>
   /** Status sent by main after library watch and auto sync. Returns an unsubscribe function */
   onSyncEvent(cb: (s: SyncStatusView) => void): () => void
+  /** Menu bar item state (macOS) */
+  traySet(state: TrayState): Promise<void>
+  /** Menu bar item clicks. Returns an unsubscribe function */
+  onTrayAction(cb: (a: TrayAction) => void): () => void
   // ---- library writes (library required. Auto sync after save when allowRealApply)
   toggle(kind: ManifestKind, name: string, tool: ToolId, on: boolean): Promise<WriteResult<Manifest> | Refused>
   ruleRead(name: string): Promise<WriteResult<string>>
@@ -815,7 +829,8 @@ export const CHANNELS = [
   'backupSetDevice',
   'backupSetAuto',
   'backupCleanupPreview',
-  'backupCleanupRun'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent'>[]
+  'backupCleanupRun',
+  'traySet'
+] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction'>[]
 
 export type Channel = (typeof CHANNELS)[number]

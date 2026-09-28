@@ -5,6 +5,7 @@ import { Download, Pencil, Trash2, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SwitchLossItem, WorkspaceView } from '../../../shared/api'
 import { TOOL_NAME } from '../lib/tools'
+import { WORKSPACE_SWITCH_REQUEST } from '../lib/mutate'
 import { ConfirmModal } from './ConfirmModal'
 
 const NEW = '__new__'
@@ -55,6 +56,20 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
     setLosses(null)
     setSwitchTo(w)
   }
+
+  // From the menu bar item: same confirmation as picking it here
+  useEffect(() => {
+    const on = (e: Event): void => {
+      const id = (e as CustomEvent<string>).detail
+      window.api.workspaces().then((ws) => {
+        setList(ws)
+        const w = ws.find((x) => x.id === id)
+        if (w && !w.active) openSwitch(w)
+      }, () => {})
+    }
+    window.addEventListener(WORKSPACE_SWITCH_REQUEST, on)
+    return () => window.removeEventListener(WORKSPACE_SWITCH_REQUEST, on)
+  }, [])
 
   const onSelect = (v: string | null): void => {
     if (!v) return

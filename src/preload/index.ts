@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { CHANNELS, type Api } from '../shared/api'
 
-// The invoke channel list is defined by CHANNELS in shared/api.ts. Events are onSyncEvent, onSearchIndexEvent and onBackupCleanupEvent (main -> renderer)
+// The invoke channel list is defined by CHANNELS in shared/api.ts. Events are onSyncEvent, onSearchIndexEvent, onTrayAction and onBackupCleanupEvent (main -> renderer)
 const api = {
   ...Object.fromEntries(
     CHANNELS.map((ch) => [ch, (...args: unknown[]) => ipcRenderer.invoke(`api:${ch}`, ...args)])
@@ -19,6 +19,13 @@ const api = {
     ipcRenderer.on('api:searchIndexEvent', listener)
     return () => {
       ipcRenderer.removeListener('api:searchIndexEvent', listener)
+    }
+  },
+  onTrayAction: (cb: (a: unknown) => void): (() => void) => {
+    const listener = (_e: unknown, a: unknown): void => cb(a)
+    ipcRenderer.on('api:trayAction', listener)
+    return () => {
+      ipcRenderer.removeListener('api:trayAction', listener)
     }
   },
   onBackupCleanupEvent: (cb: (r: unknown) => void): (() => void) => {

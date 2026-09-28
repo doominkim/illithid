@@ -35,7 +35,7 @@ import Backup from './views/Backup'
 import Onboarding from './views/Onboarding'
 import { ApplyPreviewModal } from './components/ApplyPreviewModal'
 import { SyncContext } from './lib/sync'
-import { LIBRARY_CHANGED, notifySync } from './lib/mutate'
+import { LIBRARY_CHANGED, notifySync, WORKSPACE_SWITCH_REQUEST } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
 
 export type { Menu }
@@ -180,6 +180,20 @@ function App(): React.JSX.Element {
     previewCancel.current = null
     setPreviewOpen(false)
   }, [])
+  // Menu bar item (macOS): push pending count and workspaces; run its clicks through the same flows as the window
+  useEffect(() => {
+    let alive = true
+    window.api.workspaces().then(
+      (workspaces) => {
+        if (!alive) return
+        void window.api.traySet({ pending: pending?.pending ?? 0, failed: pending?.failed ?? 0, workspaces })
+      },
+      () => {}
+    )
+    return () => {
+      alive = false
+    }
+  }, [pending, syncStatus, cfgTick])
   const syncCtx = useMemo(
     () => ({ status: syncStatus, refresh: refreshSync, syncNow, busy: syncBusy, pending, applyOnce, openPreview }),
     [syncStatus, refreshSync, syncNow, syncBusy, pending, applyOnce, openPreview]
@@ -202,6 +216,14 @@ function App(): React.JSX.Element {
       seq: r.seq + 1
     }))
   }, [])
+  useEffect(
+    () =>
+      window.api.onTrayAction((a) => {
+        if (a.kind === 'settings') navigate('settings')
+        else window.dispatchEvent(new CustomEvent(WORKSPACE_SWITCH_REQUEST, { detail: a.id }))
+      }),
+    [navigate]
+  )
 
   // After workspace switch or import: reload config and data (main already synced on switch)
   const onWorkspaceChange = useCallback((): void => {

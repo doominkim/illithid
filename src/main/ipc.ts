@@ -7,6 +7,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
+import { updateTray } from './tray'
 import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { extname, join } from 'node:path'
@@ -48,6 +49,7 @@ import type {
   Refused,
   SearchIndexView,
   TranscriptView,
+  TrayState,
   WriteResult
 } from '../shared/api'
 import type { Op } from './reads'
@@ -295,6 +297,7 @@ export function registerIpc(): void {
       })
     },
     detectTools: async () => detectTools(home, await envNow()),
+    traySet: async (state) => updateTray(state as TrayState),
     pickDirectory: async (current) => {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
       const opts = {

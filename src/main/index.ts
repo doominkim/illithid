@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow } from 'electron'
+import { setupTray } from './tray'
 import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -52,9 +53,26 @@ if (TEST_MODE && process.platform === 'darwin') {
   app.dock?.hide()
 }
 
+/** macOS outside tests: closing the window hides it and the app stays in the menu bar (Cmd+Q quits) */
+const MENU_BAR = process.platform === 'darwin' && !TEST_MODE
+let mainWindow: BrowserWindow | null = null
+let quitting = false
+
+/** Show the main window (re-created if it was destroyed) and bring the Dock icon back */
+function showMainWindow(): BrowserWindow | null {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow()
+  const w = mainWindow
+  if (!w) return null
+  if (MENU_BAR) void app.dock?.show()
+  if (w.isMinimized()) w.restore()
+  w.show()
+  w.focus()
+  return w
+}
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     show: false,
@@ -73,17 +91,28 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    if (!TEST_MODE) mainWindow.show()
+  const win = mainWindow
+  win.on('ready-to-show', () => {
+    if (!TEST_MODE) win.show()
+  })
+  // Close hides; the renderer keeps running so the menu bar item stays current
+  win.on('close', (e) => {
+    if (!MENU_BAR || quitting) return
+    e.preventDefault()
+    win.hide()
+    app.dock?.hide()
+  })
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  win.webContents.setWindowOpenHandler((details) => {
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   // Keep link clicks inside previews from navigating the app window away
-  mainWindow.webContents.on('will-navigate', (event, url) => {
+  win.webContents.on('will-navigate', (event, url) => {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     if (is.dev && devUrl && url.startsWith(devUrl)) return
     event.preventDefault()
@@ -93,9 +122,9 @@ function createWindow(): void {
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
@@ -120,6 +149,7 @@ app.whenReady().then(() => {
   registerIpc()
   prepareLibraryOnStart()
   createWindow()
+  if (MENU_BAR) setupTray(showMainWindow)
   // Sync source -> tools once right after startup (deferred so it does not block showing the window)
   setTimeout(() => {
     void envReady.then(() => {
@@ -132,8 +162,7 @@ app.whenReady().then(() => {
   // Content index (worker scans sessions and documents -> incremental index). Slightly delayed to avoid overlapping window display and first reads
   setTimeout(runSearchIndex, 3000)
 
-  // Auto backup on quit (once; quits for real when done)
-  let quitting = false
+  // Auto backup on quit (once; quits for real when done). Also lets the hidden window close for real
   app.on('before-quit', (e) => {
     if (quitting) return
     quitting = true
@@ -144,7 +173,8 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (MENU_BAR) showMainWindow()
+    else if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
