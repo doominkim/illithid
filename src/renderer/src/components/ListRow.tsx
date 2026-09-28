@@ -10,6 +10,8 @@ interface Props {
   active?: boolean
   onClick?: () => void
   style?: React.CSSProperties
+  /** Control before the row button (e.g. a selection checkbox); clicks on it don't open the row */
+  leading?: React.ReactNode
 }
 
 /** Initial avatar (accent tone) */
@@ -37,7 +39,7 @@ export function Initial({ text, size = 28 }: { text: string; size?: number }): R
 }
 
 /** List row: avatar + title/tags + subtext + right slot */
-export function ListRow({ avatar, title, tags, subtitle, right, active, onClick, style }: Props): React.JSX.Element {
+export function ListRow({ avatar, title, tags, subtitle, right, active, onClick, style, leading }: Props): React.JSX.Element {
   const body = (
     <>
       {avatar}
@@ -57,6 +59,15 @@ export function ListRow({ avatar, title, tags, subtitle, right, active, onClick,
       {right && <Box style={{ flexShrink: 0 }}>{right}</Box>}
     </>
   )
+  if (leading)
+    return (
+      <Box className="ac-row" data-active={active || undefined} style={style}>
+        <Box style={{ flexShrink: 0, display: 'flex' }}>{leading}</Box>
+        <UnstyledButton onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+          {body}
+        </UnstyledButton>
+      </Box>
+    )
   if (onClick)
     return (
       <UnstyledButton className="ac-row" data-active={active || undefined} onClick={onClick} style={style}>

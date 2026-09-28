@@ -70,10 +70,21 @@ export interface PreparedSkill {
   description?: string
 }
 
-export async function prepareSkill(fetchFn: FetchFn, source: string, skillId: string): Promise<PreparedSkill> {
+/** One HEAD + tree per repository, shared by bulk installs (the unauthenticated GitHub API allows 60 calls an hour) */
+export type RepoTrees = Map<string, Promise<{ sha: string; tree: Awaited<ReturnType<typeof listTree>> }>>
+
+export async function prepareSkill(fetchFn: FetchFn, source: string, skillId: string, trees?: RepoTrees): Promise<PreparedSkill> {
   if (!SKILL_ID_RE.test(skillId)) throw new MarketError('invalid', 'invalid skill id')
-  const sha = await resolveSha(fetchFn, source)
-  const tree = await listTree(fetchFn, source, sha)
+  const load = async (): Promise<{ sha: string; tree: Awaited<ReturnType<typeof listTree>> }> => {
+    const sha = await resolveSha(fetchFn, source)
+    return { sha, tree: await listTree(fetchFn, source, sha) }
+  }
+  let pending = trees?.get(source)
+  if (!pending) {
+    pending = load()
+    trees?.set(source, pending)
+  }
+  const { sha, tree } = await pending
   const dir = findSkillDir(tree.entries, skillId)
   if (dir === null) throw new MarketError('notFound', 'SKILL.md not found')
   const plan = skillFilePlan(tree.entries, dir)

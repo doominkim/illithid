@@ -475,6 +475,20 @@
       "kind": "未対応の形式",
       "transport": "未対応の接続",
       "secretInArgs": "引数にシークレット"
+    },
+    "selectAll": "すべて選択",
+    "installPicked": "インストール ({{n}})",
+    "bulkDone": "{{n}} 件インストール",
+    "skip": {
+      "installed": "インストール済み",
+      "exists": "名前が重複",
+      "needsInput": "入力が必要",
+      "unsupported": "未対応",
+      "rateLimited": "GitHub のリクエスト上限、後で再試行",
+      "notFound": "見つかりません",
+      "network": "ネットワークエラー",
+      "tooLarge": "大きすぎます",
+      "changed": "変更あり"
     }
   }
 }

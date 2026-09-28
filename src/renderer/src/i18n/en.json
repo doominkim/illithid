@@ -475,6 +475,20 @@
       "kind": "unsupported type",
       "transport": "unsupported transport",
       "secretInArgs": "secret in arguments"
+    },
+    "selectAll": "Select all",
+    "installPicked": "Install ({{n}})",
+    "bulkDone": "Installed {{n}}",
+    "skip": {
+      "installed": "already installed",
+      "exists": "name in use",
+      "needsInput": "needs input",
+      "unsupported": "not supported",
+      "rateLimited": "GitHub rate limit, try later",
+      "notFound": "not found",
+      "network": "network error",
+      "tooLarge": "too large",
+      "changed": "changed"
     }
   }
 }

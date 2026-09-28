@@ -30,9 +30,17 @@ import {
   type MarketKind,
   type PreparedRule,
   type PreparedSkill,
-  type RegistryServer
+  type RegistryServer,
+  type RepoTrees
 } from '../engine'
-import type { MarketDetailView, MarketInstallOptions, MarketSearchView, Refused, WriteResult } from '../shared/api'
+import type {
+  MarketBulkResult,
+  MarketDetailView,
+  MarketInstallOptions,
+  MarketSearchView,
+  Refused,
+  WriteResult
+} from '../shared/api'
 
 const CACHE_MS = 10 * 60 * 1000
 const KINDS: readonly MarketKind[] = ['skill', 'mcp', 'rule']
@@ -219,6 +227,69 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
       } catch (e) {
         return fail(e)
       }
+    },
+
+    /**
+     * Install several items with default names and options. Already installed, name clashes, MCP servers that need input
+     * and anything past a GitHub rate limit are skipped and reported; the library syncs once at the end
+     */
+    marketInstallMany: async (kind: unknown, ids: unknown): Promise<WriteResult<MarketBulkResult> | Refused> => {
+      if (!marketEnabled(home)) return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+      let k: MarketKind
+      try {
+        k = kindOf(kind)
+      } catch (e) {
+        return fail(e)
+      }
+      const list = [...new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [])].slice(0, 500)
+      const installedIdx = marketInstalledIndex(home)
+      const skipped: MarketBulkResult['skipped'] = []
+      const todo = list.filter((id) => {
+        if (installedIdx[`${k}:${id}`]) skipped.push({ id, reason: 'installed' })
+        return !installedIdx[`${k}:${id}`]
+      })
+      const trees: RepoTrees = new Map()
+      let limited = false
+      type Ready = { id: string; commit: () => { name: string } }
+      const ready: Ready[] = []
+      const prepOne = async (id: string): Promise<void> => {
+        if (limited) return void skipped.push({ id, reason: 'rateLimited' })
+        try {
+          if (k === 'skill') {
+            const { source, skillId } = splitSkillId(id)
+            const p = await marketPrepareSkill(fetchFn, source, skillId, trees)
+            ready.push({ id, commit: () => marketCommitSkill(home, p, p.name) })
+          } else if (k === 'mcp') {
+            const s = await prepServer(id)
+            const choice = marketInstallChoices(s).find((c) => c.supported)
+            if (!choice) return void skipped.push({ id, reason: 'unsupported' })
+            const name = marketSuggestMcpName(s.name)
+            ready.push({ id, commit: () => marketCommitMcp(home, s, choice.id, {}, name, defaultSecretBackend()) })
+          } else {
+            const r = await prepRule(home, id)
+            ready.push({ id, commit: () => marketCommitRule(home, r, r.name) })
+          }
+        } catch (e) {
+          if (e instanceof MarketError && e.code === 'rateLimited') limited = true
+          skipped.push({ id, reason: e instanceof MarketError ? e.code : 'error' })
+        }
+      }
+      for (let i = 0; i < todo.length; i += 4) await Promise.all(todo.slice(i, i + 4).map(prepOne))
+      const order = new Map(list.map((id, i) => [id, i]))
+      ready.sort((a, b) => order.get(a.id)! - order.get(b.id)!)
+      return libWrite(() => {
+        const installed: MarketBulkResult['installed'] = []
+        for (const r of ready) {
+          try {
+            installed.push({ id: r.id, name: r.commit().name })
+          } catch (e) {
+            const code = (e as { code?: string }).code
+            // A required value with no default: needs the install form
+            skipped.push({ id: r.id, reason: e instanceof MarketError && code === 'invalid' ? 'needsInput' : (code ?? 'error') })
+          }
+        }
+        return { installed, skipped }
+      })
     },
 
     marketUpdates: async () => run(home, () => marketCheckUpdates(fetchFn, home)),

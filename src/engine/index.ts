@@ -406,6 +406,7 @@ export {
   suggestMcpName as marketSuggestMcpName,
   AWESOME_COPILOT_REPO,
   MarketError,
+  liveOrigins as marketLiveOrigins,
   readOrigins
 } from './market'
 export type {
@@ -420,6 +421,7 @@ export type {
   MarketUpdate,
   PreparedRule,
   PreparedSkill,
+  RepoTrees,
   RegistryServer,
   McpRunKind
 } from './market'

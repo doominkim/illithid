@@ -15,6 +15,7 @@ export {
   prepareSkill,
   type MarketUpdate,
   type PreparedRule,
-  type PreparedSkill
+  type PreparedSkill,
+  type RepoTrees
 } from './install'
 export * from './popularity'

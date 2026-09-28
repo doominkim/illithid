@@ -5,6 +5,7 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Group,
   PasswordInput,
   SegmentedControl,
@@ -68,11 +69,14 @@ function Market(): React.JSX.Element {
   const [selected, setSelected] = useState<string | null>(null)
   const [updates, setUpdates] = useState<{ updates: MarketUpdate[]; failed: string[] } | null>(null)
   const [checking, setChecking] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
   const seq = useRef(0)
 
   const search = async (): Promise<void> => {
     const my = ++seq.current
     setError(null)
+    setPicked(new Set())
     setMcpMore([])
     setCursor(undefined)
     setLoading(true)
@@ -127,6 +131,51 @@ function Market(): React.JSX.Element {
   )
   const servers = [...(result?.mcp ?? []), ...mcpMore]
 
+  // Selectable = shown and not installed yet (MCP: installable here)
+  const selectable: string[] =
+    kind === 'skill'
+      ? (result?.skills ?? []).filter((x) => !installed[`skill:${x.id}`]).map((x) => x.id)
+      : kind === 'mcp'
+        ? servers.filter((x) => x.installable && !installed[`mcp:${x.name}`]).map((x) => x.name)
+        : rules.filter((x) => !installed[`rule:${x.id}`]).map((x) => x.id)
+  const pickedVisible = selectable.filter((id) => picked.has(id))
+  const allPicked = selectable.length > 0 && pickedVisible.length === selectable.length
+  const togglePick = (id: string): void =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const pickBox = (id: string, key: string, enabled = true): React.ReactNode => (
+    <Checkbox
+      size="sm"
+      checked={!!installed[key] || picked.has(id)}
+      disabled={!!installed[key] || !enabled}
+      onChange={() => togglePick(id)}
+      aria-label={id}
+      data-testid="market-pick"
+    />
+  )
+
+  const installPicked = async (): Promise<void> => {
+    if (!pickedVisible.length) return
+    setBulkBusy(true)
+    const r = await runWrite(window.api.marketInstallMany(kind, pickedVisible))
+    setBulkBusy(false)
+    if (!r) return
+    setPicked(new Set())
+    notifications.show({
+      color: r.skipped.length ? 'yellow' : 'accent',
+      title: t('market.bulkDone', { n: r.installed.length }),
+      message: r.skipped.length
+        ? r.skipped.map((x) => `${x.id}: ${t(`market.skip.${x.reason}`, { defaultValue: x.reason })}`).join(' · ')
+        : undefined,
+      autoClose: r.skipped.length ? false : 3000
+    })
+    void search()
+  }
+
   const badgeInstalled = (key: string): React.ReactNode =>
     installed[key] ? (
       <Badge variant="light" size="xs" fw={500}>
@@ -145,6 +194,7 @@ function Market(): React.JSX.Element {
           {items.map((s: MarketSkillItem) => (
             <ListRow
               key={s.id}
+              leading={pickBox(s.id, `skill:${s.id}`)}
               avatar={<Initial text={s.name} />}
               title={s.name}
               tags={badgeInstalled(`skill:${s.id}`)}
@@ -169,6 +219,7 @@ function Market(): React.JSX.Element {
             {servers.map((s) => (
               <ListRow
                 key={s.name}
+                leading={pickBox(s.name, `mcp:${s.name}`, s.installable)}
                 avatar={<Initial text={s.title ?? s.name.split('/').pop() ?? s.name} />}
                 title={s.title ?? s.name}
                 tags={
@@ -211,6 +262,7 @@ function Market(): React.JSX.Element {
         {rules.map((r: MarketRuleItem) => (
           <ListRow
             key={r.id}
+            leading={pickBox(r.id, `rule:${r.id}`)}
             avatar={<Initial text={r.title} />}
             title={r.title}
             tags={badgeInstalled(`rule:${r.id}`)}
@@ -290,6 +342,22 @@ function Market(): React.JSX.Element {
               data-testid="market-tabs"
             />
             <SearchInput value={query} onChange={setQuery} placeholder={t('market.search')} />
+          </>
+        }
+        right={
+          <>
+            <Checkbox
+              size="sm"
+              label={t('market.selectAll')}
+              checked={allPicked}
+              indeterminate={pickedVisible.length > 0 && !allPicked}
+              disabled={!selectable.length}
+              onChange={() => setPicked(allPicked ? new Set() : new Set(selectable))}
+              data-testid="market-pick-all"
+            />
+            <Button size="xs" disabled={!pickedVisible.length} loading={bulkBusy} onClick={() => void installPicked()} data-testid="market-install-picked">
+              {t('market.installPicked', { n: pickedVisible.length })}
+            </Button>
           </>
         }
       />

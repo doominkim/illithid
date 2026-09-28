@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Button, Group, Modal, Select, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
+import { Badge, Box, Button, Group, Modal, Select, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
 import { Download, FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
@@ -79,6 +79,12 @@ function Skills(): React.JSX.Element {
   if (!data) return <Loading />
 
   const q = query.trim().toLowerCase()
+  const marketTag = (name: string): React.ReactNode =>
+    data?.market?.[name] ? (
+      <Badge variant="light" size="xs" fw={500} title={data.market[name]}>
+        {t('nav.market')}
+      </Badge>
+    ) : null
   const visible = rows.filter((r) => !q || includesCI(r.name, q) || includesCI(r.description, q))
   const prev = renamed && renamed.to === selected ? rows.find((r) => r.name === renamed.from) : undefined
   const current = rows.find((r) => r.name === selected) ?? (prev && { ...prev, name: renamed!.to })
@@ -160,6 +166,7 @@ function Skills(): React.JSX.Element {
             <ItemCard
               key={r.name}
               name={r.name}
+              badges={marketTag(r.name)}
               description={r.description}
               dot={dotOfPills(r.pills)}
               switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
@@ -178,6 +185,7 @@ function Skills(): React.JSX.Element {
               key={r.name}
               avatar={<Initial text={r.name} />}
               title={r.name}
+              tags={marketTag(r.name)}
               subtitle={r.description}
               right={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
               active={r.name === selected}
@@ -192,6 +200,7 @@ function Skills(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         description={current?.description || undefined}
+        tags={current && marketTag(current.name)}
         meta={
           current && (
             <>

@@ -566,6 +566,46 @@ async function run(): Promise<void> {
     }
   }
 
+  // h4. bulk install: skills from one repo share one HEAD+tree, installed/duplicate/needs-input skipped, one libWrite
+  {
+    const H = makeFixture('illithid-market-h4-')
+    initLibrary(H)
+    setToolsInUse(H, ['claude'])
+    const SK2 = '---\nname: other\n---\nx\n'
+    const routes = skillRoutes(SHA1, 'd1', {
+      [`${RAW}/${SHA1}/skills/other/SKILL.md`]: SK2,
+      [`${REG}/servers/${encodeURIComponent('io.github.acme/fs-mcp')}/versions/latest`]: FS_SERVER
+    })
+    const f = fakeFetch(routes)
+    const real = globalThis.fetch
+    globalThis.fetch = ((url: string) => f(url)) as typeof fetch
+    let writes = 0
+    try {
+      const { marketHandlers } = await import('../src/main/market')
+      const h = marketHandlers(H, async (fn) => {
+        writes++
+        return { ok: true, value: fn() }
+      })
+      const r1 = await h.marketInstallMany('skill', ['acme/skills/pdf', 'acme/skills/other', 'acme/skills/missing'])
+      const apiCalls = f.calls.filter((u) => u.startsWith('https://api.github.com')).length
+      const r2 = await h.marketInstallMany('skill', ['acme/skills/pdf'])
+      const r3 = await h.marketInstallMany('mcp', ['io.github.acme/fs-mcp'])
+      const v1 = 'ok' in r1 && r1.ok ? r1.value : null
+      const v2 = 'ok' in r2 && r2.ok ? r2.value : null
+      const v3 = 'ok' in r3 && r3.ok ? r3.value : null
+      check(
+        'h4. bulk: shared repo tree (2 API calls), missing skipped, re-run skipped as installed, MCP needing input skipped',
+        !!v1 && v1.installed.map((x) => x.name).join() === 'pdf-tools,other' && v1.skipped.map((x) => x.reason).join() === 'notFound' &&
+          apiCalls === 2 && writes === 3 &&
+          !!v2 && v2.skipped[0]?.reason === 'installed' &&
+          !!v3 && v3.installed.length === 0 && v3.skipped[0]?.reason === 'needsInput',
+        JSON.stringify({ v1, apiCalls, v2, v3 })
+      )
+    } finally {
+      globalThis.fetch = real
+    }
+  }
+
   // i. workspace zip carries market.json
   {
     const { WORKSPACE_ZIP_FILES } = await import('../src/engine/workspace')

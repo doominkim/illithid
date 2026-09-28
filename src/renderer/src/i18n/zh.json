@@ -475,6 +475,20 @@
       "kind": "不支持的类型",
       "transport": "不支持的连接",
       "secretInArgs": "参数中含密钥"
+    },
+    "selectAll": "全选",
+    "installPicked": "安装 ({{n}})",
+    "bulkDone": "已安装 {{n}} 项",
+    "skip": {
+      "installed": "已安装",
+      "exists": "名称冲突",
+      "needsInput": "需要输入",
+      "unsupported": "不支持",
+      "rateLimited": "GitHub 请求受限，请稍后再试",
+      "notFound": "未找到",
+      "network": "网络错误",
+      "tooLarge": "过大",
+      "changed": "已变更"
     }
   }
 }

@@ -46,7 +46,8 @@ import {
   type FileChange,
   type SkillSyncItem,
   type TargetId,
-  type ToolId
+  type ToolId,
+  marketLiveOrigins
 } from '../engine'
 import type {
   AgentsData,
@@ -135,6 +136,15 @@ function markSkillOverrides(home: string, env: Env, state: SkillsData['state']):
   }
 }
 
+/** Skills installed from the Market (market.json entries whose skill still exists) */
+function marketSkills(home: string): Record<string, string> {
+  try {
+    return Object.fromEntries(marketLiveOrigins(home).filter((o) => o.kind === 'skill').map((o) => [o.name, o.id]))
+  } catch {
+    return {}
+  }
+}
+
 export function skills(home: string, env: Env): SkillsData {
   const names = canonicalSkills(home)
   const oc = opencodeSkillsState(home, env)
@@ -162,7 +172,8 @@ export function skills(home: string, env: Env): SkillsData {
     ...(syncError ? { syncError } : {}),
     toggles: toggles(home, 'skills'),
     descriptions: skillDescriptions(home, names),
-    ...(geminiOff.length ? { toolDisabled: { gemini: geminiOff } } : {})
+    ...(geminiOff.length ? { toolDisabled: { gemini: geminiOff } } : {}),
+    market: marketSkills(home)
   }
 }
 

@@ -173,6 +173,8 @@ export interface SkillsData {
   descriptions: Record<string, string>
   /** Library skills the tool's own settings turn off (Gemini skills.disabled / skills.enabled=false) — shown as a warning, never changed */
   toolDisabled?: Partial<Record<ToolId, string[]>>
+  /** Skills installed from the Market: library name → `owner/repo/skillId` */
+  market?: Record<string, string>
 }
 
 /** Library agent (agents/<name>.md) */
@@ -519,6 +521,12 @@ export interface MarketInstallOptions {
   ref?: string
 }
 
+export interface MarketBulkResult {
+  installed: { id: string; name: string }[]
+  /** reason: installed · exists · needsInput · unsupported · rateLimited · MarketError code */
+  skipped: { id: string; reason: string }[]
+}
+
 export interface Api {
   // ---- reads
   status(): Promise<StatusReport>
@@ -547,6 +555,8 @@ export interface Api {
   marketSearch(kind: MarketKind, q: string, cursor?: string): Promise<WriteResult<MarketSearchView>>
   marketDetail(kind: MarketKind, id: string): Promise<WriteResult<MarketDetailView>>
   marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
+  /** Install several items with default names/options; one sync at the end */
+  marketInstallMany(kind: MarketKind, ids: string[]): Promise<WriteResult<MarketBulkResult> | Refused>
   marketUpdates(): Promise<WriteResult<{ updates: MarketUpdate[]; failed: string[] }>>
   marketUpdate(kind: MarketKind, name: string): Promise<WriteResult<{ name: string }> | Refused>
   // ---- config·library setup
@@ -724,6 +734,7 @@ export const CHANNELS = [
   'marketSearch',
   'marketDetail',
   'marketInstall',
+  'marketInstallMany',
   'marketUpdates',
   'marketUpdate',
   'configGet',
