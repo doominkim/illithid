@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { dirname, join } from 'node:path'
 import { deletedBackupRoot } from './deleteCopies'
 import { buildContext, plan, planTarget } from './plan'
-import { readSources } from './sources'
+import { readPlanSources } from './sources'
 import { ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
 import { activeWorkspaceId } from './config'
 import { dropPending } from './pendingRetire'
@@ -38,6 +38,7 @@ export type ApplySkipReason =
   | 'nothingToWrite'
   | 'toolNotInitialized'
   | 'copilotHomeOverride'
+  | 'grokHomeOverride'
 
 export interface ApplyResult {
   id: TargetId
@@ -169,7 +170,7 @@ export function apply(
     const ours = writtenNow.get(planned.path)
     if (ours !== undefined && currentHash(planned.path) === ours) {
       const t = ALL_TARGETS.find((x) => x.id === planned.id)!
-      c = planTarget(home, t, buildContext(home, readSources(home), env, opts.secrets))
+      c = planTarget(home, t, buildContext(home, readPlanSources(home), env, opts.secrets))
     }
     const base = { id: c.id, label: c.label, ...(c.serverErrors ? { serverErrors: c.serverErrors } : {}) }
     const skip = (reason: ApplySkipReason, detail?: string): void => {

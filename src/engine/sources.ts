@@ -13,7 +13,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { libraryRoot } from './config'
+import { libraryRoot, toolsRetiring } from './config'
 import { manifestFileIn, readManifest, MANIFEST_FILE } from './manifest'
 import type { Allowlist, McpServer, McpSource, RuleFile, Sources } from './types'
 
@@ -194,4 +194,11 @@ export function readSources(home: string): Sources {
     mcp: readMcp(home),
     manifest: m.manifest
   }
+}
+
+/** Sources as the sync plans them: retiring tools read as off for every item (see readPlanManifest) */
+export function readPlanSources(home: string): Sources {
+  const s = readSources(home)
+  const off = toolsRetiring(home)
+  return off.length && s.manifest ? { ...s, manifest: { ...s.manifest, offTools: off } } : s
 }

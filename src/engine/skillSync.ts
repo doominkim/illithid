@@ -11,8 +11,8 @@ import {
   unlinkSync
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { canonicalPaths, copilotHomeOverride, tools, type ToolId } from './agents'
-import { appConfigDir, toolInUse, toolsInUse } from './config'
+import { canonicalPaths, toolHomeOverride, tools, type ToolId } from './agents'
+import { appConfigDir, syncTools } from './config'
 import {
   activePending,
   dropPending,
@@ -26,7 +26,7 @@ import {
 } from './pendingRetire'
 import { plan } from './plan'
 import { deliverDir, deliveredShape, shapeMatches } from './deliver'
-import { isEnabled, MANIFEST_FILE, readManifest } from './manifest'
+import { isEnabled, MANIFEST_FILE, readPlanManifest } from './manifest'
 import { canonicalSkills, dirContentHash } from './skills'
 import { readState, writeState, type AppState, type SkillCopyEntry } from './state'
 import type { Env } from './types'
@@ -105,10 +105,10 @@ export interface SkillSyncOptions {
 /** Tool skill directories the app copies into (Claude, Codex) — tools in use only */
 function symlinkDirs(home: string, env?: Env): Map<ToolId, string> {
   const m = new Map<ToolId, string>()
-  const inUse = toolsInUse(home)
+  const inUse = syncTools(home)
   for (const t of tools(home)) if (t.skills.kind === 'symlinkDir' && inUse.includes(t.id)) m.set(t.id, t.skills.dir)
-  // With env given: no Copilot copies while COPILOT_HOME points elsewhere (copilotHomeOverride)
-  if (env && copilotHomeOverride(home, env)) m.delete('copilot')
+  // With env given: no Copilot / Grok copies while COPILOT_HOME / GROK_HOME points elsewhere
+  if (env) for (const t of [...m.keys()]) if (toolHomeOverride(home, t, env)) m.delete(t)
   return m
 }
 
@@ -140,7 +140,7 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
   const canonSet = new Set(canon)
   const appState = readState(home).state
   const managedAll = appState.skills ?? {}
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const items: SkillSyncItem[] = []
 
@@ -259,7 +259,7 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
     }
   }
   // Imported OpenCode originals (OpenCode reads library skills through skills.paths)
-  if (toolInUse(home, 'opencode')) {
+  if (syncTools(home).includes('opencode')) {
     for (const p of activePending(home, appState.pendingRetire)) {
       if (p.kind !== 'skill' || p.tool !== 'opencode' || !canonSet.has(p.name)) continue
       const currentHash = retireHash(p.path)
@@ -536,7 +536,7 @@ export function adoptSkillCopies(home: string, name: string): { adopted: ToolId[
   const out = { adopted: [] as ToolId[], userOwned: [] as ToolId[] }
   const st = readState(home)
   if (st.error) return out
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) return out
   let sourceHash: string
   try {

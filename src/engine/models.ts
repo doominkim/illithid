@@ -55,9 +55,10 @@ export function readConfigObject(
   }
 }
 
-/** Dotted JSON key path (`model.name` = key name inside object model) */
+/** Dotted key path: JSON `model.name` = key name inside object model; TOML `models.default` = key default in table [models] */
 function keyPath(key: string, format: 'json' | 'toml'): string[] {
-  return format === 'json' ? key.split('.') : [key]
+  void format
+  return key.split('.')
 }
 
 function getPath(obj: Record<string, unknown>, path: string[]): unknown {
@@ -89,7 +90,8 @@ export const MODEL_KEYS: Readonly<Record<ToolId, readonly string[]>> = {
   codex: ['model', 'model_reasoning_effort'],
   opencode: ['model', 'small_model'],
   gemini: ['model.name'],
-  copilot: []
+  copilot: [],
+  grok: ['models.default']
 }
 
 export interface SetModelResult {
@@ -155,6 +157,41 @@ function setTomlKey(text: string, key: string, value: string): string {
 }
 
 /**
+ * `key = "..."` inside one [table] (Grok: [models] default). The line is changed in place, or inserted right after the header;
+ * a missing table is appended. Refused when the table is written inline or as dotted keys (not safe to edit by line)
+ */
+function setTomlTableKey(text: string, table: string, key: string, value: string): string {
+  const eol = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.split(/\r?\n/)
+  const literal = JSON.stringify(value)
+  const esc = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const firstHeader = lines.findIndex((l) => /^\s*\[/.test(l))
+  if (lines.slice(0, firstHeader === -1 ? lines.length : firstHeader).some((l) => new RegExp(`^\\s*${esc}\\s*[.=]`).test(l)))
+    throw new SetModelError(`${table} is written inline; not changing ${table}.${key}`)
+  const header = lines.findIndex((l) => new RegExp(`^\\s*\\[\\s*${esc}\\s*\\]\\s*(#.*)?$`).test(l))
+  if (header === -1) {
+    while (lines.length && lines[lines.length - 1].trim() === '') lines.pop()
+    lines.push('', `[${table}]`, `${key} = ${literal}`, '')
+    return lines.join(eol)
+  }
+  let end = lines.findIndex((l, i) => i > header && /^\s*\[/.test(l))
+  if (end === -1) end = lines.length
+  const keyRe = new RegExp(`^(\\s*${key}\\s*=\\s*)(.*)$`)
+  const hits = lines
+    .slice(header + 1, end)
+    .map((l, i) => [header + 1 + i, keyRe.exec(l)] as const)
+    .filter(([, m]) => m)
+  if (hits.length > 1) throw new SetModelError(`${table}.${key} appears ${hits.length} times`)
+  if (hits.length === 1) {
+    const [i, m] = hits[0]
+    const vm = /^("(?:[^"\\]|\\.)*"|'[^']*')(\s*(?:#.*)?)$/.exec(m![2])
+    if (!vm) throw new SetModelError(`${table}.${key} value is not a single-line string; not changing it`)
+    lines[i] = m![1] + literal + vm[2]
+  } else lines.splice(header + 1, 0, `${key} = ${literal}`)
+  return lines.join(eol)
+}
+
+/**
  * Change a single model key in a tool config file. SetModelError for disallowed keys, missing file, or parse failure.
  * Before writing, parse the result to confirm all other top-level keys are unchanged; otherwise don't write.
  */
@@ -191,7 +228,12 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   const base = { tool, key, path, previous }
   if (getPath(prevObj, kp) === value) return { ...base, status: 'unchanged' }
 
-  const after = format === 'toml' ? setTomlKey(before, key, value) : setJsonKey(before, key, value)
+  const after =
+    format === 'toml'
+      ? kp.length === 2
+        ? setTomlTableKey(before, kp[0], kp[1], value)
+        : setTomlKey(before, key, value)
+      : setJsonKey(before, key, value)
   let nextObj: Record<string, unknown>
   try {
     nextObj = parse(after)

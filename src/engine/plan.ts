@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { copilotHomeOverride } from './agents'
-import { readConfig, toolsInUse } from './config'
+import { toolHomeOverride } from './agents'
+import { readConfig, syncTools } from './config'
 import { activePending } from './pendingRetire'
 import { defaultSecretBackend, memoSecretBackend, type SecretBackend } from './secrets'
-import { readSources } from './sources'
+import { readPlanSources } from './sources'
 import { readState } from './state'
 import { ALL_TARGETS, MCP_TARGET_TOOL, serverChanges, TARGETS } from './targets'
 import { sha256 } from './text'
@@ -55,7 +55,12 @@ export function buildContext(
 }
 
 /** Plan for one target. Also used by apply to recompute when writing the same file in sequence */
-export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileChange {
+export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): FileChange {
+  // A retiring tool (every item off via offTools) also loses the memory index and leaves permissions as they are
+  const retiring = !!planCtx.sources.manifest?.offTools?.includes(t.tool)
+  const ctx: BuildContext = retiring
+    ? { ...planCtx, retiring, sources: { ...planCtx.sources, memoryIndex: null, hasPermissions: false } }
+    : planCtx
   const { sources } = ctx
   const path = join(home, t.rel)
   const label = `~/${t.rel}`
@@ -63,15 +68,19 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
 
   const exists = existsSync(path)
   const seed = t.seed ?? ''
-  const override = t.tool === 'copilot' ? copilotHomeOverride(home, ctx.env) : null
+  const override = toolHomeOverride(home, t.tool, ctx.env)
   if (override)
     return {
       ...base,
       before: exists ? readFileSync(path, 'utf8') : '',
       after: exists ? readFileSync(path, 'utf8') : '',
       changed: false,
-      notes: [`COPILOT_HOME is set to another folder — Copilot doesn't read ~/.copilot, so nothing is written`],
-      skip: 'copilotHomeOverride',
+      notes: [
+        t.tool === 'grok'
+          ? `GROK_HOME is set to another folder — Grok doesn't read ~/.grok, so nothing is written`
+          : `COPILOT_HOME is set to another folder — Copilot doesn't read ~/.copilot, so nothing is written`
+      ],
+      skip: t.tool === 'grok' ? 'grokHomeOverride' : 'copilotHomeOverride',
       beforeRegionHash: null,
       afterRegionHash: null
     }
@@ -93,7 +102,7 @@ export function planTarget(home: string, t: TargetDef, ctx: BuildContext): FileC
       beforeRegionHash: null,
       afterRegionHash: null
     })
-    if (!has) return absent('nothingToWrite', [`${label} absent — nothing to write`])
+    if (!has || retiring) return absent('nothingToWrite', [`${label} absent — nothing to write`])
     const alternate = (t.alternates ?? []).find((r) => existsSync(join(home, r)))
     if (alternate) return absent('toolNotInitialized', [`${label} absent — ~/${alternate} is used instead, not creating a second file`])
     const creatable = t.optional || (!!t.createIfInUse && !!readConfig(home).config.toolsInUse?.includes(t.tool))
@@ -150,9 +159,9 @@ export function plan(
   ids?: readonly TargetId[],
   secrets?: SecretBackend
 ): FileChange[] {
-  const sources = readSources(home)
+  const sources = readPlanSources(home)
   const ctx = buildContext(home, sources, env, secrets)
-  const inUse = toolsInUse(home)
+  const inUse = syncTools(home)
   const targets = (ids ? ALL_TARGETS.filter((t) => ids.includes(t.id)) : TARGETS).filter((t) => inUse.includes(t.tool))
   return targets.map((t) => planTarget(home, t, ctx))
 }

@@ -13,6 +13,7 @@ import { LIBRARY_CHANGED, runWrite } from '../lib/mutate'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { ToolIcon } from '../components/ToolIcon'
+import { claudeCombos, ToolComboDialog } from '../components/ToolComboDialog'
 import type { ToolId, ToolsInUseView } from '../../../shared/api'
 import { DEFAULT_TOOLS_IN_USE } from '../../../engine/toolIds'
 
@@ -45,7 +46,7 @@ function Row({ label, hint, control }: { label: string; hint?: React.ReactNode; 
   )
 }
 
-/** Tools in use: on → save → apply preview. Off → save only (files already written stay as they are) */
+/** Tools in use: on or off → save → apply preview (on adds the library there, off removes the app's copies); cancel restores */
 function ToolsInUse(): React.JSX.Element {
   const { t } = useTranslation()
   const { refresh } = useConfig()
@@ -60,11 +61,24 @@ function ToolsInUse(): React.JSX.Element {
   // Never chosen yet: inUse is already the default tools that look installed (engine toolsInUse) — the first change saves that list
   const detected = (tool: ToolId): boolean => !!view?.detected.find((d) => d.tool === tool)?.detected
   const shown: ToolId[] = view?.inUse ?? []
+  // Claude + a tool that also reads Claude's files: the user picks (both, Claude off, cancel) before anything is saved
+  const [combo, setCombo] = useState<{ next: ToolId[]; tools: ToolId[] } | null>(null)
   const set = async (tool: ToolId, on: boolean): Promise<void> => {
     if (!view) return
     const next = on ? TOOLS.filter((x) => x === tool || shown.includes(x)) : shown.filter((x) => x !== tool)
+    const tools = on ? claudeCombos(shown, next) : []
+    if (tools.length) {
+      setCombo({ next, tools })
+      return
+    }
+    await save(next)
+  }
+  const save = async (next: ToolId[]): Promise<void> => {
+    if (!view) return
+    if (view.configured && next.length === shown.length && next.every((x) => shown.includes(x))) return
     // Restored if the apply preview is dismissed: a never-saved list goes back to unset
     const previous = view.configured ? view.inUse : null
+    const retiring = view.retiring
     setBusy(true)
     const r = await runWrite(window.api.toolsInUseSet(next), { success: t('settings.saved') })
     setBusy(false)
@@ -73,11 +87,12 @@ function ToolsInUse(): React.JSX.Element {
     refresh()
     reload()
     window.dispatchEvent(new Event(LIBRARY_CHANGED))
-    if (on) openPreview({ onCancel: () => void restore(previous) })
+    // Off works like on: the preview lists what leaves that tool (the app's copies); cancelling restores the list and what was retiring
+    openPreview({ onCancel: () => void restore(previous, retiring) })
   }
-  const restore = async (previous: ToolId[] | null): Promise<void> => {
+  const restore = async (previous: ToolId[] | null, retiring: ToolId[]): Promise<void> => {
     setBusy(true)
-    const r = await runWrite(window.api.toolsInUseSet(previous))
+    const r = await runWrite(window.api.toolsInUseSet(previous, retiring))
     setBusy(false)
     if (!r) return
     setView(r)
@@ -106,11 +121,30 @@ function ToolsInUse(): React.JSX.Element {
                   {t('settings.copilotDoubleLoad')}
                 </Text>
               )}
+              {tool === 'grok' && shown.includes('grok') && (shown.includes('claude') || !!view?.detected.find((d) => d.tool === 'claude')?.configFound) && (
+                <Text size="xs" c="dimmed" data-testid="grok-reads-claude">
+                  {t(shown.includes('claude') ? 'settings.grokWithClaude' : 'settings.grokReadsClaude')}
+                </Text>
+              )}
             </Box>
           </Group>
           <Switch size="md" checked={shown.includes(tool)} disabled={!view || busy} onChange={(e) => void set(tool, e.currentTarget.checked)} data-testid={`tool-in-use-${tool}`} />
         </Group>
       ))}
+      <ToolComboDialog
+        tools={combo?.tools ?? []}
+        onCancel={() => setCombo(null)}
+        onBoth={() => {
+          const c = combo
+          setCombo(null)
+          if (c) void save(c.next)
+        }}
+        onDropClaude={() => {
+          const c = combo
+          setCombo(null)
+          if (c) void save(c.next.filter((x) => x !== 'claude'))
+        }}
+      />
     </Section>
   )
 }

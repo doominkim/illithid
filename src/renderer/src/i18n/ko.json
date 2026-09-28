@@ -42,7 +42,9 @@
     "cleanupFailed": "백업 정리 실패: {{count}}개",
     "tools": "사용 중인 툴",
     "copilotDoubleLoad": "Claude Code와 함께 쓰면 VS Code에서 룰·스킬·에이전트가 두 번 로드될 수 있습니다.",
-    "marketEnabled": "마켓 사용"
+    "marketEnabled": "마켓 사용",
+    "grokWithClaude": "Claude Code 에 켠 스킬·MCP·에이전트도 함께 읽음",
+    "grokReadsClaude": "기존 Claude Code 설정도 함께 읽음"
   },
   "common": {
     "loading": "불러오는 중…",
@@ -192,7 +194,8 @@
       "originalGone": "원본이 없음"
     },
     "notInitialized": "{{tool}} 를 한 번 실행한 뒤 다시 반영하세요",
-    "copilotHomeOverride": "COPILOT_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다"
+    "copilotHomeOverride": "COPILOT_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
+    "grokHomeOverride": "GROK_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다"
   },
   "app": {
     "name": "Illithid"
@@ -502,5 +505,13 @@
     "none": "로컬 세션 기록에 호출 없음",
     "indexing": "세션 기록 읽는 중…",
     "since": "{{day}}부터"
+  },
+  "combo": {
+    "title": "Claude Code 도 함께 쓸까요?",
+    "grok": "{{tool}} 는 Claude Code 의 스킬·MCP·에이전트도 함께 읽어요. Claude 에 켠 항목은 {{tool}} 에서만 끌 수 없어요. 룰은 겹치지 않아요.",
+    "copilot": "VS Code 의 {{tool}} 는 Claude Code 의 룰·스킬·에이전트도 읽어서 두 번 로드될 수 있어요.",
+    "both": "둘 다 켜기",
+    "dropClaude": "Claude 끄기",
+    "readsClaude": "Claude Code 에 켜져 있어 Grok 이 거기서 읽음"
   }
 }

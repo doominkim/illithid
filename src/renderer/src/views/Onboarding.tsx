@@ -8,6 +8,7 @@ import { ImportModal } from '../components/ImportModal'
 import { Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
 import { ToolIcon } from '../components/ToolIcon'
+import { claudeCombos, ToolComboDialog } from '../components/ToolComboDialog'
 import { runWrite } from '../lib/mutate'
 import type { Menu } from '../lib/nav'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
@@ -59,9 +60,19 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
     setStep(1)
   }
 
-  const saveTools = async (): Promise<void> => {
+  const [combo, setCombo] = useState<ToolId[]>([])
+  const saveTools = async (list: ToolId[] = tools, asked = false): Promise<void> => {
+    // Claude + a tool that also reads Claude's files: ask first
+    if (!asked) {
+      const c = claudeCombos([], list)
+      if (c.length) {
+        setCombo(c)
+        return
+      }
+    }
+    setTools(list)
     setBusy(true)
-    const r = await runWrite(window.api.toolsInUseSet(tools))
+    const r = await runWrite(window.api.toolsInUseSet(list))
     setBusy(false)
     if (!r) return
     setStep(mode === 'fresh' ? 3 : 2)
@@ -200,6 +211,18 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
           )}
         </Stack>
       </Box>
+      <ToolComboDialog
+        tools={combo}
+        onCancel={() => setCombo([])}
+        onBoth={() => {
+          setCombo([])
+          void saveTools(tools, true)
+        }}
+        onDropClaude={() => {
+          setCombo([])
+          void saveTools(tools.filter((x) => x !== 'claude'), true)
+        }}
+      />
     </Box>
   )
 }

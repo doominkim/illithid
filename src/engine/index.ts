@@ -427,3 +427,4 @@ export type {
 } from './market'
 export { usageOf } from './search/usage'
 export type { UsageKind, UsageStats } from './search/usage'
+export { seedNewToolToggles } from './manifest'

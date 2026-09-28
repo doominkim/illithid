@@ -83,6 +83,11 @@ export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
       { value: 'gpt-5.3-codex', label: 'gpt-5.3-codex' }
     ],
     efforts: ['low', 'medium', 'high']
+  },
+  // Grok CLI (models_cache.json, 2026-09). Agent files carry no effort key, so no effort list
+  grok: {
+    models: [{ value: 'grok-4.7', label: 'grok-4.7' }],
+    efforts: []
   }
 }
 

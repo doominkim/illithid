@@ -1,12 +1,12 @@
 import { copyFileSync, lstatSync, mkdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { copilotHomeOverride, TOOL_IDS, type ToolId } from './agents'
+import { TOOL_IDS, toolHomeOverride, type ToolId } from './agents'
 import { agentExts, agentNameOk, agentToolDir, agentToolPath, renderAgent } from './agentRender'
-import { appConfigDir, toolsInUse } from './config'
+import { appConfigDir, syncTools } from './config'
 import { dropPending, importedBackupDest, importStamp, moveToImportedBackup, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { deliverFile } from './deliver'
 import { listAgents, readAgentDoc } from './library'
-import { isEnabled, MANIFEST_FILE, readManifest } from './manifest'
+import { isEnabled, MANIFEST_FILE, readPlanManifest } from './manifest'
 import { libraryPaths } from './sources'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
@@ -89,7 +89,7 @@ function renderAll(home: string, names: string[]): Map<string, Map<ToolId, strin
 
 /** Plan. Read-only */
 export function planAgentSync(home: string, _env: Env = process.env): AgentSyncItem[] {
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const agentsDir = libraryPaths(home).agentsDir
   const names = listAgents(home)
@@ -99,10 +99,9 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
   const managedAll = appState.agents ?? {}
   const items: AgentSyncItem[] = []
 
-  // No Copilot files while COPILOT_HOME points elsewhere (copilotHomeOverride)
-  const override = copilotHomeOverride(home, _env)
-  for (const tool of toolsInUse(home)) {
-    if (tool === 'copilot' && override) continue
+  // No Copilot / Grok files while COPILOT_HOME / GROK_HOME points elsewhere
+  for (const tool of syncTools(home)) {
+    if (toolHomeOverride(home, tool, _env)) continue
     const managed = managedAll[tool] ?? {}
     for (const name of names) {
       const path = agentToolPath(home, tool, name)
@@ -389,11 +388,11 @@ export function adoptAgentFiles(home: string, name: string): { adopted: ToolId[]
   const out = { adopted: [] as ToolId[], userOwned: [] as ToolId[] }
   const st = readState(home)
   if (st.error) return out
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) return out
   const doc = readAgentDoc(home, name)
   const state: AppState = { ...st.state, agents: { ...(st.state.agents ?? {}) } }
-  for (const tool of toolsInUse(home)) {
+  for (const tool of syncTools(home)) {
     if (!isEnabled(mf.manifest, 'agents', name, tool) || !agentNameOk(tool, name)) continue
     if (state.agents![tool]?.[name]) continue
     const path = agentToolPath(home, tool, name)

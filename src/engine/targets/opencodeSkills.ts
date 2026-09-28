@@ -78,7 +78,7 @@ export const opencodeSkills: TargetDef = {
     const owned = ownedSet(sources, ctx)
     const want = librarySkillsPath(sources)
     // With no library skills, add no path and remove previously added app-owned paths
-    if (!hasLibrarySkills(want)) {
+    if (ctx?.retiring || !hasLibrarySkills(want)) {
       const rest = ((list as unknown[] | undefined) ?? []).filter((x) => !(typeof x === 'string' && owned.has(x)))
       const removedN = ((list as unknown[] | undefined) ?? []).length - rest.length
       if (!removedN) return { after: before, notes: ['0 library skills — not writing skills.paths'], owned: [] }

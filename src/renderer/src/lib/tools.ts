@@ -11,16 +11,18 @@ export const TOOL_NAME: Record<ToolId, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
   gemini: 'Gemini CLI',
-  copilot: 'GitHub Copilot'
+  copilot: 'GitHub Copilot',
+  grok: 'Grok CLI'
 }
 
-/** Tool identity colors (pill and icon background). Orange, black, blue, violet, slate to avoid clashing with status colors */
+/** Tool identity colors (pill and icon background). Orange, black, blue, violet, slate, teal to avoid clashing with status colors */
 export const TOOL_COLOR: Record<ToolId, string> = {
   claude: '#D97757',
   codex: '#3F3F46',
   opencode: '#3B82F6',
   gemini: '#8B5CF6',
-  copilot: '#64748B'
+  copilot: '#64748B',
+  grok: '#0F766E'
 }
 
 /** Display state of a single tool pill */
@@ -64,4 +66,12 @@ export function dotOfPills(p: PillMap): 'on' | 'off' | 'warn' | 'error' {
   if (v.some((x) => x?.problem)) return 'error'
   if (v.some((x) => x?.pending)) return 'warn'
   return v.length ? 'on' : 'off'
+}
+
+/**
+ * Grok CLI also reads Claude Code's skills, MCP servers and agents: an item off for Grok but on for Claude still reaches Grok
+ * while both are in use. Shown as a flagged off pill with a hint
+ */
+export function grokReadsFromClaude(inUse: readonly ToolId[], onFor: (tool: ToolId) => boolean): boolean {
+  return inUse.includes('grok') && inUse.includes('claude') && !onFor('grok') && onFor('claude')
 }

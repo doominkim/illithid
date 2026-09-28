@@ -48,6 +48,11 @@ export interface AppConfig {
   toolsInUse?: ToolId[]
   /** Marketplace (skills.sh · MCP registry · awesome-copilot). Default on; off = no menu and no network calls */
   marketEnabled?: boolean
+  /**
+   * Tools just turned off whose app copies are still in their folders. The next approved sync removes them (same as turning every
+   * item off for that tool); a tool leaves this list once nothing of the app is left there, or when it is turned back on
+   */
+  toolsRetiring?: ToolId[]
 }
 
 /** Tools that toolsInUse accepts (= TOOL_IDS, in tool order) */
@@ -130,6 +135,7 @@ export function validateConfig(v: unknown): string[] {
     errs.push('activeWorkspace must be a workspace id (lowercase letters, digits, -)')
   if (o.allowRealApply !== undefined && typeof o.allowRealApply !== 'boolean')
     errs.push('allowRealApply must be a boolean')
+  if (o.toolsRetiring !== undefined && !isToolList(o.toolsRetiring)) errs.push(`toolsRetiring must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   if (o.marketEnabled !== undefined && typeof o.marketEnabled !== 'boolean')
     errs.push('marketEnabled must be a boolean')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))
@@ -186,6 +192,12 @@ export function readConfig(home: string): ConfigRead {
     const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
     raw = known.length ? { ...rest, toolsInUse: known } : rest
   }
+  // Same for toolsRetiring: unknown ids (a newer app's tool) are dropped instead of resetting the config
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'toolsRetiring' in raw && !isToolList((raw as Record<string, unknown>).toolsRetiring)) {
+    const { toolsRetiring: bad, ...rest } = raw as Record<string, unknown>
+    const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
+    raw = known.length ? { ...rest, toolsRetiring: known } : rest
+  }
   const errs = validateConfig(raw)
   if (errs.length) return { path, exists: true, config: defaultConfig(), error: errs.join('; ') }
   return { path, exists: true, config: raw as AppConfig }
@@ -208,14 +220,50 @@ export function toolInUse(home: string, tool: ToolId): boolean {
   return toolsInUse(home).includes(tool)
 }
 
-/** Save toolsInUse (undefined removes the key = DEFAULT_TOOLS_IN_USE). Other settings are kept. Returns the saved list */
-export function setToolsInUse(home: string, list: ToolId[] | undefined): ToolId[] {
+/** Tools turned off whose app copies are still to be removed (never a tool in use) */
+export function toolsRetiring(home: string): ToolId[] {
+  const v = readConfig(home).config.toolsRetiring ?? []
+  const inUse = toolsInUse(home)
+  return CONFIG_TOOL_IDS.filter((t) => v.includes(t) && !inUse.includes(t))
+}
+
+/** Tools the sync plans for: in use, plus retiring ones (planned with every item off, which removes the app's copies) */
+export function syncTools(home: string): ToolId[] {
+  const s = new Set([...toolsInUse(home), ...toolsRetiring(home)])
+  return CONFIG_TOOL_IDS.filter((t) => s.has(t))
+}
+
+/** Retiring tools done: drop them from the list (no-op when absent) */
+export function clearToolsRetiring(home: string, tools: ToolId[]): void {
+  const cur = readConfig(home)
+  if (cur.error || !cur.config.toolsRetiring?.length) return
+  const left = cur.config.toolsRetiring.filter((t) => !tools.includes(t))
+  const { toolsRetiring: _old, ...rest } = cur.config
+  void _old
+  writeConfig(home, left.length ? { ...rest, toolsRetiring: left } : rest)
+}
+
+/**
+ * Save toolsInUse (undefined removes the key = DEFAULT_TOOLS_IN_USE). Other settings are kept. Returns the saved list.
+ * Tools that go off start retiring (their app copies are removed on the next apply): tools of an explicitly saved list, or while
+ * the list is unset only `wrote` (tools the app has written to — computed defaults alone never retire). `retiring` sets the list
+ * exactly instead (undoing a change whose preview was cancelled)
+ */
+export function setToolsInUse(home: string, list: ToolId[] | undefined, opts: { wrote?: ToolId[]; retiring?: ToolId[] } = {}): ToolId[] {
   if (list !== undefined && !isToolList(list)) throw new ConfigError(`toolsInUse must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   const cur = readConfig(home)
   if (cur.error) throw new ConfigError(`config.json: ${cur.error}`)
-  const { toolsInUse: _old, ...rest } = cur.config
+  const prev = cur.config.toolsInUse !== undefined ? toolsInUse(home) : toolsInUse(home).filter((t) => opts.wrote?.includes(t))
+  const { toolsInUse: _old, toolsRetiring: _ret, ...rest } = cur.config
   void _old
-  writeConfig(home, list === undefined ? rest : { ...rest, toolsInUse: CONFIG_TOOL_IDS.filter((t) => list.includes(t)) })
+  const chosen = list === undefined ? undefined : CONFIG_TOOL_IDS.filter((t) => list.includes(t))
+  const base: AppConfig = chosen === undefined ? rest : { ...rest, toolsInUse: chosen }
+  // Tools that just went off start retiring; a tool turned back on stops retiring
+  const next = chosen ?? DEFAULT_TOOLS_IN_USE.filter((t) => toolConfigFound(home, t))
+  const retiring = opts.retiring
+    ? CONFIG_TOOL_IDS.filter((t) => opts.retiring?.includes(t) && !next.includes(t))
+    : CONFIG_TOOL_IDS.filter((t) => ((_ret ?? []).includes(t) || prev.includes(t)) && !next.includes(t))
+  writeConfig(home, retiring.length ? { ...base, toolsRetiring: retiring } : base)
   return toolsInUse(home)
 }
 

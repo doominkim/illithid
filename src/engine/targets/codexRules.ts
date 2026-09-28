@@ -2,6 +2,7 @@ import {
   blockBodyMulti,
   normalizeEntry,
   outsideBlockMulti,
+  removeBlockMulti,
   spliceBlockMulti,
   type MarkerPair
 } from '../text'
@@ -66,7 +67,12 @@ export const codexRules: TargetDef = {
   rel: '.codex/rules/default.rules',
   optional: true,
   region: (text) => blockBodyMulti(text, ALL_RULES_MARKERS),
-  build(before, { sources }) {
+  build(before, { sources, retiring }) {
+    // Codex turned off: the app's block goes, hand-written rules outside it stay
+    if (retiring) {
+      const after = removeBlockMulti(before, ALL_RULES_MARKERS)
+      return { after, notes: [after === before ? 'Codex is off — no app block' : 'Codex is off — app block removed'] }
+    }
     if (!sources.hasPermissions) {
       return {
         after: before,

@@ -564,6 +564,45 @@ export async function readGemini(path: string, c: Collector): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------- Grok
+
+/**
+ * Grok chat_history.jsonl: {type:'user', content:[{type:'text', text}]}, {type:'assistant', content, model_id, tool_calls:[{name,
+ * arguments}]}, plus system / reasoning / tool_result records (skipped). Messages carry no timestamps
+ */
+function grokFile(home: string, id: string): string | undefined {
+  const root = join(home, '.grok/sessions')
+  if (!existsSync(root) || !/^[A-Za-z0-9_-]+$/.test(id)) return undefined
+  return fg.sync(`*/${id}/chat_history.jsonl`, { cwd: root, absolute: true, onlyFiles: true, suppressErrors: true })[0]
+}
+
+export async function readGrok(path: string, c: Collector): Promise<void> {
+  await eachJsonLine(path, (l) => {
+    if (l.type === 'user') {
+      const text = userTextOf(l.content)
+      if (text) c.push('user', text)
+      return
+    }
+    if (l.type !== 'assistant') return
+    const model = typeof l.model_id === 'string' ? l.model_id : undefined
+    if (typeof l.content === 'string' && l.content.trim()) c.push('assistant', l.content)
+    if (Array.isArray(l.tool_calls))
+      for (const t of l.tool_calls as Json[]) {
+        if (!t || typeof t !== 'object') continue
+        const name = String(t.name ?? '')
+        let input: unknown = t.arguments
+        if (typeof input === 'string')
+          try {
+            input = JSON.parse(input)
+          } catch {
+            // keep the raw string
+          }
+        c.push('assistant', toolLine(name || 'tool', input), undefined, 'tool')
+        c.onCall?.({ name, input, model })
+      }
+  })
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Transcript of a single session. Throws if the file is missing */
@@ -598,6 +637,12 @@ export async function readSessionTranscript(
     }
     case 'copilot':
       throw new Error('Copilot sessions are not supported yet')
+    case 'grok': {
+      const f = grokFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readGrok(f, c)
+      break
+    }
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)

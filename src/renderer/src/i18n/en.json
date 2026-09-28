@@ -42,7 +42,9 @@
     "cleanupFailed": "Backup cleanup failed: {{count}} items",
     "tools": "Tools in use",
     "copilotDoubleLoad": "With Claude Code also in use, VS Code may load rules, skills and agents twice.",
-    "marketEnabled": "Use the marketplace"
+    "marketEnabled": "Use the marketplace",
+    "grokWithClaude": "Also reads the skills, MCP servers and agents on for Claude Code",
+    "grokReadsClaude": "Also reads your existing Claude Code settings"
   },
   "common": {
     "loading": "Loading…",
@@ -192,7 +194,8 @@
       "originalGone": "Original no longer exists"
     },
     "notInitialized": "Run {{tool}} once, then apply again",
-    "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written"
+    "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written",
+    "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written"
   },
   "app": {
     "name": "Illithid"
@@ -502,5 +505,13 @@
     "none": "No calls in local session logs",
     "indexing": "Reading session logs…",
     "since": "Since {{day}}"
+  },
+  "combo": {
+    "title": "Also use Claude Code?",
+    "grok": "{{tool}} also reads Claude Code's skills, MCP servers and agents. Items on for Claude can't be turned off for {{tool}} alone. Rules don't overlap.",
+    "copilot": "{{tool}} in VS Code also reads Claude Code's rules, skills and agents, so they may load twice there.",
+    "both": "Use both",
+    "dropClaude": "Turn Claude off",
+    "readsClaude": "On for Claude Code — Grok reads it from there"
   }
 }

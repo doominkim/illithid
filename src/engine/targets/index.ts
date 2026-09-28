@@ -8,6 +8,7 @@ import { codexMcp } from './codexMcp'
 import { codexRules } from './codexRules'
 import { copilotMcp } from './copilotMcp'
 import { geminiMcp } from './geminiMcp'
+import { grokMcp } from './grokMcp'
 import { geminiRules } from './geminiRules'
 import { opencodeMcp } from './opencodeMcp'
 import { opencodeRules } from './opencodeRules'
@@ -34,7 +35,8 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   ...SKILL_OVERRIDE_TARGETS,
   geminiRules,
   geminiMcp,
-  copilotMcp
+  copilotMcp,
+  grokMcp
 ]
 
 /** All targets. Targets writing the same file come later */
@@ -48,7 +50,8 @@ export const MCP_TARGET_OF: Readonly<Record<ToolId, TargetId>> = {
   codex: 'codexMcp',
   opencode: 'opencodeMcp',
   gemini: 'geminiMcp',
-  copilot: 'copilotMcp'
+  copilot: 'copilotMcp',
+  grok: 'grokMcp'
 }
 
 /** MCP target id -> tool */
@@ -62,7 +65,8 @@ const MCP_TABLE: Readonly<Record<ToolId, { format: 'json' | 'toml'; key: string 
   codex: { format: 'toml', key: 'mcp_servers' },
   opencode: { format: 'json', key: 'mcp' },
   gemini: { format: 'json', key: 'mcpServers' },
-  copilot: { format: 'json', key: 'mcpServers' }
+  copilot: { format: 'json', key: 'mcpServers' },
+  grok: { format: 'toml', key: 'mcp_servers' }
 }
 
 /**

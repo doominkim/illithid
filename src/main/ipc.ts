@@ -287,10 +287,10 @@ export function registerIpc(): void {
       return r
     },
     toolsInUseGet: async () => W.toolsInUseView(home, await envNow()),
-    toolsInUseSet: async (tools) => {
+    toolsInUseSet: async (tools, retiring) => {
       const env = await envNow()
       return W.wrap(() => {
-        W.toolsInUseSet(home, tools as ToolId[] | null)
+        W.toolsInUseSet(home, tools as ToolId[] | null, retiring as ToolId[] | undefined)
         return W.toolsInUseView(home, env)
       })
     },

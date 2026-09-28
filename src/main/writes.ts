@@ -57,7 +57,8 @@ import {
   type McpServer,
   type SkillDocInput,
   type SwitchLossItem,
-  type ToolId
+  type ToolId,
+  seedNewToolToggles
 } from '../engine'
 import { previewSwitch } from '../engine'
 import { LEGACY_LIBRARY_DIR } from '../engine/config'
@@ -69,6 +70,7 @@ import { setToolsInUse, toolsInUse } from '../engine/config'
 import { libraryExists } from '../engine/sources'
 import { syncAll, type SyncAllResult } from '../engine/sync'
 import { ALL_TARGETS } from '../engine/targets'
+import { readState } from '../engine/state'
 import { deleteSyncCandidates } from '../engine/deleteCopies'
 import {
   createWorkspace,
@@ -356,7 +358,7 @@ export function notInitializedOf(changes: SyncAllResult['plan']['targets']): Not
     const tool = TARGET_TOOL.get(c.id)
     if (!tool || out.has(c.path)) continue
     if (c.skip === 'toolNotInitialized') out.set(c.path, { tool, label: c.label })
-    else if (c.skip === 'copilotHomeOverride') out.set(c.path, { tool, label: c.label, reason: 'copilotHomeOverride' })
+    else if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride') out.set(c.path, { tool, label: c.label, reason: c.skip })
   }
   return [...out.values()]
 }
@@ -424,14 +426,43 @@ export function toolsInUseView(home: string, env: Env): ToolsInUseView {
   return {
     inUse: toolsInUse(home),
     configured: readConfig(home).config.toolsInUse !== undefined,
+    retiring: readConfig(home).config.toolsRetiring ?? [],
     detected: detectTools(home, env)
   }
 }
 
-/** Save tools in use (null/undefined = unset → the default tools). Config only; nothing is applied to tools here */
-export function toolsInUseSet(home: string, list: ToolId[] | null | undefined): void {
+/** Tools the app has written to (state records): while toolsInUse is unset, only these retire when turned off */
+function toolsWritten(home: string): ToolId[] {
+  const st = readState(home).state
+  const targetTool = new Map<string, ToolId>(ALL_TARGETS.map((t) => [t.id, t.tool]))
+  const out = new Set<ToolId>()
+  for (const id of Object.keys(st.applied)) {
+    const t = targetTool.get(id)
+    if (t) out.add(t)
+  }
+  if (Object.keys(st.rules ?? {}).length) out.add('claude')
+  for (const rec of [st.skills, st.toolRules, st.agents])
+    for (const [t, v] of Object.entries(rec ?? {})) if (v && Object.keys(v).length) out.add(t as ToolId)
+  return [...out]
+}
+
+/**
+ * Save tools in use (null/undefined = unset → the default tools). Config only; nothing is applied to tools here.
+ * `retiring` (undo after a cancelled preview) restores the retiring list exactly
+ */
+export function toolsInUseSet(home: string, list: ToolId[] | null | undefined, retiring?: ToolId[]): void {
   if (list !== null && list !== undefined && !Array.isArray(list)) throw new ConfigError('toolsInUse must be an array')
-  setToolsInUse(home, list ?? undefined)
+  if (retiring !== undefined && !Array.isArray(retiring)) throw new ConfigError('toolsRetiring must be an array')
+  const before = toolsInUse(home)
+  setToolsInUse(home, list ?? undefined, retiring ? { retiring } : { wrote: toolsWritten(home) })
+  // Tools added to the app later (Grok CLI) don't inherit items that are explicitly off everywhere else
+  for (const t of toolsInUse(home)) if (t === 'grok' && !before.includes(t)) {
+    try {
+      seedNewToolToggles(home, t)
+    } catch {
+      // the library may not exist yet (onboarding): nothing to seed
+    }
+  }
 }
 
 // ---------------------------------------------------------------- Library

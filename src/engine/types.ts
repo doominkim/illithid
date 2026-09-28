@@ -84,6 +84,7 @@ export type ExtraTargetId =
   | 'geminiRules'
   | 'geminiMcp'
   | 'copilotMcp'
+  | 'grokMcp'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 
@@ -123,7 +124,7 @@ export interface FileChange {
    * - toolNotInitialized  there is content, but the file is one the tool creates itself on first run (~/.claude.json) — run the tool once
    * - copilotHomeOverride COPILOT_HOME points elsewhere, so Copilot wouldn't read ~/.copilot — no Copilot file is written
    */
-  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride'
+  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride' | 'grokHomeOverride'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]
   /** MCP targets: servers this change adds, updates or removes (names only) */
@@ -152,6 +153,8 @@ export interface BuildContext {
   pendingRetire?: PendingRetire[]
   /** Owned-region hash each target last wrote (state.applied) — tells tool-side edits from library changes */
   applied?: Partial<Record<TargetId, string>>
+  /** The target's tool is turned off (retiring): only removals are planned — no memory index, permissions or new files */
+  retiring?: boolean
 }
 
 export interface BuildResult {

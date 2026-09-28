@@ -22,7 +22,7 @@ import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
-import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
@@ -53,7 +53,13 @@ function Mcp(): React.JSX.Element {
       TOOLS.map((tool) => {
         const st = s.tools[tool] ?? 'notApplicable'
         // Off but still present in the tool config: needs sync
-        if (!enabled(s.name, tool)) return [tool, { on: false, pending: st === 'needsSync' }]
+        if (!enabled(s.name, tool))
+          return [
+            tool,
+            tool === 'grok' && grokReadsFromClaude(inUse, (x) => enabled(s.name, x))
+              ? { on: false, pending: st === 'needsSync', problem: true, hint: t('combo.readsClaude') }
+              : { on: false, pending: st === 'needsSync' }
+          ]
         return [tool, { ...pillFromCellState(st), on: true, na: false }]
       })
     ) as PillMap

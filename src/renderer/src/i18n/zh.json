@@ -42,7 +42,9 @@
     "cleanupFailed": "备份清理失败: {{count}} 项",
     "tools": "使用中的工具",
     "copilotDoubleLoad": "与 Claude Code 同时使用时，VS Code 可能会重复加载规则、技能和代理。",
-    "marketEnabled": "使用市场"
+    "marketEnabled": "使用市场",
+    "grokWithClaude": "也会读取为 Claude Code 开启的技能、MCP 和代理",
+    "grokReadsClaude": "也会读取现有的 Claude Code 设置"
   },
   "common": {
     "loading": "加载中…",
@@ -192,7 +194,8 @@
       "originalGone": "原文件已不存在"
     },
     "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
-    "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件"
+    "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
+    "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件"
   },
   "app": {
     "name": "Illithid"
@@ -502,5 +505,13 @@
     "none": "本地会话记录中没有调用",
     "indexing": "正在读取会话记录…",
     "since": "自 {{day}} 起"
+  },
+  "combo": {
+    "title": "同时使用 Claude Code？",
+    "grok": "{{tool}} 也会读取 Claude Code 的技能、MCP 和代理。为 Claude 开启的项目无法只对 {{tool}} 关闭。规则不会重复。",
+    "copilot": "VS Code 中的 {{tool}} 也会读取 Claude Code 的规则、技能和代理，可能会加载两次。",
+    "both": "都使用",
+    "dropClaude": "关闭 Claude",
+    "readsClaude": "已为 Claude Code 开启 — Grok 从那里读取"
   }
 }

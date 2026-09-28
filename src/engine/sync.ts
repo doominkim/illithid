@@ -11,7 +11,7 @@ import { basename, resolve } from 'node:path'
 import { applyAgentSync, planAgentSync, type AgentSyncItem, type AgentSyncResult } from './agentSync'
 import { apply, type ApplyResult } from './apply'
 import { deleteSyncCandidates, type DeleteRequest, type DeleteResult } from './deleteCopies'
-import { activeWorkspaceId, readConfig, withActiveWorkspace, workspaceIds } from './config'
+import { activeWorkspaceId, clearToolsRetiring, readConfig, toolsRetiring, withActiveWorkspace, workspaceIds } from './config'
 import type { ToolId } from './agents'
 import { rulesBlockItems } from './targets/codexAgents'
 import { planAll } from './plan'
@@ -26,7 +26,7 @@ import type { SecretBackend } from './secrets'
 import { libraryExists } from './sources'
 import { activePending, dropPending, retireHash, type RetireKind } from './pendingRetire'
 import { readState, writeState } from './state'
-import { ALL_TARGET_IDS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
+import { ALL_TARGET_IDS, ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
 import { sha256 } from './text'
 import type { Env, FileChange } from './types'
 
@@ -176,6 +176,31 @@ export function planFingerprint(p: SyncPlan): string {
   return sha256(rows.sort().join('\n'))
 }
 
+/**
+ * Retiring tools (turned off, app copies still there) leave the list once a fresh plan has nothing left to do for them.
+ * Items the app never removes (user files, copies the user edited) don't keep a tool retiring
+ */
+export function settleRetiringTools(home: string, env: Env, secrets?: SecretBackend): void {
+  const retiring = toolsRetiring(home)
+  if (!retiring.length) return
+  const p = planSyncAll(home, env, secrets)
+  // Same actions as pendingSyncCount (items a normal sync never runs, like replaceLink, don't hold a tool back)
+  const acts = (a: string): boolean =>
+    a === 'copy' || a === 'update' || a === 'deleteCandidate' || a === 'replaceImported' || a === 'retireImported'
+  const targetTool = new Map<string, string>(ALL_TARGETS.map((t) => [t.id, t.tool]))
+  // A tool stays retiring while something is left to remove, or its copies can't be reached (a file error, COPILOT_HOME/GROK_HOME)
+  const busy = new Set<string>([
+    ...p.targets
+      .filter((c) => (c.changed && !c.error) || c.error || c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride')
+      .map((c) => targetTool.get(c.id) ?? ''),
+    ...p.rules.filter((x) => acts(x.action)).map((x) => x.tool ?? 'claude'),
+    ...p.skills.filter((x) => acts(x.action)).map((x) => x.tool),
+    ...p.agents.filter((x) => acts(x.action)).map((x) => x.tool)
+  ])
+  const done = retiring.filter((t) => !busy.has(t))
+  if (done.length) clearToolsRetiring(home, done)
+}
+
 export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllResult {
   if (!libraryExists(home)) {
     return {
@@ -197,6 +222,7 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   }
   applyDeletes(home, env, plan, results)
   pruneGonePending(home)
+  settleRetiringTools(home, env, opts.secrets)
   return { libraryExists: true, plan, results }
 }
 

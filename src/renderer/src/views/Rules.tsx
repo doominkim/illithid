@@ -88,7 +88,7 @@ function Rules(): React.JSX.Element {
       TOOLS.map((tool) => {
         const on = enabled(name, tool)
         const inj = injection[tool]
-        if (on && (tool === 'claude' || tool === 'copilot') && failedIn('rule', name, tool)) return [tool, { on: true, problem: true }]
+        if (on && (tool === 'claude' || tool === 'copilot' || tool === 'grok') && failedIn('rule', name, tool)) return [tool, { on: true, problem: true }]
         return [tool, on ? { ...inj, on: true } : { on: false }]
       })
     ) as PillMap

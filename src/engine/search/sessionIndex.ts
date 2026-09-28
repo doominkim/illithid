@@ -17,6 +17,7 @@ import {
   readClaude,
   readCodex,
   readGemini,
+  readGrok,
   readOpencodeDb,
   type OpencodeDb,
   type TranscriptMessage
@@ -380,6 +381,9 @@ export async function indexSessions(
             break
           case 'copilot':
             throw new Error('Copilot sessions are not supported yet')
+          case 'grok':
+            await readGrok(s.path, c)
+            break
           default: {
             const never: never = s.tool
             throw new Error(`unknown tool ${String(never)}`)

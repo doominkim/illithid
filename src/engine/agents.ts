@@ -58,6 +58,7 @@ export function tools(home: string): ToolInfo[] {
   const canon = canonicalPaths(home)
   const claudeSettings = join(home, '.claude/settings.json')
   const codexConfig = join(home, '.codex/config.toml')
+  const grokConfig = join(home, '.grok/config.toml')
   const opencodeConfig = join(home, '.config/opencode/opencode.json')
   const geminiSettings = join(home, '.gemini/settings.json')
   const copilotMcp = join(home, '.copilot/mcp-config.json')
@@ -144,8 +145,32 @@ export function tools(home: string): ToolInfo[] {
         dirs: [join(home, '.copilot/agents')],
         ext: '.agent.md'
       }
+    },
+    {
+      id: 'grok',
+      displayName: 'Grok CLI',
+      configFile: grokConfig,
+      // Grok reads *.md directly under ~/.grok/rules (not subfolders), a folder shared with the user — app copies are tracked in state
+      rules: { kind: 'copyDir', dir: join(home, '.grok/rules') },
+      skills: { kind: 'symlinkDir', dir: join(home, '.grok/skills') },
+      models: { path: grokConfig, format: 'toml', keys: ['models.default'] },
+      roster: {
+        dirs: [join(home, '.grok/agents')],
+        ext: '.md'
+      }
     }
   ]
+}
+
+/**
+ * GROK_HOME pointing somewhere other than ~/.grok (absolute path), else null. Same handling as COPILOT_HOME: Grok writes are
+ * skipped because Grok wouldn't read ~/.grok
+ */
+export function grokHomeOverride(home: string, env: Record<string, string | undefined>): string | null {
+  const v = env.GROK_HOME?.trim()
+  if (!v) return null
+  const abs = resolve(v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v))
+  return abs === join(home, '.grok') ? null : abs
 }
 
 /**
@@ -157,6 +182,13 @@ export function copilotHomeOverride(home: string, env: Record<string, string | u
   if (!v) return null
   const abs = resolve(v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v))
   return abs === join(home, '.copilot') ? null : abs
+}
+
+/** Home override of a tool that has one (COPILOT_HOME, GROK_HOME) pointing away from the folder the app writes, else null */
+export function toolHomeOverride(home: string, id: ToolId, env: Record<string, string | undefined>): string | null {
+  if (id === 'copilot') return copilotHomeOverride(home, env)
+  if (id === 'grok') return grokHomeOverride(home, env)
+  return null
 }
 
 export function tool(home: string, id: ToolId): ToolInfo {

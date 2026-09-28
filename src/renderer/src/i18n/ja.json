@@ -42,7 +42,9 @@
     "cleanupFailed": "バックアップ整理に失敗: {{count}} 件",
     "tools": "使用中のツール",
     "copilotDoubleLoad": "Claude Code と併用すると、VS Code でルール・スキル・エージェントが二重に読み込まれることがあります。",
-    "marketEnabled": "マーケットを使う"
+    "marketEnabled": "マーケットを使う",
+    "grokWithClaude": "Claude Code で有効なスキル・MCP・エージェントも読み込む",
+    "grokReadsClaude": "既存の Claude Code 設定も読み込む"
   },
   "common": {
     "loading": "読み込み中…",
@@ -192,7 +194,8 @@
       "originalGone": "元ファイルがありません"
     },
     "notInitialized": "{{tool}} を一度起動してから再度反映してください",
-    "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません"
+    "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
+    "grokHomeOverride": "GROK_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません"
   },
   "app": {
     "name": "Illithid"
@@ -502,5 +505,13 @@
     "none": "ローカルのセッション記録に呼び出しなし",
     "indexing": "セッション記録を読み込み中…",
     "since": "{{day}} から"
+  },
+  "combo": {
+    "title": "Claude Code も一緒に使いますか？",
+    "grok": "{{tool}} は Claude Code のスキル・MCP・エージェントも読み込みます。Claude で有効な項目は {{tool}} だけでオフにできません。ルールは重複しません。",
+    "copilot": "VS Code の {{tool}} は Claude Code のルール・スキル・エージェントも読むため、二重に読み込まれることがあります。",
+    "both": "両方使う",
+    "dropClaude": "Claude をオフ",
+    "readsClaude": "Claude Code で有効 — Grok はそこから読み込みます"
   }
 }

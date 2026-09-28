@@ -44,6 +44,7 @@ import {
   snapshot,
   watchLibrary,
   writeConfig,
+  setToolsInUse,
   importAllFromLegacy,
   applyRuleSync,
   canonicalPaths,
@@ -110,6 +111,7 @@ import {
   summarizeSync,
   syncAll,
   pendingSyncCount,
+  seedNewToolToggles,
   previewSwitch,
   upsertMcpServer,
   writePermissions,
@@ -136,7 +138,7 @@ import {
   type McpServer,
   type ToolId
 } from '../src/engine'
-import { configView, deleteCandidates, mcpRead, mcpSave, toolsInUseView } from '../src/main/writes'
+import { configView, deleteCandidates, mcpRead, mcpSave, toolsInUseSet, toolsInUseView } from '../src/main/writes'
 import {
   indexSessions,
   usageOf,
@@ -651,10 +653,10 @@ async function toolSteps(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const want: [string, string][] = [
-        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
-        [tg('skills', 'gsk2'), '{"claude":false,"codex":false,"copilot":false}'],
-        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false,"copilot":false}'],
-        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false,"copilot":false}']
+        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('skills', 'gsk2'), '{"claude":false,"codex":false,"copilot":false,"grok":false}'],
+        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}'],
+        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}']
       ]
       for (const [got, w] of want) if (got !== w) bad.push(`toggles ${got} ≠ ${w}`)
       const skillRes = ir.find((x) => x.kind === 'skill')
@@ -968,11 +970,11 @@ async function toolSteps(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       for (const [g, w] of [
-        [tg('rules', 'team.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
-        [tg('rules', 'copilot-instructions.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
-        [tg('skills', 'csk2'), '{"claude":false,"codex":false,"gemini":false}'],
-        [tg('agents', 'cag'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}'],
-        [tg('mcp', 'c1'), '{"claude":false,"codex":false,"opencode":false,"gemini":false}']
+        [tg('rules', 'team.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'],
+        [tg('rules', 'copilot-instructions.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('skills', 'csk2'), '{"claude":false,"codex":false,"gemini":false,"grok":false}'],
+        [tg('agents', 'cag'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'],
+        [tg('mcp', 'c1'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}']
       ])
         if (g !== w) bad.push(`toggles ${g} ≠ ${w}`)
       if (readAgentDoc(H, 'cag').tools.copilot?.effort !== 'medium') bad.push('agent effort not under copilot')
@@ -1024,6 +1026,350 @@ async function toolSteps(): Promise<void> {
         .sort()
         .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
         .join(',')
+    }
+
+    // ---- aj. Grok CLI (~/.grok)
+  {
+    const envC: Env = { PATH: '' }
+    const memC = memorySecretBackend()
+    const cHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+      const H = makeFixture(prefix)
+      unlinkSync(join(H, '.agents'))
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
+      initLibrary(H)
+      return H
+    }
+    const ctree = (H: string, rel: string): string => {
+      const p = join(H, rel)
+      if (!existsSync(p)) return 'absent'
+      return readdirSync(p, { recursive: true })
+        .map(String)
+        .sort()
+        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .join(',')
+    }
+    const G_CONFIG = '# mine\n[ui]\ncompact_mode = true\n\n[models]\ndefault = "grok-4.7"\n\n[mcp_servers.mine]\ncommand = "my-server"\n'
+    const grokFiles = {
+      '.grok/config.toml': G_CONFIG,
+      '.grok/rules/user.md': '# Mine\n\n- Personal rule.\n',
+      '.grok/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n\nOwn.\n',
+      '.grok/agents/mine.md': '---\nname: mine\ndescription: Mine\n---\n\nMine.\n'
+    }
+    const seedG = (H: string): void => {
+      createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
+      createRule(H, 'extra.md', '# Extra\n')
+      mkdirSync(libraryPaths(H).memoryDir, { recursive: true })
+      writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n\n- [Note](notes/a.md) — a note\n')
+      createSkill(H, 'gsk', 'Grok skill')
+      createAgent(H, 'helper', 'Helps')
+      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { grok: { model: 'grok-4.7' } } })
+      upsertMcpServer(H, 'g-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } })
+      upsertMcpServer(H, 'g-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
+      upsertMcpServer(H, 'g-sec', { transport: 'stdio', command: 'sec', env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' } }, { secrets: memC })
+    }
+
+    // aj1. not chosen — ~/.grok byte-identical
+    {
+      const bad: string[] = []
+      for (const [label, inUse] of [['unset', undefined], ['explicit', ['claude', 'codex', 'copilot']]] as [string, ToolId[] | undefined][]) {
+        const H = cHome(`illithid-m7-G1${label}-`, { ...grokFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
+        seedG(H)
+        const g0 = ctree(H, '.grok')
+        const p = planSyncAll(H, envC, memC)
+        if (p.targets.some((c) => c.id === 'grokMcp') || [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'grok')) bad.push(`${label}: plan has Grok items`)
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (ctree(H, '.grok') !== g0) bad.push(`${label}: ~/.grok changed`)
+      }
+      check('aj1. Grok not chosen — toolsInUse unset and an explicit list without Grok: no Grok plan items, ~/.grok byte-identical', !bad.length, bad.length ? bad.join('; ') : '2 cases unchanged')
+    }
+
+    // aj2. chosen — rules flat in ~/.grok/rules (user files kept), config.toml marker block, skills, agents, model, re-sync 0, delete, GROK_HOME
+    {
+      const bad: string[] = []
+      const H = cHome('illithid-m7-G2-', grokFiles, ['grok'])
+      seedG(H)
+      const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (!r.results) bad.push('sync refused')
+      const rd = join(H, '.grok/rules')
+      if (read(join(rd, 'style.md')) !== readRule(H, 'style.md')) bad.push('rule copy')
+      if (!read(join(rd, 'illithid-memory.md')).includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory copy')
+      if (read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']) bad.push('user rule touched')
+      if (!readState(H).state.toolRules?.grok?.['style.md']) bad.push('toolRules.grok state')
+      const cfg = read(join(H, '.grok/config.toml'))
+      if (!cfg.startsWith(G_CONFIG.trimEnd())) bad.push('config.toml outside the block changed')
+      const t = parseToml(cfg) as Json
+      const ms = t.mcp_servers as Json
+      const want: Record<string, unknown> = {
+        mine: { command: 'my-server' },
+        'g-stdio': { command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } },
+        'g-http': { url: 'https://mcp.example.com/mcp', headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' } }
+      }
+      for (const [n, w] of Object.entries(want)) if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
+      if (((ms['g-sec'] as Json)?.env as Json)?.API_TOKEN !== 'sk-fixture-literal-1234567890abcdef') bad.push('secret not resolved')
+      if ((t.models as Json)?.default !== 'grok-4.7' || (t.ui as Json)?.compact_mode !== true) bad.push('other tables')
+      if (dirContentHash(join(H, '.grok/skills/gsk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'gsk'))) bad.push('skill copy')
+      if (read(join(H, '.grok/skills/own/SKILL.md')) !== grokFiles['.grok/skills/own/SKILL.md'] || read(join(H, '.grok/agents/mine.md')) !== grokFiles['.grok/agents/mine.md']) bad.push('user skill/agent touched')
+      if (read(join(H, '.grok/agents/helper.md')) !== '---\nname: helper\ndescription: Helps\nmodel: grok-4.7\n---\n\nHelp out.\n') bad.push('helper render')
+      for (const rel of ['.claude', '.codex', '.gemini', '.copilot', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      const p2 = planSyncAll(H, envC, memC)
+      const busy = [...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id), ...[...p2.rules, ...p2.skills, ...p2.agents].filter((x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')).map((x) => `${x.name}:${x.action}`)]
+      if (busy.length) bad.push(`re-plan ${busy.join(',')}`)
+      // default model: [models] default changed in place, the rest of the file intact
+      setModel(H, 'grok', 'models.default', 'grok-5')
+      const cfg2 = read(join(H, '.grok/config.toml'))
+      if ((parseToml(cfg2) as Json as { models: Json }).models.default !== 'grok-5' || cfg2.replace('"grok-5"', '"grok-4.7"') !== cfg) bad.push('setModel models.default')
+      // a user rule with the library name is left alone (userOwned); turning a rule off deletes only the app copy
+      createRule(H, 'user.md', '# Library user\n')
+      const uo = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'user.md')
+      if (uo?.action !== 'skip' || uo.reason !== 'userOwned') bad.push(`user.md ${uo?.action}`)
+      setToggle(H, 'rules', 'extra.md', 'grok', false)
+      const rx = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const dres = rx.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool}:${x.name}:${x.status}`).join(',')
+      if (dres !== 'grok:extra.md:done' || existsSync(join(rd, 'extra.md')) || read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']) bad.push(`delete ${dres}`)
+      // a copy the user edited in the shared folder is not deleted when the rule goes away
+      createRule(H, 'mine2.md', '# M2\n')
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      writeFileSync(join(rd, 'mine2.md'), '# edited by me\n')
+      setToggle(H, 'rules', 'mine2.md', 'grok', false)
+      const ue = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'mine2.md')
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (ue?.action !== 'skip' || ue.reason !== 'userEdited' || read(join(rd, 'mine2.md')) !== '# edited by me\n') bad.push(`user-edited copy ${ue?.action}:${ue?.reason}`)
+      // a library rule named like the memory copy is skipped (reservedName)
+      createRule(H, 'illithid-memory.md', '# clash\n')
+      const rn = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'illithid-memory.md')
+      if (rn?.reason !== 'reservedName') bad.push(`reserved name ${rn?.action}:${rn?.reason}`)
+      // Grok-only keys of the same-name table are kept; an inline mcp_servers entry outside the block is refused (file untouched)
+      const cfgNow = read(join(H, '.grok/config.toml'))
+      writeFileSync(join(H, '.grok/config.toml'), cfgNow.replace('[mcp_servers.mine]', '[mcp_servers.g-stdio2]\nenabled = false\ntool_timeout_sec = 90\n\n[mcp_servers.mine]'))
+      upsertMcpServer(H, 'g-stdio2', { transport: 'stdio', command: 'x2' })
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const k2 = (parseToml(read(join(H, '.grok/config.toml'))) as { mcp_servers: Json }).mcp_servers['g-stdio2'] as Json
+      if (k2?.enabled !== false || k2?.tool_timeout_sec !== 90 || k2?.command !== 'x2') bad.push(`kept keys ${JSON.stringify(k2)}`)
+      const inlineCfg = read(join(H, '.grok/config.toml')) + '\n[mcp_servers]\ng-inline = { command = "y" }\n'
+      writeFileSync(join(H, '.grok/config.toml'), inlineCfg)
+      upsertMcpServer(H, 'g-inline', { transport: 'stdio', command: 'z' })
+      const pin = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokMcp')
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (!pin?.error || read(join(H, '.grok/config.toml')) !== inlineCfg) bad.push(`inline refused ${pin?.error}`)
+      writeFileSync(join(H, '.grok/config.toml'), cfgNow)
+      // GROK_HOME elsewhere → nothing written
+      const envO: Env = { ...envC, GROK_HOME: join(H, 'elsewhere') }
+      createRule(H, 'later.md', '# Later\n')
+      const po = planSyncAll(H, envO, memC)
+      if (po.targets.find((c) => c.id === 'grokMcp')?.skip !== 'grokHomeOverride' || [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'grok')) bad.push('GROK_HOME override plan')
+      syncAll(H, envO, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (existsSync(join(rd, 'later.md'))) bad.push('written despite GROK_HOME override')
+      check(
+        'aj2. Grok chosen — rules copied flat into ~/.grok/rules (memory as illithid-memory.md, user rules kept, toolRules state), config.toml marker block (${VAR} kept, secret resolved, other tables intact), skills, agents, [models] default, re-sync 0, delete candidate, GROK_HOME',
+        !bad.length,
+        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}`
+      )
+    }
+
+    // aj3. import from ~/.grok and Grok sessions (scan, transcript, usage)
+    {
+      const bad: string[] = []
+      const H = cHome('illithid-m7-G3-', {
+        ...grokFiles,
+        '.grok/config.toml': G_CONFIG + '\n[mcp_servers.web]\nurl = "https://w.example/mcp"\n\n[mcp_servers.web.headers]\nAuthorization = "Bearer ${W_TOKEN}"\n'
+      }, ['claude', 'grok'])
+      const pl = planImport(H, 'tool:grok')
+      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
+      if (names(pl.rules) !== 'user.md' || names(pl.mcp) !== 'mine,web' || !names(pl.skills).includes('own') || !names(pl.agents).includes('mine')) bad.push(`plan ${names(pl.rules)} | ${names(pl.mcp)} | ${names(pl.skills)} | ${names(pl.agents)}`)
+      const web = pl.mcp.find((x) => x.name === 'web')?.variants[0].server as Json | undefined
+      // Authorization: Bearer ${VAR} becomes the library's bearerEnv
+      if (web?.transport !== 'http' || web.bearerEnv !== 'W_TOKEN') bad.push(`web ${JSON.stringify(web)}`)
+      const sels = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+      applyImport(H, sels, 'tool:grok', { secrets: memC })
+      if (JSON.stringify(readManifest(H).manifest.rules['user.md'] ?? {}) !== '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}') bad.push(`toggles ${JSON.stringify(readManifest(H).manifest.rules['user.md'])}`)
+      // the imported ~/.grok/rules/user.md is adopted in place (same path as the app copy): nothing pending after the approved Sync
+      if (!readState(H).state.toolRules?.grok?.['user.md']) bad.push('user.md not adopted')
+      mkdirSync(join(H, '.claude'), { recursive: true })
+      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      if (pendingSyncCount(H, envC, memC) !== 0) bad.push(`pending after import+sync ${planSyncAll(H, envC, memC).rules.filter((x) => x.action !== 'inSync').map((x) => `${x.tool}:${x.name}:${x.action}:${x.reason}`).join(',')}`)
+      // sessions
+      const sdir = join(H, '.grok/sessions', encodeURIComponent('/tmp/gp'), '01a0e595-ded6-7120-89f3-dfb150e34e68')
+      mkdirSync(sdir, { recursive: true })
+      writeFileSync(join(sdir, 'summary.json'), JSON.stringify({ info: { id: 'x', cwd: '/tmp/gp' }, generated_title: 'Grok title', created_at: '2026-09-20T01:00:00Z', updated_at: '2026-09-20T02:00:00Z', num_chat_messages: 4 }))
+      writeFileSync(
+        join(sdir, 'chat_history.jsonl'),
+        [
+          { type: 'system', content: 'sys' },
+          { type: 'user', content: [{ type: 'text', text: 'grok question' }] },
+          { type: 'assistant', content: 'grok answer', model_id: 'grok-4.7', tool_calls: [{ id: 'c1', name: 'use_tool', arguments: JSON.stringify({ tool_name: 'kaneo__get_task', tool_input: { id: 'GROKARGSECRET' } }) }] },
+          { type: 'tool_result', tool_call_id: 'c1', content: 'out' }
+        ].map((x) => JSON.stringify(x)).join('\n') + '\n'
+      )
+      const ss = scanSessions(H, ['grok']).sessions
+      const s0 = ss[0]
+      if (ss.length !== 1 || s0.title !== 'Grok title' || s0.cwd !== '/tmp/gp' || s0.resumeCommand !== "cd -- /tmp/gp && grok --resume 01a0e595-ded6-7120-89f3-dfb150e34e68") bad.push(`scan ${JSON.stringify(s0)}`)
+      const tr = await readSessionTranscript(H, 'grok', '01a0e595-ded6-7120-89f3-dfb150e34e68')
+      if (tr.messages.map((m) => `${m.role}:${m.kind ?? 'text'}`).join(',') !== 'user:text,assistant:text,assistant:tool') bad.push(`transcript ${tr.messages.map((m) => m.role).join(',')}`)
+      await indexSessions(H, scanSessions(H, ['grok']).sessions)
+      const u = usageOf(H, 'mcp', 'kaneo', { now: Date.parse('2026-09-24T00:00:00Z') })
+      if (u?.total !== 1 || u.byModel[0]?.model !== 'grok-4.7' || u.byTool[0]?.tool !== 'grok') bad.push(`usage ${JSON.stringify(u?.byTool)}`)
+      // turning Grok on for a library imported before Grok existed: items off for every other tool are off for Grok too
+      {
+        const S = cHome('illithid-m7-G4-', {}, ['claude'])
+        createRule(S, 'notes.md', '# notes\n')
+        for (const t of ['claude', 'codex', 'opencode', 'gemini', 'copilot'] as ToolId[]) setToggle(S, 'rules', 'notes.md', t, false)
+        createRule(S, 'shared.md', '# shared\n')
+        const n = seedNewToolToggles(S, 'grok')
+        const mf = readManifest(S).manifest.rules
+        if (n !== 1 || mf['notes.md']?.grok !== false || mf['shared.md']?.grok === false) bad.push(`seed ${n} ${JSON.stringify(mf)}`)
+      }
+      // [models] default refusal only for root-level inline/dotted models, not a models key in another table
+      {
+        const S = cHome('illithid-m7-G5-', { '.grok/config.toml': '[profile]\nmodels = ["a"]\n' }, ['grok'])
+        try {
+          setModel(S, 'grok', 'models.default', 'grok-4.7')
+          if ((parseToml(read(join(S, '.grok/config.toml'))) as { models?: Json }).models?.default !== 'grok-4.7') bad.push('models.default not appended')
+        } catch (e) {
+          bad.push(`setModel refused ${(e as Error).message}`)
+        }
+      }
+      check('aj3. Grok import (rules except app copies, config.toml mcp_servers with headers, skills, agents, source-only toggles) and sessions (summary.json title/cwd/resume, chat_history transcript, use_tool MCP usage)', !bad.length, bad.length ? bad.join('; ') : 'import + 1 session, usage kaneo 1 by grok-4.7')
+    }
+  }
+
+    // ---- ak. turning a tool off removes the app's copies there (retiring), user files stay, turning it back on restores
+    {
+      const bad: string[] = []
+      const envK: Env = { PATH: '' }
+      const memK = memorySecretBackend()
+      const H = makeFixture('illithid-m7-K-')
+      unlinkSync(join(H, '.agents'))
+      const files: Record<string, string> = {
+        '.claude/settings.json': '{}\n',
+        '.claude.json': JSON.stringify({ projects: { keep: true }, mcpServers: { mine: { command: 'mine' } } }, null, 2) + '\n',
+        '.claude/rules/user-rule.md': '# user\n',
+        '.claude/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n',
+        '.codex/AGENTS.md': '# My codex notes\n',
+        '.codex/config.toml': 'model = "gpt-5.5"\n',
+        '.grok/config.toml': '[ui]\ncompact_mode = true\n',
+        '.grok/rules/user.md': '# grok user\n'
+      }
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      writeConfig(H, { version: 1, toolsInUse: ['claude', 'codex', 'grok'] })
+      initLibrary(H)
+      createRule(H, 'style.md', '# Style\n')
+      createSkill(H, 'ksk', 'K skill')
+      createAgent(H, 'kag', 'K agent')
+      upsertMcpServer(H, 'k-srv', { transport: 'stdio', command: 'npx', args: ['k'] })
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      const have = (rel: string): boolean => existsSync(join(H, rel))
+      if (!have('.claude/rules/illithid/style.md') || !have('.claude/skills/ksk/SKILL.md') || !have('.claude/agents/kag.md') || !have('.grok/rules/style.md')) bad.push('initial sync')
+      // turn Claude off → retiring; the plan removes Claude copies only
+      setToolsInUse(H, ['codex', 'grok'])
+      if (JSON.stringify(readConfig(H).config.toolsRetiring) !== '["claude"]') bad.push(`retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      const p = planSyncAll(H, envK, memK)
+      const claudeDeletes = [...p.rules, ...p.skills, ...p.agents].filter((x) => (x.tool ?? 'claude') === 'claude' && x.action === 'deleteCandidate').map((x) => x.name).sort()
+      if (claudeDeletes.join() !== 'MEMORY.md,kag,ksk,style.md'.split(',').filter((n) => n !== 'MEMORY.md' || existsSync(libraryPaths(H).memoryIndex)).join()) bad.push(`claude deletes ${claudeDeletes}`)
+      if (!p.targets.find((c) => c.id === 'claudeMcp')?.changed) bad.push('claudeMcp not planned')
+      if ([...p.rules, ...p.skills, ...p.agents].some((x) => x.tool && x.tool !== 'claude' && x.action === 'deleteCandidate')) bad.push('other tools touched')
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      if (have('.claude/rules/illithid/style.md') || have('.claude/skills/ksk') || have('.claude/agents/kag.md')) bad.push('Claude copies left')
+      const cj = readJson(join(H, '.claude.json'))
+      if (JSON.stringify(cj.mcpServers) !== JSON.stringify({ mine: { command: 'mine' } }) || JSON.stringify(cj.projects) !== '{"keep":true}') bad.push(`claude.json ${JSON.stringify(cj.mcpServers)}`)
+      if (read(join(H, '.claude/rules/user-rule.md')) !== '# user\n' || !have('.claude/skills/own/SKILL.md')) bad.push('Claude user files touched')
+      if (!have('.grok/rules/style.md') || !have('.codex/agents/kag.toml')) bad.push('other tools lost copies')
+      if (readConfig(H).config.toolsRetiring !== undefined) bad.push('retiring not cleared')
+      if (pendingSyncCount(H, envK, memK) !== 0) bad.push('pending after retire')
+      // Grok off too: its rules folder keeps the user's file only; config.toml block removed, [ui] kept
+      setToolsInUse(H, ['codex'])
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      if (have('.grok/rules/style.md') || read(join(H, '.grok/rules/user.md')) !== '# grok user\n' || read(join(H, '.grok/config.toml')).includes('illithid') || !read(join(H, '.grok/config.toml')).includes('compact_mode')) bad.push('Grok retire')
+      // turned back on before applying: retiring is dropped and nothing is removed
+      setToolsInUse(H, ['codex', 'grok', 'claude'])
+      if (readConfig(H).config.toolsRetiring !== undefined) bad.push('retiring kept after turning back on')
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      if (!have('.claude/rules/illithid/style.md') || !have('.grok/rules/style.md')) bad.push('turning back on did not restore copies')
+      check(
+        'ak. tool off removes its app copies — Claude off: rules/skills/agents copies and owned ~/.claude.json servers removed, user files and other tools kept, retiring cleared; Grok off: rules copies and config.toml block removed; back on restores',
+        !bad.length,
+        bad.length ? bad.join('; ') : 'Claude and Grok retired cleanly, restored on re-enable'
+      )
+    }
+
+    // ---- ak2. a retiring tool only gets removals (no memory index, permissions or new files); cancel restores retiring exactly;
+    // computed defaults never retire; unknown retiring ids don't reset the config
+    {
+      const bad: string[] = []
+      const envK: Env = { PATH: '' }
+      const memK = memorySecretBackend()
+      const H = makeFixture('illithid-m7-K2-')
+      unlinkSync(join(H, '.agents'))
+      const files: Record<string, string> = {
+        '.codex/AGENTS.md': '# My codex notes\n',
+        '.codex/config.toml': 'model = "gpt-5.5"\n',
+        '.config/opencode/opencode.json': '{\n  "theme": "x"\n}\n'
+      }
+      for (const [rel, body] of Object.entries(files)) {
+        mkdirSync(join(H, rel, '..'), { recursive: true })
+        writeFileSync(join(H, rel), body)
+      }
+      writeConfig(H, { version: 1, toolsInUse: ['claude', 'codex', 'opencode'] })
+      initLibrary(H)
+      createRule(H, 'style.md', '# Style\n')
+      createSkill(H, 'ksk', 'K skill')
+      mkdirSync(join(libraryPaths(H).memoryIndex, '..'), { recursive: true })
+      writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n')
+      writePermissions(H, { bash: [['git', 'status']], claudeOnly: { allow: [], deny: [] } } as unknown as Allowlist)
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      const codexMd = (): string => read(join(H, '.codex/AGENTS.md'))
+      const oc = (): Json => readJson(join(H, '.config/opencode/opencode.json'))
+      if (!codexMd().includes('memory/MEMORY.md') || !existsSync(join(H, '.codex/rules/default.rules')) || !JSON.stringify(oc()).includes('MEMORY.md') || !JSON.stringify(oc().skills ?? {}).includes('skills'))
+        bad.push('initial sync')
+      // Codex and OpenCode off: blocks, memory entry, skills.paths and the permissions block go; user text stays
+      setToolsInUse(H, ['claude'])
+      syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
+      if (codexMd() !== '# My codex notes\n') bad.push(`codex AGENTS.md ${JSON.stringify(codexMd())}`)
+      if (read(join(H, '.codex/rules/default.rules')).includes('illithid')) bad.push('codex default.rules block left')
+      if (JSON.stringify(oc().instructions ?? []).includes('MEMORY.md') || oc().skills !== undefined || oc().theme !== 'x') bad.push(`opencode ${JSON.stringify(oc())}`)
+      if (readConfig(H).config.toolsRetiring !== undefined) bad.push(`retiring left ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      // a retiring tool never gets a file created
+      {
+        const S = makeFixture('illithid-m7-K3-')
+        unlinkSync(join(S, '.agents'))
+        mkdirSync(join(S, '.codex'), { recursive: true })
+        writeConfig(S, { version: 1, toolsInUse: ['claude'], toolsRetiring: ['codex'] })
+        initLibrary(S)
+        createRule(S, 'style.md', '# Style\n')
+        writeFileSync(libraryPaths(S).memoryIndex, '# Memory\n')
+        writePermissions(S, { bash: [['git', 'status']], claudeOnly: { allow: [], deny: [] } } as unknown as Allowlist)
+        const created = planSyncAll(S, envK, memK).targets.filter((c) => c.id.startsWith('codex') && c.changed).map((c) => c.id)
+        if (created.length) bad.push(`retiring creates ${created}`)
+      }
+      // on → preview cancelled → restore: retiring comes back exactly (nothing new retires)
+      setToolsInUse(H, ['claude', 'gemini'])
+      toolsInUseSet(H, ['claude'], [])
+      if (readConfig(H).config.toolsRetiring !== undefined) bad.push(`cancel left retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      // unset list: tools the app never wrote to don't retire
+      {
+        const S = makeFixture('illithid-m7-K4-')
+        unlinkSync(join(S, '.agents'))
+        mkdirSync(join(S, '.codex'), { recursive: true })
+        mkdirSync(join(S, '.claude'), { recursive: true })
+        initLibrary(S)
+        toolsInUseSet(S, ['claude'])
+        if (readConfig(S).config.toolsRetiring !== undefined) bad.push(`computed defaults retired ${JSON.stringify(readConfig(S).config.toolsRetiring)}`)
+        // an unknown id in toolsRetiring is dropped, not a config reset
+        writeFileSync(join(S, '.config/illithid/config.json'), JSON.stringify({ version: 1, toolsInUse: ['claude'], allowRealApply: false, toolsRetiring: ['cursor', 'codex'] }))
+        const rc = readConfig(S)
+        if (rc.error || rc.config.allowRealApply !== false || JSON.stringify(rc.config.toolsRetiring) !== '["codex"]') bad.push(`unknown retiring ${JSON.stringify(rc)}`)
+      }
+      check(
+        'ak2. retiring plans only removals (Codex/OpenCode blocks, memory entry, skills.paths, permissions block; no file created), cancel restores retiring, computed defaults never retire, unknown retiring ids dropped',
+        !bad.length,
+        bad.length ? bad.join('; ') : 'Codex/OpenCode cleaned, nothing created, cancel/defaults/unknown ids handled'
+      )
     }
 
     // ai1. fingerprint: the preview's plan is applied only while it still matches
@@ -5317,12 +5663,12 @@ async function run(): Promise<void> {
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const wantToggles: [string, string][] = [
         // Gemini and Copilot are toggleable for every kind, so they are off too (skills: both joined claude/codex as copy targets)
-        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
-        [tg('skills', 'pr-check'), '{"codex":false,"gemini":false,"copilot":false}'],
-        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
-        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false}'],
-        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false,"copilot":false}'],
-        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false,"copilot":false}']
+        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('skills', 'pr-check'), '{"codex":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}'],
+        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}']
       ]
       for (const [got, want] of wantToggles) if (got !== want) bad.push(`toggles ${got} ≠ ${want}`)
       // automatic apply off (libWrite path): plan only, nothing written — ~/.claude/rules keeps the original
@@ -5458,7 +5804,7 @@ async function run(): Promise<void> {
       const det = detectTools(H, { PATH: bin })
         .map((d) => `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`)
         .join(',')
-      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false,copilot:-:-:false') bad.push(`detectTools ${det}`)
+      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false,copilot:-:-:false,grok:-:-:false') bad.push(`detectTools ${det}`)
       check(
         'af3. HAR-12 toolsInUse=[claude] — Codex/OpenCode get no files or folders, status notApplicable; setModel and Claude memory writes refused for tools not in use; bad toolsInUse ignored alone; detectTools',
         !bad.length,

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { MANIFEST_KINDS, MANIFEST_TOOLS, type ManifestKind, type ToolId } from './toolIds'
-import { libraryRoot } from './config'
+import { libraryRoot, toolsRetiring } from './config'
 import { assertInsideLibrary } from './libpath'
 import { atomicWrite } from './write'
 
@@ -17,6 +17,8 @@ export type ToolToggles = Partial<Record<ToolId, boolean>>
 /** A missing key means on (true). Only false is stored in the file */
 export interface Manifest {
   version: 1
+  /** Planning only, never stored: tools every item is off for (retiring tools) */
+  offTools?: ToolId[]
   rules: Record<string, ToolToggles>
   skills: Record<string, ToolToggles>
   mcp: Record<string, ToolToggles>
@@ -98,7 +100,15 @@ export function isEnabled(
   name: string,
   tool: ToolId
 ): boolean {
+  if (m?.offTools?.includes(tool)) return false
   return m?.[kind]?.[name]?.[tool] !== false
+}
+
+/** Manifest as the sync plans it: retiring tools read as off for every item (their app copies are removed) */
+export function readPlanManifest(home: string): ManifestRead {
+  const r = readManifest(home)
+  const off = toolsRetiring(home)
+  return off.length ? { ...r, manifest: { ...r.manifest, offTools: off } } : r
 }
 
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
@@ -153,4 +163,30 @@ export function renameManifestEntry(home: string, kind: ManifestKind, from: stri
   const target = assertInsideLibrary(home, cur.path)
   atomicWrite(target, JSON.stringify(m, null, 2) + '\n', existsSync(target) ? {} : { mode: 0o644 })
   return true
+}
+
+/**
+ * A tool added to the app after items were imported has no key in their toggles, so it would read as on. When such a tool is
+ * turned on, items that every other tool has explicitly off (tool-only imports, tool notes) are turned off for it too.
+ * Returns the number of entries changed; writes nothing when there are none
+ */
+export function seedNewToolToggles(home: string, tool: ToolId): number {
+  const cur = readManifest(home)
+  if (cur.error || !existsSync(cur.path)) return 0
+  const m: Manifest = structuredClone(cur.manifest)
+  let n = 0
+  for (const kind of MANIFEST_KINDS) {
+    const others = MANIFEST_TOOLS[kind].filter((t) => t !== tool)
+    if (!MANIFEST_TOOLS[kind].includes(tool) || !others.length) continue
+    for (const [name, entry] of Object.entries(m[kind])) {
+      if (entry[tool] !== undefined) continue
+      if (others.every((t) => entry[t] === false)) {
+        m[kind][name] = { ...entry, [tool]: false }
+        n++
+      }
+    }
+  }
+  if (!n) return 0
+  atomicWrite(assertInsideLibrary(home, cur.path), JSON.stringify(m, null, 2) + '\n')
+  return n
 }

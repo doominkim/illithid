@@ -3,6 +3,7 @@ import codexSvg from '@lobehub/icons-static-svg/icons/openai.svg?raw'
 import cursorSvg from '@lobehub/icons-static-svg/icons/cursor.svg?raw'
 import geminiSvg from '@lobehub/icons-static-svg/icons/geminicli-color.svg?raw'
 import copilotSvg from '@lobehub/icons-static-svg/icons/githubcopilot.svg?raw'
+import grokSvg from '@lobehub/icons-static-svg/icons/grok.svg?raw'
 import opencodeSvg from '@lobehub/icons-static-svg/icons/opencode.svg?raw'
 import type { ToolId } from '../../../shared/api'
 
@@ -16,6 +17,7 @@ const SVG: Record<IconToolId, string> = {
   opencode: opencodeSvg,
   gemini: geminiSvg,
   copilot: copilotSvg,
+  grok: grokSvg,
   cursor: cursorSvg
 }
 
@@ -33,6 +35,7 @@ const MARKUP: Record<IconToolId, { __html: string }> = {
   opencode: { __html: fit(SVG.opencode) },
   gemini: { __html: fit(SVG.gemini) },
   copilot: { __html: fit(SVG.copilot) },
+  grok: { __html: fit(SVG.grok) },
   cursor: { __html: fit(SVG.cursor) }
 }
 

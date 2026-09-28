@@ -231,6 +231,8 @@ export interface ToolsInUseView {
   inUse: ToolId[]
   /** false = config.toolsInUse not set yet (users from before the setting, or first run) */
   configured: boolean
+  /** Tools turned off whose app copies are still to be removed (config.toolsRetiring) */
+  retiring: ToolId[]
   /** What looks installed on this device (config folder or executable on PATH) */
   detected: ToolDetection[]
 }
@@ -355,7 +357,7 @@ export interface NotInitializedView {
   /** Display path (~) */
   label: string
   /** Why the file is left alone instead of the tool's first run: COPILOT_HOME points somewhere other than ~/.copilot */
-  reason?: 'copilotHomeOverride'
+  reason?: 'copilotHomeOverride' | 'grokHomeOverride'
 }
 
 export interface DeleteCandidateRequest {
@@ -571,7 +573,7 @@ export interface Api {
   /** Tools in use + detection (read-only) */
   toolsInUseGet(): Promise<ToolsInUseView>
   /** Save the tools in use (null = unset, all tools). Writes config only — applying to a newly enabled tool is a separate sync */
-  toolsInUseSet(tools: ToolId[] | null): Promise<WriteResult<ToolsInUseView>>
+  toolsInUseSet(tools: ToolId[] | null, retiring?: ToolId[]): Promise<WriteResult<ToolsInUseView>>
   /** Installed-tool detection only (read-only) */
   detectTools(): Promise<ToolDetection[]>
   pickDirectory(current?: string): Promise<string | null>

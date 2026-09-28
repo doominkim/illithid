@@ -34,7 +34,7 @@ import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { useToolsInUse } from '../lib/config'
-import { dotOfPills, pillFromCellState, TOOL_NAME, TOOLS, type PillMap } from '../lib/tools'
+import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOL_NAME, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
@@ -79,7 +79,13 @@ function Agents(): React.JSX.Element {
         TOOLS.map((tool) => {
           const on = data.toggles[name]?.[tool] !== false
           const st = data.state[name]?.[tool]
-          if (!on) return [tool, { on: false }]
+          if (!on)
+            return [
+              tool,
+              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
+                ? { on: false, problem: true, hint: t('combo.readsClaude') }
+                : { on: false }
+            ]
           if (failedIn('agent', name, tool)) return [tool, { on: true, problem: true }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
           return [tool, { ...pillFromCellState(st ?? 'synced'), on: true }]
@@ -87,7 +93,7 @@ function Agents(): React.JSX.Element {
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
     })
-  }, [data, failedIn])
+  }, [data, failedIn, inUse, t])
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />

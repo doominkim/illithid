@@ -69,6 +69,8 @@ function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | un
     case 'gemini':
       // Gemini looks sessions up per project (the directory it runs in)
       return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && gemini --resume ${id}` : undefined
+    case 'grok':
+      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && grok --resume ${id}` : `grok --resume ${id}`
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -446,6 +448,47 @@ function scanGemini(home: string): Session[] {
   return out
 }
 
+// ---------------------------------------------------------------- Grok
+
+/**
+ * ~/.grok/sessions/<url-encoded cwd>/<session id>/: summary.json (title, times, cwd, counts) and chat_history.jsonl (messages).
+ * The session path is chat_history.jsonl (read by the transcript reader and the index)
+ */
+function scanGrok(home: string): Session[] {
+  const root = join(home, '.grok/sessions')
+  if (!existsSync(root)) return []
+  const files = fg.sync('*/*/summary.json', { cwd: root, absolute: true, onlyFiles: true, followSymbolicLinks: false, suppressErrors: true })
+  const out: Session[] = []
+  for (const f of files) {
+    let s: Json
+    try {
+      s = JSON.parse(readFileSync(f, 'utf8')) as Json
+    } catch {
+      continue
+    }
+    const dir = f.slice(0, -'/summary.json'.length)
+    const id = basename(dir)
+    const chat = join(dir, 'chat_history.jsonl')
+    if (!existsSync(chat)) continue
+    const info = (s.info ?? {}) as Json
+    const cwd = str(info.cwd)
+    const title = str(s.generated_title) ?? str(s.session_summary) ?? ''
+    out.push({
+      id,
+      tool: 'grok',
+      title: clip(title, TITLE_MAX),
+      cwd,
+      project: projectOf(cwd),
+      startedAt: isoOrUndefined(s.created_at),
+      updatedAt: isoOrUndefined(s.updated_at) ?? isoOrUndefined(s.last_active_at),
+      ...(typeof s.num_chat_messages === 'number' ? { messageCount: s.num_chat_messages } : {}),
+      path: chat,
+      resumeCommand: resumeCommand('grok', id, cwd)
+    })
+  }
+  return out
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Read-only scan. Sorted by updatedAt descending. Returns the rest even if one tool fails. */
@@ -456,7 +499,8 @@ export function scanSessions(home: string, tools?: SessionTool[]): SessionScanRe
     opencode: scanOpencode,
     gemini: scanGemini,
     // ~/.copilot/session-state format is unverified (no local samples) — not scanned yet
-    copilot: () => []
+    copilot: () => [],
+    grok: scanGrok
   }
   const sessions: Session[] = []
   const errors: SessionScanResult['errors'] = []

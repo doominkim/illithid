@@ -69,6 +69,8 @@ import { libraryPaths, readMcp } from './sources'
 import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
 import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
 import { mcpEntries, outsideBlockMulti, sha256, stripJsonComments } from './text'
+import { LEGACY_TOML_MCP_MARKERS, TOML_MCP_MARKERS } from './targets/codexMcp'
+import { GROK_MEMORY_RULE_FILE } from './ruleSync'
 import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
@@ -148,6 +150,12 @@ export function listImportSources(home: string): ImportSource[] {
       label: 'GitHub Copilot (~/.copilot)',
       path: join(home, '.copilot'),
       available: toolConfigFound(home, 'copilot'),
+      kinds: ['rule', 'mcp', 'skill', 'agent']
+    },
+    grok: {
+      label: 'Grok CLI (~/.grok)',
+      path: join(home, '.grok'),
+      available: toolConfigFound(home, 'grok'),
       kinds: ['rule', 'mcp', 'skill', 'agent']
     }
   }
@@ -827,7 +835,8 @@ const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   codex: new Set(['name', 'description', 'model', 'model_reasoning_effort', 'developer_instructions']),
   opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
   gemini: new Set(['name', 'description', 'model', 'kind']),
-  copilot: new Set(['name', 'description', 'model', 'reasoning-effort'])
+  copilot: new Set(['name', 'description', 'model', 'reasoning-effort']),
+  grok: new Set(['name', 'description', 'model'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
 const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set(['description', 'mode', 'model', 'reasoningEffort', 'prompt'])
@@ -950,6 +959,7 @@ function agentRaw(tool: ToolId, name: string, text: string, reasons: Portability
       }
     }
     case 'claude':
+    case 'grok':
     case 'opencode': {
       const m = matter(text, AGENT_MATTER)
       const d = structuredClone(m.data) as Json
@@ -1136,6 +1146,21 @@ function agentRetirements(home: string, name: string, v: AgentVariant): { pendin
  * leaving both makes Claude read the same rule twice. Files referenced by opencode.json instructions are user paths and never moved;
  * only that instructions entry is removed by the opencodeRules target (sync adds the library path instead).
  */
+/** Record ~/.grok/rules/<name> as the app's copy when it matches the library rule byte for byte (Grok copies rules as they are) */
+function adoptGrokRule(home: string, name: string, path: string): void {
+  try {
+    const bytes = readFileSync(path, 'utf8')
+    if (sha256(bytes) !== sha256(readRule(home, name))) return
+    const st = readState(home)
+    if (st.error) return
+    const state = { ...st.state, toolRules: { ...(st.state.toolRules ?? {}) } }
+    state.toolRules.grok = { ...(state.toolRules.grok ?? {}), [name]: { contentHash: sha256(bytes), at: new Date().toISOString() } }
+    writeState(home, state)
+  } catch {
+    // not adopted: the next sync reports it as the user's file
+  }
+}
+
 function ruleRetirements(home: string, name: string, v: FileVariant): { pending: PendingRetire[]; converted: ToolId[] } {
   const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
   const claudeRule = join(home, '.claude/rules', name)
@@ -1150,6 +1175,10 @@ function ruleRetirements(home: string, name: string, v: FileVariant): { pending:
         continue
       }
       e = pendingEntry(home, 'rule', 'copilot', name, src.path)
+    } else if (src.label === 'grok' && src.path === join(home, '.grok/rules', name)) {
+      // The original already sits where the app copy goes (~/.grok/rules/<name>): nothing to retire — adopt it when the bytes match
+      adoptGrokRule(home, name, src.path)
+      continue
     } else if (src.label === 'claude' && src.path === claudeRule) {
       try {
         if (!lstatSync(src.path).isFile()) continue
@@ -1523,6 +1552,26 @@ function convertCodex(name: string, s: Json): Conv {
   }
   if (Object.keys(cx).length) server.codex = cx
   if (s.enabled === false) c.warnings.push('was disabled in codex (enabled=false)')
+  return { server, c }
+}
+
+const TOML_ALL_MARKERS = [TOML_MCP_MARKERS, ...LEGACY_TOML_MCP_MARKERS]
+
+/** Grok CLI config.toml [mcp_servers.<name>]: command/args/env or url/headers (Grok expands ${VAR} itself) */
+function convertGrok(name: string, s: Json): Conv {
+  const c = new Converter(name)
+  let server: McpServer
+  if (typeof s.command === 'string') {
+    server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
+    if (isObj(s.env) && Object.keys(s.env).length)
+      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, v)]))
+    if (typeof s.startup_timeout_sec === 'number') server.timeoutMs = s.startup_timeout_sec * 1000
+  } else if (typeof s.url === 'string') {
+    server = { transport: 'http', url: c.url(s.url) }
+    if (isObj(s.headers) && Object.keys(s.headers).length)
+      server.headers = Object.fromEntries(Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, v)]))
+  } else return null
+  if (s.enabled === false) c.warnings.push('was disabled in grok (enabled=false)')
   return { server, c }
 }
 
@@ -2013,6 +2062,34 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
             if (isObj(s)) addMcp(n, convertCopilot(n, s), mp)
       }
       scanSkillDir(found, home, join(home, '.copilot/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
+    case 'grok': {
+      // ~/.grok/rules/*.md except the copies the app wrote there (tracked in state.toolRules.grok)
+      const rd = join(home, '.grok/rules')
+      const owned = readState(home).state.toolRules?.grok ?? {}
+      if (isDir(rd))
+        for (const f of readdirSync(rd).sort()) {
+          const p = join(rd, f)
+          if (f.endsWith('.md') && !f.startsWith('.') && !owned[f] && f !== GROK_MEMORY_RULE_FILE && lstatSync(p).isFile())
+            addFile(found.rules, f, p, ref(p), rulePortability(found.ctx, f, p))
+        }
+      const tp = join(home, '.grok/config.toml')
+      if (existsSync(tp)) {
+        try {
+          const o = parseToml(outsideBlockMulti(readFileSync(tp, 'utf8'), TOML_ALL_MARKERS)) as Json
+          if (isObj(o.mcp_servers))
+            for (const [n, s] of Object.entries(o.mcp_servers))
+              if (isObj(s)) addMcp(n, convertGrok(n, s), tp)
+        } catch {
+          found.notes.push('~/.grok/config.toml parse failed')
+        }
+      }
+      scanSkillDir(found, home, join(home, '.grok/skills'), {
         origin: 'tool',
         sourceId: src.id,
         label: tool

@@ -23,7 +23,7 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
-import { dotOfPills, pillFromCellState, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS, type PillMap } from '../lib/tools'
+import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 
@@ -65,7 +65,13 @@ function Skills(): React.JSX.Element {
         TOOLS.map((tool) => {
           const st = data.state[name]?.[tool]
           const on = !TOGGLE_TOOLS.includes(tool) || data.toggles[name]?.[tool] !== false
-          if (!on) return [tool, { on: false }]
+          if (!on)
+            return [
+              tool,
+              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
+                ? { on: false, problem: true, hint: t('combo.readsClaude') }
+                : { on: false }
+            ]
           if (failedIn('skill', name, tool)) return [tool, { on: true, problem: true }]
           if (data.toolDisabled?.[tool]?.includes(name)) return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
@@ -74,7 +80,7 @@ function Skills(): React.JSX.Element {
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
     })
-  }, [data, failedIn, t])
+  }, [data, failedIn, inUse, t])
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />

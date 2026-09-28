@@ -516,16 +516,117 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
   }
 }
 
+/**
+ * Scenario 6: Claude Code in use, then Grok CLI (and GitHub Copilot) turned on in Settings → the combo dialog. Cancel saves nothing,
+ * "Turn Claude off" saves the list without Claude, "Use both" saves both and the apply writes ~/.grok/rules
+ */
+async function comboRun(shots: string): Promise<RunResult> {
+  const home = '/Users/Shared/illithid-combo'
+  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  mkdirSync(home)
+  const userData = mkdtempSync(join(tmpdir(), 'illithid-combo-userdata-'))
+  const ws = '.illithid/workspaces/default'
+  put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
+  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(home, `${ws}/rules/style.md`, '# Style\n')
+  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n')
+  put(home, '.claude/settings.json', '{}\n')
+  put(home, '.claude.json', '{}\n')
+  put(home, '.grok/config.toml', '[ui]\ncompact_mode = true\n')
+  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const failures: string[] = []
+  const check = (ok: boolean, what: string): void => {
+    if (!ok) failures.push(what)
+  }
+  const errors: string[] = []
+  const cfg = (): { toolsInUse?: string[]; toolsRetiring?: string[] } => JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8'))
+  const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => errors.push(e.message))
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(1280, 800)
+    })
+    await page.evaluate(() => localStorage.setItem('illithid-language', 'en'))
+    await page.reload()
+    const tid = (id: string): ReturnType<Page['locator']> => page.locator(`[data-testid="${id}"]`)
+    await page.locator('[data-menu="settings"]').waitFor({ timeout: 30_000 })
+    await page.click('[data-menu="settings"]')
+    await tid('tool-in-use-grok').waitFor()
+    // 1. cancel → nothing saved
+    await tid('tool-in-use-grok').click({ force: true })
+    await page.waitForTimeout(800)
+    await page.screenshot({ path: join(shots, 'combo-0-after-click.png') })
+    await tid('combo-both').waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: join(shots, 'combo-1-dialog.png') })
+    await tid('combo-cancel').click()
+    await page.waitForTimeout(500)
+    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `cancel: unchanged (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(!(await tid('tool-in-use-grok').isChecked()), 'cancel: Grok switch off')
+    // 2. turn Claude off → saved without Claude (preview opens; Apply)
+    await tid('tool-in-use-grok').click({ force: true })
+    await tid('combo-drop-claude').click()
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    check(JSON.stringify(cfg().toolsInUse) === '["grok"]', `drop Claude: ["grok"] (got ${JSON.stringify(cfg().toolsInUse)})`)
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    await page.waitForTimeout(500)
+    check(existsSync(join(home, '.grok/rules/style.md')), 'drop Claude: ~/.grok/rules written')
+    // 3. Claude back on → dialog again → use both
+    await tid('tool-in-use-claude').click({ force: true })
+    await tid('combo-both').waitFor({ timeout: 10_000 })
+    await tid('combo-both').click()
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    check(JSON.stringify(cfg().toolsInUse) === '["claude","grok"]', `both: ["claude","grok"] (got ${JSON.stringify(cfg().toolsInUse)})`)
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    await page.waitForTimeout(500)
+    check(await tid('grok-reads-claude').isVisible(), 'Grok row notes it reads Claude settings')
+    // 4. Copilot on with Claude → same dialog with the Copilot text (wait for the apply toasts to clear the switch)
+    await page.waitForTimeout(3000)
+    await page.screenshot({ path: join(shots, 'combo-1b-before-copilot.png') })
+    await tid('tool-in-use-copilot').click({ force: true })
+    await tid('combo-both').waitFor({ timeout: 10_000 })
+    check((await tid('tool-combo-dialog').textContent())?.includes('VS Code') ?? false, 'Copilot text in the dialog')
+    await page.screenshot({ path: join(shots, 'combo-2-copilot.png') })
+    await tid('combo-cancel').click()
+    await page.waitForTimeout(300)
+    check(JSON.stringify(cfg().toolsInUse) === '["claude","grok"]', 'Copilot cancel: unchanged')
+    // 5. Grok off → the preview lists the Grok copies leaving; Apply removes them, the user's settings stay
+    await page.waitForTimeout(1500)
+    await tid('tool-in-use-grok').click({ force: true })
+    await tid('apply-preview').waitFor({ timeout: 30_000 })
+    await page.waitForTimeout(400)
+    check((await tid('apply-preview-grok').textContent())?.includes('style.md') ?? false, 'off preview lists the Grok rule copy')
+    await page.screenshot({ path: join(shots, 'combo-3-off-preview.png') })
+    await tid('apply-preview-apply').click()
+    await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
+    await page.waitForTimeout(500)
+    check(!existsSync(join(home, '.grok/rules/style.md')), 'Grok off: rule copy removed')
+    check(readFileSync(join(home, '.grok/config.toml'), 'utf8').includes('compact_mode'), 'Grok off: user config kept')
+    check(JSON.stringify(cfg().toolsInUse) === '["claude"]' && cfg().toolsRetiring === undefined, `Grok off: saved and settled (got ${JSON.stringify(cfg())})`)
+    return { failures, errors }
+  } finally {
+    await app.close()
+    rmSync(userData, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const shots = process.env.SHOTS_DIR ?? mkdtempSync(join(tmpdir(), 'illithid-onboarding-shots-'))
   mkdirSync(shots, { recursive: true })
-  const a = await firstRun(shots)
-  const b = await notInitializedRun(shots)
-  const c = await previewDetailsRun(shots)
-  const d = await firstToolSaveRun(shots)
-  const e = await toolsCancelRun(shots)
-  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d, toolsCancel: e }, null, 2))
-  if ([a, b, c, d, e].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
+  const only = process.env.ONLY
+  const skip = { failures: [], errors: [] } as RunResult
+  const a = only && only !== 'a' ? skip : await firstRun(shots)
+  const b = only && only !== 'b' ? skip : await notInitializedRun(shots)
+  const c = only && only !== 'c' ? skip : await previewDetailsRun(shots)
+  const d = only && only !== 'd' ? skip : await firstToolSaveRun(shots)
+  const e = only && only !== 'e' ? skip : await toolsCancelRun(shots)
+  const f = only && only !== 'f' ? skip : await comboRun(shots)
+  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d, toolsCancel: e, combo: f }, null, 2))
+  if ([a, b, c, d, e, f].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
 }
 
 main().catch((e) => {

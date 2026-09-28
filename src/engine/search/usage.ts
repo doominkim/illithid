@@ -112,6 +112,15 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
       }
       return []
     }
+    case 'grok': {
+      // MCP tools are reached through use_tool with the qualified catalog key <server>__<tool>
+      if (call.name === 'use_tool') {
+        const key = typeof input?.tool_name === 'string' ? input.tool_name : ''
+        const n = key.includes('__') ? str(key.split('__')[0]) : undefined
+        return n ? [{ kind: 'mcp', name: n }] : []
+      }
+      return []
+    }
     default:
       return []
   }

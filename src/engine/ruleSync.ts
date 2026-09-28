@@ -11,11 +11,11 @@ import {
   unlinkSync
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { canonicalPaths, copilotHomeOverride, tilde } from './agents'
-import { toolInUse } from './config'
+import { canonicalPaths, copilotHomeOverride, grokHomeOverride, tilde } from './agents'
+import { syncTools } from './config'
 import { dropPending, importStamp, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
 import { libraryPaths } from './sources'
-import { isEnabled, MANIFEST_FILE, readManifest } from './manifest'
+import { isEnabled, MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
 import type { Env } from './types'
@@ -195,25 +195,27 @@ function planLegacyDir(
   return { ok: true, entries, plans }
 }
 
-/** Plan (Claude copies, then Copilot copies). Read-only */
+/** Plan (Claude copies, then Copilot and Grok copies). Read-only */
 export function planRuleSync(home: string, env: Env = process.env): RuleSyncItem[] {
-  return [...planClaudeRules(home, env), ...planCopyRules(home, 'copilot', env)]
+  return [...planClaudeRules(home, env), ...planCopyRules(home, 'copilot', env), ...planCopyRules(home, 'grok', env)]
 }
 
 function planClaudeRules(home: string, _env: Env = process.env): RuleSyncItem[] {
   void _env
-  if (!toolInUse(home, 'claude')) return []
+  if (!syncTools(home).includes('claude')) return []
   const rulesDir = canonicalPaths(home).rules
   const { dir, legacyLink, legacyDirs } = claudeRulesPaths(home)
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const appState = readState(home).state
   const managed = appState.rules ?? {}
   const items: RuleSyncItem[] = []
 
-  // Old-name folders: a migration item (runs first) if all app-owned, otherwise skip
+  // Old-name folders: a migration item (runs first) if all app-owned, otherwise skip. Not while Claude is off (nothing moves in)
   const movable: string[] = []
+  const claudeOff = !!mf.manifest.offTools?.includes('claude')
   legacyDirs.forEach((legacyDir, i) => {
+    if (claudeOff) return
     const legacy = planLegacyDir(legacyDir, managed)
     if (!legacy) return
     if (legacy.ok) movable.push(legacyDir)
@@ -248,7 +250,7 @@ function planClaudeRules(home: string, _env: Env = process.env): RuleSyncItem[] 
   // Memory index → MEMORY.md (when no rule has the same name)
   const memIndex = libraryPaths(home).memoryIndex
   const memSt = lstatOrNull(memIndex)
-  if (!names.includes(CLAUDE_MEMORY_RULE) && memSt?.isFile()) {
+  if (!names.includes(CLAUDE_MEMORY_RULE) && memSt?.isFile() && !mf.manifest.offTools?.includes('claude')) {
     enabled.add(CLAUDE_MEMORY_RULE)
     sources.set(CLAUDE_MEMORY_RULE, memIndex)
   }
@@ -527,7 +529,10 @@ export function applyRuleSync(
       out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
     }
   }
-  if (copyItems.length) results.push(...applyCopyRules(home, env, 'copilot', copyItems.filter((it) => it.tool === 'copilot')))
+  for (const tool of COPY_RULE_TOOLS) {
+    const mine = copyItems.filter((it) => it.tool === tool)
+    if (mine.length) results.push(...applyCopyRules(home, env, tool, mine))
+  }
   return results
 }
 
@@ -542,13 +547,25 @@ export function restoreLegacyRulesLink(home: string, previousLink: string): bool
 // ---------------------------------------------------------------- Rule copies of other tools (Copilot)
 
 /** Tools whose rules are copied file by file. undefined (absent) = Claude, handled above */
-export type CopyRuleTool = 'copilot'
+export type CopyRuleTool = 'copilot' | 'grok'
+export const COPY_RULE_TOOLS: readonly CopyRuleTool[] = ['copilot', 'grok']
+
+/** Grok's copy of the memory index. ~/.grok/rules is shared with the user, so the app's file carries the app name */
+export const GROK_MEMORY_RULE_FILE = 'illithid-memory.md'
+
+/** The tool's home override points elsewhere (COPILOT_HOME / GROK_HOME): the app's folder would not be read */
+function copyToolOverridden(home: string, tool: CopyRuleTool, env: Env): boolean {
+  return tool === 'copilot' ? !!copilotHomeOverride(home, env) : !!grokHomeOverride(home, env)
+}
 
 /** App-owned folder the tool reads rules from */
 export function copyRulesDir(home: string, tool: CopyRuleTool): string {
   switch (tool) {
     case 'copilot':
       return join(home, '.copilot/instructions', CLAUDE_RULES_DIR)
+    // Grok reads only *.md directly under rules/ — the folder is shared with the user (app copies tracked in state)
+    case 'grok':
+      return join(home, '.grok/rules')
   }
 }
 
@@ -557,6 +574,8 @@ export function copyRuleFile(tool: CopyRuleTool, name: string): string {
   switch (tool) {
     case 'copilot':
       return name.replace(/\.md$/, '') + '.instructions.md'
+    case 'grok':
+      return name === CLAUDE_MEMORY_RULE ? GROK_MEMORY_RULE_FILE : name
   }
 }
 
@@ -572,6 +591,8 @@ export function copyRuleContent(tool: CopyRuleTool, text: string): string {
       if (/^applyTo\s*:/m.test(fm[1])) return text
       return text.replace(/^---(\r?\n)/, (m, eol: string) => `${m}applyTo: "**"${eol}`)
     }
+    case 'grok':
+      return text
   }
 }
 
@@ -580,10 +601,10 @@ export function copyRuleContent(tool: CopyRuleTool, text: string): string {
  * state.toolRules[tool]; other files in the folder are user-owned (skip). Empty when the tool is not in use.
  */
 function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem[] {
-  if (!toolInUse(home, tool) || (tool === 'copilot' && copilotHomeOverride(home, env))) return []
+  if (!syncTools(home).includes(tool) || copyToolOverridden(home, tool, env)) return []
   const rulesDir = canonicalPaths(home).rules
   const dir = copyRulesDir(home, tool)
-  const mf = readManifest(home)
+  const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const appState = readState(home).state
   const managed = appState.toolRules?.[tool] ?? {}
@@ -596,11 +617,16 @@ function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem
   const sources = new Map<string, string>()
   for (const n of names) if (isEnabled(mf.manifest, 'rules', n, tool)) sources.set(n, join(rulesDir, n))
   const memIndex = libraryPaths(home).memoryIndex
-  if (!names.includes(CLAUDE_MEMORY_RULE) && lstatOrNull(memIndex)?.isFile()) sources.set(CLAUDE_MEMORY_RULE, memIndex)
+  if (!names.includes(CLAUDE_MEMORY_RULE) && lstatOrNull(memIndex)?.isFile() && !mf.manifest.offTools?.includes(tool)) sources.set(CLAUDE_MEMORY_RULE, memIndex)
 
   for (const name of [...sources.keys()].sort()) {
     const path = join(dir, copyRuleFile(tool, name))
     const source = sources.get(name)!
+    // A library rule named like Grok's memory copy would collide with it in the shared folder
+    if (tool === 'grok' && name === GROK_MEMORY_RULE_FILE) {
+      items.push({ tool, name, action: 'skip', path, source, reason: 'reservedName' })
+      continue
+    }
     for (const p of pendingOf(home, appState, 'rule', tool, name)) {
       const currentHash = retireHash(p.path)
       if (currentHash === null) continue
@@ -633,6 +659,11 @@ function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem
     if (sources.has(name)) continue
     const path = join(dir, copyRuleFile(tool, name))
     const st = lstatOrNull(path)
+    // ~/.grok/rules is shared with the user: a copy edited there since the app wrote it is left alone
+    if (tool === 'grok' && st?.isFile() && !st.isSymbolicLink() && fileHash(path) !== managed[name].contentHash) {
+      items.push({ tool, name, action: 'skip', path, source: join(rulesDir, name), currentHash: fileHash(path), reason: 'userEdited' })
+      continue
+    }
     if (st?.isFile() && !st.isSymbolicLink())
       items.push({
         tool,

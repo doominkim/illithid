@@ -5,6 +5,7 @@
  * - OpenCode ~/.config/opencode/agents/<name>.md frontmatter description, mode: subagent, model, reasoningEffort + body
  * - Gemini   ~/.gemini/agents/<name>.md          frontmatter name, description, model + body (no effort setting)
  * - Copilot  ~/.copilot/agents/<name>.agent.md   frontmatter name, description, model, reasoning-effort + body
+ * - Grok     ~/.grok/agents/<name>.md            frontmatter name, description, model + body (the Claude format Grok also loads)
  * Keys without a value are omitted (the tool's default applies). The name is the library file name.
  */
 import { join } from 'node:path'
@@ -25,6 +26,8 @@ export function agentToolDir(home: string, tool: ToolId): { dir: string; ext: '.
       return { dir: join(home, '.gemini/agents'), ext: '.md' }
     case 'copilot':
       return { dir: join(home, '.copilot/agents'), ext: '.agent.md' }
+    case 'grok':
+      return { dir: join(home, '.grok/agents'), ext: '.md' }
   }
 }
 
@@ -120,6 +123,15 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
           ['description', description],
           ['model', t.model],
           ['reasoning-effort', t.effort]
+        ],
+        doc.body
+      )
+    case 'grok':
+      return mdDoc(
+        [
+          ['name', doc.name],
+          ['description', description],
+          ['model', t.model]
         ],
         doc.body
       )
