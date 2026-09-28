@@ -1,12 +1,12 @@
 import { app, shell, BrowserWindow } from 'electron'
-import { setTrayUpdate, setupTray } from './tray'
-import { onUpdateChange, startUpdateCheck } from './update'
+import { refreshTraySessions, setupTray } from './tray'
+import { startUpdateCheck } from './update'
 import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shellEnvReady } from './shellEnv'
-import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, registerIpc, resolveHome, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
+import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, recentSessions, registerIpc, resolveHome, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
 const LEGACY_USER_DATA_DIRS = ['harnesssync']
@@ -102,6 +102,7 @@ function createWindow(): void {
     e.preventDefault()
     win.hide()
     app.dock?.hide()
+    void refreshTraySessions()
   })
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
@@ -150,8 +151,16 @@ app.whenReady().then(() => {
   registerIpc()
   prepareLibraryOnStart()
   createWindow()
-  if (MENU_BAR) setupTray(showMainWindow)
-  if (MENU_BAR) onUpdateChange(setTrayUpdate)
+  if (MENU_BAR)
+    setupTray(
+      showMainWindow,
+      () => recentSessions(10),
+      (w) => {
+        if (is.dev && process.env['ELECTRON_RENDERER_URL']) void w.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#tray`)
+        else void w.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'tray' })
+      },
+      join(__dirname, '../preload/index.js')
+    )
   if (!TEST_MODE) startUpdateCheck(resolveHome().home)
   // Sync source -> tools once right after startup (deferred so it does not block showing the window)
   setTimeout(() => {

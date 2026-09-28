@@ -176,3 +176,19 @@ body {
   background-color: var(--mantine-color-yellow-3);
   color: var(--mantine-color-black);
 }
+
+/* Menu bar popover */
+.ac-tray-row {
+  border-radius: 6px;
+}
+.ac-tray-row:hover {
+  background: var(--ac-surface-hover);
+}
+.ac-tray-action {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: var(--mantine-font-size-sm);
+}
+.ac-tray-action:hover {
+  background: var(--ac-surface-hover);
+}

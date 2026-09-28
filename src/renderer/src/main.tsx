@@ -10,6 +10,7 @@ import { createRoot } from 'react-dom/client'
 import { MantineProvider, localStorageColorSchemeManager } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import App from './App'
+import { TrayPopover } from './TrayPopover'
 import { cssVariablesResolver, theme } from './theme'
 import { migrateStorageKey } from './lib/storage'
 
@@ -25,8 +26,15 @@ createRoot(document.getElementById('root')!).render(
       colorSchemeManager={colorSchemeManager}
       defaultColorScheme="auto"
     >
-      <Notifications position="bottom-right" />
-      <App />
+      {/* The menu bar popover loads the same page with #tray */}
+      {window.location.hash === '#tray' ? (
+        <TrayPopover />
+      ) : (
+        <>
+          <Notifications position="bottom-right" />
+          <App />
+        </>
+      )}
     </MantineProvider>
   </StrictMode>
 )

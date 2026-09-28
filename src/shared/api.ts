@@ -281,6 +281,17 @@ export interface TrayState {
 /** Menu bar item clicks the renderer handles (main shows the window first) */
 export type TrayAction = { kind: 'settings' } | { kind: 'update' } | { kind: 'workspace'; id: string }
 
+/** Recent session in the menu bar popover */
+export interface TraySession {
+  title: string
+  tool: ToolId
+  updatedAt?: string
+  resumeCommand: string
+}
+
+/** Menu bar popover buttons */
+export type TrayCommand = { kind: 'open' | 'settings' | 'update' | 'quit' } | { kind: 'workspace'; id: string }
+
 /** A newer release than the running app */
 export interface UpdateView {
   version: string
@@ -622,6 +633,12 @@ export interface Api {
   traySet(state: TrayState): Promise<void>
   /** Menu bar item clicks. Returns an unsubscribe function */
   onTrayAction(cb: (a: TrayAction) => void): () => void
+  /** Menu bar popover: last read recent sessions (fresh ones follow through onTraySessions) */
+  traySessions(): Promise<TraySession[]>
+  /** Menu bar popover buttons */
+  trayCommand(c: TrayCommand): Promise<void>
+  /** Menu bar popover: recent sessions re-read. Returns an unsubscribe function */
+  onTraySessions(cb: (s: TraySession[]) => void): () => void
   /** Running app version */
   appVersion(): Promise<string>
   /** Newer release found by the last check (null = none) */
@@ -870,11 +887,13 @@ export const CHANNELS = [
   'backupCleanupPreview',
   'backupCleanupRun',
   'traySet',
+  'traySessions',
+  'trayCommand',
   'appVersion',
   'updateStatus',
   'updateCheckNow',
   'updateSkip',
   'updateOpenTerminal'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent'>[]
+] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent' | 'onTraySessions'>[]
 
 export type Channel = (typeof CHANNELS)[number]

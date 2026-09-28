@@ -7,7 +7,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
-import { updateTray } from './tray'
+import { trayCommand, traySessions, updateTray } from './tray'
 import { checkForUpdate, clearUpdate, openUpgradeInTerminal, updateAvailable } from './update'
 import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -50,6 +50,8 @@ import type {
   Refused,
   SearchIndexView,
   TranscriptView,
+  TrayCommand,
+  TraySession,
   TrayState,
   WriteResult
 } from '../shared/api'
@@ -85,6 +87,17 @@ const MIME: Record<string, string> = {
 const ENV_OPS: ReadonlySet<Op> = new Set<Op>(['status', 'syncPending', 'syncPreview', 'mcp'])
 
 /** Run synchronous scans on a worker thread so the main event loop is not blocked */
+/** Recent sessions for the menu bar item (worker scan; subagent, untitled and non-resumable sessions left out) */
+export async function recentSessions(limit: number): Promise<TraySession[]> {
+  const { home } = resolveHome()
+  const r = await inWorker<{ sessions: { title: string; tool: string; updatedAt?: string; parentId?: string; resumeCommand?: string }[] }>('sessions', home)
+  return r.sessions
+    .filter((s) => !s.parentId && s.resumeCommand && s.title.trim())
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+    .slice(0, limit)
+    .map((s) => ({ title: s.title, tool: s.tool as ToolId, updatedAt: s.updatedAt, resumeCommand: s.resumeCommand! }))
+}
+
 async function inWorker<T>(op: Op, home: string, args: unknown[] = [], onProgress?: (p: unknown) => void): Promise<T> {
   // Workers get a copy of process.env. Only reads that depend on it wait for the login shell environment,
   // so lists (rules, skills, sessions, artifacts, search) show right away even when the shell is slow to start
@@ -300,6 +313,8 @@ export function registerIpc(): void {
     },
     detectTools: async () => detectTools(home, await envNow()),
     traySet: async (state) => updateTray(state as TrayState),
+    traySessions: async () => traySessions(),
+    trayCommand: async (c) => trayCommand(c as TrayCommand),
     appVersion: async () => app.getVersion(),
     updateStatus: async () => updateAvailable(),
     updateCheckNow: async () => checkForUpdate(home, true),
