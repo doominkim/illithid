@@ -8,10 +8,11 @@ import icon1x from '../../resources/trayTemplate.png?asset'
 import icon2x from '../../resources/trayTemplate@2x.png?asset'
 import pending1x from '../../resources/trayPendingTemplate.png?asset'
 import pending2x from '../../resources/trayPendingTemplate@2x.png?asset'
-import type { TrayAction, TrayState } from '../shared/api'
+import type { TrayAction, TrayState, UpdateView } from '../shared/api'
 
 let tray: Tray | null = null
 let state: TrayState | null = null
+let update: UpdateView | null = null
 let showWindow: (() => BrowserWindow | null) | null = null
 
 function templateImage(x1: string, x2: string): NativeImage {
@@ -39,6 +40,7 @@ function render(): void {
   tray.setImage(s && (s.pending > 0 || s.failed > 0) ? dotted! : plain!)
   // Always English, regardless of the app language
   const items: Electron.MenuItemConstructorOptions[] = [
+    ...(update ? [{ label: `Update to ${update.version}…`, click: () => send({ kind: 'update' }) }, { type: 'separator' as const }] : []),
     {
       label: 'Change Workspace',
       enabled: !!s?.workspaces.length,
@@ -67,6 +69,12 @@ export function setupTray(show: () => BrowserWindow | null): void {
   dotted = templateImage(pending1x, pending2x)
   tray = new Tray(plain)
   tray.setToolTip('Illithid')
+  render()
+}
+
+/** Newer release (null = none): an item on top of the menu opens the notice */
+export function setTrayUpdate(v: UpdateView | null): void {
+  update = v
   render()
 }
 

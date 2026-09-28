@@ -44,7 +44,9 @@
     "copilotDoubleLoad": "With Claude Code also in use, VS Code may load rules, skills and agents twice.",
     "marketEnabled": "Use the marketplace",
     "grokWithClaude": "Also reads the skills, MCP servers and agents on for Claude Code",
-    "grokReadsClaude": "Also reads your existing Claude Code settings"
+    "grokReadsClaude": "Also reads your existing Claude Code settings",
+    "updates": "Updates",
+    "updateCheck": "Check for new versions"
   },
   "common": {
     "loading": "Loading…",

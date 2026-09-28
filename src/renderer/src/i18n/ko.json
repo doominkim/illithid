@@ -44,7 +44,9 @@
     "copilotDoubleLoad": "Claude Code와 함께 쓰면 VS Code에서 룰·스킬·에이전트가 두 번 로드될 수 있습니다.",
     "marketEnabled": "마켓 사용",
     "grokWithClaude": "Claude Code 에 켠 스킬·MCP·에이전트도 함께 읽음",
-    "grokReadsClaude": "기존 Claude Code 설정도 함께 읽음"
+    "grokReadsClaude": "기존 Claude Code 설정도 함께 읽음",
+    "updates": "업데이트",
+    "updateCheck": "새 버전 확인"
   },
   "common": {
     "loading": "불러오는 중…",

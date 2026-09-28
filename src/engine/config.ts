@@ -48,6 +48,10 @@ export interface AppConfig {
   toolsInUse?: ToolId[]
   /** Marketplace (skills.sh · MCP registry · awesome-copilot). Default on; off = no menu and no network calls */
   marketEnabled?: boolean
+  /** New version check against the latest GitHub release. Default on; off = no update requests */
+  updateCheck?: boolean
+  /** Version the user chose to skip in the update notice (asked again only for a newer one) */
+  updateSkip?: string
   /**
    * Tools just turned off whose app copies are still in their folders. The next approved sync removes them (same as turning every
    * item off for that tool); a tool leaves this list once nothing of the app is left there, or when it is turned back on
@@ -138,6 +142,9 @@ export function validateConfig(v: unknown): string[] {
   if (o.toolsRetiring !== undefined && !isToolList(o.toolsRetiring)) errs.push(`toolsRetiring must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   if (o.marketEnabled !== undefined && typeof o.marketEnabled !== 'boolean')
     errs.push('marketEnabled must be a boolean')
+  if (o.updateCheck !== undefined && typeof o.updateCheck !== 'boolean') errs.push('updateCheck must be a boolean')
+  if (o.updateSkip !== undefined && (typeof o.updateSkip !== 'string' || !/^\d+\.\d+\.\d+/.test(o.updateSkip)))
+    errs.push('updateSkip must be a version')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))
     errs.push('deviceName must be a non-empty string')
   if (o.backupRetention !== undefined) {

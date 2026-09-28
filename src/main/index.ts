@@ -1,11 +1,12 @@
 import { app, shell, BrowserWindow } from 'electron'
-import { setupTray } from './tray'
+import { setTrayUpdate, setupTray } from './tray'
+import { onUpdateChange, startUpdateCheck } from './update'
 import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shellEnvReady } from './shellEnv'
-import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, registerIpc, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
+import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, registerIpc, resolveHome, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
 const LEGACY_USER_DATA_DIRS = ['harnesssync']
@@ -150,6 +151,8 @@ app.whenReady().then(() => {
   prepareLibraryOnStart()
   createWindow()
   if (MENU_BAR) setupTray(showMainWindow)
+  if (MENU_BAR) onUpdateChange(setTrayUpdate)
+  if (!TEST_MODE) startUpdateCheck(resolveHome().home)
   // Sync source -> tools once right after startup (deferred so it does not block showing the window)
   setTimeout(() => {
     void envReady.then(() => {

@@ -44,7 +44,9 @@
     "copilotDoubleLoad": "与 Claude Code 同时使用时，VS Code 可能会重复加载规则、技能和代理。",
     "marketEnabled": "使用市场",
     "grokWithClaude": "也会读取为 Claude Code 开启的技能、MCP 和代理",
-    "grokReadsClaude": "也会读取现有的 Claude Code 设置"
+    "grokReadsClaude": "也会读取现有的 Claude Code 设置",
+    "updates": "更新",
+    "updateCheck": "检查新版本"
   },
   "common": {
     "loading": "加载中…",

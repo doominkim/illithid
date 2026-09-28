@@ -244,9 +244,9 @@ function Settings(): React.JSX.Element {
   const { config, allowRealApply, refresh } = useConfig()
   const reload = useReload()
   const [confirmApply, setConfirmApply] = useState(false)
-  const [saving, setSaving] = useState<'apply' | 'market' | null>(null)
+  const [saving, setSaving] = useState<'apply' | 'market' | 'update' | null>(null)
 
-  const save = async (patch: Parameters<typeof window.api.configSet>[0], what: 'apply' | 'market'): Promise<void> => {
+  const save = async (patch: Parameters<typeof window.api.configSet>[0], what: 'apply' | 'market' | 'update'): Promise<void> => {
     setSaving(what)
     const r = await runWrite(window.api.configSet(patch), { success: t('settings.saved') })
     setSaving(null)
@@ -317,6 +317,24 @@ function Settings(): React.JSX.Element {
               disabled={!config || saving === 'market'}
               onChange={(e) => void save({ marketEnabled: e.currentTarget.checked ? undefined : false }, 'market')}
               data-testid="market-enabled"
+            />
+          }
+        />
+      </Section>
+
+      <Section title={t('settings.updates')}>
+        <Row
+          label={t('settings.updateCheck')}
+          control={
+            <Switch
+              size="md"
+              checked={config?.config.updateCheck !== false}
+              disabled={!config || saving === 'update'}
+              onChange={(e) => {
+                const on = e.currentTarget.checked
+                void save({ updateCheck: on ? undefined : false }, 'update').then(() => window.api.updateCheckNow())
+              }}
+              data-testid="update-check"
             />
           }
         />

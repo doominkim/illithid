@@ -110,7 +110,7 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 ## FAQ
 
 **Does my code or prompts go through Illithid?**
-No. Illithid never talks to any model API. It edits local config files and reads local session logs. Network access is limited to Git backup (only if you connect a remote) and the Market, which talks to skills.sh, the official MCP registry and GitHub. You can turn the Market off in Settings.
+No. Illithid never talks to any model API. It edits local config files and reads local session logs. Network access is limited to Git backup (only if you connect a remote), the update check and the Market, which talks to skills.sh, the official MCP registry and GitHub. You can turn the Market off in Settings. Illithid also asks GitHub once a day whether a newer version is out; turn that off under Settings → Updates.
 
 **Will it overwrite my existing setup?**
 On first run Illithid offers to import what you have. Imported originals are backed up before Illithid takes them over.

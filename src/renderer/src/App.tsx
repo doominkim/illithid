@@ -16,7 +16,7 @@ import {
   Store,
   Users
 } from 'lucide-react'
-import type { ConfigView, ToolId } from '../../shared/api'
+import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
 import { clearApiCache, RefreshContext, useApi } from './lib/useApi'
 import { ReloadContext } from './components/ReloadButton'
 import { ConfigContext } from './lib/config'
@@ -34,6 +34,7 @@ import Sessions from './views/Sessions'
 import Backup from './views/Backup'
 import Onboarding from './views/Onboarding'
 import { ApplyPreviewModal } from './components/ApplyPreviewModal'
+import { UpdateDialog } from './components/UpdateDialog'
 import { SyncContext } from './lib/sync'
 import { LIBRARY_CHANGED, notifySync, WORKSPACE_SWITCH_REQUEST } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
@@ -216,10 +217,30 @@ function App(): React.JSX.Element {
       seq: r.seq + 1
     }))
   }, [])
+  // New version notice: opens once per version per launch; the menu bar item reopens it
+  const [update, setUpdate] = useState<UpdateView | null>(null)
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const updateShown = useRef<string | null>(null)
+  useEffect(() => {
+    const show = (v: UpdateView | null): void => {
+      setUpdate(v)
+      if (!v) return setUpdateOpen(false)
+      if (updateShown.current === v.version) return
+      updateShown.current = v.version
+      setUpdateOpen(true)
+    }
+    window.api.updateStatus().then(show, () => {})
+    return window.api.onUpdateEvent(show)
+  }, [])
+  const skipUpdate = useCallback(async (version: string): Promise<void> => {
+    setUpdateOpen(false)
+    await window.api.updateSkip(version)
+  }, [])
   useEffect(
     () =>
       window.api.onTrayAction((a) => {
         if (a.kind === 'settings') navigate('settings')
+        else if (a.kind === 'update') setUpdateOpen(true)
         else window.dispatchEvent(new CustomEvent(WORKSPACE_SWITCH_REQUEST, { detail: a.id }))
       }),
     [navigate]
@@ -326,6 +347,7 @@ function App(): React.JSX.Element {
         </Box>
         )}
         <ApplyPreviewModal opened={previewOpen} onCancel={cancelPreview} onDone={finishPreview} />
+        <UpdateDialog update={update} opened={updateOpen} onLater={() => setUpdateOpen(false)} onSkip={(v) => void skipUpdate(v)} />
        </SyncContext.Provider>
       </ConfigContext.Provider>
       <Spotlight

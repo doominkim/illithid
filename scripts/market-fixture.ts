@@ -606,6 +606,25 @@ async function run(): Promise<void> {
     }
   }
 
+  // j. update check: newer release only, drafts/pre-releases/bad tags ignored, brew vs DMG install
+  {
+    const { compareVersions, latestUpdate, installKind, RELEASES_API } = await import('../src/engine/update')
+    const rel = (body: Record<string, unknown>): FetchFn => async (url) =>
+      url === RELEASES_API ? new Response(JSON.stringify(body), { status: 200 }) : new Response('', { status: 404 })
+    const newer = await latestUpdate(rel({ tag_name: 'v0.3.0', body: '## Notes', html_url: 'https://x/r' }), '0.2.8')
+    const same = await latestUpdate(rel({ tag_name: 'v0.2.8' }), '0.2.8')
+    const draft = await latestUpdate(rel({ tag_name: 'v9.0.0', draft: true }), '0.2.8')
+    const pre = await latestUpdate(rel({ tag_name: 'v9.0.0', prerelease: true }), '0.2.8')
+    const bad = await latestUpdate(rel({ tag_name: 'nightly' }), '0.2.8')
+    const order = compareVersions('0.10.0', '0.9.9') > 0 && compareVersions('1.0.0', '1.0') === 0 && compareVersions('0.2.8', '0.2.10') < 0
+    const kinds = installKind((p) => p === '/opt/homebrew/Caskroom/illithid') + ',' + installKind(() => false)
+    check(
+      'j. update check: newer release with notes, same/draft/pre-release/bad tag ignored, numeric version order, brew vs DMG',
+      newer?.version === '0.3.0' && newer.notes === '## Notes' && newer.url === 'https://x/r' && !same && !draft && !pre && !bad && order && kinds === 'brew,dmg',
+      JSON.stringify({ newer, same, draft, pre, bad, order, kinds })
+    )
+  }
+
   // i. workspace zip carries market.json
   {
     const { WORKSPACE_ZIP_FILES } = await import('../src/engine/workspace')

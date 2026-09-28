@@ -8,6 +8,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { updateTray } from './tray'
+import { checkForUpdate, clearUpdate, openUpgradeInTerminal, updateAvailable } from './update'
 import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { extname, join } from 'node:path'
@@ -298,6 +299,22 @@ export function registerIpc(): void {
     },
     detectTools: async () => detectTools(home, await envNow()),
     traySet: async (state) => updateTray(state as TrayState),
+    updateStatus: async () => updateAvailable(),
+    updateCheckNow: async () => checkForUpdate(home),
+    updateOpenTerminal: async () => {
+      try {
+        await openUpgradeInTerminal()
+        return { ok: true, value: null }
+      } catch (e) {
+        return { ok: false, message: (e as Error).message }
+      }
+    },
+    updateSkip: async (version) =>
+      W.wrap(() => {
+        W.configSet(home, { updateSkip: String(version) })
+        clearUpdate()
+        return null
+      }),
     pickDirectory: async (current) => {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
       const opts = {

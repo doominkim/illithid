@@ -279,7 +279,20 @@ export interface TrayState {
 }
 
 /** Menu bar item clicks the renderer handles (main shows the window first) */
-export type TrayAction = { kind: 'settings' } | { kind: 'workspace'; id: string }
+export type TrayAction = { kind: 'settings' } | { kind: 'update' } | { kind: 'workspace'; id: string }
+
+/** A newer release than the running app */
+export interface UpdateView {
+  version: string
+  current: string
+  /** Release notes (markdown) */
+  notes: string
+  /** Release page */
+  url: string
+  /** Installed through Homebrew (update with `command`) or from the DMG (download from `url`) */
+  install: 'brew' | 'dmg'
+  command: string | null
+}
 
 export interface WorkspaceExportResult {
   /** Saved file (~ form) */
@@ -609,6 +622,16 @@ export interface Api {
   traySet(state: TrayState): Promise<void>
   /** Menu bar item clicks. Returns an unsubscribe function */
   onTrayAction(cb: (a: TrayAction) => void): () => void
+  /** Newer release found by the last check (null = none) */
+  updateStatus(): Promise<UpdateView | null>
+  /** Check now (Settings) */
+  updateCheckNow(): Promise<UpdateView | null>
+  /** Homebrew installs: open Terminal running the upgrade command */
+  updateOpenTerminal(): Promise<WriteResult<null>>
+  /** Don't ask about this version again */
+  updateSkip(version: string): Promise<WriteResult<null>>
+  /** A check found (or dropped) a newer release. Returns an unsubscribe function */
+  onUpdateEvent(cb: (v: UpdateView | null) => void): () => void
   // ---- library writes (library required. Auto sync after save when allowRealApply)
   toggle(kind: ManifestKind, name: string, tool: ToolId, on: boolean): Promise<WriteResult<Manifest> | Refused>
   ruleRead(name: string): Promise<WriteResult<string>>
@@ -830,7 +853,11 @@ export const CHANNELS = [
   'backupSetAuto',
   'backupCleanupPreview',
   'backupCleanupRun',
-  'traySet'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction'>[]
+  'traySet',
+  'updateStatus',
+  'updateCheckNow',
+  'updateSkip',
+  'updateOpenTerminal'
+] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent'>[]
 
 export type Channel = (typeof CHANNELS)[number]

@@ -44,7 +44,9 @@
     "copilotDoubleLoad": "Claude Code と併用すると、VS Code でルール・スキル・エージェントが二重に読み込まれることがあります。",
     "marketEnabled": "マーケットを使う",
     "grokWithClaude": "Claude Code で有効なスキル・MCP・エージェントも読み込む",
-    "grokReadsClaude": "既存の Claude Code 設定も読み込む"
+    "grokReadsClaude": "既存の Claude Code 設定も読み込む",
+    "updates": "アップデート",
+    "updateCheck": "新しいバージョンを確認"
   },
   "common": {
     "loading": "読み込み中…",
