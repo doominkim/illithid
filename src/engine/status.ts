@@ -112,6 +112,7 @@ function changeCell(
   const target = c.id
   if (c.skip === 'nothingToWrite') return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — nothing to write` }
   if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride') return { ...base, target, state: 'notApplicable', detail: c.notes[0] ?? `${c.skip === 'grokHomeOverride' ? 'GROK_HOME' : 'COPILOT_HOME'} override` }
+  if (c.skip === 'jsoncUnsupported') return { ...base, target, state: 'notApplicable', detail: c.notes[0] ?? `${c.label} is not plain JSON` }
   if (c.skip === 'toolNotInitialized')
     return { ...base, target, state: 'notApplicable', detail: `${c.label} absent — run the tool once so it creates it` }
   if (c.error) {

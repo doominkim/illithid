@@ -123,8 +123,9 @@ export interface FileChange {
    * - nothingToWrite      the library has nothing for this target — not an error, nothing to show
    * - toolNotInitialized  there is content, but the file is one the tool creates itself on first run (~/.claude.json) — run the tool once
    * - copilotHomeOverride COPILOT_HOME points elsewhere, so Copilot wouldn't read ~/.copilot — no Copilot file is written
+   * - jsoncUnsupported    (the file exists) the alternate being used (opencode.jsonc) is not plain JSON — left untouched to keep its comments
    */
-  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride' | 'grokHomeOverride'
+  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]
   /** MCP targets: servers this change adds, updates or removes (names only) */
@@ -190,7 +191,10 @@ export interface TargetDef {
    * (users who never chose their tools keep the old behavior: an absent file is never created — skip=toolNotInitialized)
    */
   createIfInUse?: boolean
-  /** Other files (relative to home) the tool reads instead — if one exists, a missing file is never created */
+  /**
+   * Other files (relative to home) the tool reads instead. If the main file is missing and one exists, that file is read and
+   * written in its place (never a second file) — as long as it is plain JSON (otherwise skip=jsoncUnsupported)
+   */
   alternates?: string[]
   build(before: string, ctx: BuildContext): BuildResult
   /**

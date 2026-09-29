@@ -385,13 +385,16 @@ export interface SyncStatusView {
   notInitialized: NotInitializedView[]
 }
 
-/** A tool file skipped because the tool has not created it yet (FileChange.skip = toolNotInitialized) or COPILOT_HOME points elsewhere */
+/**
+ * A tool file skipped because the tool has not created it yet (FileChange.skip = toolNotInitialized), COPILOT_HOME/GROK_HOME points
+ * elsewhere, or the opencode.jsonc in use is not plain JSON
+ */
 export interface NotInitializedView {
   tool: ToolId
   /** Display path (~) */
   label: string
-  /** Why the file is left alone instead of the tool's first run: COPILOT_HOME points somewhere other than ~/.copilot */
-  reason?: 'copilotHomeOverride' | 'grokHomeOverride'
+  /** Why the file is left alone instead of the tool's first run: COPILOT_HOME/GROK_HOME points elsewhere, or the file has JSONC syntax */
+  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
 }
 
 export interface DeleteCandidateRequest {

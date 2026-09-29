@@ -358,7 +358,7 @@ export function notInitializedOf(changes: SyncAllResult['plan']['targets']): Not
     const tool = TARGET_TOOL.get(c.id)
     if (!tool || out.has(c.path)) continue
     if (c.skip === 'toolNotInitialized') out.set(c.path, { tool, label: c.label })
-    else if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride') out.set(c.path, { tool, label: c.label, reason: c.skip })
+    else if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride' || c.skip === 'jsoncUnsupported') out.set(c.path, { tool, label: c.label, reason: c.skip })
   }
   return [...out.values()]
 }

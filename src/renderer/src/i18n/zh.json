@@ -212,7 +212,8 @@
     },
     "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
     "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
-    "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件"
+    "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
+    "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用"
   },
   "app": {
     "name": "Illithid"

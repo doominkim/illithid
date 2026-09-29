@@ -212,7 +212,8 @@
     },
     "notInitialized": "{{tool}} 를 한 번 실행한 뒤 다시 반영하세요",
     "copilotHomeOverride": "COPILOT_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
-    "grokHomeOverride": "GROK_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다"
+    "grokHomeOverride": "GROK_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
+    "jsoncUnsupported": "opencode.jsonc 에 주석이 있어 {{tool}} 설정은 쓰지 않습니다 — 주석을 지우면 반영됩니다"
   },
   "app": {
     "name": "Illithid"

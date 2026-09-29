@@ -27,7 +27,7 @@ import {
  * - stateError         could not read state.json (abort everything so state is not overwritten)
  * - writeFailed        I/O failure during backup/write
  * - drift              (not produced since M7d — kept for compatibility. The source always wins; tool-side changes are backed up and overwritten)
- * - nothingToWrite / toolNotInitialized  (status unchanged, not a failure) the file is absent and left alone — FileChange.skip
+ * - nothingToWrite / toolNotInitialized / jsoncUnsupported  (status unchanged, not a failure) the file is left alone — FileChange.skip
  */
 export type ApplySkipReason =
   | 'error'
@@ -39,6 +39,7 @@ export type ApplySkipReason =
   | 'toolNotInitialized'
   | 'copilotHomeOverride'
   | 'grokHomeOverride'
+  | 'jsoncUnsupported'
 
 export interface ApplyResult {
   id: TargetId

@@ -286,6 +286,7 @@ export const opencodeSkillPermissions: TargetDef = {
   tool: 'opencode',
   rel: '.config/opencode/opencode.json',
   optional: true,
+  alternates: ['.config/opencode/opencode.jsonc'],
   region: (text, src) => {
     try {
       const hits = opencodeHits(parseJsonObject(text), src)

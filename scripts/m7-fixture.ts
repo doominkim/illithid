@@ -138,7 +138,7 @@ import {
   type McpServer,
   type ToolId
 } from '../src/engine'
-import { configView, deleteCandidates, mcpRead, mcpSave, toolsInUseSet, toolsInUseView } from '../src/main/writes'
+import { configView, deleteCandidates, mcpRead, mcpSave, notInitializedOf, toolsInUseSet, toolsInUseView } from '../src/main/writes'
 import {
   indexSessions,
   usageOf,
@@ -1546,7 +1546,7 @@ async function toolSteps(): Promise<void> {
       if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r.md')) || !existsSync(join(H, '.claude/agents/a1.md'))) bad.push('Claude not synced')
       if (pendingSyncCount(H, envP, memI) !== 0) bad.push('pending after sync')
       if (statusReport(H, envP, memI).cells.some((c) => c.tool !== 'claude' && c.state !== 'notApplicable')) bad.push('status cells for tools without a folder')
-      // saved from Settings (explicit list) → OpenCode is in use and its files are created (createIfInUse)
+      // saved from Settings (explicit list) → OpenCode is in use and its files are created
       writeConfig(H, { version: 1, toolsInUse: ['claude', 'opencode'] })
       syncAll(H, envP, { allowReal: true, approvedOnce: true, secrets: memI })
       if (!existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('saved OpenCode not written')
@@ -6084,16 +6084,47 @@ async function run(): Promise<void> {
         if (readState(H).state.pendingRetire?.length) bad.push('records left after rename sync')
         notes.push(`rename records ${names}`)
       }
-      // (6) opencode.jsonc present → opencode.json never created, even with OpenCode explicitly in use
+      // (6) opencode.jsonc with comments → left byte-identical (jsoncUnsupported, shown as a hint), opencode.json never created
       {
-        const H = harHome('illithid-m7-H7e-', { '.config/opencode/opencode.jsonc': '{\n  // user config\n}\n' }, ['opencode'])
+        const JSONC = '{\n  // user config\n}\n'
+        const H = harHome('illithid-m7-H7e-', { '.config/opencode/opencode.jsonc': JSONC }, ['opencode'])
         createRule(H, 'x.md', '# x\n')
         const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
         if (existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('opencode.json created next to opencode.jsonc')
-        if (r.results?.targets.find((x) => x.id === 'opencodeRules')?.reason !== 'toolNotInitialized') bad.push('jsonc skip reason')
+        if (read(join(H, '.config/opencode/opencode.jsonc')) !== JSONC) bad.push('commented opencode.jsonc rewritten')
+        if (r.results?.targets.find((x) => x.id === 'opencodeRules')?.reason !== 'jsoncUnsupported') bad.push('jsonc skip reason')
+        const ni = notInitializedOf(planAll(H, envH, memH))
+        if (ni.length !== 1 || ni[0].reason !== 'jsoncUnsupported' || ni[0].label !== '~/.config/opencode/opencode.jsonc') bad.push(`jsonc hint ${JSON.stringify(ni)}`)
+      }
+      // (7) opencode.jsonc as OpenCode creates it on first run ($schema only), tools never chosen → it is the file written
+      {
+        const H = harHome('illithid-m7-H7f-', { '.config/opencode/opencode.jsonc': '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' })
+        createRule(H, 'x.md', '# x\n')
+        upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
+        const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const oc = readJson(join(H, '.config/opencode/opencode.jsonc'))
+        if (existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('opencode.json created next to plain opencode.jsonc')
+        if (oc.$schema !== 'https://opencode.ai/config.json') bad.push('$schema dropped from opencode.jsonc')
+        if (!('m1' in ((oc.mcp as Json | undefined) ?? {})) || !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md')))
+          bad.push('opencode.jsonc not written with mcp + instructions')
+        if (r.results?.targets.some((x) => x.id.startsWith('opencode') && x.reason)) bad.push(`jsonc results ${r.results?.targets.map((x) => `${x.id}:${x.reason ?? x.status}`)}`)
+        if (notInitializedOf(planAll(H, envH, memH)).some((x) => x.tool === 'opencode')) bad.push('OpenCode hint left after writing opencode.jsonc')
+        if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending after jsonc sync')
+        notes.push('plain jsonc written')
+      }
+      // (8) ~/.config/opencode left by an old install (no config file), tools never chosen → opencode.json created, no hint
+      {
+        const H = harHome('illithid-m7-H7g-', { '.config/opencode/package.json': '{}\n' })
+        createRule(H, 'x.md', '# x\n')
+        const hint = notInitializedOf(planAll(H, envH, memH)).filter((x) => x.tool === 'opencode')
+        syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
+        const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+        if (hint.length) bad.push(`OpenCode hint for an existing folder ${JSON.stringify(hint)}`)
+        if (!ins.some((x) => x.endsWith('/x.md'))) bad.push('opencode.json not created for an existing OpenCode folder')
+        notes.push('old folder → opencode.json')
       }
       check(
-        'af7. HAR-12 review follow-ups — instruction entry kept unless the library entry replaces it, no new tool files without explicit toolsInUse, unknown ids dropped, unreadable originals kept, records follow renames, opencode.jsonc respected',
+        'af7. HAR-12 review follow-ups — instruction entry kept unless the library entry replaces it, no new tool files for tools without a folder, unknown ids dropped, unreadable originals kept, records follow renames, opencode.jsonc written when plain JSON and left alone with comments, old OpenCode folder gets opencode.json',
         !bad.length,
         bad.length ? bad.join('; ') : notes.join('; ')
       )

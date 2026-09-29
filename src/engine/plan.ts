@@ -54,6 +54,15 @@ export function buildContext(
   }
 }
 
+function isPlainJson(text: string): boolean {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Plan for one target. Also used by apply to recompute when writing the same file in sequence */
 export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): FileChange {
   // A retiring tool (every item off via offTools) also loses the memory index and leaves permissions as they are
@@ -62,8 +71,10 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
     ? { ...planCtx, retiring, sources: { ...planCtx.sources, memoryIndex: null, hasPermissions: false } }
     : planCtx
   const { sources } = ctx
-  const path = join(home, t.rel)
-  const label = `~/${t.rel}`
+  // Main file missing but the tool reads an alternate instead (opencode.jsonc, which OpenCode creates on first run): that file is read and written
+  const rel = existsSync(join(home, t.rel)) ? t.rel : ((t.alternates ?? []).find((r) => existsSync(join(home, r))) ?? t.rel)
+  const path = join(home, rel)
+  const label = `~/${rel}`
   const base = { id: t.id, path, label }
 
   const exists = existsSync(path)
@@ -103,12 +114,22 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
       afterRegionHash: null
     })
     if (!has || retiring) return absent('nothingToWrite', [`${label} absent — nothing to write`])
-    const alternate = (t.alternates ?? []).find((r) => existsSync(join(home, r)))
-    if (alternate) return absent('toolNotInitialized', [`${label} absent — ~/${alternate} is used instead, not creating a second file`])
     const creatable = t.optional || (!!t.createIfInUse && !!readConfig(home).config.toolsInUse?.includes(t.tool))
     if (!creatable) return absent('toolNotInitialized', [`${label} absent — run the tool once so it creates it`])
   }
   const before = exists ? readFileSync(path, 'utf8') : ''
+  // An alternate with comments or other JSONC syntax is left alone: rewriting it as plain JSON would drop them
+  if (rel !== t.rel && !isPlainJson(before))
+    return {
+      ...base,
+      before,
+      after: before,
+      changed: false,
+      notes: [`${label} is not plain JSON (comments?) — left untouched`],
+      skip: 'jsoncUnsupported',
+      beforeRegionHash: null,
+      afterRegionHash: null
+    }
   const beforeRegionHash = regionHash(t, before, sources, ctx)
 
   try {

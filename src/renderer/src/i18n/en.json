@@ -212,7 +212,8 @@
     },
     "notInitialized": "Run {{tool}} once, then apply again",
     "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written",
-    "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written"
+    "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written",
+    "jsoncUnsupported": "opencode.jsonc has comments — {{tool}} settings are not written until they are removed"
   },
   "app": {
     "name": "Illithid"
