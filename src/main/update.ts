@@ -1,5 +1,6 @@
 /**
- * New version notice: checks the latest GitHub release once shortly after start and then daily (packaged app only, unless
+ * New version notice: checks the latest GitHub release once shortly after start, then daily and when a window gains focus at least
+ * 30 minutes after the last check (packaged app only, unless
  * ILLITHID_UPDATE_CHECK=1; a dev run can pretend to be an older version with ILLITHID_UPDATE_FROM=x.y.z and force the install kind
  * with ILLITHID_UPDATE_INSTALL=brew|dmg). A newer version that
  * isn't skipped is kept here, sent to the window and shown in the menu bar
@@ -16,9 +17,13 @@ import type { UpdateView } from '../shared/api'
 const FIRST_DELAY_MS = 10_000
 const APP_BUNDLE_ID = 'com.illithid.app'
 const INTERVAL_MS = 24 * 60 * 60 * 1000
+/** Focusing a window checks again once this long has passed since the last check */
+const FOCUS_MIN_GAP_MS = 30 * 60 * 1000
 const fetchFn: FetchFn = (url, init) => fetch(url, init)
 
 let available: UpdateView | null = null
+/** When the last check started (0 = never) */
+let lastCheckAt = 0
 
 function currentVersion(): string {
   const from = process.env['ILLITHID_UPDATE_FROM']
@@ -43,6 +48,7 @@ export function onUpdateChange(f: (v: UpdateView | null) => void): void {
 
 /** One check. Automatic checks never throw (offline, rate limits: the next check tries again); Check now does */
 export async function checkForUpdate(home: string, explicit = false): Promise<UpdateView | null> {
+  lastCheckAt = Date.now()
   const cfg = readConfig(home).config
   // Check now in Settings runs even with automatic checks off, and shows a skipped version too
   if (cfg.updateCheck === false && !explicit) {
@@ -73,6 +79,10 @@ export function startUpdateCheck(home: string): void {
     void checkForUpdate(home)
     setInterval(() => void checkForUpdate(home), INTERVAL_MS)
   }, FIRST_DELAY_MS)
+  // The app often stays open for days: opening a window (main or menu bar popover) checks again after a while
+  app.on('browser-window-focus', () => {
+    if (lastCheckAt && Date.now() - lastCheckAt >= FOCUS_MIN_GAP_MS) void checkForUpdate(home)
+  })
 }
 
 /**
