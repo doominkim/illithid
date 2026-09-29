@@ -381,7 +381,7 @@ async function searchIndex(
   home: string,
   onProgress?: (p: unknown) => void
 ): Promise<{ sessions: IndexResult; docs: DocIndexResult }> {
-  const { sessions, errors } = scanSessions(home)
+  const { sessions, errors } = scanSessions(home, undefined, { cache: true })
   const failed = new Set(errors.map((e) => e.tool))
   const s = await indexSessions(home, sessions, {
     completeTools: TOOL_IDS.filter((t) => !failed.has(t)),
@@ -435,7 +435,7 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     case 'artifacts':
       return withSessionTitles(home, scanArtifacts(home))
     case 'sessions':
-      return scanSessions(home)
+      return scanSessions(home, undefined, { cache: true })
     case 'toolMemory':
       return { claude: scanClaudeMemory(home), codex: scanCodexMemory(home) }
     case 'syncPending':
