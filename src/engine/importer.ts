@@ -1300,12 +1300,16 @@ function recordRetirements(home: string, pending: PendingRetire[]): void {
 
 /**
  * Newly imported items start enabled only for the tool(s) they came from (tool sources only; library·manager sources keep the
- * all-on default). Tools the kind can't toggle (MANIFEST_TOOLS) are left alone
+ * all-on default). Tools the kind can't toggle (MANIFEST_TOOLS) are left alone. OpenCode skills keep their default too:
+ * OpenCode already found them in ~/.claude/skills or ~/.agents/skills, so an import must not start hiding them
  */
 function enableOnlySourceTools(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): void {
   const from = new Set(sources.filter((s) => s.origin === 'tool').map((s) => s.label))
   if (!from.size) return
-  for (const tool of MANIFEST_TOOLS[kind]) setToggle(home, kind, name, tool, from.has(tool))
+  for (const tool of MANIFEST_TOOLS[kind]) {
+    if (kind === 'skills' && tool === 'opencode') continue
+    setToggle(home, kind, name, tool, from.has(tool))
+  }
 }
 
 // ---------------------------------------------------------------- MCP conversion

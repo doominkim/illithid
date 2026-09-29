@@ -2303,7 +2303,7 @@ async function run(): Promise<void> {
       planRuleSync(F, env).some((x) => x.action !== 'inSync')
     )
       bad.push('rule back on')
-    // skills: claude off → deleteCandidate, codex kept, opencode toggle refused
+    // skills: claude off → deleteCandidate, codex kept; opencode off copies nothing (it is a permission deny — p2)
     const K = legacySkills[0]
     setToggle(F, 'skills', K, 'claude', false)
     const ps = planSkillSync(F, env)
@@ -2311,8 +2311,11 @@ async function run(): Promise<void> {
       bad.push('skill claude off')
     if (ps.find((x) => x.tool === 'codex' && x.name === K)?.action !== 'inSync')
       bad.push('skill affects codex')
-    if (errCode(() => setToggle(F, 'skills', K, 'opencode', false)) === 'ok')
-      bad.push('opencode skill toggle allowed')
+    if (errCode(() => setToggle(F, 'skills', K, 'opencode', false)) !== 'ok')
+      bad.push('opencode skill toggle refused')
+    if (planSkillSync(F, env).some((x) => x.tool === 'opencode' && x.name === K && x.action !== 'inSync'))
+      bad.push('opencode skill off planned a copy change')
+    setToggle(F, 'skills', K, 'opencode', true)
     setToggle(F, 'skills', K, 'claude', true)
     if (planSkillSync(F, env).some((x) => x.action !== 'inSync')) bad.push('skill back on')
     // opencodeRules: legacy ~/.agents entries (glob, MEMORY.md) replaced with library entries, non-owned kept
@@ -3163,6 +3166,80 @@ async function run(): Promise<void> {
       bad.length
         ? bad.join('; ')
         : 'claude off 1 removed / 3 kept, codex name/path 2 removed / 2 kept, opencode deny 1 removed / 3 kept, other keys unchanged, status and pill needsSync→synced, re-sync writes 0, empty key removed, name-only kept'
+    )
+  }
+
+  // ---- p2. OpenCode skill toggle — off writes permission.skill "deny" (last, over user wildcards), on removes it, owned entries leave with the skill
+  {
+    const bad: string[] = []
+    const names = canonicalSkills(F)
+    const [a, b] = names
+    const op = join(F, '.config/opencode/opencode.json')
+    const rule = (): Json => (((readJson(op).permission as Json | undefined) ?? {}).skill as Json | undefined) ?? {}
+    const setRule = (r: unknown): void => {
+      const o = readJson(op)
+      const perm: Json = { ...((o.permission as Json | undefined) ?? {}) }
+      if (r === undefined) delete perm.skill
+      else perm.skill = r
+      if (Object.keys(perm).length) o.permission = perm
+      else delete o.permission
+      writeJson(op, o)
+    }
+    const others = (o: Json): string => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'permission')))
+    setRule({ [b]: 'ask', 'x*': 'allow', 'not-in-library': 'deny' })
+    syncAll(F, env, { allowReal: true })
+    if (changedOrError(planAll(F, env)).length) bad.push(`setup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
+    const rest0 = others(readJson(op))
+
+    // off for OpenCode → deny written after the user's entries; ask replaced; preview lists the skill leaving OpenCode
+    setToggle(F, 'skills', b, 'opencode', false)
+    const pv = applyPreview(F, env)
+    if (!pv.items.some((x) => x.tool === 'opencode' && x.kind === 'skill' && x.name === b && x.action === 'remove' && x.parent))
+      bad.push('preview: no skill row leaving OpenCode')
+    syncAll(F, env, { allowReal: true })
+    const r1 = rule()
+    if (r1[b] !== 'deny') bad.push(`deny not written ${JSON.stringify(r1)}`)
+    const keys1 = Object.keys(r1)
+    if (keys1[keys1.length - 1] !== b) bad.push(`deny not last ${JSON.stringify(keys1)}`)
+    if (r1['x*'] !== 'allow' || r1['not-in-library'] !== 'deny') bad.push('user entries gone')
+    if (r1[a] !== undefined) bad.push('entry for a skill on for OpenCode')
+    if (others(readJson(op)) !== rest0) bad.push('keys outside permission changed')
+    if (!readState(F).state.owned?.opencodeSkillPermissions?.includes(b)) bad.push('deny not recorded as owned')
+    if (changedOrError(planAll(F, env)).length) bad.push(`re-plan after deny ${changedOrError(planAll(F, env)).join(',')}`)
+    if (readsSkills(F, env).state[b]?.opencode === 'error') bad.push('pill error while off')
+
+    // a string rule (one value for every skill) is kept as "*"
+    setRule('ask')
+    syncAll(F, env, { allowReal: true })
+    const r2 = rule()
+    if (r2['*'] !== 'ask' || r2[b] !== 'deny') bad.push(`string rule ${JSON.stringify(r2)}`)
+
+    // on again → the deny goes, "*" stays
+    setToggle(F, 'skills', b, 'opencode', true)
+    syncAll(F, env, { allowReal: true })
+    const r3 = rule()
+    if (r3[b] !== undefined || r3['*'] !== 'ask') bad.push(`on again ${JSON.stringify(r3)}`)
+
+    // a denied skill leaving the library → its owned deny goes too
+    const tmp = join(libraryPaths(F).skillsDir, 'zz-oc-tmp')
+    mkdirSync(tmp, { recursive: true })
+    writeFileSync(join(tmp, 'SKILL.md'), '---\nname: zz-oc-tmp\ndescription: temp\n---\nbody\n')
+    setToggle(F, 'skills', 'zz-oc-tmp', 'opencode', false)
+    syncAll(F, env, { allowReal: true })
+    if (rule()['zz-oc-tmp'] !== 'deny') bad.push('temp skill not denied')
+    rmSync(tmp, { recursive: true, force: true })
+    syncAll(F, env, { allowReal: true })
+    if (rule()['zz-oc-tmp'] !== undefined) bad.push('owned deny left after the skill left the library')
+    setToggle(F, 'skills', 'zz-oc-tmp', 'opencode', true)
+
+    setRule(undefined)
+    syncAll(F, env, { allowReal: true })
+    if (changedOrError(planAll(F, env)).length) bad.push(`cleanup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
+
+    check(
+      'p2. OpenCode skill toggle — off writes permission.skill deny last (over user wildcards), string rule kept as "*", on removes it, owned deny leaves with the skill, preview row, re-sync 0',
+      !bad.length,
+      bad.length ? bad.join('; ') : 'deny written last / removed on, ask replaced, user entries kept, owned recorded, string rule → "*", temp skill deny removed, other keys unchanged'
     )
   }
 
@@ -5749,7 +5826,8 @@ async function run(): Promise<void> {
       const mf = readManifest(H).manifest
       const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
       const wantToggles: [string, string][] = [
-        // Gemini and Copilot are toggleable for every kind, so they are off too (skills: both joined claude/codex as copy targets)
+        // Gemini and Copilot are toggleable for every kind, so they are off too (skills: both joined claude/codex as copy targets;
+        // OpenCode skills keep their default — OpenCode already saw them in ~/.claude/skills)
         [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
         [tg('skills', 'pr-check'), '{"codex":false,"gemini":false,"copilot":false,"grok":false}'],
         [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],

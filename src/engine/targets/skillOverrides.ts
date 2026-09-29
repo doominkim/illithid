@@ -6,6 +6,7 @@
  * - OpenCode opencode.json            permission.skill.<name> = "deny"
  * Skills not in the library, skills disabled in the library (handled by deleting copies), partial-disable values
  * (Claude name-only/user-invocable-only, OpenCode ask), and wildcard rules are user-owned and preserved.
+ * OpenCode also works the other way: it has no skill copies to delete, so a library skill off for OpenCode gets a "deny".
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,6 +21,7 @@ import {
   type TargetDef,
   type TargetId
 } from '../types'
+import { previouslyOwned } from './toggles'
 
 type Json = Record<string, unknown>
 
@@ -265,66 +267,121 @@ export const codexSkillConfig: TargetDef = {
 
 const OC_KEY = 'permission'
 const OC_SUB = 'skill'
+const OC_TARGET: TargetId = 'opencodeSkillPermissions'
 
-function opencodeHits(config: Json, src: Sources): string[] {
+/**
+ * Library skills turned off for OpenCode — the sync writes permission.skill.<name> = "deny" for them.
+ * OpenCode finds skills in every root (library skills.paths, ~/.claude/skills, ~/.agents/skills), so a name rule is the only
+ * switch that hides a skill whichever root it comes from. A retiring OpenCode gets none (its own entries are removed)
+ */
+function opencodeDenied(src: Sources, ctx: BuildContext | undefined): Set<string> {
+  if (ctx?.retiring || src.manifest?.offTools?.includes('opencode')) return new Set()
+  return new Set(librarySkillNames(src).filter((n) => !isEnabled(src.manifest, 'skills', n, 'opencode')))
+}
+
+/** permission.skill as a per-skill object ({} if absent). A string applies to every skill and is kept as "*". undefined if not usable */
+function opencodeRule(config: Json): Json | undefined {
   const perm = config[OC_KEY]
-  if (perm === undefined) return []
-  if (!isObj(perm)) return []
+  if (perm === undefined) return {}
+  if (!isObj(perm)) return undefined
   const rule = perm[OC_SUB]
-  // A string (one value for all skills) is not a per-skill setting — user-owned
-  if (!isObj(rule)) return []
-  // OpenCode has no skill toggle — library skills are always on
+  if (rule === undefined) return {}
+  if (typeof rule === 'string') return { '*': rule }
+  return isObj(rule) ? rule : undefined
+}
+
+/** Library skills on for OpenCode but denied in opencode.json (the sync removes the deny) */
+function opencodeHits(config: Json, src: Sources, ctx?: BuildContext): string[] {
+  const rule = opencodeRule(config)
+  if (!rule) return []
+  const off = opencodeDenied(src, ctx)
   const lib = new Set(librarySkillNames(src))
   return Object.keys(rule)
-    .filter((k) => lib.has(k) && rule[k] === 'deny')
+    .filter((k) => lib.has(k) && !off.has(k) && rule[k] === 'deny')
     .sort()
 }
 
-/** 12. opencode.json — remove only "deny" entries in permission.skill for library skills (wildcard rules are kept) */
+/**
+ * 12. opencode.json permission.skill — "deny" for library skills off for OpenCode, placed last so they win over the user's
+ * wildcard rules (OpenCode applies the last matching rule). A library skill on for OpenCode loses its "deny" (tool settings don't
+ * override the library). Previously owned entries of skills that left the library are removed. Other values (ask, allow),
+ * wildcards and names outside the library are user-owned and kept in place
+ */
 export const opencodeSkillPermissions: TargetDef = {
-  id: 'opencodeSkillPermissions',
+  id: OC_TARGET,
   tool: 'opencode',
   rel: '.config/opencode/opencode.json',
   optional: true,
   alternates: ['.config/opencode/opencode.jsonc'],
-  region: (text, src) => {
+  region: (text, src, ctx) => {
     try {
-      const hits = opencodeHits(parseJsonObject(text), src)
-      return hits.length ? JSON.stringify(hits) : null
+      const rule = opencodeRule(parseJsonObject(text))
+      if (!rule) return null
+      // Only the "deny" entries the sync manages (library or previously owned names) — ask/allow values are the user's
+      const names = new Set([...librarySkillNames(src), ...previouslyOwned(ctx, OC_TARGET)])
+      const own = Object.keys(rule)
+        .filter((k) => names.has(k) && rule[k] === 'deny')
+        .sort()
+      return own.length ? JSON.stringify(own) : null
     } catch {
       return null
     }
   },
-  build(before, { sources: src }) {
+  build(before, ctx) {
+    const src = ctx.sources
     if (!before.trim()) return { after: before, notes: ['opencode.json missing — left untouched'] }
     const config = parseJsonObject(before)
-    if (config[OC_KEY] !== undefined && !isObj(config[OC_KEY]))
-      return { after: before, notes: [], error: `${OC_KEY} is not an object` }
-    const hits = opencodeHits(config, src)
-    if (!hits.length)
-      return { after: before, notes: [`${OC_KEY}.${OC_SUB}: no library skills denied`] }
+    const deny = opencodeDenied(src, ctx)
+    const owned = [...deny].sort()
+    const rule = opencodeRule(config)
+    if (!rule) {
+      const bad = isObj(config[OC_KEY]) ? `${OC_KEY}.${OC_SUB}` : OC_KEY
+      if (!deny.size) return { after: before, notes: [`${bad} is not a per-skill object — left untouched`] }
+      return { after: before, notes: [], error: `${bad} is not an object` }
+    }
+    const lib = new Set(librarySkillNames(src))
+    const prev = new Set(previouslyOwned(ctx, OC_TARGET))
+    // Entries the sync removes: denies of library skills on for OpenCode, and of previously owned skills no longer denied
+    const drop = (k: string): boolean =>
+      rule[k] === 'deny' && !deny.has(k) && (lib.has(k) || prev.has(k))
+    const kept = Object.fromEntries(Object.entries(rule).filter(([k]) => !deny.has(k) && !drop(k)))
+    const nextRule: Json = { ...kept, ...Object.fromEntries(owned.map((k) => [k, 'deny'])) }
+    // JSON objects always list integer-like keys first, so such a deny can't be placed after the user's rules
+    const numeric = owned.filter((k) => /^(0|[1-9]\d*)$/.test(k))
+    const numericNote =
+      numeric.length && Object.keys(kept).length
+        ? [`${OC_KEY}.${OC_SUB}: ${numeric.join(', ')} can't be placed last (numeric name) — a later wildcard rule may still show it`]
+        : []
+    if (JSON.stringify(Object.entries(nextRule)) === JSON.stringify(Object.entries(rule)))
+      return {
+        after: before,
+        notes: [`${OC_KEY}.${OC_SUB}: ${owned.length} library skill(s) denied — already in place`, ...numericNote],
+        owned
+      }
+
     const next = structuredClone(config)
-    const perm = { ...(next[OC_KEY] as Json) }
-    const rule = { ...(perm[OC_SUB] as Json) }
-    for (const k of hits) delete rule[k]
-    if (Object.keys(rule).length) perm[OC_SUB] = rule
+    const perm: Json = { ...((next[OC_KEY] as Json | undefined) ?? {}) }
+    if (Object.keys(nextRule).length) perm[OC_SUB] = nextRule
     else delete perm[OC_SUB]
     if (Object.keys(perm).length) next[OC_KEY] = perm
     else delete next[OC_KEY]
     const after = toJsonText(next, before)
     const rest = untouchedKeysSame(config, next, OC_KEY)
-    const origPerm = config[OC_KEY] as Json
+    const origPerm = (config[OC_KEY] as Json | undefined) ?? {}
     const permSame = Object.keys(origPerm)
       .filter((k) => k !== OC_SUB)
       .every((k) => same(origPerm[k], perm[k]))
-    const origRule = origPerm[OC_SUB] as Json
-    const ruleSame = Object.entries(rule).every(([k, v]) => same(origRule[k], v))
-    const ok = rest.same && permSame && ruleSame
+    const keptSame = Object.entries(kept).every(([k, v]) => same(rule[k], v))
+    const ok = rest.same && permSame && keptSame
+    const removed = Object.keys(rule).filter((k) => drop(k))
     const notes = [
-      `${OC_KEY}.${OC_SUB}: removed "deny" for ${hits.length} library skill(s) (${hits.join(', ')}), kept ${Object.keys(rule).length} other(s)`,
-      `everything other than ${OC_KEY}.${OC_SUB} unchanged: ${ok ? 'OK' : 'broken!'}`
+      `${OC_KEY}.${OC_SUB}: "deny" for ${owned.length} library skill(s) off for OpenCode${owned.length ? ` (${owned.join(', ')})` : ''}, removed ${removed.length}${removed.length ? ` (${removed.join(', ')})` : ''}, kept ${Object.keys(kept).length} other(s)`,
+      `everything other than ${OC_KEY}.${OC_SUB} unchanged: ${ok ? 'OK' : 'broken!'}`,
+      ...numericNote
     ]
-    return ok ? { after, notes } : { after, notes, error: `keys other than ${OC_KEY}.${OC_SUB} changed` }
+    return ok
+      ? { after, notes, owned }
+      : { after, notes, owned, error: `keys other than ${OC_KEY}.${OC_SUB} changed` }
   }
 }
 
@@ -368,7 +425,7 @@ export function skillOverrideHits(
         .sort()
     }
     case 'opencodeSkillPermissions':
-      return opencodeHits(parseJsonObject(text), src)
+      return opencodeHits(parseJsonObject(text), src, ctx)
     default:
       return []
   }

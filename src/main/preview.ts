@@ -5,6 +5,7 @@
 import { basename } from 'node:path'
 import {
   ALL_TARGETS,
+  canonicalSkills,
   importedChangedOf,
   isEnabled,
   readManifest,
@@ -64,6 +65,9 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     // opencode.json instructions: which rules enter or leave (the file row alone does not say)
     const c = p.targets.find((x) => x.id === 'opencodeRules' && x.path === abs && x.changed && !x.error)
     if (c) items.push(...instructionDiff(home, c.before, c.after, f.path))
+    // opencode.json permission.skill: which skills OpenCode stops or starts seeing
+    const sp = p.targets.find((x) => x.id === 'opencodeSkillPermissions' && x.path === abs && x.changed && !x.error)
+    if (sp) items.push(...skillDenyDiff(sp.before, sp.after, f.path, new Set(canonicalSkills(home))))
     // MCP servers entering, changing or leaving the file (names only)
     for (const m of p.targets.filter((x) => x.path === abs && x.changed && !x.error && x.servers?.length))
       for (const s of m.servers!) items.push({ tool: f.tool, kind: 'mcp', action: s.action, name: s.name, path: s.name, parent: f.path })
@@ -136,6 +140,38 @@ function instructionDiff(home: string, before: string, after: string, parent: st
     parent
   })
   return [...b.filter((x) => !a.includes(x)).map((x) => row(x, 'add')), ...a.filter((x) => !b.includes(x)).map((x) => row(x, 'remove'))]
+}
+
+/** Skill names set to "deny" in opencode.json permission.skill */
+function deniedSkills(text: string): string[] {
+  try {
+    const perm = parseJsonObject(text || '{}').permission
+    const rule = perm && typeof perm === 'object' && !Array.isArray(perm) ? (perm as Record<string, unknown>).skill : undefined
+    if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return []
+    return Object.entries(rule as Record<string, unknown>)
+      .filter(([k, v]) => v === 'deny' && k !== '*')
+      .map(([k]) => k)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Library skills denied (leave OpenCode) or no longer denied (enter OpenCode), as skill rows under the file row.
+ * A deny dropped because its skill left the library is not a skill entering OpenCode, so it gets no row
+ */
+function skillDenyDiff(before: string, after: string, parent: string, library: Set<string>): ApplyPreviewItem[] {
+  const a = deniedSkills(before).filter((x) => library.has(x))
+  const b = deniedSkills(after).filter((x) => library.has(x))
+  const row = (name: string, action: 'add' | 'remove'): ApplyPreviewItem => ({
+    tool: 'opencode',
+    kind: 'skill',
+    action,
+    name,
+    path: `permission.skill.${name}`,
+    parent
+  })
+  return [...a.filter((x) => !b.includes(x)).map((x) => row(x, 'add')), ...b.filter((x) => !a.includes(x)).map((x) => row(x, 'remove'))]
 }
 
 /**

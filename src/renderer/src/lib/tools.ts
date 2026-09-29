@@ -3,7 +3,7 @@ import { MANIFEST_TOOLS, TOOL_IDS } from '../../../engine/toolIds'
 
 export const TOOLS: readonly ToolId[] = TOOL_IDS
 
-/** Tools whose skills can be toggled (OpenCode reads the library directly) */
+/** Tools whose skills can be toggled (OpenCode reads the library directly; its off skills are denied in opencode.json) */
 export const SKILL_TOGGLE_TOOLS: readonly ToolId[] = MANIFEST_TOOLS.skills
 
 export const TOOL_NAME: Record<ToolId, string> = {
