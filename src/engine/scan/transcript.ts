@@ -202,10 +202,64 @@ export interface ToolCall {
   turn?: number
 }
 
+/** Token counts of one model call. `input` excludes cached input */
+export interface TurnUsage {
+  input: number
+  cacheRead: number
+  cacheWrite: number
+  output: number
+  reasoning: number
+}
+
+/** mistake = edit/read slip (closest to a model error), command = non-zero exit, policy = permission or hook block */
+export type ToolErrorKind = 'mistake' | 'command' | 'policy' | 'userReject' | 'other'
+
+/**
+ * Model usage hooks (model stats). Readers pass on model ids, times, counts and tool names only — never message text.
+ * `turn` is one model call (one API response)
+ */
+export interface StatsHooks {
+  turn(t: { model?: string; effort?: string; at?: string; endAt?: string; usage: TurnUsage; cost?: number }): void
+  toolError(e: { name?: string; kind: ToolErrorKind; at?: string }): void
+  /** A request typed by the user starts */
+  prompt(at?: string): void
+  interrupt(at?: string): void
+  /** Explicit end of the current request (Codex task_complete) */
+  requestEnd(at?: string): void
+  /** Codex subscription usage */
+  limits(l: { at?: string; usedPercent: number; windowMinutes?: number; plan?: string }): void
+}
+
+/** Classify a failed tool result from the first part of its text (the text itself is not kept) */
+export function toolErrorKind(text: string): ToolErrorKind {
+  const t = text.slice(0, 400).toLowerCase()
+  if (t.includes("user doesn't want") || t.includes('the user doesn') || t.includes('rejected')) return 'userReject'
+  if (t.includes('permission') || t.includes('denied') || t.includes('hook') || t.includes('blocked') || t.includes('not allowed')) return 'policy'
+  if (
+    t.includes('has not been read') ||
+    t.includes('modified since') ||
+    t.includes('string to replace not found') ||
+    t.includes('no changes to make') ||
+    (t.includes('found') && t.includes('matches')) ||
+    t.includes('does not exist') ||
+    t.includes('no such file') ||
+    t.includes('enoent')
+  )
+    return 'mistake'
+  if (t.includes('exit code') || t.includes('exited with') || t.includes('error:') || t.includes('failed') || t.includes('timed out')) return 'command'
+  return 'other'
+}
+
+function num(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0
+}
+
 /** Message collector. With a sink, messages are passed through instead of accumulated (streaming for indexing) */
 export class Collector {
   /** Optional tool-call hook (usage stats) */
   onCall?: (call: ToolCall) => void
+  /** Optional model usage hooks (model stats) */
+  stats?: StatsHooks
   messages: TranscriptMessage[] = []
   prompts: TranscriptPrompt[] = []
   /** Messages received so far = next index */
@@ -284,25 +338,83 @@ function claudeFile(home: string, id: string): string | undefined {
 /** `/name` typed by the user: `<command-name>/name</command-name>` in the user message (only the name is used) */
 const COMMAND_RE = /<command-name>\/?([A-Za-z0-9][A-Za-z0-9:._-]{0,127})<\/command-name>/
 
+/** Claude usage block → turn tokens (input_tokens already excludes the cache; thinking tokens are part of the output) */
+function claudeUsage(u: Json | undefined): TurnUsage {
+  const details = u?.output_tokens_details as Json | undefined
+  return {
+    input: num(u?.input_tokens),
+    cacheRead: num(u?.cache_read_input_tokens),
+    cacheWrite: num(u?.cache_creation_input_tokens),
+    output: num(u?.output_tokens),
+    reasoning: num(details?.thinking_tokens)
+  }
+}
+
+/** Effort of one Claude response: `perTurnEffort` in current logs, `effort` in older ones (equal when both are present) */
+function claudeEffort(l: Json): string | undefined {
+  const e = l.perTurnEffort ?? l.effort
+  return typeof e === 'string' && e ? e : undefined
+}
+
+/** Text of a tool_result block (string or text parts) */
+function toolResultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) return (content as Json[]).map((x) => (x && typeof x.text === 'string' ? x.text : '')).join(' ')
+  return ''
+}
+
+/**
+ * Model stats of a Claude transcript line, shared by the main reader and the subagent reader. Streaming writes several lines
+ * per API response with the same message id, so turns count once per id
+ */
+function claudeStatsLine(l: Json, stats: StatsHooks, seen: Set<string>, toolNames: Map<string, string>): void {
+  const m = l.message as Json | undefined
+  const at = isoOrUndefined(l.timestamp)
+  if (l.type === 'assistant' && m?.role === 'assistant') {
+    const id = typeof m.id === 'string' ? m.id : undefined
+    if (!id || !seen.has(id)) {
+      if (id) seen.add(id)
+      stats.turn({ model: typeof m.model === 'string' ? m.model : undefined, effort: claudeEffort(l), at, usage: claudeUsage(m.usage as Json | undefined) })
+    }
+    if (Array.isArray(m.content))
+      for (const b of m.content as Json[]) if (b?.type === 'tool_use' && typeof b.id === 'string') toolNames.set(b.id, String(b.name ?? ''))
+    return
+  }
+  if (l.type === 'user' && m?.role === 'user' && Array.isArray(m.content))
+    for (const b of m.content as Json[])
+      if (b?.type === 'tool_result' && b.is_error)
+        stats.toolError({ name: typeof b.tool_use_id === 'string' ? toolNames.get(b.tool_use_id) : undefined, kind: toolErrorKind(toolResultText(b.content)), at })
+}
+
+const INTERRUPT_MARK = '[Request interrupted by user'
+
 export async function readClaude(path: string, c: Collector): Promise<void> {
   let model: string | undefined
+  const seen = new Set<string>()
+  const toolNames = new Map<string, string>()
   await eachJsonLine(path, (l) => {
     const m = l.message as Json | undefined
     const at = isoOrUndefined(l.timestamp)
     if (l.type === 'user' && m?.role === 'user') {
       if (l.isMeta || l.isSidechain) return
+      const raw = c.onCall || c.stats ? (typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')) : ''
       if (c.onCall) {
-        const raw = typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')
         const cmd = COMMAND_RE.exec(raw)
         if (cmd) c.onCall({ name: 'SlashCommand', input: { command: cmd[1] }, model, at })
       }
+      if (c.stats) claudeStatsLine(l, c.stats, seen, toolNames)
       const text = userTextOf(m.content)
+      if (c.stats) {
+        if (raw.includes(INTERRUPT_MARK)) c.stats.interrupt(at)
+        else if (text) c.stats.prompt(at)
+      }
       if (text) c.push('user', text, at)
       return
     }
     if (l.type === 'assistant' && m?.role === 'assistant' && Array.isArray(m.content)) {
       if (l.isSidechain) return
       if (typeof m.model === 'string') model = m.model
+      if (c.stats) claudeStatsLine(l, c.stats, seen, toolNames)
       const texts: string[] = []
       for (const b of m.content as Json[]) {
         if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) texts.push(b.text)
@@ -314,6 +426,20 @@ export async function readClaude(path: string, c: Collector): Promise<void> {
       }
       if (texts.length) c.push('assistant', texts.join('\n\n'), at)
     }
+  })
+}
+
+/** Model stats and tool calls of a Claude subagent transcript (sidechain lines included — they are the subagent's own turns) */
+export async function readClaudeSubagentStats(path: string, onCall: (c: ToolCall) => void, stats?: StatsHooks): Promise<void> {
+  const seen = new Set<string>()
+  const toolNames = new Map<string, string>()
+  await eachJsonLine(path, (l) => {
+    if (stats) claudeStatsLine(l, stats, seen, toolNames)
+    const m = l.message as Json | undefined
+    if (l.type !== 'assistant' || !m || !Array.isArray(m.content)) return
+    const at = typeof l.timestamp === 'string' ? l.timestamp : undefined
+    for (const b of m.content as Json[])
+      if (b && b.type === 'tool_use') onCall({ name: String(b.name ?? ''), input: b.input, model: typeof m.model === 'string' ? m.model : undefined, at })
   })
 }
 
@@ -339,20 +465,90 @@ function codexArgs(v: unknown): unknown {
   }
 }
 
+const EXIT_CODE_RE = /[Ee]xit code:? ?(\d+)|"exit_code":\s*(\d+)/
+
+/** Codex event_msg lines for model stats: request boundaries, tokens per model call, subscription usage */
+function codexStatsEvent(p: Json, at: string | undefined, stats: StatsHooks, state: { model?: string; effort?: string; taskOpen: boolean }): void {
+  switch (p.type) {
+    case 'task_started':
+      state.taskOpen = true
+      stats.prompt(at)
+      return
+    case 'user_message':
+      // Older logs have no task events: each user message starts a request
+      if (!state.taskOpen) stats.prompt(at)
+      return
+    case 'task_complete':
+      state.taskOpen = false
+      stats.requestEnd(at)
+      return
+    case 'turn_aborted':
+      state.taskOpen = false
+      stats.interrupt(at)
+      return
+    case 'token_count': {
+      const info = p.info as Json | undefined
+      const u = info?.last_token_usage as Json | undefined
+      if (u) {
+        const cached = num(u.cached_input_tokens)
+        stats.turn({
+          model: state.model,
+          effort: state.effort,
+          at,
+          usage: {
+            input: Math.max(0, num(u.input_tokens) - cached),
+            cacheRead: cached,
+            cacheWrite: num(u.cache_write_input_tokens),
+            output: num(u.output_tokens),
+            reasoning: num(u.reasoning_output_tokens)
+          }
+        })
+      }
+      const rl = p.rate_limits as Json | undefined
+      const primary = rl?.primary as Json | undefined
+      if (typeof primary?.used_percent === 'number')
+        stats.limits({
+          at,
+          usedPercent: primary.used_percent,
+          windowMinutes: typeof primary.window_minutes === 'number' ? primary.window_minutes : undefined,
+          plan: typeof rl?.plan_type === 'string' ? rl.plan_type : undefined
+        })
+      return
+    }
+  }
+}
+
 export async function readCodex(path: string, c: Collector): Promise<void> {
   let model: string | undefined
   let turn = 0
+  const state: { model?: string; effort?: string; taskOpen: boolean } = { taskOpen: false }
+  const callNames = new Map<string, string>()
   await eachJsonLine(path, (l) => {
     if (l.type === 'turn_context') {
       const tc = l.payload as Json | undefined
       if (typeof tc?.model === 'string') model = tc.model
+      state.model = model
+      const effort = tc?.effort ?? tc?.reasoning_effort
+      state.effort = typeof effort === 'string' ? effort : undefined
       turn++
+      return
+    }
+    if (l.type === 'event_msg') {
+      const p = l.payload as Json | undefined
+      if (c.stats && p) codexStatsEvent(p, isoOrUndefined(l.timestamp), c.stats, state)
       return
     }
     if (l.type !== 'response_item') return
     const p = l.payload as Json | undefined
     if (!p) return
     const at = isoOrUndefined(l.timestamp)
+    if (c.stats && (p.type === 'function_call_output' || p.type === 'custom_tool_call_output')) {
+      const out = typeof p.output === 'string' ? p.output : JSON.stringify(p.output ?? '')
+      const exit = EXIT_CODE_RE.exec(out)
+      const code = exit ? (exit[1] ?? exit[2]) : undefined
+      if (code && code !== '0') c.stats.toolError({ name: typeof p.call_id === 'string' ? callNames.get(p.call_id) : undefined, kind: 'command', at })
+      return
+    }
     if (p.type === 'message' && p.role === 'user') {
       const text = userTextOf(p.content)
       if (text) c.push('user', text, at)
@@ -371,6 +567,7 @@ export async function readCodex(path: string, c: Collector): Promise<void> {
     ) {
       const name = String(p.name ?? (p.type === 'local_shell_call' ? 'shell' : 'tool'))
       const input = codexArgs(p.arguments ?? p.input ?? p.action)
+      if (typeof p.call_id === 'string') callNames.set(p.call_id, name)
       c.push('assistant', toolLine(name, input), at, 'tool')
       c.onCall?.({ name, input, namespace: typeof p.namespace === 'string' ? p.namespace : undefined, model, at, turn })
     }
@@ -429,6 +626,20 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
     if (!role) continue
     const time = data.time as Json | undefined
     const at = isoOrUndefined(time?.created) ?? isoOrUndefined(m.time_created)
+    if (c.stats) {
+      if (role === 'user') c.stats.prompt(at)
+      else {
+        const tk = data.tokens as Json | undefined
+        const cache = tk?.cache as Json | undefined
+        c.stats.turn({
+          model: typeof data.modelID === 'string' ? data.modelID : undefined,
+          at,
+          endAt: isoOrUndefined(time?.completed),
+          usage: { input: num(tk?.input), cacheRead: num(cache?.read), cacheWrite: num(cache?.write), output: num(tk?.output), reasoning: num(tk?.reasoning) },
+          cost: typeof data.cost === 'number' ? data.cost : undefined
+        })
+      }
+    }
     const texts: string[] = []
     for (const row of partStmt.all(String(m.id)) as Json[]) {
       let part: Json
@@ -453,6 +664,7 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
           'tool'
         )
         c.onCall?.({ name: String(part.tool ?? ''), input: state?.input, model: typeof data.modelID === 'string' ? data.modelID : undefined, at })
+        if (state?.status === 'error') c.stats?.toolError({ name: String(part.tool ?? ''), kind: 'other', at })
       }
     }
     if (texts.length) c.push(role, texts.join('\n\n'), at)

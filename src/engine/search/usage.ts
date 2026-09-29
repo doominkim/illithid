@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { eachJsonLine, type ToolCall } from '../scan/transcript'
+import type { ToolCall } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 
 export const USAGE_SCHEMA = '2'
@@ -45,7 +45,7 @@ export function ensureUsage(db: DatabaseSync): boolean {
 }
 
 /** Local calendar day (YYYY-MM-DD) of an ISO time, or of the fallback */
-function dayOf(at: string | undefined, fallback: string | undefined): string {
+export function dayOf(at: string | undefined, fallback: string | undefined): string {
   const t = Date.parse(at ?? '') || Date.parse(fallback ?? '')
   if (!t) return ''
   const d = new Date(t)
@@ -180,17 +180,6 @@ export function claudeSubagentStat(sessionPath: string): { size: number; mtime: 
     }
   }
   return { size, mtime }
-}
-
-/** Tool calls in a Claude subagent transcript (sidechain lines included — they are the subagent's own turns) */
-export async function readClaudeSubagentCalls(path: string, onCall: (c: ToolCall) => void): Promise<void> {
-  await eachJsonLine(path, (l) => {
-    const m = l.message as Json | undefined
-    if (l.type !== 'assistant' || !m || !Array.isArray(m.content)) return
-    const at = typeof l.timestamp === 'string' ? l.timestamp : undefined
-    for (const b of m.content as Json[])
-      if (b && b.type === 'tool_use') onCall({ name: String(b.name ?? ''), input: b.input, model: typeof m.model === 'string' ? m.model : undefined, at })
-  })
 }
 
 // ---------------------------------------------------------------- query

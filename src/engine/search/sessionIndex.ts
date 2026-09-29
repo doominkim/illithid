@@ -18,11 +18,13 @@ import {
   readCodex,
   readGemini,
   readGrok,
+  readClaudeSubagentStats,
   readOpencodeDb,
   type OpencodeDb,
   type TranscriptMessage
 } from '../scan/transcript'
-import { claudeSubagentFiles, claudeSubagentStat, ensureUsage, readClaudeSubagentCalls, UsageCounter } from './usage'
+import { ensureModelStats, MODEL_TABLES, ModelStatsCounter } from './modelStats'
+import { claudeSubagentFiles, claudeSubagentStat, ensureUsage, UsageCounter } from './usage'
 
 const SCHEMA_VERSION = '2'
 const SNIPPET_SIDE = 60
@@ -134,6 +136,11 @@ export function openDb(path: string): DatabaseSync {
     db.exec(`
       drop table if exists messages;
       drop table if exists usage;
+      drop table if exists model_day;
+      drop table if exists model_request;
+      drop table if exists model_ctx;
+      drop table if exists model_tool;
+      drop table if exists model_limit;
       drop table if exists msg;
       drop table if exists sessions;
       drop table if exists meta;
@@ -249,7 +256,10 @@ export async function indexSessions(
     // upgrade can't leave an empty table marked current
     db.exec('begin')
     try {
-      if (ensureUsage(db)) db.exec('update sessions set mtime = -1')
+      // Each is checked on its own; either one being new means every session is read again
+      const usageNew = ensureUsage(db)
+      const modelNew = ensureModelStats(db)
+      if (usageNew || modelNew) db.exec('update sessions set mtime = -1')
       db.exec('commit')
     } catch (e) {
       db.exec('rollback')
@@ -257,7 +267,7 @@ export async function indexSessions(
     }
     const prevTools = metaGet(db, 'includeTools')
     if (prevTools !== undefined && prevTools !== String(includeTools)) {
-      db.exec('delete from messages; delete from msg; delete from sessions; delete from usage;')
+      db.exec(`delete from messages; delete from msg; delete from sessions; delete from usage; ${MODEL_TABLES.map((t) => `delete from ${t};`).join(' ')}`)
     }
     if (prevTools !== String(includeTools)) metaSet(db, 'includeTools', String(includeTools))
 
@@ -279,6 +289,7 @@ export async function indexSessions(
     const delMsg = db.prepare('delete from msg where sid = ?')
     const delSession = db.prepare('delete from sessions where sid = ?')
     const delUsage = db.prepare('delete from usage where sid = ?')
+    const delModel = MODEL_TABLES.map((t) => db.prepare(`delete from ${t} where sid = ?`))
     const insUsage = db.prepare('insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)')
 
     // Sessions that disappeared
@@ -291,6 +302,7 @@ export async function indexSessions(
           delMessages.run(r.sid)
           delMsg.run(r.sid)
           delUsage.run(r.sid)
+          for (const d of delModel) d.run(r.sid)
           delSession.run(r.sid)
         }
         db.exec('commit')
@@ -358,16 +370,29 @@ export async function indexSessions(
         }
         const c = new Collector(sink)
         const usage = new UsageCounter(s.tool, s.updatedAt)
-        c.onCall = (call) => usage.add(call)
+        // Codex and OpenCode child sessions are subagents as a whole; Claude subagents are separate files read below
+        const models = new ModelStatsCounter(s.tool, s.updatedAt, !!s.parentId)
+        c.onCall = (call) => {
+          usage.add(call)
+          models.call(call)
+        }
+        c.stats = models
         switch (s.tool) {
           case 'claude':
             await readClaude(s.path, c)
-            for (const f of claudeSubagentFiles(s.path))
+            models.finish()
+            for (const f of claudeSubagentFiles(s.path)) {
+              models.beginSubagent()
               try {
-                await readClaudeSubagentCalls(f, (call) => usage.add(call))
+                await readClaudeSubagentStats(f, (call) => {
+                  usage.add(call)
+                  models.call(call)
+                }, models)
               } catch {
                 // an unreadable or vanished subagent file must not fail the whole session
               }
+              models.endSubagent()
+            }
             break
           case 'codex':
             await readCodex(s.path, c)
@@ -391,6 +416,7 @@ export async function indexSessions(
         }
         delUsage.run(sid)
         for (const u of usage.rows.values()) insUsage.run(sid, s.tool, u.kind, u.name, u.model, u.day, u.n)
+        models.write(db, sid)
         finish.run(s.path, sig.mtime, sig.size, s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null, n, sid)
         db.exec('commit')
         indexed++

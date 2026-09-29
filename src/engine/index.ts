@@ -427,4 +427,6 @@ export type {
 } from './market'
 export { usageOf } from './search/usage'
 export type { UsageKind, UsageStats } from './search/usage'
+export { modelDetail, modelList, sessionModels, MIN_REQUESTS, MIN_TOOL_CALLS } from './search/modelStats'
+export type { Dist, ModelDetail, ModelKey, ModelRange, ModelSummary, SessionRef } from './search/modelStats'
 export { seedNewToolToggles } from './manifest'
