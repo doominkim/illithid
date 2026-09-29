@@ -88,15 +88,22 @@ export function startUpdateCheck(home: string): void {
 /**
  * Homebrew installs: open Terminal running the upgrade, then quit so the running copy isn't the old version. The script waits for
  * the app to exit, upgrades, and opens the new version. A .command file is opened rather than scripting Terminal, so no
- * automation permission is asked. The commands are fixed here, nothing comes from the release
+ * automation permission is asked. The commands are fixed here, nothing comes from the release.
+ * On success the script closes its own window (Terminal keeps it at "[Process completed]" by default): the window is titled with
+ * a per-run mark and closed by that name — Terminal closing its own window asks no permission. A failed upgrade stays open
  */
 export async function openUpgradeInTerminal(): Promise<void> {
   const file = join(tmpdir(), 'illithid-upgrade.command')
   const script = [
     '#!/bin/zsh -l',
+    'mark="Illithid update $$"',
+    `printf '\\e]0;%s\\a' "$mark"`,
     '# Wait up to 30s for Illithid to quit',
     'for i in {1..60}; do pgrep -xq Illithid || break; sleep 0.5; done',
-    `${BREW_UPGRADE} && open -b ${APP_BUNDLE_ID}`,
+    `if ${BREW_UPGRADE} && open -b ${APP_BUNDLE_ID}; then`,
+    '  [[ $TERM_PROGRAM == Apple_Terminal ]] &&',
+    `    osascript -e 'on run {m}' -e 'tell application "Terminal" to close (every window whose name contains m)' -e 'end run' "$mark" >/dev/null 2>&1 &`,
+    'fi',
     ''
   ].join('\n')
   writeFileSync(file, script)
