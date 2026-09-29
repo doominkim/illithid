@@ -18,13 +18,14 @@ import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
 import { UsagePanel } from '../components/UsagePanel'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
+import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
+import { useViewMode } from '../lib/viewMode'
 
 const NEW = '__new__'
 
@@ -37,7 +38,7 @@ function Mcp(): React.JSX.Element {
   const reload = useReload()
   const { data, error } = useApi('mcp', () => window.api.mcp())
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewMode>('grid')
+  const [view, setView] = useViewMode('mcp')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const pending = useToggleBusy()
   const [confirmDelete, setConfirmDelete] = useState(false)

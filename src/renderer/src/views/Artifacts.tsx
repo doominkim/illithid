@@ -13,12 +13,13 @@ import { SearchInput } from '../components/SearchInput'
 import { Snippet } from '../components/Snippet'
 import { ToolIcon } from '../components/ToolIcon'
 import { VirtualList } from '../components/VirtualList'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
+import { ViewToggle } from '../components/ViewToggle'
 import { useNav } from '../lib/nav'
 import { fmtSize, fmtTime, includesCI } from '../lib/format'
 import { useTextHighlight } from '../lib/highlight'
 import { runWrite } from '../lib/mutate'
 import { useApi } from '../lib/useApi'
+import { useViewMode } from '../lib/viewMode'
 
 const ALL = '__all__'
 
@@ -46,17 +47,26 @@ function sourceName(source: string, t: (k: string) => string): string {
   return source.split('/').filter(Boolean).pop() ?? source
 }
 
-/** Image thumbnail (loaded once the card scrolls into view) or a file-type icon */
+/** Characters of a Markdown file rendered in its thumbnail (the card shows only the top) */
+const MD_THUMB_CHARS = 1500
+
+/**
+ * Thumbnail loaded once the card scrolls into view: Quick Look image for images and HTML,
+ * the first part of the text rendered small for Markdown, otherwise a file-type icon
+ */
 function Thumb({ a }: { a: Artifact }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const [url, setUrl] = useState<string | null>(null)
+  const [md, setMd] = useState<string | null>(null)
   useEffect(() => {
-    if ((a.kind !== 'image' && a.kind !== 'html') || !ref.current) return
+    if ((a.kind !== 'image' && a.kind !== 'html' && a.kind !== 'md') || !ref.current) return
     let alive = true
     const io = new IntersectionObserver((entries) => {
       if (!entries.some((e) => e.isIntersecting)) return
       io.disconnect()
-      window.api.artifactThumb(a.id).then((u) => alive && setUrl(u), () => {})
+      if (a.kind === 'md')
+        window.api.artifactPreview(a.id).then((p) => alive && !p.error && setMd((p.text ?? '').slice(0, MD_THUMB_CHARS)), () => {})
+      else window.api.artifactThumb(a.id).then((u) => alive && setUrl(u), () => {})
     })
     io.observe(ref.current)
     return () => {
@@ -65,9 +75,13 @@ function Thumb({ a }: { a: Artifact }): React.JSX.Element {
     }
   }, [a.id, a.kind])
   return (
-    <div ref={ref} className="ac-thumb">
+    <div ref={ref} className="ac-thumb" data-md={md ? true : undefined}>
       {url ? (
         <img src={url} alt="" draggable={false} />
+      ) : md ? (
+        <div className="ac-thumb-md" aria-hidden="true">
+          <Markdown text={md} />
+        </div>
       ) : a.kind === 'md' || a.kind === 'html' ? (
         <FileText size={28} strokeWidth={1.5} />
       ) : (
@@ -255,7 +269,7 @@ function Artifacts(): React.JSX.Element {
   const { data, error } = useApi('artifacts', () => window.api.artifacts())
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<KindFilter>('all')
-  const [view, setView] = useState<ViewMode>('grid')
+  const [view, setView] = useViewMode('artifacts')
   const [tool, setTool] = useState<string>(ALL)
   const [selected, setSelected] = useState<string | null>(null)
   const [mode, setMode] = useState<'title' | 'content'>('title')

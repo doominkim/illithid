@@ -19,7 +19,7 @@ import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
 import { UsagePanel } from '../components/UsagePanel'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
+import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
@@ -27,6 +27,7 @@ import { useSyncFailures } from '../lib/sync'
 import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
+import { useViewMode } from '../lib/viewMode'
 
 
 interface Row {
@@ -46,7 +47,7 @@ function Skills(): React.JSX.Element {
   const failedIn = useSyncFailures()
   const [query, setQuery] = useState('')
   const [importOpen, setImportOpen] = useState(false)
-  const [view, setView] = useState<ViewMode>('grid')
+  const [view, setView] = useViewMode('skills')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)

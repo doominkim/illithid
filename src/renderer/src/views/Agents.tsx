@@ -31,7 +31,7 @@ import { SearchInput } from '../components/SearchInput'
 import { ToolIcon } from '../components/ToolIcon'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
+import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
@@ -40,6 +40,7 @@ import { useToolsInUse } from '../lib/config'
 import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOL_NAME, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
+import { useViewMode } from '../lib/viewMode'
 
 interface Row {
   name: string
@@ -62,7 +63,7 @@ function Agents(): React.JSX.Element {
   const { data, error } = useApi('agents', () => window.api.agents())
   const failedIn = useSyncFailures()
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewMode>('grid')
+  const [view, setView] = useViewMode('agents')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const pending = useToggleBusy()
   const [importOpen, setImportOpen] = useState(false)

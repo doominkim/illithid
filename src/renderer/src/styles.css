@@ -337,6 +337,22 @@ body {
   height: 100%;
   object-fit: contain;
 }
+/* Markdown thumbnail: the page top rendered at 40% on a white sheet, clipped by the square */
+.ac-thumb[data-md] {
+  align-items: flex-start;
+  justify-content: flex-start;
+  background: var(--ac-surface);
+  border: 1px solid var(--ac-border-subtle);
+}
+.ac-thumb-md {
+  flex: none;
+  width: 250%;
+  padding: 16px 20px;
+  transform: scale(0.4);
+  transform-origin: top left;
+  pointer-events: none;
+  color: var(--ac-text);
+}
 
 /* Rendered HTML artifact (sandboxed) */
 .ac-html-frame {

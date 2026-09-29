@@ -18,7 +18,7 @@ import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
+import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
@@ -26,6 +26,7 @@ import { useSyncFailures } from '../lib/sync'
 import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
+import { useViewMode } from '../lib/viewMode'
 
 /** First heading (# …) or first non-empty line */
 function firstHeading(text: string): string {
@@ -52,7 +53,7 @@ function Rules(): React.JSX.Element {
   const status = useApi('status', () => window.api.status())
   const failedIn = useSyncFailures()
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewMode>('grid')
+  const [view, setView] = useViewMode('rules')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)

@@ -275,6 +275,43 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
     void jump(jumpTo.index)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpTo, first.data])
+  // Contents follows the transcript: the active request is the last one whose message top has passed the middle of the pane
+  // (or the last loaded one once scrolled to the bottom). The Contents list scrolls to keep it in view
+  const [active, setActive] = useState<number | null>(null)
+  const contentsRef = useRef<HTMLDivElement>(null)
+  const spyFrame = useRef(0)
+  const prompts = tr.data?.available ? tr.data.prompts : []
+  const spy = (): void => {
+    cancelAnimationFrame(spyFrame.current)
+    spyFrame.current = requestAnimationFrame(() => {
+      const box = scrollRef.current
+      if (!box || prompts.length === 0) return
+      const b = box.getBoundingClientRect()
+      const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4
+      let pick: number | null = null
+      for (const p of prompts) {
+        const el = refs.current.get(p.index)
+        if (!el) continue
+        if (atBottom || el.getBoundingClientRect().top - b.top <= b.height / 2) pick = p.index
+      }
+      setActive(pick ?? prompts.find((p) => refs.current.has(p.index))?.index ?? null)
+    })
+  }
+  useEffect(() => {
+    spy()
+    return () => cancelAnimationFrame(spyFrame.current)
+    // Re-run when messages load or change; spy reads the latest refs itself
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tr.data])
+  useEffect(() => {
+    const list = contentsRef.current
+    const row = active === null ? null : list?.querySelector<HTMLElement>(`[data-index="${active}"]`)
+    if (!list || !row) return
+    const l = list.getBoundingClientRect()
+    const r = row.getBoundingClientRect()
+    if (r.top < l.top) list.scrollTop += r.top - l.top
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom
+  }, [active])
   const resume = s.resumeCommand
 
   return (
@@ -345,7 +382,7 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
             </Badge>
           )}
         </Group>
-        <Box ref={scrollRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', overflowAnchor: 'none' }} p="md" data-testid="transcript-scroll">
+        <Box ref={scrollRef} onScroll={spy} style={{ flex: 1, minHeight: 0, overflow: 'auto', overflowAnchor: 'none' }} p="md" data-testid="transcript-scroll">
           {tr.error ? (
             <ErrorAlert message={tr.error} />
           ) : !tr.data ? (
@@ -375,15 +412,28 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
             {t('sessions.contents')}
           </Text>
         </Group>
-        <Box style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Box ref={contentsRef} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {!tr.data?.available || tr.data.prompts.length === 0 ? (
             <Text size="xs" c="dimmed" p="md">
               {t('sessions.noContents')}
             </Text>
           ) : (
             tr.data.prompts.map((p, i) => (
-              <UnstyledButton key={p.index} className="ac-row" data-testid="contents-item" data-index={p.index} onClick={() => void jump(p.index)} style={{ alignItems: 'flex-start', padding: '8px 12px' }}>
-                <Badge size="xs" variant="light" circle fw={600} style={{ flexShrink: 0, marginTop: 2 }}>
+              <UnstyledButton
+                key={p.index}
+                className="ac-row"
+                data-testid="contents-item"
+                data-index={p.index}
+                data-active={active === p.index || undefined}
+                aria-current={active === p.index || undefined}
+                onClick={() => {
+                  setActive(p.index)
+                  void jump(p.index)
+                }}
+                style={{ alignItems: 'flex-start', padding: '8px 12px' }}
+              >
+                {/* Not a circle: two- and three-digit numbers must fit */}
+                <Badge size="xs" variant="light" fw={600} miw={20} px={5} style={{ flexShrink: 0, marginTop: 2 }}>
                   {i + 1}
                 </Badge>
                 <Text size="xs" lineClamp={2} style={{ lineHeight: 1.4 }}>
