@@ -20,7 +20,8 @@
     "postinstall": "electron-builder install-app-deps",
     "git-fixture": "tsx scripts/git-fixture.ts",
     "screens": "electron-vite build && tsx scripts/screens.ts",
-    "apply-fixture": "tsx scripts/apply-fixture.ts"
+    "apply-fixture": "tsx scripts/apply-fixture.ts",
+    "session-scan-fixture": "tsx scripts/session-scan-fixture.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

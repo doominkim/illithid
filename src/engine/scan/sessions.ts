@@ -3,6 +3,7 @@ import { basename, isAbsolute, join } from 'node:path'
 import fg from 'fast-glob'
 import type { ToolId } from '../toolIds'
 import { clip, isoOrUndefined, readRange } from './common'
+import { SessionScanCache, sessionScanCachePath } from './sessionCache'
 import { geminiText, isGeminiInjected, replayGemini, titleText } from './transcript'
 
 export { readSessionTranscript, cleanUserText, titleText, toolLine } from './transcript'
@@ -149,7 +150,7 @@ function userText(parts: unknown): string | undefined {
 
 // ---------------------------------------------------------------- Claude
 
-function scanClaude(home: string): Session[] {
+function scanClaude(home: string, cache?: SessionScanCache): Session[] {
   const root = join(home, '.claude/projects')
   if (!existsSync(root)) return []
   // Subagent transcripts (<session>/subagents/*.jsonl) cannot be resumed, so they are excluded.
@@ -164,56 +165,68 @@ function scanClaude(home: string): Session[] {
   const out: Session[] = []
   for (const f of files) {
     const size = f.stats?.size ?? 0
-    const mtime = f.stats?.mtime?.toISOString()
-    let head: Json[] = []
-    let tail: Json[] = []
-    try {
-      ;({ head, tail } = headTail(f.path, size))
-    } catch {
+    const mtimeMs = f.stats?.mtimeMs ?? 0
+    const hit = cache?.get<Session>('claude', f.path, mtimeMs, size)
+    if (hit) {
+      out.push(hit)
       continue
     }
-    const all = [...head, ...tail]
-    let id: string | undefined
-    let cwd: string | undefined
-    for (const l of head) {
-      id ??= str(l.sessionId)
-      cwd ??= str(l.cwd)
-      if (id && cwd) break
-    }
-    id ??= basename(f.path, '.jsonl')
-
-    // Title priority: custom-title > ai-title > summary > first user message
-    let custom: string | undefined
-    let ai: string | undefined
-    let summary: string | undefined
-    for (const l of all) {
-      if (l.type === 'custom-title') custom = str(l.customTitle) ?? str(l.title) ?? custom
-      else if (l.type === 'ai-title') ai = str(l.aiTitle) ?? ai
-      else if (l.type === 'summary') summary = str(l.summary) ?? summary
-    }
-    let first: string | undefined
-    if (!custom && !ai && !summary) {
-      for (const l of head) {
-        if (l.type !== 'user' || l.isMeta || l.isSidechain) continue
-        const m = l.message as Json | undefined
-        if (!m || m.role !== 'user') continue
-        first = userText(m.content)
-        if (first) break
-      }
-    }
-    out.push({
-      id,
-      tool: 'claude',
-      title: clip(custom ?? ai ?? summary ?? first ?? '', TITLE_MAX),
-      cwd,
-      project: projectOf(cwd),
-      startedAt: firstTimestamp(head),
-      updatedAt: lastTimestamp(tail) ?? mtime,
-      path: f.path,
-      resumeCommand: resumeCommand('claude', id)
-    })
+    const s = parseClaude(f.path, size, f.stats?.mtime?.toISOString())
+    if (!s) continue
+    cache?.set('claude', f.path, mtimeMs, size, s)
+    out.push(s)
   }
   return out
+}
+
+function parseClaude(path: string, size: number, mtime: string | undefined): Session | undefined {
+  let head: Json[] = []
+  let tail: Json[] = []
+  try {
+    ;({ head, tail } = headTail(path, size))
+  } catch {
+    return undefined
+  }
+  const all = [...head, ...tail]
+  let id: string | undefined
+  let cwd: string | undefined
+  for (const l of head) {
+    id ??= str(l.sessionId)
+    cwd ??= str(l.cwd)
+    if (id && cwd) break
+  }
+  id ??= basename(path, '.jsonl')
+
+  // Title priority: custom-title > ai-title > summary > first user message
+  let custom: string | undefined
+  let ai: string | undefined
+  let summary: string | undefined
+  for (const l of all) {
+    if (l.type === 'custom-title') custom = str(l.customTitle) ?? str(l.title) ?? custom
+    else if (l.type === 'ai-title') ai = str(l.aiTitle) ?? ai
+    else if (l.type === 'summary') summary = str(l.summary) ?? summary
+  }
+  let first: string | undefined
+  if (!custom && !ai && !summary) {
+    for (const l of head) {
+      if (l.type !== 'user' || l.isMeta || l.isSidechain) continue
+      const m = l.message as Json | undefined
+      if (!m || m.role !== 'user') continue
+      first = userText(m.content)
+      if (first) break
+    }
+  }
+  return {
+    id,
+    tool: 'claude',
+    title: clip(custom ?? ai ?? summary ?? first ?? '', TITLE_MAX),
+    cwd,
+    project: projectOf(cwd),
+    startedAt: firstTimestamp(head),
+    updatedAt: lastTimestamp(tail) ?? mtime,
+    path,
+    resumeCommand: resumeCommand('claude', id)
+  }
 }
 
 // ---------------------------------------------------------------- Codex
@@ -245,7 +258,7 @@ function codexFirstUserText(lines: Json[]): string | undefined {
   return undefined
 }
 
-function scanCodex(home: string): Session[] {
+function scanCodex(home: string, cache?: SessionScanCache): Session[] {
   const root = join(home, '.codex/sessions')
   if (!existsSync(root)) return []
   const names = codexIndex(home)
@@ -260,56 +273,65 @@ function scanCodex(home: string): Session[] {
   const out: Session[] = []
   for (const f of files) {
     const size = f.stats?.size ?? 0
-    const mtime = f.stats?.mtime?.toISOString()
-    let head: Json[] = []
-    let tail: Json[] = []
-    try {
-      ;({ head, tail } = headTail(f.path, size))
-    } catch {
-      continue
+    const mtimeMs = f.stats?.mtimeMs ?? 0
+    let s = cache?.get<Session>('codex', f.path, mtimeMs, size)
+    if (!s) {
+      s = parseCodex(f.path, size, f.stats?.mtime?.toISOString())
+      if (!s) continue
+      cache?.set('codex', f.path, mtimeMs, size, s)
     }
-    const meta = head.find((l) => l.type === 'session_meta')?.payload as Json | undefined
-    const fromName = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(
-      f.path
-    )?.[1]
-    const id = str(meta?.id) ?? fromName ?? basename(f.path, '.jsonl')
-    const cwd = str(meta?.cwd)
-    const source = meta?.source as Json | undefined
-    const spawn = (source?.subagent as Json | undefined)?.thread_spawn as Json | undefined
-    const parentId = str(spawn?.parent_thread_id) ?? str(meta?.forked_from_id)
-
-    const indexed = names.get(id)
-    let first: string | undefined
-    if (!indexed) {
-      first = codexFirstUserText(head)
-      // Injected messages (AGENTS.md, developer instructions) are long, so the first input often lies past 64KB.
-      // For title lookup only, read up to the first 256KB.
-      if (!first && size > CHUNK) {
-        first = codexFirstUserText(
-          parseLines(readRange(f.path, 0, Math.min(size, TITLE_SCAN_LIMIT)), false, true)
-        )
-      }
-      // Subagents have no user input, so nickname(role) is used instead.
-      if (!first) {
-        const nick = str(meta?.agent_nickname)
-        const role = str(meta?.agent_role)
-        if (nick || role) first = role && nick ? `${nick} (${role})` : (nick ?? role)
-      }
-    }
-    out.push({
-      id,
-      tool: 'codex',
-      title: clip(indexed ?? first ?? '', TITLE_MAX),
-      cwd,
-      project: projectOf(cwd),
-      startedAt: isoOrUndefined(meta?.timestamp) ?? firstTimestamp(head),
-      updatedAt: lastTimestamp(tail) ?? mtime,
-      parentId,
-      path: f.path,
-      resumeCommand: resumeCommand('codex', id)
-    })
+    // The thread name lives in session_index.jsonl, not in the rollout file, so it is applied after the cache
+    const indexed = names.get(s.id)
+    out.push(indexed ? { ...s, title: clip(indexed, TITLE_MAX) } : s)
   }
   return out
+}
+
+/** Title here is the fallback (first user input, else subagent nickname); scanCodex prefers the thread name */
+function parseCodex(path: string, size: number, mtime: string | undefined): Session | undefined {
+  let head: Json[] = []
+  let tail: Json[] = []
+  try {
+    ;({ head, tail } = headTail(path, size))
+  } catch {
+    return undefined
+  }
+  const meta = head.find((l) => l.type === 'session_meta')?.payload as Json | undefined
+  const fromName = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(path)?.[1]
+  const id = str(meta?.id) ?? fromName ?? basename(path, '.jsonl')
+  const cwd = str(meta?.cwd)
+  const source = meta?.source as Json | undefined
+  const spawn = (source?.subagent as Json | undefined)?.thread_spawn as Json | undefined
+  const parentId = str(spawn?.parent_thread_id) ?? str(meta?.forked_from_id)
+
+  let first = codexFirstUserText(head)
+  // Injected messages (AGENTS.md, developer instructions) are long, so the first input often lies past 64KB.
+  // For title lookup only, read up to the first 256KB.
+  if (!first && size > CHUNK) {
+    try {
+      first = codexFirstUserText(parseLines(readRange(path, 0, Math.min(size, TITLE_SCAN_LIMIT)), false, true))
+    } catch {
+      // Keep the session without a title
+    }
+  }
+  // Subagents have no user input, so nickname(role) is used instead.
+  if (!first) {
+    const nick = str(meta?.agent_nickname)
+    const role = str(meta?.agent_role)
+    if (nick || role) first = role && nick ? `${nick} (${role})` : (nick ?? role)
+  }
+  return {
+    id,
+    tool: 'codex',
+    title: clip(first ?? '', TITLE_MAX),
+    cwd,
+    project: projectOf(cwd),
+    startedAt: isoOrUndefined(meta?.timestamp) ?? firstTimestamp(head),
+    updatedAt: lastTimestamp(tail) ?? mtime,
+    parentId,
+    path,
+    resumeCommand: resumeCommand('codex', id)
+  }
 }
 
 // ---------------------------------------------------------------- OpenCode
@@ -491,11 +513,17 @@ function scanGrok(home: string): Session[] {
 
 // ---------------------------------------------------------------- Entry point
 
-/** Read-only scan. Sorted by updatedAt descending. Returns the rest even if one tool fails. */
-export function scanSessions(home: string, tools?: SessionTool[]): SessionScanResult {
+export interface ScanOptions {
+  /** Reuse parsed Claude/Codex session files whose (mtime, size) are unchanged, via a cache file under the app config dir */
+  cache?: boolean
+}
+
+/** Sorted by updatedAt descending. Returns the rest even if one tool fails. Writes nothing unless opts.cache is set */
+export function scanSessions(home: string, tools?: SessionTool[], opts: ScanOptions = {}): SessionScanResult {
+  const cache = opts.cache ? new SessionScanCache(sessionScanCachePath(home)) : undefined
   const scanners: Record<SessionTool, (h: string) => Session[]> = {
-    claude: scanClaude,
-    codex: scanCodex,
+    claude: (h) => scanClaude(h, cache),
+    codex: (h) => scanCodex(h, cache),
     opencode: scanOpencode,
     gemini: scanGemini,
     // ~/.copilot/session-state format is unverified (no local samples) — not scanned yet
@@ -506,11 +534,15 @@ export function scanSessions(home: string, tools?: SessionTool[]): SessionScanRe
   const errors: SessionScanResult['errors'] = []
   for (const tool of tools ?? (Object.keys(scanners) as SessionTool[])) {
     try {
-      sessions.push(...scanners[tool](home))
+      const found = scanners[tool](home)
+      // A failed tool keeps its cache entries
+      cache?.begin(tool)
+      sessions.push(...found)
     } catch (e) {
       errors.push({ tool, message: (e as Error).message })
     }
   }
+  cache?.save()
   sessions.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
   return { sessions, errors }
 }
