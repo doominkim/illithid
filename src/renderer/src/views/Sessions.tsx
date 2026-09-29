@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown, ChevronRight, Clock, Copy, FileText, FolderOpen, Hash, Layers, ListOrdered, MessageSquare, Play, RefreshCw, Wrench } from 'lucide-react'
 import { notifications } from '@mantine/notifications'
 import { useTranslation } from 'react-i18next'
-import type { SearchIndexView, Session, SessionSearchHit, SessionSearchResponse, TranscriptMessage, TranscriptView } from '../../../shared/api'
+import type { SearchIndexView, Session, SessionModelShare, SessionSearchHit, SessionSearchResponse, TranscriptMessage, TranscriptView } from '../../../shared/api'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
@@ -13,7 +13,8 @@ import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { Snippet } from '../components/Snippet'
 import { ToolIcon } from '../components/ToolIcon'
-import { useNavSelect } from '../lib/nav'
+import { modelKeyStr, modelLabel } from '../lib/modelKey'
+import { useNav, useNavSelect } from '../lib/nav'
 import { cleanTitle, fmtTime, includesCI, relTime } from '../lib/format'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { useApi } from '../lib/useApi'
@@ -188,6 +189,58 @@ function Bubble({ m, highlight, refCb }: { m: TranscriptMessage; highlight: bool
   )
 }
 
+/** Share below which models fold into "and N under 1%" */
+const MINOR_SHARE = 0.01
+
+/** "Models in this session: a 48% · b 46% · and 1 under 1%" — each model opens its Stats detail */
+function SessionModels({ tool, id }: { tool: Session['tool']; id: string }): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const { navigate } = useNav()
+  const [rows, setRows] = useState<SessionModelShare[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    window.api.sessionModels(tool, id).then(
+      (r) => alive && setRows(r),
+      () => alive && setRows(null)
+    )
+    return () => {
+      alive = false
+    }
+  }, [tool, id])
+  if (!rows?.length) return null
+  const main = rows.filter((r) => r.share >= MINOR_SHARE)
+  const minor = rows.length - main.length
+  return (
+    <Group gap={6} mt={6} wrap="wrap" data-testid="session-models">
+      <Text size="xs" c="dimmed">
+        {t('models.session.models')}
+      </Text>
+      {main.map((r, i) => (
+        <Group key={modelKeyStr(r)} gap={4} wrap="nowrap">
+          {i > 0 && (
+            <Text size="xs" c="dimmed">
+              ·
+            </Text>
+          )}
+          <UnstyledButton onClick={() => navigate('stats', { select: modelKeyStr(r) })}>
+            <Text size="xs" ff="monospace" td="underline" style={{ textDecorationStyle: 'dotted' }}>
+              {modelLabel(r)}
+            </Text>
+          </UnstyledButton>
+          <Text size="xs" c="dimmed">
+            {Math.round(r.share * 100)}%
+          </Text>
+        </Group>
+      ))}
+      {minor > 0 && (
+        <Text size="xs" c="dimmed">
+          · {t('models.session.rest', { n: minor })}
+        </Text>
+      )}
+    </Group>
+  )
+}
+
 /** Center: header + transcript, right: Contents */
 const PAGE = 80
 
@@ -359,6 +412,7 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
               </Text>
             </Group>
           </Group>
+          <SessionModels tool={s.tool} id={s.id} />
           <Group gap={6} mt={8} wrap="nowrap">
             <Code style={{ flex: 1, minWidth: 0, padding: '6px 10px', whiteSpace: 'nowrap', overflowX: 'auto' }}>{resume ?? t('sessions.noResume')}</Code>
             {resume && (
