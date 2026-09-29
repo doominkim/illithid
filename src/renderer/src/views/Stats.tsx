@@ -120,6 +120,19 @@ interface Row {
   group: boolean
 }
 
+/** Reasoning levels from low to high; unknown ones go last in name order */
+const EFFORT_ORDER = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+const effortRank = (e: string): number => {
+  const i = EFFORT_ORDER.indexOf(e)
+  return i < 0 ? EFFORT_ORDER.length : i
+}
+/** Efforts of a grouped model, low to high: "low · medium · high" */
+const effortList = (models: ModelSummary[]): string =>
+  models
+    .map((m) => m.effort || '—')
+    .sort((a, b) => effortRank(a) - effortRank(b) || a.localeCompare(b))
+    .join(' · ')
+
 function sortValue(m: ModelSummary, k: SortKey): number | string | null {
   switch (k) {
     case 'last':
@@ -184,13 +197,15 @@ function StatsList({
     for (const m of visible) {
       const list = groups.get(gk(m))!
       if (list.length > 1) {
-        if (list[0] === m) out.push({ key: { tool: m.tool, model: m.model, effort: '' }, models: [...list].sort(cmp), group: true })
+        // Rows inside a group follow the effort level, like the list in the group row
+        if (list[0] === m)
+          out.push({ key: { tool: m.tool, model: m.model, effort: '' }, models: [...list].sort((a, b) => effortRank(a.effort) - effortRank(b.effort) || a.effort.localeCompare(b.effort)), group: true })
         continue
       }
       out.push({ key: m, models: [m], group: false })
     }
-    // Groups sort by their best child
-    return out.sort((a, b) => cmp(a.models[0], b.models[0]))
+    // Groups sort by their best child for the chosen column
+    return out.sort((a, b) => cmp([...a.models].sort(cmp)[0], [...b.models].sort(cmp)[0]))
   }, [visible, sort])
 
   const head = (key: SortKey, text: string, sub?: string, tip?: string): React.JSX.Element => (
@@ -300,15 +315,38 @@ function StatsList({
       </Text>
     ) : null
 
+  // Model name above its tool, so long ids don't push the columns apart
+  const modelCell = (k: ModelKey): React.JSX.Element => (
+    <Stack gap={2}>
+      <Text size="sm" fw={600} ff="monospace" style={{ whiteSpace: 'nowrap' }}>
+        {k.model}
+      </Text>
+      <ToolTag tool={k.tool} />
+    </Stack>
+  )
+  const effortCell = (m: ModelSummary): React.JSX.Element => (
+    <Group gap={6} wrap="nowrap">
+      <Text size="sm" ff="monospace" c={m.effort ? undefined : 'dimmed'}>
+        {m.effort || '—'}
+      </Text>
+      {small(m)}
+    </Group>
+  )
+
   return (
     <Box className="ac-card" style={{ overflowX: 'auto' }} data-testid="stats-table">
-      <Table highlightOnHover verticalSpacing={8} horizontalSpacing="sm" style={{ minWidth: 980 }}>
+      <Table highlightOnHover verticalSpacing={8} horizontalSpacing={8} style={{ minWidth: 960 }}>
         <Table.Thead>
           <Table.Tr>
             <Table.Th w={28} />
-            <Table.Th>
+            <Table.Th style={{ verticalAlign: 'bottom' }}>
               <Text size="xs" fw={600} c="dimmed">
                 {t('models.col.model')}
+              </Text>
+            </Table.Th>
+            <Table.Th w={150} style={{ verticalAlign: 'bottom' }}>
+              <Text size="xs" fw={600} c="dimmed">
+                {t('models.col.effort')}
               </Text>
             </Table.Th>
             <Table.Th style={{ verticalAlign: 'bottom' }}>
@@ -336,15 +374,8 @@ function StatsList({
               return (
                 <Table.Tr key={id} onClick={() => onOpen(m)} style={{ cursor: 'pointer', opacity: m.requests < MIN_REQUESTS ? 0.7 : 1 }} data-testid="stats-row">
                   <Table.Td>{check(m)}</Table.Td>
-                  <Table.Td>
-                    <Group gap={8} wrap="nowrap">
-                      <Text size="sm" fw={600} ff="monospace">
-                        {label(m)}
-                      </Text>
-                      <ToolTag tool={m.tool} />
-                      {small(m)}
-                    </Group>
-                  </Table.Td>
+                  <Table.Td>{modelCell(m)}</Table.Td>
+                  <Table.Td>{effortCell(m)}</Table.Td>
                   {cells([m])}
                 </Table.Tr>
               )
@@ -365,16 +396,12 @@ function StatsList({
                 data-testid="stats-group"
               >
                 <Table.Td>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</Table.Td>
-                <Table.Td>
-                  <Group gap={8} wrap="nowrap">
-                    <Text size="sm" fw={600} ff="monospace">
-                      {r.key.model}
-                    </Text>
-                    <ToolTag tool={r.key.tool} />
-                    <Text size="xs" c="dimmed">
-                      {t('models.efforts', { n: r.models.length })}
-                    </Text>
-                  </Group>
+                <Table.Td>{modelCell(r.key)}</Table.Td>
+                {/* Long lists wrap inside a fixed width instead of pushing the number columns apart */}
+                <Table.Td maw={150}>
+                  <Text size="xs" ff="monospace" c="dimmed" style={{ lineHeight: 1.5 }}>
+                    {effortList(r.models)}
+                  </Text>
                 </Table.Td>
                 {cells(r.models)}
               </Table.Tr>,
@@ -382,14 +409,8 @@ function StatsList({
                 ? r.models.map((m) => (
                     <Table.Tr key={modelKeyStr(m)} onClick={() => onOpen(m)} style={{ cursor: 'pointer', opacity: m.requests < MIN_REQUESTS ? 0.7 : 1 }} data-testid="stats-row">
                       <Table.Td>{check(m)}</Table.Td>
-                      <Table.Td pl={36}>
-                        <Group gap={6} wrap="nowrap">
-                          <Text size="sm" ff="monospace">
-                            {m.effort}
-                          </Text>
-                          {small(m)}
-                        </Group>
-                      </Table.Td>
+                      <Table.Td />
+                      <Table.Td>{effortCell(m)}</Table.Td>
                       {cells([m])}
                     </Table.Tr>
                   ))

@@ -564,6 +564,7 @@
     "compareHint": "2つチェックすると並べて見られる",
     "col": {
       "model": "モデル",
+      "effort": "effort",
       "period": "使用期間",
       "requests": "リクエスト",
       "toolsPerReq": "リクエストあたりツール呼び出し",
@@ -583,7 +584,6 @@
     },
     "mistakesNA": "このツールのログでは区別されない",
     "activeDays": "{{n}}日使用",
-    "efforts": "effort {{n}}個",
     "small": "サンプル少",
     "empty": "この期間の使用記録なし",
     "showAll": "全期間を見る",

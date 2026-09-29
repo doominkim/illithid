@@ -564,6 +564,7 @@
     "compareHint": "Check two to compare",
     "col": {
       "model": "Model",
+      "effort": "Effort",
       "period": "Period",
       "requests": "Requests",
       "toolsPerReq": "Tools / request",
@@ -583,7 +584,6 @@
     },
     "mistakesNA": "Not distinguished in this tool's logs",
     "activeDays": "{{n}} days used",
-    "efforts": "{{n}} efforts",
     "small": "Few samples",
     "empty": "No usage in this period",
     "showAll": "Show all time",

@@ -564,6 +564,7 @@
     "compareHint": "勾选两个即可并排查看",
     "col": {
       "model": "模型",
+      "effort": "effort",
       "period": "使用期间",
       "requests": "请求",
       "toolsPerReq": "每请求工具调用",
@@ -583,7 +584,6 @@
     },
     "mistakesNA": "该工具的日志不区分",
     "activeDays": "使用 {{n}} 天",
-    "efforts": "effort {{n}} 个",
     "small": "样本少",
     "empty": "此期间没有使用记录",
     "showAll": "查看全部期间",

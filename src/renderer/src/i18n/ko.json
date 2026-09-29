@@ -564,6 +564,7 @@
     "compareHint": "두 개를 체크하면 나란히 보기",
     "col": {
       "model": "모델",
+      "effort": "effort",
       "period": "사용 기간",
       "requests": "요청",
       "toolsPerReq": "요청당 툴 호출",
@@ -583,7 +584,6 @@
     },
     "mistakesNA": "이 툴 로그에서는 구분되지 않음",
     "activeDays": "{{n}}일 사용",
-    "efforts": "effort {{n}}개",
     "small": "표본 적음",
     "empty": "이 기간에 사용 기록 없음",
     "showAll": "전체 기간 보기",
