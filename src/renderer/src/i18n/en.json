@@ -51,7 +51,10 @@
     "checkNow": "Check now",
     "upToDate": "You have the latest version",
     "updateAvailable": "{{version}} available",
-    "checkFailed": "Couldn't check for updates. Check your connection and try again."
+    "checkFailed": "Couldn't check for updates. Check your connection and try again.",
+    "themeHint": "System follows the macOS appearance.",
+    "cleanupEnabledHint": "Moves old backup copies to the Trash.",
+    "cleanupNowHint": "Uses the rules above once, right away."
   },
   "common": {
     "loading": "Loading…",
@@ -229,7 +232,16 @@
     "source": "Preview",
     "edit": "Edit",
     "fields": "Fields",
-    "tools": "Tools"
+    "tools": "Tools",
+    "enabledIn": "Enabled in",
+    "on": "On",
+    "off": "Off",
+    "turnOff": "{{tool}}: on — click to turn off",
+    "turnOn": "{{tool}}: off — click to turn on",
+    "applyOnSync": "Changes apply on the next sync.",
+    "more": "More actions",
+    "copyPath": "Copy path",
+    "deleteItem": "Delete…"
   },
   "editor": {
     "lines": "{{n}} lines",
@@ -362,7 +374,8 @@
     "aheadBehind": "ahead {{ahead}} · behind {{behind}}",
     "connected": "Backup connected",
     "snapshotFirst": "Snapshot current state first",
-    "snapshotFirstHint": "There are changes not yet backed up."
+    "snapshotFirstHint": "There are changes not yet backed up.",
+    "autoHint": "Creates a snapshot whenever the library is applied to the tools."
   },
   "memory": {
     "new": "New note",
@@ -395,7 +408,13 @@
     "resultOk": "{{n}} done",
     "resultFail": "{{n}} failed",
     "more": "More ({{done}} / {{total}})",
-    "lineCount": "{{n}} lines"
+    "lineCount": "{{n}} lines",
+    "indexLinesLabel": "Index lines",
+    "indexSizeLabel": "Index size",
+    "nearLimit": "MEMORY.md is close to its limit. Lines past the limit are not loaded; move detail into topic files.",
+    "pathEmpty": "Enter a path for the note.",
+    "pathRelative": "Use a path relative to memory/, without a leading slash or \"..\".",
+    "pathExists": "A note with this path already exists. Pick another name."
   },
   "library": {
     "renamePending": "Rename migration required",

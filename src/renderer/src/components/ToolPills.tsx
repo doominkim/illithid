@@ -1,4 +1,5 @@
 import { Group, Loader, Tooltip, UnstyledButton } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 import type { ToolId } from '../../../shared/api'
 import { useToolsInUse } from '../lib/config'
 import { TOOL_NAME, type PillMap } from '../lib/tools'
@@ -15,8 +16,12 @@ interface Props {
   showNa?: boolean
 }
 
-/** Tool pill row: on opaque / off 40% / problem amber ring / pending dot. Tools not in use on this device are not shown */
+/**
+ * Tool pill row: on opaque / off dimmed with a slash / problem amber ring / pending dot. Tools not in use on this device are not shown.
+ * Every pill has a tooltip with the tool name and state, so off is never told by color alone
+ */
 export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: Props): React.JSX.Element {
+  const { t } = useTranslation()
   const tools = useToolsInUse()
   const saving: readonly ToolId[] = busy == null ? [] : typeof busy === 'string' ? [busy] : busy
   const toggle = saving.length ? undefined : onToggle
@@ -25,12 +30,8 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
       {tools.map((tool) => {
         const p = pills[tool]
         if (!p || (p.na && !showNa)) return null
-        const icon =
-          saving.includes(tool) ? (
-            <Loader size={size - 4} color="accent" />
-          ) : (
-            <ToolIcon tool={tool} size={size} />
-          )
+        const name = TOOL_NAME[tool]
+        const icon = saving.includes(tool) ? <Loader size={size - 4} color="accent" /> : <ToolIcon tool={tool} size={size} />
         const pill = (
           <span
             className="ac-pill"
@@ -43,30 +44,31 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
             {icon}
           </span>
         )
-        const body = p.hint ? (
-          <Tooltip label={p.hint} withArrow>
-            {pill}
+        const state = onToggle
+          ? t(p.on ? 'detail.turnOff' : 'detail.turnOn', { tool: name })
+          : `${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`
+        const label = p.hint ? `${state}\n${p.hint}` : state
+        return (
+          <Tooltip key={tool} label={label} withArrow openDelay={300} style={{ whiteSpace: 'pre-line' }}>
+            {onToggle ? (
+              <UnstyledButton
+                disabled={!toggle}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggle?.(tool)
+                }}
+                aria-label={name}
+                aria-pressed={p.on}
+                display="inline-flex"
+              >
+                {pill}
+              </UnstyledButton>
+            ) : (
+              <span style={{ display: 'inline-flex' }} role="img" aria-label={`${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`}>
+                {pill}
+              </span>
+            )}
           </Tooltip>
-        ) : (
-          pill
-        )
-        return onToggle ? (
-          <UnstyledButton
-            key={tool}
-            disabled={!toggle}
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle?.(tool)
-            }}
-            aria-label={TOOL_NAME[tool]}
-            display="inline-flex"
-          >
-            {body}
-          </UnstyledButton>
-        ) : (
-          <span key={tool} style={{ display: 'inline-flex' }}>
-            {body}
-          </span>
         )
       })}
     </Group>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Box, Button, Group, Modal, Select, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
-import { Download, FolderOpen, Plus, Trash2 } from 'lucide-react'
+import { Download, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import type { SkillDoc, ToolId } from '../../../shared/api'
@@ -11,6 +11,7 @@ import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
+import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
@@ -208,16 +209,10 @@ function Skills(): React.JSX.Element {
         title={current?.name ?? ''}
         description={current?.description || undefined}
         tags={current && marketTag(current.name)}
-        meta={
-          current && (
-            <>
-              <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}`}</MetaItem>
-              <Button size="compact-xs" variant="subtle" color="red" leftSection={<Trash2 size={12} />} onClick={() => setConfirmDelete(true)} data-testid="skill-delete">
-                {t('common.delete')}
-              </Button>
-            </>
-          )
-        }
+        meta={current && <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}`}</MetaItem>}
+        copyPath={current ? `${data.dir}/${current.name}` : undefined}
+        onDelete={() => setConfirmDelete(true)}
+        deleteTestId="skill-delete"
       >
         {current && (
           <Stack gap="lg">
@@ -271,7 +266,7 @@ function Skills(): React.JSX.Element {
   )
 }
 
-/** Skill detail: rename + SKILL.md (description, body) + extra files */
+/** Skill detail tabs: Preview (rendered SKILL.md body) / Edit (rename, description, body) / extra files */
 function SkillEditor({
   name,
   onSaved,
@@ -282,7 +277,7 @@ function SkillEditor({
   onRenamed: (to: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<string | null>('doc')
+  const [tab, setTab] = useState<string | null>('preview')
   const [files, setFiles] = useState<string[]>([])
   const [doc, setDoc] = useState<SkillDoc | null>(null)
   const [docErr, setDocErr] = useState<string | null>(null)
@@ -336,45 +331,56 @@ function SkillEditor({
 
   if (err) return <ErrorAlert message={err} />
   return (
-    <Stack gap="md">
-      <Box>
-        <Group gap="xs" align="flex-end">
-          <TextInput
-            label={t('common.name')}
-            value={nameDraft}
-            onChange={(e) => {
-              setNameDraft(e.currentTarget.value)
-              setRenameErr(null)
-            }}
-            w={320}
-            error={renameErr ?? undefined}
-            data-testid="skill-name"
-          />
-          <Button
-            variant="default"
-            disabled={!trimmed || trimmed === name}
-            loading={renaming}
-            onClick={() => void rename()}
-            mb={renameErr ? 22 : 0}
-            data-testid="skill-rename"
-          >
-            {t('skills.rename')}
-          </Button>
-        </Group>
-      </Box>
-
-      <Tabs value={tab} onChange={setTab} keepMounted={false}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="doc">SKILL.md</Tabs.Tab>
-          {others.length > 0 && <Tabs.Tab value="files">{`${t('skills.files')} ${others.length}`}</Tabs.Tab>}
-        </Tabs.List>
-        <Tabs.Panel value="doc">
+    <Tabs value={tab} onChange={setTab} keepMounted={false}>
+      <Tabs.List mb="md">
+        <Tabs.Tab value="preview">{t('detail.source')}</Tabs.Tab>
+        <Tabs.Tab value="doc" data-testid="tab-edit">
+          {t('detail.edit')}
+        </Tabs.Tab>
+        {others.length > 0 && <Tabs.Tab value="files">{`${t('skills.files')} ${others.length}`}</Tabs.Tab>}
+      </Tabs.List>
+      <Tabs.Panel value="preview">
+        {docErr ? (
+          <ErrorAlert message={docErr} />
+        ) : !doc ? (
+          <Loading />
+        ) : (
+          <Box className="ac-card" p="lg">
+            <Markdown text={doc.body} />
+          </Box>
+        )}
+      </Tabs.Panel>
+      <Tabs.Panel value="doc">
+        <Stack gap="md">
+          <Group gap="xs" align="flex-end">
+            <TextInput
+              label={t('common.name')}
+              value={nameDraft}
+              onChange={(e) => {
+                setNameDraft(e.currentTarget.value)
+                setRenameErr(null)
+              }}
+              w={320}
+              error={renameErr ?? undefined}
+              data-testid="skill-name"
+            />
+            <Button
+              variant="default"
+              disabled={!trimmed || trimmed === name}
+              loading={renaming}
+              onClick={() => void rename()}
+              mb={renameErr ? 22 : 0}
+              data-testid="skill-rename"
+            >
+              {t('skills.rename')}
+            </Button>
+          </Group>
           {docErr ? (
             <ErrorAlert message={docErr} />
           ) : !doc ? (
             <Loading />
           ) : (
-            <Stack gap="md">
+            <>
               <Box className="ac-card" p="md">
                 <Group justify="space-between" mb="xs">
                   <Text size="sm" fw={600}>
@@ -402,16 +408,16 @@ function SkillEditor({
                 onRevert={() => setDesc(doc.description)}
                 onSave={saveDoc}
               />
-            </Stack>
+            </>
           )}
+        </Stack>
+      </Tabs.Panel>
+      {others.length > 0 && (
+        <Tabs.Panel value="files">
+          <SkillFileEditor name={name} files={others} onSaved={onSaved} />
         </Tabs.Panel>
-        {others.length > 0 && (
-          <Tabs.Panel value="files">
-            <SkillFileEditor name={name} files={others} onSaved={onSaved} />
-          </Tabs.Panel>
-        )}
-      </Tabs>
-    </Stack>
+      )}
+    </Tabs>
   )
 }
 

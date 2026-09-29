@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Box, Button, Group, Modal, Stack, Tabs, Text, TextInput } from '@mantine/core'
-import { Brain, FileText, FolderOpen, Layers, Plus, Trash2 } from 'lucide-react'
+import { Brain, FileText, FolderOpen, Layers, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
-import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
-import { Initial, ListCard, ListRow } from '../components/ListRow'
+import { ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolIcon } from '../components/ToolIcon'
-import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { useConfig } from '../lib/config'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useApi } from '../lib/useApi'
 import type { IndexStat } from '../../../shared/api'
-import { ClaudeMemory, CodexMemory, IndexBadges } from './ToolMemory'
+import { nearLimit } from '../lib/memoryIndex'
+import { ClaudeMemory, CodexMemory, IndexMeters } from './ToolMemory'
 
 function firstHeading(text: string): string {
   const m = /^#{1,3}\s+(.+)$/m.exec(text)
@@ -44,7 +43,6 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
   const reload = useReload()
   const files = useApi('memoryFiles', loadFiles)
   const [query, setQuery] = useState('')
-  const [view, setView] = useState<ViewMode>('grid')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -60,9 +58,19 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
   const current = selected && files.data.includes(selected) ? selected : null
   const dir = `${config?.libraryRoot ?? ''}/memory`
 
+  /** Path typed in New note, with .md added. The error is shown under the field */
+  const newRel = ((v: string): string => (v && !v.endsWith('.md') ? `${v}.md` : v))(newName.trim())
+  const newErr = !newName.trim()
+    ? null
+    : newRel.startsWith('/') || newRel.split('/').includes('..')
+      ? t('memory.pathRelative')
+      : files.data.includes(newRel)
+        ? t('memory.pathExists')
+        : null
+
   const create = async (): Promise<void> => {
-    let rel = newName.trim().replace(/^\/+/, '')
-    if (!rel.endsWith('.md')) rel += '.md'
+    const rel = newRel
+    if (!rel || newErr) return
     const title = rel.split('/').pop()!.replace(/\.md$/, '')
     const r = await runWrite(window.api.memorySave(rel, `# ${title}\n\n`), { success: t('memory.created') })
     if (r !== null) {
@@ -88,7 +96,7 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
         left={
           <>
             <SearchInput value={query} onChange={setQuery} placeholder={t('memory.search')} />
-            {shared && <IndexBadges stat={shared} limits={limits} />}
+            {shared && <IndexMeters stat={shared} limits={limits} />}
           </>
         }
         right={
@@ -96,33 +104,40 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
             <Button size="xs" leftSection={<Plus size={13} />} onClick={() => setCreating(true)} data-testid="memory-new">
               {t('memory.new')}
             </Button>
-            <ViewToggle value={view} onChange={setView} />
           </>
         }
       />
+      {shared && nearLimit(shared, limits) && (
+        <Text size="sm" c="var(--ac-warning)" mb="sm" data-testid="index-near-limit">
+          {t('memory.nearLimit')}
+        </Text>
+      )}
       <ImportModal opened={importOpen} onClose={() => setImportOpen(false)} onImported={reload} />
       {files.data.length === 0 ? (
         <EmptyLibrary onImport={() => setImportOpen(true)} icon={<Brain size={18} />} />
       ) : visible.length === 0 ? (
         <EmptyState title={t('common.noResults')} icon={<Brain size={18} />} />
-      ) : view === 'grid' ? (
-        <CardGrid>
-          {visible.map((f) => (
-            <ItemCard
-              key={f}
-              name={f}
-              description={f.split('/').slice(0, -1).join('/')}
-              dot="on"
-              selected={f === selected}
-              onClick={() => setSelected(f)}
-            />
-          ))}
-        </CardGrid>
       ) : (
         <ListCard>
-          {visible.map((f) => (
-            <ListRow key={f} avatar={<Initial text={f.split('/').pop() ?? f} />} title={f} active={f === selected} onClick={() => setSelected(f)} />
-          ))}
+          {visible.map((f) => {
+            const folder = f.includes('/') ? f.split('/')[0] : null
+            return (
+              <ListRow
+                key={f}
+                avatar={<FileText size={16} style={{ color: 'var(--ac-text-muted)', flexShrink: 0 }} />}
+                title={f}
+                right={
+                  folder && (
+                    <Text size="xs" c="dimmed">
+                      {folder}
+                    </Text>
+                  )
+                }
+                active={f === selected}
+                onClick={() => setSelected(f)}
+              />
+            )
+          })}
         </ListCard>
       )}
 
@@ -135,26 +150,35 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
             <>
               <MetaItem icon={<FolderOpen size={14} />}>{dir}</MetaItem>
               <MetaItem icon={<FileText size={14} />}>{current}</MetaItem>
-              {current !== 'MEMORY.md' && (
-                <Button size="compact-xs" variant="subtle" color="red" leftSection={<Trash2 size={12} />} onClick={() => setConfirmDelete(true)} data-testid="memory-delete">
-                  {t('common.delete')}
-                </Button>
-              )}
             </>
           )
         }
+        copyPath={current ? `${dir}/${current}` : undefined}
+        // MEMORY.md is the index and cannot be deleted here
+        onDelete={current && current !== 'MEMORY.md' ? () => setConfirmDelete(true) : undefined}
+        deleteTestId="memory-delete"
       >
         {current && <MemoryFile key={current} rel={current} onSaved={reload} />}
       </DetailSheet>
 
       <Modal opened={creating} onClose={() => setCreating(false)} title={t('memory.new')} centered radius="lg">
         <Stack gap="md">
-          <TextInput label={t('common.name')} description={t('memory.nameHint')} placeholder="feedback/my-note.md" value={newName} onChange={(e) => setNewName(e.currentTarget.value)} data-autofocus data-testid="memory-new-name" />
+          <TextInput
+            label={t('common.name')}
+            description={t('memory.nameHint')}
+            placeholder="feedback/my-note.md"
+            value={newName}
+            onChange={(e) => setNewName(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !newErr && newName.trim() && void create()}
+            error={newErr}
+            data-autofocus
+            data-testid="memory-new-name"
+          />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim()} onClick={() => void create()} data-testid="memory-new-ok">
+            <Button disabled={!newName.trim() || !!newErr} onClick={() => void create()} data-testid="memory-new-ok">
               {t('common.create')}
             </Button>
           </Group>
@@ -187,7 +211,7 @@ function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): Rea
       <Text size="md" c="dimmed">
         {firstHeading(text)}
       </Text>
-      <Tabs defaultValue="source" variant="pills" keepMounted={false}>
+      <Tabs defaultValue="source" keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="source">{t('detail.source')}</Tabs.Tab>
           <Tabs.Tab value="edit" data-testid="tab-edit">

@@ -247,6 +247,7 @@ function BackupCleanup(): React.JSX.Element {
     <Section title={t('settings.cleanup')}>
       <Row
         label={t('settings.cleanupEnabled')}
+        hint={t('settings.cleanupEnabledHint')}
         control={<Switch size="md" checked={saved.enabled} disabled={!config || busy} onChange={(e) => void save({ enabled: e.currentTarget.checked })} data-testid="cleanup-enabled" />}
       />
       <Row
@@ -263,6 +264,7 @@ function BackupCleanup(): React.JSX.Element {
       />
       <Row
         label={t('settings.cleanupNow')}
+        hint={t('settings.cleanupNowHint')}
         control={
           <Button variant="default" size="xs" loading={busy} disabled={!config} onClick={() => void check()} data-testid="cleanup-now">
             {t('settings.cleanupNow')}
@@ -322,6 +324,7 @@ function Settings(): React.JSX.Element {
         />
         <Row
           label={t('settings.theme')}
+          hint={t('settings.themeHint')}
           control={
             <SegmentedControl
               value={colorScheme}
@@ -398,6 +401,7 @@ function Settings(): React.JSX.Element {
       >
         <Row
           label={t('settings.allowApply')}
+          hint={t('settings.allowApplyBody')}
           control={
             <Switch
               size="md"

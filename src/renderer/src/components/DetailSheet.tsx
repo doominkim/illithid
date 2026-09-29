@@ -1,5 +1,6 @@
-import { ActionIcon, Box, Drawer, Group, Stack, Text, Title } from '@mantine/core'
-import { ArrowLeft } from 'lucide-react'
+import { ActionIcon, Box, Drawer, Group, Menu, Stack, Text, Title } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
+import { ArrowLeft, Copy, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
@@ -11,6 +12,14 @@ interface Props {
   tags?: React.ReactNode
   /** Meta line such as path or file (icon + text) */
   meta?: React.ReactNode
+  /** Path offered by "Copy path" in the ⋯ menu */
+  copyPath?: string
+  /** "Delete…" in the ⋯ menu (the caller confirms) */
+  onDelete?: () => void
+  /** data-testid of the Delete menu item */
+  deleteTestId?: string
+  /** Content max width (default 880 for reading and editing text) */
+  maw?: number
   children?: React.ReactNode
 }
 
@@ -25,9 +34,19 @@ export function DetailSheet({
   description,
   tags,
   meta,
+  copyPath,
+  onDelete,
+  deleteTestId,
+  maw = 880,
   children
 }: Props): React.JSX.Element {
   const { t } = useTranslation()
+  const copy = (text: string): void => {
+    navigator.clipboard.writeText(text).then(
+      () => notifications.show({ message: t('common.copied'), color: 'accent', autoClose: 1500 }),
+      () => notifications.show({ message: t('common.copyFailed'), color: 'red' })
+    )
+  }
   return (
     <Drawer
       opened={opened}
@@ -44,16 +63,38 @@ export function DetailSheet({
         body: { padding: 0, flex: 1, minHeight: 0, overflowY: 'auto' }
       }}
     >
-      <Box p={28} pt={48} mx="auto" maw={1200} data-testid="detail-sheet">
+      <Box p={28} pt={48} mx="auto" maw={maw} data-testid="detail-sheet">
         <Group gap="sm" align="center" wrap="nowrap">
           <ActionIcon variant="subtle" color="gray" size="lg" onClick={onClose} aria-label={t('common.back')} style={{ flexShrink: 0 }}>
             <ArrowLeft size={20} />
           </ActionIcon>
-          <Title order={1} style={{ wordBreak: 'break-word' }}>
+          <Title order={1} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             {title}
           </Title>
+          {(copyPath || onDelete) && (
+            <Menu position="bottom-end" width={200} shadow="md">
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="gray" size="lg" aria-label={t('detail.more')} style={{ flexShrink: 0 }} data-testid="detail-more">
+                  <MoreHorizontal size={20} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {copyPath && (
+                  <Menu.Item leftSection={<Copy size={14} />} onClick={() => copy(copyPath)}>
+                    {t('detail.copyPath')}
+                  </Menu.Item>
+                )}
+                {copyPath && onDelete && <Menu.Divider />}
+                {onDelete && (
+                  <Menu.Item color="red" leftSection={<Trash2 size={14} />} onClick={onDelete} data-testid={deleteTestId}>
+                    {t('detail.deleteItem')}
+                  </Menu.Item>
+                )}
+              </Menu.Dropdown>
+            </Menu>
+          )}
         </Group>
-        <Stack gap="sm" mt="sm">
+        <Stack gap="sm" mt="sm" pl={44}>
           {description && (
             <Text size="lg" c="var(--ac-text-2)" lineClamp={4} style={{ lineHeight: 1.55 }}>
               {description}
@@ -70,7 +111,9 @@ export function DetailSheet({
             </Group>
           )}
         </Stack>
-        <Box mt="lg">{children}</Box>
+        <Box mt="lg" pl={44}>
+          {children}
+        </Box>
       </Box>
     </Drawer>
   )

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Badge, Box, Button, Code, Stack, Tabs } from '@mantine/core'
-import { Download, Globe, Plus, Terminal, Trash2 } from 'lucide-react'
+import { Download, Globe, Plus, Terminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import { MASK, type McpEditView, type McpServer, type McpServerView, type ToolId } from '../../../shared/api'
@@ -177,16 +177,9 @@ function Mcp(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         tags={current && transportTag(current)}
-        meta={
-          current && (
-            <>
-              <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>{endpoint(current) || none}</MetaItem>
-              <Button size="compact-xs" variant="subtle" color="red" leftSection={<Trash2 size={12} />} onClick={() => setConfirmDelete(true)} data-testid="mcp-delete">
-                {t('common.delete')}
-              </Button>
-            </>
-          )
-        }
+        meta={current && <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>{endpoint(current) || none}</MetaItem>}
+        onDelete={() => setConfirmDelete(true)}
+        deleteTestId="mcp-delete"
       >
         {current && (
           <Stack gap="lg">
@@ -197,9 +190,9 @@ function Mcp(): React.JSX.Element {
               testId="mcp-detail-tools"
             />
             <UsagePanel kind="mcp" name={current.name} />
-            <Tabs defaultValue="fields" variant="pills" keepMounted={false}>
+            <Tabs defaultValue="fields" keepMounted={false}>
               <Tabs.List>
-                <Tabs.Tab value="fields">{t('detail.fields')}</Tabs.Tab>
+                <Tabs.Tab value="fields">{t('detail.source')}</Tabs.Tab>
                 <Tabs.Tab value="edit" data-testid="tab-edit">
                   {t('detail.edit')}
                 </Tabs.Tab>

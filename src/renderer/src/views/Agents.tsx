@@ -7,11 +7,12 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Tabs,
   Text,
   Textarea,
   TextInput
 } from '@mantine/core'
-import { Download, FolderOpen, Plus, Trash2 } from 'lucide-react'
+import { Download, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { AgentDoc, ToolId } from '../../../shared/api'
 import { effortsFor, MODEL_CATALOG } from '../../../shared/modelCatalog'
@@ -20,14 +21,16 @@ import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
-import { ErrorAlert, Loading } from '../components/Layout'
+import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
+import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton, useReload } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolIcon } from '../components/ToolIcon'
 import { ToolPills } from '../components/ToolPills'
+import { ToolToggleRow } from '../components/ToolToggleRow'
 import { ViewToggle, type ViewMode } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
@@ -237,37 +240,25 @@ function Agents(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         description={current?.description || undefined}
-        meta={
-          current && (
-            <>
-              <MetaItem
-                icon={<FolderOpen size={14} />}
-              >{`${data.dir}/${current.name}.md`}</MetaItem>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="red"
-                leftSection={<Trash2 size={12} />}
-                onClick={() => setConfirmDelete(true)}
-                data-testid="agent-delete"
-              >
-                {t('common.delete')}
-              </Button>
-            </>
-          )
-        }
+        meta={current && <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}.md`}</MetaItem>}
+        copyPath={current ? `${data.dir}/${current.name}.md` : undefined}
+        onDelete={() => setConfirmDelete(true)}
+        deleteTestId="agent-delete"
       >
         {current && (
-          <AgentEditor
-            key={current.name}
-            name={current.name}
-            onSaved={reload}
-            onRenamed={(to) => {
-              setRenamed({ from: current.name, to })
-              setSelected(to)
-              reload()
-            }}
-          />
+          <Stack gap="lg">
+            <ToolToggleRow pills={current.pills} onToggle={pillToggle(current)} busy={pending.of(current.name)} testId="agent-detail-tools" />
+            <AgentEditor
+              key={current.name}
+              name={current.name}
+              onSaved={reload}
+              onRenamed={(to) => {
+                setRenamed({ from: current.name, to })
+                setSelected(to)
+                reload()
+              }}
+            />
+          </Stack>
         )}
       </DetailSheet>
 
@@ -402,7 +393,7 @@ function ToolCard({
   )
 }
 
-/** Agent detail: rename + description + per-tool model/effort + instructions */
+/** Agent detail tabs: Preview (per-tool model/effort, instructions) / Edit (rename, description, per-tool model/effort, instructions) */
 function AgentEditor({
   name,
   onSaved,
@@ -461,70 +452,115 @@ function AgentEditor({
 
   if (err) return <ErrorAlert message={err} />
   if (!doc) return <Loading />
+  const cols = { base: 1, md: Math.max(1, shown.length <= 3 ? shown.length : 2), xl: Math.max(1, shown.length) }
   return (
-    <Stack gap="md">
-      <Group gap="xs" align="flex-end">
-        <TextInput
-          label={t('common.name')}
-          value={nameDraft}
-          onChange={(e) => {
-            setNameDraft(e.currentTarget.value)
-            setRenameErr(null)
-          }}
-          w={320}
-          error={renameErr ?? undefined}
-          data-testid="agent-name"
-        />
-        <Button
-          variant="default"
-          disabled={!trimmed || trimmed === name}
-          loading={renaming}
-          onClick={() => void rename()}
-          mb={renameErr ? 22 : 0}
-          data-testid="agent-rename"
-        >
-          {t('skills.rename')}
-        </Button>
+    <Tabs defaultValue="preview" keepMounted={false}>
+      <Tabs.List mb="md">
+        <Tabs.Tab value="preview">{t('detail.source')}</Tabs.Tab>
+        <Tabs.Tab value="edit" data-testid="tab-edit">
+          {t('detail.edit')}
+        </Tabs.Tab>
+      </Tabs.List>
+      <Tabs.Panel value="preview">
+        <Stack gap="md">
+          <SimpleGrid cols={cols} spacing="md">
+            {shown.map((tool) => (
+              <ToolSummary key={tool} tool={tool} value={doc.tools[tool] ?? {}} />
+            ))}
+          </SimpleGrid>
+          <Box className="ac-card" p="lg">
+            <Text size="sm" fw={600} c="dimmed" mb="xs">
+              {t('agents.instructions')}
+            </Text>
+            <Markdown text={doc.body} />
+          </Box>
+        </Stack>
+      </Tabs.Panel>
+      <Tabs.Panel value="edit">
+          <Stack gap="md">
+            <Group gap="xs" align="flex-end">
+              <TextInput
+                label={t('common.name')}
+                value={nameDraft}
+                onChange={(e) => {
+                  setNameDraft(e.currentTarget.value)
+                  setRenameErr(null)
+                }}
+                w={320}
+                error={renameErr ?? undefined}
+                data-testid="agent-name"
+              />
+              <Button
+                variant="default"
+                disabled={!trimmed || trimmed === name}
+                loading={renaming}
+                onClick={() => void rename()}
+                mb={renameErr ? 22 : 0}
+                data-testid="agent-rename"
+              >
+                {t('skills.rename')}
+              </Button>
+            </Group>
+
+            <Box className="ac-card" p="md">
+              <Text size="sm" fw={600} mb="xs">
+                {t('agents.description')}
+              </Text>
+              <Textarea
+                value={desc}
+                onChange={(e) => setDesc(e.currentTarget.value)}
+                autosize
+                minRows={2}
+                maxRows={12}
+                error={!desc.trim()}
+                data-testid="agent-desc"
+              />
+            </Box>
+
+            <SimpleGrid cols={cols} spacing="md">
+              {shown.map((tool) => (
+                <ToolCard
+                  key={tool}
+                  tool={tool}
+                  value={tools[tool] ?? {}}
+                  onChange={(v) => setTools((m) => ({ ...m, [tool]: v }))}
+                />
+              ))}
+            </SimpleGrid>
+
+            <MarkdownEditor
+              key={name}
+              title={t('agents.instructions')}
+              value={doc.body}
+              extraDirty={desc !== doc.description || !sameTools(tools, doc.tools)}
+              onRevert={() => {
+                setDesc(doc.description)
+                setTools(doc.tools)
+              }}
+              onSave={save}
+            />
+          </Stack>
+      </Tabs.Panel>
+    </Tabs>
+  )
+}
+
+/** Read-only model and effort of one tool (Preview tab) */
+function ToolSummary({ tool, value }: { tool: ToolId; value: { model?: string; effort?: string } }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Box className="ac-card" p="md" data-testid={`agent-summary-${tool}`}>
+      <Group gap={8} wrap="nowrap" mb="sm">
+        <ToolIcon tool={tool} size={20} />
+        <Text fw={600}>{TOOL_NAME[tool]}</Text>
       </Group>
-
-      <Box className="ac-card" p="md">
-        <Text size="sm" fw={600} mb="xs">
-          {t('agents.description')}
-        </Text>
-        <Textarea
-          value={desc}
-          onChange={(e) => setDesc(e.currentTarget.value)}
-          autosize
-          minRows={2}
-          maxRows={12}
-          error={!desc.trim()}
-          data-testid="agent-desc"
-        />
-      </Box>
-
-      <SimpleGrid cols={{ base: 1, md: Math.max(1, shown.length <= 3 ? shown.length : 2), xl: Math.max(1, shown.length) }} spacing="md">
-        {shown.map((tool) => (
-          <ToolCard
-            key={tool}
-            tool={tool}
-            value={tools[tool] ?? {}}
-            onChange={(v) => setTools((m) => ({ ...m, [tool]: v }))}
-          />
-        ))}
-      </SimpleGrid>
-
-      <MarkdownEditor
-        key={name}
-        title={t('agents.instructions')}
-        value={doc.body}
-        extraDirty={desc !== doc.description || !sameTools(tools, doc.tools)}
-        onRevert={() => {
-          setDesc(doc.description)
-          setTools(doc.tools)
-        }}
-        onSave={save}
+      <Fields
+        rows={[
+          [t('agents.model'), value.model ?? t('agents.default')],
+          ...(MODEL_CATALOG[tool].efforts.length > 0 || value.effort ? [[t('agents.effort'), value.effort ?? t('agents.default')] as [string, string]] : [])
+        ]}
       />
-    </Stack>
+    </Box>
   )
 }
 

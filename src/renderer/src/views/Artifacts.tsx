@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActionIcon, Alert, Badge, Box, Code, Group, Image, SegmentedControl, Select, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { Alert, Box, Button, Code, Group, Image, SegmentedControl, Select, Stack, Tabs, Text, Title, UnstyledButton } from '@mantine/core'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ExternalLink, File, FileText, FolderOpen, HelpCircle, Layers, MessagesSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -162,15 +162,28 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
           </UnstyledButton>
         )}
       </Box>
-      <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
-        <ActionIcon variant="subtle" color="gray" aria-label={t('artifacts.open')} onClick={() => void runWrite(window.api.artifactOpen(a.id))} data-testid="artifact-open">
-          <ExternalLink size={16} />
-        </ActionIcon>
-        <ActionIcon variant="subtle" color="gray" aria-label={t('artifacts.reveal')} onClick={() => void runWrite(window.api.artifactReveal(a.id))} data-testid="artifact-reveal">
-          <FolderOpen size={16} />
-        </ActionIcon>
+      <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+        <Button size="xs" variant="default" leftSection={<ExternalLink size={14} />} onClick={() => void runWrite(window.api.artifactOpen(a.id))} data-testid="artifact-open">
+          {t('artifacts.open')}
+        </Button>
+        <Button size="xs" variant="subtle" color="gray" leftSection={<FolderOpen size={14} />} onClick={() => void runWrite(window.api.artifactReveal(a.id))} data-testid="artifact-reveal">
+          {t('artifacts.reveal')}
+        </Button>
       </Group>
     </Group>
+  )
+  const facts = (
+    <Stack gap={4}>
+      <Text size="sm" c="dimmed">
+        {[a.tool === 'unknown' ? t('artifacts.unknownTool') : ARTIFACT_TOOL_NAME[a.tool], a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · ')}
+      </Text>
+      <Group gap={6} wrap="nowrap" c="dimmed">
+        <FolderOpen size={14} style={{ flexShrink: 0 }} />
+        <Text size="xs" ff="monospace" c="dimmed" truncate="start" title={a.path}>
+          {a.path}
+        </Text>
+      </Group>
+    </Stack>
   )
   let body: React.ReactNode
   if (error) body = <ErrorAlert message={error} />
@@ -218,18 +231,14 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
   return (
     <Stack gap="md">
       {head}
+      {facts}
       {data?.kind === 'html' && !data.error && (
-        <SegmentedControl
-          size="xs"
-          w="fit-content"
-          value={htmlView}
-          onChange={(v) => setHtmlView(v as 'rendered' | 'source')}
-          data={[
-            { value: 'rendered', label: t('artifacts.htmlRendered') },
-            { value: 'source', label: t('artifacts.htmlSourceView') }
-          ]}
-          data-testid="artifact-html-view"
-        />
+        <Tabs value={htmlView} onChange={(v) => v && setHtmlView(v as 'rendered' | 'source')} data-testid="artifact-html-view">
+          <Tabs.List>
+            <Tabs.Tab value="rendered">{t('artifacts.htmlRendered')}</Tabs.Tab>
+            <Tabs.Tab value="source">{t('artifacts.htmlSourceView')}</Tabs.Tab>
+          </Tabs.List>
+        </Tabs>
       )}
       {data?.truncated && (
         <Alert color="yellow" variant="light" radius="md">
@@ -383,12 +392,8 @@ function Artifacts(): React.JSX.Element {
                 id: a.id,
                 label: a.title,
                 avatar: a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />,
-                description: [a.sessionTitle ?? a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · '),
-                tag: (
-                  <Badge variant="default" size="xs" fw={500} c="dimmed" title={a.source}>
-                    {sourceName(a.source, t)}
-                  </Badge>
-                )
+                // Location goes on the secondary line with time and size instead of a chip next to the title
+                description: [sourceName(a.source, t), a.sessionTitle ?? a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · ')
               }))}
               selected={selected}
               onSelect={setSelected}

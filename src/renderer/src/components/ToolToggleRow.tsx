@@ -1,8 +1,9 @@
-import { Group, Text } from '@mantine/core'
+import { Group, Loader, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type { ToolId } from '../../../shared/api'
-import type { PillMap } from '../lib/tools'
-import { ToolPills } from './ToolPills'
+import { useToolsInUse } from '../lib/config'
+import { TOOL_NAME, type PillMap } from '../lib/tools'
+import { ToolIcon } from './ToolIcon'
 
 interface Props {
   pills: PillMap
@@ -14,16 +15,51 @@ interface Props {
   testId: string
 }
 
-/** "Tools" line of a detail sheet (rules, skills, MCP): one toggle pill per tool in use, same save flow as the list cards */
+/**
+ * "Enabled in" block of a detail sheet (rules, skills, MCP): one labeled toggle per tool in use — logo, tool name and On/Off text —
+ * with the same save flow as the list pills
+ */
 export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): React.JSX.Element {
   const { t } = useTranslation()
-  const shown: PillMap = tools ? Object.fromEntries(tools.map((x) => [x, pills[x]])) : pills
+  const inUse = useToolsInUse()
+  const shown = inUse.filter((tool) => (!tools || tools.includes(tool)) && pills[tool] && !pills[tool]!.na)
   return (
-    <Group gap="sm" data-testid={testId} data-busy={busy.length ? true : undefined}>
-      <Text size="sm" c="dimmed">
-        {t('detail.tools')}
+    <Stack gap={8} data-testid={testId} data-busy={busy.length ? true : undefined}>
+      <Text size="sm" fw={600} c="dimmed">
+        {t('detail.enabledIn')}
       </Text>
-      <ToolPills pills={shown} size={22} onToggle={onToggle} busy={busy} />
-    </Group>
+      <Group gap={8} wrap="wrap">
+        {shown.map((tool) => {
+          const p = pills[tool]!
+          const name = TOOL_NAME[tool]
+          const button = (
+            <UnstyledButton
+              key={tool}
+              className="ac-tool-btn"
+              aria-pressed={p.on}
+              data-problem={p.problem || undefined}
+              data-pending={p.pending || undefined}
+              data-tool={tool}
+              disabled={busy.length > 0}
+              onClick={() => onToggle(tool)}
+            >
+              {busy.includes(tool) ? <Loader size={14} color="accent" /> : <ToolIcon tool={tool} size={16} />}
+              <span className="ac-tool-btn-name">{name}</span>
+              <span className="ac-tool-btn-state">{t(p.on ? 'detail.on' : 'detail.off')}</span>
+            </UnstyledButton>
+          )
+          return p.hint ? (
+            <Tooltip key={tool} label={p.hint} withArrow>
+              {button}
+            </Tooltip>
+          ) : (
+            button
+          )
+        })}
+      </Group>
+      <Text size="xs" c="dimmed">
+        {t('detail.applyOnSync')}
+      </Text>
+    </Stack>
   )
 }

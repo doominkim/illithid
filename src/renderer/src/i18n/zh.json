@@ -51,7 +51,10 @@
     "checkNow": "立即检查",
     "upToDate": "已是最新版本",
     "updateAvailable": "{{version}} 可用",
-    "checkFailed": "无法检查更新。请检查网络连接后重试。"
+    "checkFailed": "无法检查更新。请检查网络连接后重试。",
+    "themeHint": "“系统”跟随 macOS 外观。",
+    "cleanupEnabledHint": "将旧的备份副本移到废纸篓。",
+    "cleanupNowHint": "立即按上面的规则执行一次。"
   },
   "common": {
     "loading": "加载中…",
@@ -229,7 +232,16 @@
     "source": "预览",
     "edit": "编辑",
     "fields": "字段",
-    "tools": "工具"
+    "tools": "工具",
+    "enabledIn": "已启用的工具",
+    "on": "开",
+    "off": "关",
+    "turnOff": "{{tool}}：开 — 点击关闭",
+    "turnOn": "{{tool}}：关 — 点击开启",
+    "applyOnSync": "更改将在下次同步时生效。",
+    "more": "更多操作",
+    "copyPath": "复制路径",
+    "deleteItem": "删除…"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -362,7 +374,8 @@
     "aheadBehind": "领先 {{ahead}} · 落后 {{behind}}",
     "connected": "备份已连接",
     "snapshotFirst": "先为当前状态创建快照",
-    "snapshotFirstHint": "存在尚未备份的更改。"
+    "snapshotFirstHint": "存在尚未备份的更改。",
+    "autoHint": "每次将资料库应用到工具时创建快照。"
   },
   "memory": {
     "new": "新建笔记",
@@ -395,7 +408,13 @@
     "resultOk": "{{n}} 个完成",
     "resultFail": "{{n}} 个失败",
     "more": "加载更多 ({{done}} / {{total}})",
-    "lineCount": "{{n}} 行"
+    "lineCount": "{{n}} 行",
+    "indexLinesLabel": "索引行数",
+    "indexSizeLabel": "索引大小",
+    "nearLimit": "MEMORY.md 已接近上限。超出上限的行不会被加载，请把细节移到主题文件中。",
+    "pathEmpty": "请输入笔记路径。",
+    "pathRelative": "请使用相对于 memory/ 的路径，不能以 / 开头或包含 ..。",
+    "pathExists": "已存在相同路径的笔记，请换一个名称。"
   },
   "library": {
     "renamePending": "需要执行重命名迁移",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Box, Button, Group, Modal, Stack, Tabs, TextInput } from '@mantine/core'
-import { Download, FileText, FolderOpen, Plus, Trash2 } from 'lucide-react'
+import { Download, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import type { ToolId } from '../../../shared/api'
@@ -221,12 +221,12 @@ function Rules(): React.JSX.Element {
             <>
               <MetaItem icon={<FolderOpen size={14} />}>{data.dir}</MetaItem>
               <MetaItem icon={<FileText size={14} />}>{current.name}</MetaItem>
-              <Button size="compact-xs" variant="subtle" color="red" leftSection={<Trash2 size={12} />} onClick={() => setConfirmDelete(true)} data-testid="rule-delete">
-                {t('common.delete')}
-              </Button>
             </>
           )
         }
+        copyPath={current ? `${data.dir}/${current.name}` : undefined}
+        onDelete={() => setConfirmDelete(true)}
+        deleteTestId="rule-delete"
       >
         {current && (
           <Stack gap="lg">
@@ -236,30 +236,7 @@ function Rules(): React.JSX.Element {
               busy={pending.of(current.name)}
               testId="rule-detail-tools"
             />
-            <Group gap="xs" align="flex-end">
-              <TextInput
-                label={t('common.name')}
-                value={nameDraft}
-                onChange={(e) => {
-                  setNameDraft(e.currentTarget.value)
-                  setRenameErr(null)
-                }}
-                w={320}
-                error={renameErr ?? undefined}
-                data-testid="rule-name"
-              />
-              <Button
-                variant="default"
-                disabled={!nextName || nextName === current.name}
-                loading={renaming}
-                onClick={() => void rename()}
-                mb={renameErr ? 22 : 0}
-                data-testid="rule-rename"
-              >
-                {t('rules.rename')}
-              </Button>
-            </Group>
-            <Tabs key={current.name} defaultValue="source" variant="pills" keepMounted={false}>
+            <Tabs key={current.name} defaultValue="source" keepMounted={false}>
               <Tabs.List>
                 <Tabs.Tab value="source">{t('detail.source')}</Tabs.Tab>
                 <Tabs.Tab value="edit" data-testid="tab-edit">
@@ -272,7 +249,32 @@ function Rules(): React.JSX.Element {
                 </Box>
               </Tabs.Panel>
               <Tabs.Panel value="edit" pt="md">
-                <MarkdownEditor value={current.text} onSave={(text) => save(current.name, text)} />
+                <Stack gap="md">
+                  <Group gap="xs" align="flex-end">
+                    <TextInput
+                      label={t('common.name')}
+                      value={nameDraft}
+                      onChange={(e) => {
+                        setNameDraft(e.currentTarget.value)
+                        setRenameErr(null)
+                      }}
+                      w={320}
+                      error={renameErr ?? undefined}
+                      data-testid="rule-name"
+                    />
+                    <Button
+                      variant="default"
+                      disabled={!nextName || nextName === current.name}
+                      loading={renaming}
+                      onClick={() => void rename()}
+                      mb={renameErr ? 22 : 0}
+                      data-testid="rule-rename"
+                    >
+                      {t('rules.rename')}
+                    </Button>
+                  </Group>
+                  <MarkdownEditor value={current.text} onSave={(text) => save(current.name, text)} />
+                </Stack>
               </Tabs.Panel>
             </Tabs>
           </Stack>

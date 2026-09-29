@@ -363,7 +363,7 @@ function Market(): React.JSX.Element {
       />
       {list()}
 
-      <DetailSheet opened={!!selected} onClose={() => setSelected(null)} title={selected ?? ''}>
+      <DetailSheet opened={!!selected} onClose={() => setSelected(null)} title={selected ?? ''} maw={1200}>
         {selected && (
           <MarketDetail
             key={`${kind}:${selected}`}

@@ -51,7 +51,10 @@
     "checkNow": "지금 확인",
     "upToDate": "최신 버전이에요",
     "updateAvailable": "{{version}} 사용 가능",
-    "checkFailed": "업데이트를 확인하지 못했어요. 연결을 확인하고 다시 시도하세요."
+    "checkFailed": "업데이트를 확인하지 못했어요. 연결을 확인하고 다시 시도하세요.",
+    "themeHint": "시스템은 macOS 화면 모드를 따릅니다.",
+    "cleanupEnabledHint": "오래된 백업 사본을 휴지통으로 옮깁니다.",
+    "cleanupNowHint": "위 규칙을 지금 한 번 적용합니다."
   },
   "common": {
     "loading": "불러오는 중…",
@@ -229,7 +232,16 @@
     "source": "미리보기",
     "edit": "편집",
     "fields": "필드",
-    "tools": "툴"
+    "tools": "툴",
+    "enabledIn": "켜진 툴",
+    "on": "켜짐",
+    "off": "꺼짐",
+    "turnOff": "{{tool}}: 켜짐 — 누르면 꺼짐",
+    "turnOn": "{{tool}}: 꺼짐 — 누르면 켜짐",
+    "applyOnSync": "바꾼 내용은 다음 동기화 때 반영됩니다.",
+    "more": "더 보기",
+    "copyPath": "경로 복사",
+    "deleteItem": "삭제…"
   },
   "editor": {
     "lines": "{{n}}줄",
@@ -362,7 +374,8 @@
     "aheadBehind": "앞섬 {{ahead}} · 뒤짐 {{behind}}",
     "connected": "백업 연결됨",
     "snapshotFirst": "현재 상태를 먼저 스냅샷",
-    "snapshotFirstHint": "아직 백업되지 않은 변경이 있습니다."
+    "snapshotFirstHint": "아직 백업되지 않은 변경이 있습니다.",
+    "autoHint": "라이브러리를 툴에 적용할 때마다 스냅샷을 만듭니다."
   },
   "memory": {
     "new": "새 메모",
@@ -395,7 +408,13 @@
     "resultOk": "{{n}}개 완료",
     "resultFail": "{{n}}개 실패",
     "more": "더 보기 ({{done}} / {{total}})",
-    "lineCount": "{{n}}줄"
+    "lineCount": "{{n}}줄",
+    "indexLinesLabel": "인덱스 줄 수",
+    "indexSizeLabel": "인덱스 크기",
+    "nearLimit": "MEMORY.md 가 한도에 가까워요. 한도를 넘는 줄은 로드되지 않으니 자세한 내용은 주제별 파일로 옮기세요.",
+    "pathEmpty": "메모 경로를 입력하세요.",
+    "pathRelative": "memory/ 기준 상대 경로로 입력하세요. 앞의 / 나 .. 는 쓸 수 없어요.",
+    "pathExists": "같은 경로의 메모가 이미 있어요. 다른 이름을 쓰세요."
   },
   "library": {
     "renamePending": "이름 변경 마이그레이션 필요",

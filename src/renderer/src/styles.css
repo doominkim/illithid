@@ -127,8 +127,19 @@ body {
   color: #fff;
   flex-shrink: 0;
 }
-.ac-pill[data-off] {
-  opacity: 0.4;
+.ac-pill[data-off] > :first-child {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+/* Off is also told by a slash, not by color alone */
+.ac-pill[data-off]::before {
+  content: '';
+  position: absolute;
+  width: 130%;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--ac-text-muted);
+  transform: rotate(-45deg);
 }
 .ac-pill[data-problem] {
   box-shadow: 0 0 0 2px var(--ac-warning);
@@ -143,6 +154,87 @@ body {
   border-radius: 50%;
   background: var(--ac-warning);
   border: 1.5px solid var(--ac-surface);
+}
+
+/* Labeled tool toggle in a detail sheet (logo + name + On/Off) */
+.ac-tool-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--ac-border);
+  border-radius: 8px;
+  background: var(--ac-surface);
+  font-size: 13px;
+}
+.ac-tool-btn:hover:not(:disabled) {
+  background: var(--ac-surface-hover);
+}
+.ac-tool-btn:focus-visible {
+  outline: 2px solid var(--ac-accent);
+  outline-offset: 1px;
+}
+.ac-tool-btn-state {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ac-accent-bg);
+  color: var(--ac-accent);
+}
+.ac-tool-btn[aria-pressed='false'] {
+  border-style: dashed;
+  background: transparent;
+}
+.ac-tool-btn[aria-pressed='false'] [role='img'] {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.ac-tool-btn[aria-pressed='false'] .ac-tool-btn-name {
+  color: var(--ac-text-muted);
+}
+.ac-tool-btn[aria-pressed='false'] .ac-tool-btn-state {
+  background: var(--ac-surface-active);
+  color: var(--ac-text-muted);
+}
+.ac-tool-btn[data-problem] {
+  border-color: var(--ac-warning);
+}
+.ac-tool-btn[data-pending]::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ac-warning);
+  border: 1.5px solid var(--ac-bg);
+}
+
+/* Memory index meter (label + number + bar) */
+.ac-meter {
+  width: 150px;
+}
+.ac-meter-bar {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--ac-surface-active);
+  overflow: hidden;
+}
+.ac-meter-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ac-accent);
+}
+.ac-meter[data-tone='near'] .ac-meter-fill {
+  background: var(--ac-warning);
+}
+.ac-meter[data-tone='over'] .ac-meter-fill {
+  background: var(--ac-danger);
 }
 
 /* Detail panel (everything right of the sidebar) */
