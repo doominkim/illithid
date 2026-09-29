@@ -47,8 +47,11 @@ import type {
   BackupStatusView,
   Channel,
   ManifestKind,
+  ModelDetail,
+  ModelSummary,
   Refused,
   SearchIndexView,
+  SessionModelShare,
   TranscriptView,
   TrayCommand,
   TraySession,
@@ -301,6 +304,21 @@ export function registerIpc(): void {
     // null = nothing indexed yet (fresh install or upgrade): start an index run; the panel reloads when it finishes
     usage: async (kind, name) => {
       const r = await inWorker('usage', home, [kind, name])
+      if (r === null) runSearchIndex()
+      return r
+    },
+    models: async (range) => {
+      const r = await inWorker<ModelSummary[] | null>('models', home, [range ?? {}])
+      if (r === null) runSearchIndex()
+      return r
+    },
+    modelDetail: async (key, range) => {
+      const r = await inWorker<ModelDetail | null>('modelDetail', home, [key, range ?? {}])
+      if (r === null) runSearchIndex()
+      return r
+    },
+    sessionModels: async (tool, id) => {
+      const r = await inWorker<SessionModelShare[] | null>('sessionModels', home, [tool, str(id)])
       if (r === null) runSearchIndex()
       return r
     },

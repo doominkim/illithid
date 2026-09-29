@@ -39,7 +39,7 @@ import type {
 } from '../engine'
 
 import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
-import type { UsageKind, UsageStats } from '../engine'
+import type { ModelDetail, ModelKey, ModelSummary, UsageKind, UsageStats } from '../engine'
 import type {
   AuditPartner,
   MarketInstallChoice,
@@ -566,6 +566,24 @@ export interface MarketInstallOptions {
 /** Skill / MCP usage from local session logs */
 export type { UsageKind, UsageStats } from '../engine'
 
+/** Model usage from local session logs */
+export type { Dist, ModelDetail, ModelKey, ModelSummary, SessionRef } from '../engine'
+
+/** Day range for model stats: last N days, or an inclusive YYYY-MM-DD range (wins over days). Neither = everything */
+export interface ModelRangeArg {
+  days?: number
+  from?: string
+  to?: string
+}
+
+export interface SessionModelShare {
+  tool: string
+  model: string
+  effort: string
+  turns: number
+  share: number
+}
+
 export interface MarketBulkResult {
   installed: { id: string; name: string }[]
   /** reason: installed · exists · needsInput · unsupported · rateLimited · MarketError code */
@@ -604,6 +622,12 @@ export interface Api {
   marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
   /** Skill or MCP call counts from local session logs, by model, tool and day. null = not indexed yet (an index run starts) */
   usage(kind: UsageKind, name: string): Promise<UsageStats | null>
+  /** Models used in the range with counts, tokens and request medians. null = not indexed yet (an index run starts) */
+  models(range?: ModelRangeArg): Promise<ModelSummary[] | null>
+  /** One model: daily trend, distributions, tools, skills, MCP, projects, sessions, Codex limits. null = not indexed yet */
+  modelDetail(key: ModelKey, range?: ModelRangeArg): Promise<ModelDetail | null>
+  /** Models used in one session (subagents included) by share of turns. null = not indexed yet */
+  sessionModels(tool: ToolId, id: string): Promise<SessionModelShare[] | null>
   /** Install several items with default names/options; one sync at the end */
   marketInstallMany(kind: MarketKind, ids: string[]): Promise<WriteResult<MarketBulkResult> | Refused>
   marketUpdates(): Promise<WriteResult<{ updates: MarketUpdate[]; failed: string[] }>>
@@ -820,6 +844,9 @@ export const CHANNELS = [
   'marketDetail',
   'marketInstall',
   'usage',
+  'models',
+  'modelDetail',
+  'sessionModels',
   'marketInstallMany',
   'marketUpdates',
   'marketUpdate',

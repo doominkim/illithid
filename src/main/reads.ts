@@ -49,6 +49,9 @@ import {
   type ToolId,
   marketLiveOrigins,
   usageOf,
+  modelDetail,
+  modelList,
+  sessionModels,
   sessionTitles,
   type Artifact
 } from '../engine'
@@ -369,6 +372,9 @@ export type Op =
   | 'searchSessions'
   | 'searchStatus'
   | 'usage'
+  | 'models'
+  | 'modelDetail'
+  | 'sessionModels'
   | 'searchDocs'
   | 'searchAll'
   | 'backupCleanupPlan'
@@ -390,6 +396,19 @@ async function searchIndex(
   return { sessions: s, docs: indexAllDocs(home) }
 }
 
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Range from the renderer: only whole positive days and YYYY-MM-DD strings pass */
+function rangeArg(v: unknown): { days?: number; from?: string; to?: string } {
+  const r = (v && typeof v === 'object' ? v : {}) as { days?: unknown; from?: unknown; to?: unknown }
+  return {
+    ...(typeof r.days === 'number' && Number.isInteger(r.days) && r.days > 0 ? { days: r.days } : {}),
+    ...(typeof r.from === 'string' && DAY_RE.test(r.from) ? { from: r.from } : {}),
+    ...(typeof r.to === 'string' && DAY_RE.test(r.to) ? { to: r.to } : {})
+  }
+}
+
 export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onProgress?: (p: unknown) => void): unknown {
   switch (op) {
     case 'searchIndex':
@@ -405,6 +424,18 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     }
     case 'searchStatus':
       return indexStatus(home)
+    case 'models':
+      return modelList(home, rangeArg(args[0]))
+    case 'modelDetail': {
+      const k = args[0] as { tool?: unknown; model?: unknown; effort?: unknown } | undefined
+      if (!k || typeof k.tool !== 'string' || typeof k.model !== 'string' || typeof k.effort !== 'string') return null
+      return modelDetail(home, { tool: k.tool, model: k.model, effort: k.effort }, rangeArg(args[1]))
+    }
+    case 'sessionModels': {
+      const [tool, id] = args
+      if (typeof tool !== 'string' || typeof id !== 'string' || !id) return null
+      return sessionModels(home, tool, id)
+    }
     case 'usage': {
       const [kind, name] = args
       if ((kind !== 'skill' && kind !== 'mcp') || typeof name !== 'string' || !name) return null
