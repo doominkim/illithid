@@ -323,7 +323,7 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
             </Group>
           </Group>
           <Group gap={6} mt={8} wrap="nowrap">
-            <Code style={{ flex: 1, padding: '6px 10px', wordBreak: 'break-all' }}>{resume ?? t('sessions.noResume')}</Code>
+            <Code style={{ flex: 1, minWidth: 0, padding: '6px 10px', whiteSpace: 'nowrap', overflowX: 'auto' }}>{resume ?? t('sessions.noResume')}</Code>
             {resume && (
               <ActionIcon variant="default" onClick={() => copy(resume, t('common.copied'), t('common.copyFailed'))} aria-label={t('common.copy')}>
                 <Copy size={13} />
@@ -479,9 +479,6 @@ function Sessions(): React.JSX.Element {
           <Stack gap={6} p="sm" style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}>
             <Group justify="space-between" wrap="nowrap">
               <Group gap={6}>
-                <Text size="sm" fw={600}>
-                  {t('nav.sessions')}
-                </Text>
                 <Badge variant="default" size="sm" fw={600} c="dimmed" data-testid="session-count">
                   {t('common.shown', { shown: showResults ? (resultRows?.sessions ?? 0) : filtered.length, total: data.sessions.length })}
                 </Badge>

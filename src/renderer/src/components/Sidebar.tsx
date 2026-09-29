@@ -95,7 +95,8 @@ function SyncButton(): React.JSX.Element {
       variant="light"
       color={color}
       justify="flex-start"
-      leftSection={<RefreshCw size={14} />}
+      className="ac-sync"
+      leftSection={n || busy ? <RefreshCw size={14} /> : <span className="ac-sync-dot" aria-hidden="true" />}
       disabled={!n && !busy}
       loading={busy}
       onClick={() => openPreview()}
