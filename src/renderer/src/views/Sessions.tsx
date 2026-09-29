@@ -13,6 +13,7 @@ import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { Snippet } from '../components/Snippet'
 import { ToolIcon } from '../components/ToolIcon'
+import { useNavSelect } from '../lib/nav'
 import { cleanTitle, fmtTime, includesCI, relTime } from '../lib/format'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { useApi } from '../lib/useApi'
@@ -404,6 +405,8 @@ function Sessions(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [hideSub, setHideSub] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
+  // Opened from elsewhere (an artifact's session): `${tool}:${id}`
+  useNavSelect(setSelected)
   const [mode, setMode] = useState<'title' | 'content'>('title')
   const [jumpTo, setJumpTo] = useState<{ index: number; nonce: number } | undefined>()
   const [found, setFound] = useState<SessionSearchResponse | null>(null)

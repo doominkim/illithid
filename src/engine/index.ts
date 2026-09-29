@@ -73,7 +73,7 @@ export type {
 export { scanArtifacts, defaultArtifactSources, newManifestCache, toolOfLocation, toolOfManifestString } from './scan/artifacts'
 export type { Artifact, ArtifactKind, ArtifactSource, ArtifactTool, ManifestCache } from './scan/artifacts'
 export { scanSessions, readSessionTranscript, cleanUserText, titleText } from './scan/sessions'
-export { indexSessions, indexStatus, searchSessions, searchIndexPath, makeSnippet } from './search/sessionIndex'
+export { indexSessions, indexStatus, searchSessions, searchIndexPath, makeSnippet, sessionTitles } from './search/sessionIndex'
 export {
   indexDocs,
   indexAllDocs,

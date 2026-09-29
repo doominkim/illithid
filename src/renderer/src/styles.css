@@ -192,3 +192,49 @@ body {
 .ac-tray-action:hover {
   background: var(--ac-surface-hover);
 }
+
+/* Artifact thumbnails */
+.ac-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.ac-thumb-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 8px;
+}
+.ac-thumb-card:hover {
+  background: var(--ac-surface-hover);
+}
+.ac-thumb-card[data-active] {
+  background: var(--ac-surface-hover);
+  outline: 2px solid var(--mantine-color-accent-6);
+}
+.ac-thumb {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--mantine-color-default-hover);
+  color: var(--mantine-color-dimmed);
+}
+.ac-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Rendered HTML artifact (sandboxed) */
+.ac-html-frame {
+  width: 100%;
+  height: calc(100vh - 260px);
+  min-height: 320px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  background: #fff;
+}

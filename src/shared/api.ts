@@ -436,6 +436,8 @@ export interface ArtifactPreview {
   text?: string
   /** image data URL (max 5MB) */
   dataUrl?: string
+  /** html for the rendered view: images next to the file inlined as data URLs (the sandbox loads nothing from outside) */
+  rendered?: string
   truncated: boolean
   error?: string
 }
@@ -576,6 +578,8 @@ export interface Api {
   mcp(): Promise<McpData>
   artifacts(): Promise<Artifact[]>
   artifactPreview(id: string): Promise<ArtifactPreview>
+  /** Image or HTML thumbnail (data URL, about 256px; null if there is none) */
+  artifactThumb(id: string): Promise<string | null>
   /** Open with the default app (ids from the last scan only) */
   artifactOpen(id: string): Promise<WriteResult>
   /** Reveal in Finder (ids from the last scan only) */
@@ -800,6 +804,7 @@ export const CHANNELS = [
   'mcp',
   'artifacts',
   'artifactPreview',
+  'artifactThumb',
   'artifactOpen',
   'artifactReveal',
   'sessions',

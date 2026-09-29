@@ -48,7 +48,9 @@ import {
   type TargetId,
   type ToolId,
   marketLiveOrigins,
-  usageOf
+  usageOf,
+  sessionTitles,
+  type Artifact
 } from '../engine'
 import type {
   AgentsData,
@@ -332,6 +334,24 @@ export function mcp(home: string, env: Env): McpData {
   return { servers, toggles: toggles(home, 'mcp') }
 }
 
+// ---------------------------------------------------------------- artifacts
+
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Codex generated images live in a folder named after the session: attach that session's title from the index */
+function withSessionTitles(home: string, list: Artifact[]): Artifact[] {
+  const ids = [...new Set(list.filter((a) => a.tool === 'codex' && a.project && SESSION_ID.test(a.project)).map((a) => a.project!))]
+  let titles: Map<string, string>
+  try {
+    titles = sessionTitles(home, 'codex', ids)
+  } catch {
+    return list
+  }
+  return list.map((a) =>
+    a.tool === 'codex' && a.project && titles.has(a.project) ? { ...a, sessionId: a.project, sessionTitle: titles.get(a.project) } : a
+  )
+}
+
 // ---------------------------------------------------------------- dispatch
 
 export type Op =
@@ -413,7 +433,7 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     case 'mcp':
       return mcp(home, env)
     case 'artifacts':
-      return scanArtifacts(home)
+      return withSessionTitles(home, scanArtifacts(home))
     case 'sessions':
       return scanSessions(home)
     case 'toolMemory':

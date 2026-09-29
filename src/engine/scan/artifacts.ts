@@ -22,6 +22,9 @@ export interface Artifact {
   size: number
   /** ISO 8601 */
   mtime: string
+  /** Session that made it (Codex generated images: the folder is the session id), with its title from the session index */
+  sessionId?: string
+  sessionTitle?: string
 }
 
 /**

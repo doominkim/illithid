@@ -4,14 +4,14 @@
  * - artifactPreview only reads ids from the renderer that appear in the latest artifacts scan.
  * - There is no arbitrary-path read/write channel. The engine checks that file names and relative paths stay inside the library.
  */
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { trayCommand, traySessions, updateTray } from './tray'
 import { checkForUpdate, clearUpdate, openUpgradeInTerminal, updateAvailable } from './update'
 import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { extname, join } from 'node:path'
+import { dirname, extname, join, resolve, sep } from 'node:path'
 import {
   backupStatus,
   claudeProjectSlug,
@@ -137,6 +137,44 @@ async function readPrefix(path: string, limit: number): Promise<{ buf: Buffer; s
   }
 }
 
+const INLINE_IMAGE_LIMIT = 2 * 1024 * 1024
+const INLINE_TOTAL_LIMIT = 15 * 1024 * 1024
+
+/**
+ * `<img src="relative">` → data URL, for images inside the html file's own folder (never outside it, never remote), within size
+ * limits. Other references stay as they are and don't load in the sandbox
+ */
+async function inlineLocalImages(html: string, dir: string): Promise<string> {
+  const refs = [...new Set([...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(["'])([^"']+)\1/gi)].map((m) => m[2]))]
+  const urls = new Map<string, string>()
+  let total = 0
+  for (const ref of refs) {
+    if (/^([a-z][a-z0-9+.-]*:|\/|#)/i.test(ref)) continue
+    let rel: string
+    try {
+      rel = decodeURIComponent(ref.split(/[?#]/)[0])
+    } catch {
+      continue
+    }
+    const file = resolve(dir, rel)
+    if (!file.startsWith(dir + sep)) continue
+    const mime = MIME[extname(file).toLowerCase()]
+    if (!mime) continue
+    try {
+      const { buf, size } = await readPrefix(file, INLINE_IMAGE_LIMIT)
+      if (size > INLINE_IMAGE_LIMIT || total + size > INLINE_TOTAL_LIMIT) continue
+      total += size
+      urls.set(ref, `data:${mime};base64,${buf.toString('base64')}`)
+    } catch {
+      // missing image: left as is
+    }
+  }
+  if (!urls.size) return html
+  return html.replace(/(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)\2/gi, (m, pre: string, q: string, ref: string) =>
+    urls.has(ref) ? `${pre}${q}${urls.get(ref)}${q}` : m
+  )
+}
+
 async function preview(a: Artifact): Promise<ArtifactPreview> {
   const base = { id: a.id, size: a.size, truncated: false }
   try {
@@ -153,7 +191,15 @@ async function preview(a: Artifact): Promise<ArtifactPreview> {
       return { ...base, size, kind: 'binary' }
     }
     const kind = a.kind === 'md' ? 'md' : a.kind === 'html' ? 'html' : 'text'
-    return { ...base, size, kind, text: buf.toString('utf8'), truncated: size > TEXT_LIMIT }
+    const text = buf.toString('utf8')
+    return {
+      ...base,
+      size,
+      kind,
+      text,
+      ...(kind === 'html' ? { rendered: await inlineLocalImages(text, dirname(a.path)) } : {}),
+      truncated: size > TEXT_LIMIT
+    }
   } catch (e) {
     return {
       ...base,
@@ -181,6 +227,9 @@ function autoBackupOn(home: string): boolean {
 
 // Keep git from blocking on credential prompts (applies to all engine git calls)
 process.env.GIT_TERMINAL_PROMPT = '0'
+
+/** Artifact thumbnails by id:mtime (data URL or null) */
+const thumbs = new Map<string, string | null>()
 
 export function registerIpc(): void {
   const { home, fixture } = resolveHome()
@@ -286,6 +335,21 @@ export function registerIpc(): void {
       if (!a) return { ok: false, code: 'notFound', message: 'unknownId' }
       shell.showItemInFolder(a.path)
       return { ok: true, value: undefined }
+    },
+    artifactThumb: async (id) => {
+      const a = typeof id === 'string' ? artifacts.get(id) : undefined
+      if (!a || (a.kind !== 'image' && a.kind !== 'html')) return null
+      const key = `${a.id}:${a.mtime}`
+      const hit = thumbs.get(key)
+      if (hit !== undefined) return hit
+      // Quick Look thumbnail (async, off the main thread; handles SVG and renders HTML without running it)
+      const url = await nativeImage
+        .createThumbnailFromPath(a.path, { width: 256, height: 256 })
+        .then((img) => (img.isEmpty() ? null : img.toDataURL()))
+        .catch(() => null)
+      if (thumbs.size > 1000) thumbs.clear()
+      thumbs.set(key, url)
+      return url
     },
     artifactPreview: async (id) => {
       const a = typeof id === 'string' ? artifacts.get(id) : undefined

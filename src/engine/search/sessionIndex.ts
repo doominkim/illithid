@@ -560,3 +560,18 @@ export function searchSessions(home: string, query: string, opts: SearchOptions 
     db.close()
   }
 }
+
+/** Titles of indexed sessions of one tool by id (read-only; empty when there is no index yet) */
+export function sessionTitles(home: string, tool: string, ids: string[]): Map<string, string> {
+  const out = new Map<string, string>()
+  if (!ids.length) return out
+  const db = openDbForRead(searchIndexPath(home))
+  if (!db) return out
+  try {
+    const q = db.prepare(`select id, title from sessions where tool = ? and id in (${ids.map(() => '?').join(',')})`)
+    for (const r of q.all(tool, ...ids) as { id: string; title: string | null }[]) if (r.title?.trim()) out.set(r.id, r.title)
+  } finally {
+    db.close()
+  }
+  return out
+}
