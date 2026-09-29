@@ -7,6 +7,7 @@ import {
   BookOpen,
   Brain,
   CloudUpload,
+  ChartColumn,
   FolderOpen,
   MessagesSquare,
   Plug,
@@ -31,6 +32,7 @@ import Agents from './views/Agents'
 import Market from './views/Market'
 import Artifacts from './views/Artifacts'
 import Sessions from './views/Sessions'
+import Stats from './views/Stats'
 import Backup from './views/Backup'
 import Onboarding from './views/Onboarding'
 import { ApplyPreviewModal } from './components/ApplyPreviewModal'
@@ -50,6 +52,7 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
   market: <Store size={16} />,
   artifacts: <FolderOpen size={16} />,
   sessions: <MessagesSquare size={16} />,
+  stats: <ChartColumn size={16} />,
   backup: <CloudUpload size={16} />,
   settings: <SettingsIcon size={16} />
 }
@@ -320,6 +323,7 @@ function App(): React.JSX.Element {
     market: <Market />,
     artifacts: <Artifacts />,
     sessions: <Sessions />,
+    stats: <Stats />,
     backup: <Backup />,
     settings: <Settings />
   }

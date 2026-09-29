@@ -9,6 +9,7 @@ export const PRIMARY = [
   'market',
   'artifacts',
   'sessions',
+  'stats',
   'memory'
 ] as const
 export const SECONDARY = ['backup', 'settings'] as const

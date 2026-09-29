@@ -5,6 +5,7 @@ import {
   Brain,
   FolderOpen,
   CloudUpload,
+  ChartColumn,
   MessagesSquare,
   Plug,
   RefreshCw,
@@ -30,6 +31,7 @@ const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
   market: Store,
   artifacts: FolderOpen,
   sessions: MessagesSquare,
+  stats: ChartColumn,
   backup: CloudUpload,
   settings: Settings
 }
