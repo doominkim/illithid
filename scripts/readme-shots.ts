@@ -7,7 +7,7 @@
  * Usage: npx electron-vite build && npx tsx scripts/readme-shots.ts
  *        SHOTS_TOOLS=all … for all five tools (Gemini CLI, GitHub Copilot and the richer session set)
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { _electron as electron, type Page } from 'playwright-core'
@@ -366,11 +366,12 @@ async function main(): Promise<void> {
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setSize(1280, 800)
     })
+    // UI preferences live in config.json `ui`; preload reads them again on reload
+    const configPath = join(home, '.config/illithid/config.json')
     for (const theme of THEMES) {
-      await page.evaluate((th) => {
-        localStorage.setItem('illithid-language', 'en')
-        localStorage.setItem('illithid-color-scheme', th)
-      }, theme)
+      const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
+      const ui = { language: 'en', colorScheme: theme, views: { rules: 'grid', skills: 'grid', mcp: 'grid', agents: 'grid' } }
+      writeFileSync(configPath, JSON.stringify({ ...config, ui }, null, 2) + '\n')
       await page.reload()
       await page.waitForSelector('[data-menu="rules"]')
       for (const menu of MENUS) {
