@@ -1,6 +1,6 @@
-import { ActionIcon, Box, Drawer, Group, Menu, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Box, Drawer, Group, Stack, Text, Title, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { ArrowLeft, Copy, MoreHorizontal, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
@@ -12,11 +12,11 @@ interface Props {
   tags?: React.ReactNode
   /** Meta line such as path or file (icon + text) */
   meta?: React.ReactNode
-  /** Path offered by "Copy path" in the ⋯ menu */
+  /** Path copied by the header's copy-path icon */
   copyPath?: string
-  /** "Delete…" in the ⋯ menu (the caller confirms) */
+  /** Header delete icon (the caller confirms) */
   onDelete?: () => void
-  /** data-testid of the Delete menu item */
+  /** data-testid of the delete icon */
   deleteTestId?: string
   /** Content max width (default 880 for reading and editing text) */
   maw?: number
@@ -71,27 +71,35 @@ export function DetailSheet({
           <Title order={1} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             {title}
           </Title>
-          {(copyPath || onDelete) && (
-            <Menu position="bottom-end" width={200} shadow="md">
-              <Menu.Target>
-                <ActionIcon variant="subtle" color="gray" size="lg" aria-label={t('detail.more')} style={{ flexShrink: 0 }} data-testid="detail-more">
-                  <MoreHorizontal size={20} />
-                </ActionIcon>
-              </Menu.Target>
-              <Menu.Dropdown>
-                {copyPath && (
-                  <Menu.Item leftSection={<Copy size={14} />} onClick={() => copy(copyPath)}>
-                    {t('detail.copyPath')}
-                  </Menu.Item>
-                )}
-                {copyPath && onDelete && <Menu.Divider />}
-                {onDelete && (
-                  <Menu.Item color="red" leftSection={<Trash2 size={14} />} onClick={onDelete} data-testid={deleteTestId}>
-                    {t('detail.deleteItem')}
-                  </Menu.Item>
-                )}
-              </Menu.Dropdown>
-            </Menu>
+          {copyPath && (
+            <Tooltip label={t('detail.copyPath')} withArrow openDelay={300}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                onClick={() => copy(copyPath)}
+                aria-label={t('detail.copyPath')}
+                style={{ flexShrink: 0 }}
+                data-testid="detail-copy-path"
+              >
+                <Copy size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {onDelete && (
+            <Tooltip label={t('detail.deleteItem')} withArrow openDelay={300}>
+              <ActionIcon
+                variant="subtle"
+                color="red"
+                size="lg"
+                onClick={onDelete}
+                aria-label={t('detail.deleteItem')}
+                style={{ flexShrink: 0 }}
+                data-testid={deleteTestId}
+              >
+                <Trash2 size={18} />
+              </ActionIcon>
+            </Tooltip>
           )}
         </Group>
         <Stack gap="sm" mt="sm" pl={44}>

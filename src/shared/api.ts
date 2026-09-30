@@ -223,6 +223,8 @@ export interface McpServerView {
 }
 
 export interface McpData {
+  /** Library mcps directory (display ~/...) */
+  dir?: string
   servers: McpServerView[]
   toggles: Record<string, ToolToggles>
   error?: string

@@ -202,6 +202,7 @@ function Mcp(): React.JSX.Element {
         title={current?.name ?? ''}
         tags={current && transportTag(current)}
         meta={current && <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>{endpoint(current) || none}</MetaItem>}
+        copyPath={current && data.dir ? `${data.dir}/${current.name}.json` : undefined}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="mcp-delete"
       >

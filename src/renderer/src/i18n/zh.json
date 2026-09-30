@@ -245,7 +245,6 @@
     "turnOff": "{{tool}}：开 — 点击关闭",
     "turnOn": "{{tool}}：关 — 点击开启",
     "applyOnSync": "更改将在下次同步时生效。",
-    "more": "更多操作",
     "copyPath": "复制路径",
     "deleteItem": "删除…"
   },

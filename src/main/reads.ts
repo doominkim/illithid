@@ -337,7 +337,12 @@ export function mcp(home: string, env: Env): McpData {
       tools: Object.fromEntries(perTool.map((t) => [t.tool, stateOf(t, name)]))
     }
   })
-  return { servers, toggles: toggles(home, 'mcp'), ...(grokClaudeReading(home).mcps ? {} : { grokReadsClaude: false }) }
+  return {
+    dir: tilde(home, libraryPaths(home).mcpsDir),
+    servers,
+    toggles: toggles(home, 'mcp'),
+    ...(grokClaudeReading(home).mcps ? {} : { grokReadsClaude: false })
+  }
 }
 
 // ---------------------------------------------------------------- artifacts

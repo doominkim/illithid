@@ -245,7 +245,6 @@
     "turnOff": "{{tool}}: on — click to turn off",
     "turnOn": "{{tool}}: off — click to turn on",
     "applyOnSync": "Changes apply on the next sync.",
-    "more": "More actions",
     "copyPath": "Copy path",
     "deleteItem": "Delete…"
   },

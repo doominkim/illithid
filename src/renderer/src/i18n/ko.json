@@ -245,7 +245,6 @@
     "turnOff": "{{tool}}: 켜짐 — 누르면 꺼짐",
     "turnOn": "{{tool}}: 꺼짐 — 누르면 켜짐",
     "applyOnSync": "바꾼 내용은 다음 동기화 때 반영됩니다.",
-    "more": "더 보기",
     "copyPath": "경로 복사",
     "deleteItem": "삭제…"
   },
