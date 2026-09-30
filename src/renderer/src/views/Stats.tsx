@@ -1,3 +1,4 @@
+import { formatTokens } from '../lib/tokenFormat'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import {
   Box,
@@ -56,13 +57,7 @@ function useFmt(): {
 } {
   const { t, i18n } = useTranslation()
   const int = (n: number): string => Math.round(n).toLocaleString(i18n.language)
-  const tok = (n: number): string => {
-    const a = Math.abs(n)
-    if (a < 1000) return int(n)
-    if (a < 1e6) return `${(n / 1e3).toFixed(a < 1e4 ? 1 : 0)}K`
-    if (a < 1e9) return `${(n / 1e6).toFixed(a < 1e7 ? 2 : 1)}M`
-    return `${(n / 1e9).toFixed(2)}B`
-  }
+  const tok = (n: number): string => formatTokens(n, i18n.language)
   const dur = (sec: number): string => {
     const s = Math.round(sec)
     if (s < 60) return t('models.dur.s', { s })
@@ -968,7 +963,7 @@ function Stats(): React.JSX.Element {
         count={data ? new Set(models.filter((m) => showSmall || m.requests >= MIN_REQUESTS).map((m) => m.model)).size : undefined}
         actions={<ReloadButton />}
       />
-      <Group gap="sm" mb="xs" wrap="wrap">
+      <Group gap="sm" mb="sm" wrap="wrap" className="ac-stats-filters">
         <SegmentedControl
           size="xs"
           value={String(days)}
@@ -981,6 +976,7 @@ function Stats(): React.JSX.Element {
           ]}
           data-testid="stats-days"
         />
+<Group gap="xs" wrap="nowrap">
 <Text size="xs" c="dimmed">{t('efficiency.referenceTool')}</Text>
         <SegmentedControl
           size="xs"
@@ -992,6 +988,7 @@ function Stats(): React.JSX.Element {
           ]}
           data-testid="stats-tool"
         />
+        </Group>
 <Switch size="xs" label={t('models.showSmall')} checked={showSmall} onChange={(e) => { setShowSmall(e.currentTarget.checked); setChecked([]) }} data-testid="stats-show-small" />
         <Group gap="xs" ml="auto">
           <Text size="xs" c="dimmed">

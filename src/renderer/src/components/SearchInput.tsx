@@ -15,6 +15,7 @@ export function SearchInput({
   return (
     <TextInput
       w={w}
+      style={{ maxWidth: '100%', flexShrink: 1 }}
       leftSection={<Search size={14} />}
       placeholder={placeholder}
       value={value}

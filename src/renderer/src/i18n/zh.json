@@ -60,6 +60,8 @@
     "cleanupNowHint": "立即按上面的规则执行一次。"
   },
   "common": {
+    "gridView": "网格视图",
+    "listView": "列表视图",
     "loading": "加载中…",
     "reload": "重新读取",
     "noSelection": "请在左侧选择一项。",
@@ -576,7 +578,7 @@
       "response": "响应时间",
       "mistakes": "失误类错误",
       "outPerReq": "每请求输出",
-      "context": "每轮上下文",
+      "context": "每次响应的输入Token",
       "median": "中位数",
       "per100": "每 100 次"
     },
@@ -629,7 +631,7 @@
       },
       "total": "合计",
       "perTurn": "每轮",
-      "contextPerTurn": "每轮上下文",
+      "contextPerTurn": "每次响应的输入Token",
       "cost": "日志记录的费用（OpenCode 提供值）",
       "limits": "订阅用量 · 每周",
       "limitsNote": "按账户计算，所有 Codex 模型相同。套餐：{{plan}}",
@@ -647,7 +649,7 @@
         "toolsPerRequest": "工具调用",
         "turnsPerRequest": "轮次",
         "outputPerRequest": "输出 token",
-        "contextPerTurn": "每轮上下文"
+        "contextPerTurn": "每次响应的输入Token"
       },
       "distTooFew": "请求少于 {{min}} 次（{{n}} 次），不显示分布。",
       "maxSession": "打开最大值所在会话：{{title}}",
@@ -729,9 +731,14 @@
     "priceUnit": "USD / 百万令牌",
     "priceError": "请输入有效的非负单价。单价保存失败。",
     "costTitle": "API折算费用",
-    "costNote": "采用{{date}}标准短上下文单价，缓存写入按5分钟计算。不含订阅账单、快速或长上下文附加费、缓存存储及外部工具费用。期间令牌包含子代理及未完成请求，因此除以已完成请求数得出的每次费用为近似值。"
+    "costNote": "采用{{date}}标准短上下文单价，缓存写入按5分钟计算。不含订阅账单、快速或长上下文附加费、缓存存储及外部工具费用。期间令牌包含子代理及未完成请求，因此除以已完成请求数得出的每次费用为近似值。",
+    "dragZoom": "拖动图表空白区域以放大选定范围。重置可恢复完整范围。"
   },
   "efficiency": {
+    "groupBy": "分组方式",
+    "allCombinations": "全部组合",
+    "byModel": "按模型",
+    "byTool": "按工具",
     "periodDays": "期间／活跃天数",
     "mixedCost": "记录＋换算费用",
     "tokens": "令牌合计",

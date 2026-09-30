@@ -81,3 +81,26 @@ test('REQ-USAGE-LEADERBOARD-3 series isolate tools and effort order is stable; c
   assert.notEqual(providerColor('claude-fable-5'), providerColor('gpt-6.1-sol'))
   assert.notEqual(providerColor('gemini-2.5-pro'), providerColor('gpt-6.1-sol'))
 })
+
+import { formatTokens } from '../src/renderer/src/lib/tokenFormat'
+test('REQ-MODEL-EFFICIENCY-15 token units use K, M and B', () => {
+  assert.equal(formatTokens(999), '999')
+  assert.equal(formatTokens(8500), '8.5K')
+  assert.equal(formatTokens(80000), '80K')
+  assert.equal(formatTokens(6200000), '6.2M')
+  assert.equal(formatTokens(2500000000), '2.5B')
+})
+
+// REQ-MODEL-EFFICIENCY-18: reproduce tightly clustered points and readable linear ticks.
+import { axisTicks, placeLabels } from '../src/renderer/src/lib/scatterLayout'
+test('REQ-MODEL-EFFICIENCY-18 dense labels do not overlap and tick intervals are readable', () => {
+  const labels = placeLabels(
+    Array.from({ length: 16 }, (_, i) => ({ px: 75 + i * 12, py: 350 + (i % 3) * 5, w: 170 }))
+  )
+  for (const a of labels)
+    for (const b of labels)
+      if (a !== b)
+        assert.ok(Math.abs(a.lx - b.lx) >= (a.w + b.w) / 2 + 5 || Math.abs(a.ly - b.ly) >= 20)
+  assert.deepEqual(axisTicks(0, 5.5), [0, 2, 4])
+  assert.deepEqual(axisTicks(0, 300), [0, 100, 200, 300])
+})

@@ -60,6 +60,8 @@
     "cleanupNowHint": "위 규칙을 지금 한 번 적용합니다."
   },
   "common": {
+    "gridView": "격자 보기",
+    "listView": "목록 보기",
     "loading": "불러오는 중…",
     "reload": "다시 읽기",
     "noSelection": "왼쪽에서 항목을 고르세요.",
@@ -576,7 +578,7 @@
       "response": "응답 시간",
       "mistakes": "실수형 오류",
       "outPerReq": "요청당 출력",
-      "context": "턴당 맥락",
+      "context": "응답당 입력 토큰",
       "median": "중앙값",
       "per100": "100회당"
     },
@@ -629,7 +631,7 @@
       },
       "total": "합계",
       "perTurn": "턴당",
-      "contextPerTurn": "턴당 맥락",
+      "contextPerTurn": "응답당 입력 토큰",
       "cost": "로그 기록 비용 (OpenCode 제공값)",
       "limits": "구독 한도 사용률 · 주간",
       "limitsNote": "계정 단위라 모든 Codex 모델에 같음. 요금제: {{plan}}",
@@ -647,7 +649,7 @@
         "toolsPerRequest": "툴 호출",
         "turnsPerRequest": "턴",
         "outputPerRequest": "출력 토큰",
-        "contextPerTurn": "턴당 맥락"
+        "contextPerTurn": "응답당 입력 토큰"
       },
       "distTooFew": "요청이 {{min}}건 미만({{n}}건)이라 분포를 표시하지 않음.",
       "maxSession": "최대값 세션 열기: {{title}}",
@@ -729,9 +731,14 @@
     "priceUnit": "USD / 100만 토큰",
     "priceError": "0 이상의 유효한 단가를 입력하세요. 단가를 저장하지 못했습니다.",
     "costTitle": "API 환산 비용",
-    "costNote": "{{date}} 기준 일반·짧은 맥락 단가, 캐시 쓰기는 5분 기준입니다. 구독 결제액, 고속·긴 맥락 할증, 캐시 보관과 외부 도구 비용은 포함하지 않습니다. 기간 토큰 합계에 서브에이전트와 미완료 요청이 포함되므로 완료 요청 수로 나눈 요청당 비용은 근사값입니다."
+    "costNote": "{{date}} 기준 일반·짧은 맥락 단가, 캐시 쓰기는 5분 기준입니다. 구독 결제액, 고속·긴 맥락 할증, 캐시 보관과 외부 도구 비용은 포함하지 않습니다. 기간 토큰 합계에 서브에이전트와 미완료 요청이 포함되므로 완료 요청 수로 나눈 요청당 비용은 근사값입니다.",
+    "dragZoom": "그래프의 빈 영역을 드래그하면 해당 구간을 확대해. 초기화하면 전체 범위로 돌아가."
   },
   "efficiency": {
+    "groupBy": "보기 기준",
+    "allCombinations": "전체 조합",
+    "byModel": "모델별",
+    "byTool": "툴별",
     "periodDays": "기간 / 활동일",
     "mixedCost": "기록 + 환산 비용",
     "tokens": "토큰 합계",

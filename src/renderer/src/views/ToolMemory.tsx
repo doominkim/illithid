@@ -193,12 +193,11 @@ export function ClaudeMemory({ view }: { view: ToolMemoryView }): React.JSX.Elem
   const confirmTitle = pending ? t(`memory.${pending.action}`) : ''
 
   return (
-    <Box style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
+    <Box className="ac-memory-panes" style={{ flex: 1, minHeight: 0 }}>
       {/* Projects */}
       <Box
-        className="ac-card"
+        className="ac-card ac-memory-projects"
         style={{
-          width: 280,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -265,9 +264,8 @@ export function ClaudeMemory({ view }: { view: ToolMemoryView }): React.JSX.Elem
 
       {/* Files */}
       <Box
-        className="ac-card"
+        className="ac-card ac-memory-files"
         style={{
-          width: 380,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -416,7 +414,7 @@ export function ClaudeMemory({ view }: { view: ToolMemoryView }): React.JSX.Elem
           onClose={() => setPreview(null)}
         />
       ) : (
-        <Box className="ac-card" style={{ flex: 1 }}>
+        <Box className="ac-card ac-memory-preview" style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <EmptyState title={t('common.noSelection')} />
         </Box>
       )}
@@ -497,7 +495,7 @@ function PreviewCard({
   const { t } = useTranslation()
   return (
     <Box
-      className="ac-card"
+      className="ac-card ac-memory-preview"
       style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
     >
       <Group
@@ -802,11 +800,10 @@ export function CodexMemory({ entries }: { entries: CodexMemoryEntry[] }): React
   if (entries.length === 0) return <EmptyState title={t('common.noResults')} />
   const dirName = `${ROLLOUT_DIR}/`
   return (
-    <Box style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
+    <Box className="ac-memory-panes" style={{ flex: 1, minHeight: 0 }}>
       <Box
-        className="ac-card"
+        className="ac-card ac-memory-codex"
         style={{
-          width: 340,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -892,7 +889,7 @@ export function CodexMemory({ entries }: { entries: CodexMemoryEntry[] }): React
       {rel ? (
         <CodexPreview key={rel} rel={rel} onClose={() => setRel(null)} />
       ) : (
-        <Box className="ac-card" style={{ flex: 1 }}>
+        <Box className="ac-card ac-memory-preview" style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <EmptyState title={t('common.noSelection')} />
         </Box>
       )}

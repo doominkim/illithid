@@ -73,7 +73,7 @@ function NotInitializedHint(): React.JSX.Element | null {
       {hints.map((h) => {
         const [tool, key] = h.split(':') as [ToolId, string]
         return (
-          <Text key={h} size="xs" c="yellow.8">
+          <Text key={h} size="xs" c="var(--ac-warning)">
             {t(`sync.${key}`, { tool: TOOL_NAME[tool] })}
           </Text>
         )

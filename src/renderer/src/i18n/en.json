@@ -60,6 +60,8 @@
     "cleanupNowHint": "Uses the rules above once, right away."
   },
   "common": {
+    "gridView": "Grid view",
+    "listView": "List view",
     "loading": "Loading…",
     "reload": "Reload",
     "noSelection": "Select an item on the left.",
@@ -576,7 +578,7 @@
       "response": "Response time",
       "mistakes": "Mistake errors",
       "outPerReq": "Output / request",
-      "context": "Context / turn",
+      "context": "Input tokens / response",
       "median": "median",
       "per100": "per 100 calls"
     },
@@ -729,9 +731,14 @@
     "priceUnit": "USD / 1M tokens",
     "priceError": "Enter valid non-negative prices. The price could not be saved.",
     "costTitle": "API-equivalent cost",
-    "costNote": "Standard short-context prices as of {{date}}; five-minute cache writes. Subscription bills, fast/long-context premiums, cache storage and external tools are not included. Period token totals include subagents and unfinished requests; divided by completed requests, this is an approximate cost per request."
+    "costNote": "Standard short-context prices as of {{date}}; five-minute cache writes. Subscription bills, fast/long-context premiums, cache storage and external tools are not included. Period token totals include subagents and unfinished requests; divided by completed requests, this is an approximate cost per request.",
+    "dragZoom": "Drag an empty chart area to zoom into a region. Reset restores the full range."
   },
   "efficiency": {
+    "groupBy": "Group by",
+    "allCombinations": "All combinations",
+    "byModel": "Model",
+    "byTool": "Tool",
     "periodDays": "Period / active days",
     "mixedCost": "Recorded + converted cost",
     "tokens": "Total tokens",

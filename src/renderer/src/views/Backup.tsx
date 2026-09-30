@@ -68,7 +68,7 @@ function Backup(): React.JSX.Element {
   const connected = st.initialized && !!st.remoteUrl
 
   return (
-    <Stack gap="lg">
+    <Stack gap={0}>
       <PageHeader
         title={t('nav.backup')}
         actions={
@@ -77,6 +77,7 @@ function Backup(): React.JSX.Element {
           </Button>
         }
       />
+      <Stack gap="lg">
       {st.error && (
         <Alert color="yellow" variant="light" radius="lg">
           {st.error}
@@ -247,6 +248,7 @@ function Backup(): React.JSX.Element {
         confirmLabel={t('backup.disconnect')}
         message={t('backup.disconnectBody')}
       />
+      </Stack>
     </Stack>
   )
 }

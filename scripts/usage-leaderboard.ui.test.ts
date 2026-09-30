@@ -190,16 +190,78 @@ test(
       // REQ-USAGE-LEADERBOARD-6: model labels only, bounded zoom and reset.
       assert.equal(await points.locator('.lb-agent').count(), 0)
       const viewport = page.getByTestId('stats-chart-viewport')
-      const svg = viewport.locator('svg')
+      const svg = viewport.locator('svg[role="group"]')
       await page.getByRole('button', { name: '확대', exact: true }).click()
       assert.equal(await svg.getAttribute('data-zoom'), '1.25')
-      assert.ok(await viewport.evaluate((e) => e.scrollWidth > e.clientWidth))
+      assert.ok(await viewport.evaluate((e) => e.scrollWidth <= e.clientWidth))
+      assert.notEqual(await svg.getAttribute('data-domain'), null)
       await page.getByRole('button', { name: '축소', exact: true }).click()
       assert.equal(await svg.getAttribute('data-zoom'), '1')
       await page.getByRole('button', { name: '확대', exact: true }).click()
       await page.getByRole('button', { name: '초기화', exact: true }).click()
       assert.equal(await svg.getAttribute('data-zoom'), '1')
+      // REQ-MODEL-EFFICIENCY-18: region zoom changes domains, not SVG or mark sizes.
+      const fullDomain = await svg.getAttribute('data-domain')
+      const area = (await svg.boundingBox())!
+      await page.mouse.move(area.x + area.width * 0.55, area.y + area.height * 0.2)
+      await page.mouse.down()
+      await page.mouse.move(area.x + area.width * 0.9, area.y + area.height * 0.65, { steps: 8 })
+      await page.mouse.up()
+      assert.notEqual(await svg.getAttribute('data-domain'), fullDomain)
+      assert.equal(await svg.evaluate((e) => (e as SVGSVGElement).style.width), '100%')
+      await page.getByRole('button', { name: '초기화', exact: true }).click()
+      assert.equal(await svg.getAttribute('data-domain'), fullDomain)
+      await page.mouse.move(area.x + area.width * 0.07, area.y + area.height * 0.15)
+      await page.mouse.down()
+      await page.mouse.move(area.x + area.width * 0.97, area.y + area.height * 0.4, { steps: 8 })
+      await page.mouse.up()
+      assert.ok(Number(await svg.getAttribute('data-zoom')) > 1)
+      assert.ok(await page.getByRole('button', { name: '축소', exact: true }).isEnabled())
+      await page.getByRole('button', { name: '초기화', exact: true }).click()
+      for (const line of await svg.locator('polyline').all())
+        assert.ok((await line.getAttribute('clip-path'))?.startsWith('url('))
       assert.equal(await rows.count(), 5)
+      // REQ-MODEL-EFFICIENCY-16: flat by default, tool headers optional, model hierarchy opt-in.
+      assert.equal(await page.getByTestId('stats-model-parent').count(), 0)
+      const flatTokens = page
+        .getByTestId('stats-table')
+        .getByRole('columnheader')
+        .filter({ hasText: '토큰 합계' })
+      await flatTokens.getByRole('button').click()
+      const flatValues = await rows
+        .locator('td:nth-child(3) [title]')
+        .evaluateAll((cells) =>
+          cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
+        )
+      assert.deepEqual(
+        flatValues,
+        [...flatValues].sort((a, b) => a - b)
+      )
+      await flatTokens.getByRole('button').click()
+      const flatDescending = await rows
+        .locator('td:nth-child(3) [title]')
+        .evaluateAll((cells) =>
+          cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
+        )
+      assert.deepEqual(
+        flatDescending,
+        [...flatValues].sort((a, b) => b - a)
+      )
+      await page.screenshot({ path: '/tmp/illithid-stats-flat-before.png', fullPage: true })
+      const grouping = page.getByTestId('stats-group-by')
+      await grouping.getByText('툴별', { exact: true }).click()
+      await page.screenshot({ path: '/tmp/illithid-stats-tool-before.png', fullPage: true })
+      assert.equal(await page.getByTestId('stats-tool-header').count(), 3)
+      assert.equal(await page.getByTestId('stats-model-parent').count(), 0)
+      assert.equal(await rows.count(), 5)
+      await grouping.getByText('전체 조합', { exact: true }).click()
+      assert.equal(await page.getByTestId('stats-tool-header').count(), 0)
+      assert.equal(await rows.count(), 5)
+      await grouping.getByText('모델별', { exact: true }).click()
+      await page
+        .getByTestId('stats-table')
+        .getByText('API 환산 비용 / 요청', { exact: true })
+        .click()
       await page.getByTestId('stats-show-small').check()
       assert.equal(await rows.count(), 6)
       await page.getByTestId('stats-table').getByText('요청', { exact: true }).click()
@@ -207,6 +269,39 @@ test(
       assert.equal(
         await page.getByTestId('stats-model-parent').first().getAttribute('data-model'),
         'gpt-6.1-sol'
+      )
+      // REQ-MODEL-EFFICIENCY-15: totals sort by raw parent sum, independently of compact text.
+      const tokensHeader = page
+        .getByTestId('stats-table')
+        .getByRole('columnheader')
+        .filter({ hasText: '토큰 합계' })
+      await tokensHeader.getByRole('button').click()
+      assert.equal(await tokensHeader.getAttribute('aria-sort'), 'ascending')
+      const ascending = await page
+        .getByTestId('stats-model-parent')
+        .locator('td:nth-child(3)')
+        .evaluateAll((cells) =>
+          cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
+        )
+      assert.deepEqual(
+        ascending,
+        [...ascending].sort((a, b) => a - b)
+      )
+      await tokensHeader.getByRole('button').click()
+      assert.equal(await tokensHeader.getAttribute('aria-sort'), 'descending')
+      const descending = await page
+        .getByTestId('stats-model-parent')
+        .locator('td:nth-child(3)')
+        .evaluateAll((cells) =>
+          cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
+        )
+      assert.deepEqual(
+        descending,
+        [...ascending].sort((a, b) => b - a)
+      )
+      assert.match(
+        await page.getByTestId('stats-model-parent').first().locator('td:nth-child(3)').innerText(),
+        /M$/
       )
       assert.equal(await rows.first().locator('td').count(), 13)
       assert.equal(await page.getByTestId('stats-model-parent').first().locator('td').count(), 13)
@@ -260,7 +355,7 @@ test(
       )
       const centered = await page
         .getByTestId('stats-scatter')
-        .locator('svg')
+        .locator('svg[role="group"]')
         .evaluate((svg) => {
           const dots = [...svg.querySelectorAll('.lb-dot')]
           return [...svg.querySelectorAll('.lb-labels text')].some(
@@ -338,6 +433,46 @@ test(
       await page.locator('[data-menu="stats"]').click()
       await points.first().waitFor()
       await page.screenshot({ path: '/tmp/illithid-leaderboard-dark.png', fullPage: true })
+      // HAR-41 REQ-1/2/3: responsive controls and independently bounded memory panes.
+      await app.evaluate(({ ipcMain }, data) => {
+        ipcMain.removeHandler('api:toolMemoryScan')
+        ipcMain.handle('api:toolMemoryScan', () => data)
+        ipcMain.removeHandler('api:toolMemoryRead')
+        ipcMain.handle('api:toolMemoryRead', () => ({ ok: true, value: '# Memory\n'.repeat(100) }))
+      }, {
+        claude: { projects: [{ slug: 'fixture', cwd: '/fixture/project', missing: false, temp: false,
+          files: [{ file: 'project.md', title: 'Project memory', inIndex: true, inShared: false, mtime: '2026-09-30' }],
+          index: { exists: true, lines: 5, bytes: 50, broken: [] }, updatedAt: '2026-09-30' }],
+          shared: null, limits: { lines: 200, bytes: 25600 } }, codex: []
+      })
+      for (const width of [1280, 900]) {
+        await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size, 800), width)
+        await page.locator('[data-menu="stats"]').click()
+        await page.locator('[data-testid="stats-tool"]').waitFor()
+        assert.equal(await page.locator('.ac-stats-filters').evaluate(el => el.scrollWidth <= el.clientWidth), true)
+        await page.locator('[data-menu="memory"]').click()
+        await page.locator('[data-testid="memory-tab-claude"]').click()
+        await page.locator('[data-testid="tm-project"]').click()
+        await page.locator('[data-testid="tm-index"]').click()
+        await page.locator('[data-testid="tm-preview"] h1').first().waitFor()
+        assert.equal(await page.locator('[data-testid="tm-preview"]').evaluate(el => el.scrollHeight > el.clientHeight), true)
+        const panes = await page.locator('.ac-memory-panes').evaluate(el => {
+          const root = el.getBoundingClientRect()
+          return { overflow: el.scrollWidth > el.clientWidth, height: root.height,
+            children: [...el.children].filter(e => e.classList.contains('ac-card')).map(e => {
+              const r = e.getBoundingClientRect()
+              return { bottom: r.bottom, right: r.right }
+            }), bottom: root.bottom, right: root.right }
+        })
+        assert.equal(panes.overflow, false)
+        assert.ok(panes.height > 300)
+        assert.ok(panes.children.every(p => p.bottom <= panes.bottom + 1 && p.right <= panes.right + 1))
+        await page.screenshot({ path: `/tmp/illithid-consistency-memory-${width}.png` })
+        await page.locator('[data-menu="artifacts"]').click()
+        await page.getByRole('radio', { name: /Grid view|격자 보기/, exact: true }).waitFor({ state: 'attached' })
+        await page.getByRole('radio', { name: /List view|목록 보기/, exact: true }).waitFor({ state: 'attached' })
+        assert.equal(await page.locator('.ac-toolbar').evaluate(el => el.scrollWidth <= el.clientWidth), true)
+      }
       assert.deepEqual(errors, [])
     } finally {
       await app.close()

@@ -38,7 +38,7 @@ export function PageHeader({ title, count, subtitle, actions }: HeaderProps): Re
   )
 }
 
-/** Single-line toolbar: left (search, filters) | right (actions, view toggle) */
+/** Responsive toolbar: keep each control intact while wrapping groups. */
 export function Toolbar({
   left,
   right
@@ -47,12 +47,12 @@ export function Toolbar({
   right?: React.ReactNode
 }): React.JSX.Element {
   return (
-    <Group justify="space-between" wrap="nowrap" mb="sm" gap="sm">
-      <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+    <Group className="ac-toolbar" justify="space-between" wrap="wrap" mb="sm" gap="sm">
+      <Group gap="sm" wrap="wrap" style={{ flex: '1 1 320px', minWidth: 0 }}>
         {left}
       </Group>
       {right && (
-        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0, marginLeft: 'auto' }}>
           {right}
         </Group>
       )}

@@ -363,8 +363,9 @@ function Settings(): React.JSX.Element {
   }
 
   return (
-    <Stack gap="lg" maw={820}>
+    <Stack gap={0} maw={820}>
       <PageHeader title={t('nav.settings')} />
+      <Stack gap="lg">
       {config?.fixture && (
         <Alert color="yellow" variant="light" radius="lg" title={t('settings.fixtureTitle')}>
           {t('settings.fixtureBody', { home: config.home })}
@@ -490,6 +491,7 @@ function Settings(): React.JSX.Element {
         confirmLabel={t('settings.allowApplyConfirm')}
         message={t('settings.allowApplyBody')}
       />
+      </Stack>
     </Stack>
   )
 }

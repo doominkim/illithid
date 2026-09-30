@@ -59,7 +59,7 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
 
 
 /** Screens where list and preview scroll independently: pin page height to the window so the list does not stretch the page */
-const FILL_MENUS = new Set<string>(['artifacts', 'sessions'])
+const FILL_MENUS = new Set<string>(['artifacts', 'sessions', 'memory'])
 function App(): React.JSX.Element {
   const { t } = useTranslation()
   const [request, setRequest] = useState<NavRequest>({ menu: 'rules', seq: 0 })
