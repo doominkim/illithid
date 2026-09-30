@@ -54,10 +54,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml`、OpenCode 的 `.md`、Gemini CLI 的 `.md`、GitHub Copilot 的 `.agent.md` 和 Grok CLI 的 `.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
-  <img src="docs/screenshots/agents-light.png" alt="按工具设置模型的子智能体">
-</picture>
+<p align="center"><img src="docs/demo/agents.gif" width="960" alt="子智能体在各工具中的模型，以及按工具选择模型"></p>
 
 ### 不泄露密钥的 MCP 服务器
 
@@ -95,10 +92,7 @@ Illithid 不运行模型，也不介入你和智能体之间。它只负责写�
 
 智能体生成的报告、文档和图片，按生成它们的工具分类展示。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artifacts-dark.png">
-  <img src="docs/screenshots/artifacts-light.png" alt="产出物">
-</picture>
+<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="多个工具的产出物列表、工具筛选和全文搜索"></p>
 
 ### 更多
 

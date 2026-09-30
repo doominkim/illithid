@@ -5,7 +5,8 @@
  *   Playwright's recordVideo is 1x JPEG frames in 1 Mbps VP8, which blurs text.
  * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
  * - Scenes, each cut into its own GIF (docs/demo/<scene>.gif): rules (edit → all five tools), skills (off for Gemini),
- *   mcp (off for Copilot, then the usage chart), market (install two skills), sessions (a session's requests), stats
+ *   agents (models per tool), mcp (off for Copilot, then the usage chart), market (install two skills), sessions
+ *   (a session's requests), artifacts (tool filter, full-text search), stats
  *   (cost against response time per model on seeded sessions, tool and period filters, a cost detail), tools
  *   (Grok CLI on → the Claude combo dialog → apply; Codex off → the preview lists what leaves, cancelled).
  * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes the full
@@ -199,6 +200,21 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await toggleOff(page, SKILL, SKILL_OFF, 900)
   })
 
+  // Agents: one subagent's model per tool, then the per-tool model picker (opened and closed, nothing changes)
+  await scene(page, 'agents', async () => {
+    await clickSlow(page, page.locator('[data-menu="agents"]'), 300)
+    await waitLoaded(page)
+    await clickSlow(page, main.locator('[data-card="reviewer"]'), 600)
+    for (const tool of ['claude', 'codex', 'opencode']) {
+      await moveTo(page, page.getByTestId(`agent-summary-${tool}`))
+      await page.waitForTimeout(700)
+    }
+    await clickSlow(page, page.getByTestId('tab-edit'), 600)
+    await clickSlow(page, page.getByTestId('agent-model-codex'), 1400)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(600)
+  })
+
   // 3. MCP: server cards with per-tool icons → turn one server off for Copilot → the server's usage by model
   await clickSlow(page, page.locator('[data-menu="mcp"]'), 300)
   await waitLoaded(page)
@@ -259,6 +275,28 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   for (const i of [1, 2]) if ((await items.count()) > i) await clickSlow(page, items.nth(i), 1000)
   await moveTo(page, main.locator('[data-testid="resume-copy"]'))
   await page.waitForTimeout(1000)
+  })
+
+  // Artifacts: reports from every tool in one list, the tool filter and a full-text search
+  await scene(page, 'artifacts', async () => {
+    await clickSlow(page, page.locator('[data-menu="artifacts"]'), 300)
+    await waitLoaded(page)
+    const rows = main.locator('.mantine-NavLink-root')
+    await rows.first().waitFor()
+    await clickSlow(page, rows.filter({ hasText: 'API latency' }).first(), 1400)
+    await clickSlow(page, rows.filter({ hasText: 'Onboarding' }).first(), 1200)
+    const option = (label: string): Locator => page.getByRole('option').getByText(label, { exact: true })
+    await clickSlow(page, page.getByTestId('artifact-tool-filter'), 500)
+    await clickSlow(page, option('Claude Code'), 1400)
+    await clickSlow(page, page.getByTestId('artifact-tool-filter'), 500)
+    await clickSlow(page, option('All tools'), 800)
+    await clickSlow(page, page.getByTestId('artifact-search-mode').getByText('Content', { exact: true }), 400)
+    const search = main.getByPlaceholder(/search/i).first()
+    await clickSlow(page, search, 200)
+    await page.keyboard.type('checkout', { delay: 90 })
+    const hit = page.getByTestId('artifact-content-hit').first()
+    await hit.waitFor({ timeout: 10_000 })
+    await clickSlow(page, hit, 1800)
   })
 
   // 6. Stats: cost per request against response time by model, a tool filter and the period list, then one model's cost detail

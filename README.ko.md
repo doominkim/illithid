@@ -54,10 +54,7 @@ Illithid는 모델을 실행하지 않고, 사용자와 에이전트 사이에 �
 
 서브에이전트 정의 하나를 Claude `.md`, Codex `.toml`, OpenCode `.md`, Gemini CLI `.md`, GitHub Copilot `.agent.md`, Grok CLI `.md`로 만들어 줍니다. 툴별 모델과 effort는 ID를 입력하지 않고 목록에서 고릅니다.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
-  <img src="docs/screenshots/agents-light.png" alt="툴별 모델 설정이 있는 서브에이전트">
-</picture>
+<p align="center"><img src="docs/demo/agents.gif" width="960" alt="서브에이전트의 툴별 모델과 툴별 모델 선택"></p>
 
 ### 키가 새지 않는 MCP 서버
 
@@ -95,10 +92,7 @@ Claude Code, Codex, OpenCode, Gemini CLI, Grok CLI의 지난 대화를 한 목�
 
 에이전트가 만든 보고서, 문서, 이미지를 만든 툴별로 구분해 모아 봅니다.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artifacts-dark.png">
-  <img src="docs/screenshots/artifacts-light.png" alt="산출물">
-</picture>
+<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="여러 툴의 산출물 목록, 툴 필터와 본문 검색"></p>
 
 ### 그 밖에
 

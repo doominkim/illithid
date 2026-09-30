@@ -54,10 +54,7 @@ Illithid はモデルを実行せず、あなたとエージェントの間に�
 
 ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md`、Gemini CLI の `.md`、GitHub Copilot の `.agent.md`、Grok CLI の `.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
-  <img src="docs/screenshots/agents-light.png" alt="ツールごとのモデル設定を持つサブエージェント">
-</picture>
+<p align="center"><img src="docs/demo/agents.gif" width="960" alt="サブエージェントのツールごとのモデルと、ツールごとのモデル選択"></p>
 
 ### キーを漏らさない MCP サーバー
 
@@ -95,10 +92,7 @@ Claude Code、Codex、OpenCode、Gemini CLI、Grok CLI の過去の会話をひ�
 
 エージェントが作ったレポート、ドキュメント、画像を、作成したツールごとに整理して表示します。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artifacts-dark.png">
-  <img src="docs/screenshots/artifacts-light.png" alt="成果物">
-</picture>
+<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="複数ツールの成果物の一覧、ツールでの絞り込みと本文検索"></p>
 
 ### そのほか
 

@@ -54,10 +54,7 @@ Edit a rule once and it lands in every tool you use. Turn any rule or skill off 
 
 One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCode `.md`, a Gemini CLI `.md`, a GitHub Copilot `.agent.md` and a Grok CLI `.md`. Pick the model and effort for each tool from a list instead of typing IDs.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/agents-dark.png">
-  <img src="docs/screenshots/agents-light.png" alt="Subagent with per-tool model settings">
-</picture>
+<p align="center"><img src="docs/demo/agents.gif" width="960" alt="A subagent's model for each tool, then the per-tool model picker"></p>
 
 ### MCP servers without leaking keys
 
@@ -95,10 +92,7 @@ Turn tools on or off in **Settings → Tools in use**. Turning one off removes I
 
 Reports, docs and images your agents produce, tagged by the tool that made them.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/artifacts-dark.png">
-  <img src="docs/screenshots/artifacts-light.png" alt="Artifacts">
-</picture>
+<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="Artifacts from several tools in one list, the tool filter and a full-text search"></p>
 
 ### And more
 
