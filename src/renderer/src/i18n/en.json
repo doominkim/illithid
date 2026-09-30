@@ -564,10 +564,11 @@
     "days30": "30 days",
     "days90": "90 days",
     "all": "All",
+    "custom": "Custom",
+    "from": "Start date",
+    "to": "End date",
     "allTools": "All",
     "showSmall": "Show models with few requests",
-    "compare": "Side by side",
-    "compareHint": "Check two to compare",
     "col": {
       "model": "Model",
       "effort": "Effort",
@@ -694,16 +695,6 @@
       "untitled": "(untitled)",
       "noProject": "(no folder recorded)",
       "fewRequests": "{{n}} requests · no distribution"
-    },
-    "cmp": {
-      "title": "Side by side",
-      "overlap": "Overlapping period {{from}} ~ {{to}} · both used on {{days}} days. Values cover only this period.",
-      "noOverlap": "The periods don't overlap, so differences aren't calculated: the two were used at different times on different work.",
-      "diff": "Difference",
-      "interruptsNA": "Defined differently per tool, not compared",
-      "allErrors": "All tool errors (reference)",
-      "metric": "Metric",
-      "overlapSmall": "The periods overlap on {{days}} days ({{from}} ~ {{to}}), with too few requests to compare. Values below cover each model's whole period; differences aren't calculated."
     },
     "session": {
       "models": "Models in this session:",

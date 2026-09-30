@@ -2,7 +2,6 @@ import { Fragment, useId, useRef, useState } from 'react'
 import {
   Box,
   Button,
-  Checkbox,
   Group,
   SegmentedControl,
   Stack,
@@ -45,15 +44,11 @@ type Metric =
 export function UsageLeaderboard({
   models,
   showSmall,
-  onOpen,
-  checked,
-  onCheck
+  onOpen
 }: {
   models: ModelSummary[]
   showSmall: boolean
   onOpen: (key: ModelKey) => void
-  checked: ModelKey[]
-  onCheck: (key: ModelKey, checked: boolean) => void
 }): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const [zoom, setZoom] = useState(1)
@@ -611,7 +606,7 @@ export function UsageLeaderboard({
         </Group>
         <Box className="lb-table-scroll">
           <Table
-            className="lb-table"
+            className={groupBy === 'model' ? 'lb-table lb-table-expand' : 'lb-table'}
             highlightOnHover
             verticalSpacing={10}
             horizontalSpacing={12}
@@ -619,7 +614,7 @@ export function UsageLeaderboard({
           >
             <Table.Thead>
               <Table.Tr>
-                <Table.Th w={64} />
+                {groupBy === 'model' && <Table.Th w={64} />}
                 <Table.Th>{t('models.col.model')}</Table.Th>
                 {columns.map((c) => (
                   <Table.Th
@@ -648,7 +643,7 @@ export function UsageLeaderboard({
                 <Fragment key={g.model}>
                   {groupBy === 'tool' && (
                     <Table.Tr data-testid="stats-tool-header">
-                      <Table.Td colSpan={13}>
+                      <Table.Td colSpan={columns.length + 1}>
                         <Group gap={6}>
                           <ToolIcon tool={g.model as ToolId} size={16} />
                           <Text fw={600}>{toolName(g.model)}</Text>
@@ -741,8 +736,7 @@ export function UsageLeaderboard({
                     g.children
                       .filter((m) => showSmall || m.requests >= 30)
                       .map((m) => {
-                        const cost = costs.get(modelKeyStr(m)),
-                          selected = checked.some((k) => modelKeyStr(k) === modelKeyStr(m))
+                        const cost = costs.get(modelKeyStr(m))
                         return (
                           <Table.Tr
                             key={modelKeyStr(m)}
@@ -751,15 +745,7 @@ export function UsageLeaderboard({
                             onMouseEnter={() => setHover({ series: seriesKey(m) })}
                             onMouseLeave={() => setHover(null)}
                           >
-                            <Table.Td>
-                              <Checkbox
-                                size="xs"
-                                aria-label={modelLabel(m)}
-                                checked={selected}
-                                disabled={!selected && checked.length >= 2}
-                                onChange={(e) => onCheck(m, e.currentTarget.checked)}
-                              />
-                            </Table.Td>
+                            {groupBy === 'model' && <Table.Td />}
                             <Table.Td>
                               <UnstyledButton
                                 onClick={() => onOpen(m)}

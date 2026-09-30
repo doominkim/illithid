@@ -564,10 +564,11 @@
     "days30": "30 天",
     "days90": "90 天",
     "all": "全部",
+    "custom": "自定义",
+    "from": "开始日期",
+    "to": "结束日期",
     "allTools": "全部",
     "showSmall": "显示请求较少的模型",
-    "compare": "并排查看",
-    "compareHint": "勾选两个即可并排查看",
     "col": {
       "model": "模型",
       "effort": "effort",
@@ -694,16 +695,6 @@
       "untitled": "（无标题）",
       "noProject": "（无目录信息）",
       "fewRequests": "请求 {{n}} 次 · 不显示分布"
-    },
-    "cmp": {
-      "title": "并排查看",
-      "overlap": "重叠期间 {{from}} ~ {{to}} · 两者都使用的天数 {{days}} 天。以下只统计该期间。",
-      "noOverlap": "使用期间不重叠，因此不计算差异：两个模型在不同时期用于不同任务。",
-      "diff": "差异",
-      "interruptsNA": "各工具定义不同，不比较",
-      "allErrors": "全部工具错误（参考）",
-      "metric": "指标",
-      "overlapSmall": "重叠期间（{{from}} ~ {{to}}，{{days}} 天）的请求太少，不计算差异。以下为各模型整个期间的值。"
     },
     "session": {
       "models": "本会话使用的模型：",

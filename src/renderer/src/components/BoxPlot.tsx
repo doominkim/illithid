@@ -12,28 +12,18 @@ interface Props {
   d: Dist
   /** Axis domain shared by rows that are compared */
   domain: [number, number]
-  /** Second model in a side-by-side view: hatched box */
-  hatch?: boolean
   height?: number
   scale?: 'log' | 'linear'
 }
 
 /** One-line box plot: whisker min–max, box p25–p75, median line, mean dot, p90 tick */
-export function BoxPlot({ d, domain, hatch, height = 18, scale = 'log' }: Props): React.JSX.Element {
+export function BoxPlot({ d, domain, height = 18, scale = 'log' }: Props): React.JSX.Element {
   const x = scale === 'linear' ? (v: number): number => Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0] || 1))) : logScale(domain[0], domain[1])
   const pct = (v: number): string => `${(x(v) * 100).toFixed(2)}%`
   const mid = height / 2
   const box = height * 0.62
-  const fill = hatch ? 'url(#ac-hatch)' : 'var(--ac-accent-bg)'
-  const stroke = hatch ? 'var(--ac-text)' : 'var(--ac-accent)'
   return (
     <svg width="100%" height={height} role="img" aria-hidden="true" style={{ display: 'block', overflow: 'visible' }}>
-      <defs>
-        <pattern id="ac-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="5" height="5" fill="var(--ac-surface)" />
-          <line x1="0" y1="0" x2="0" y2="5" stroke="var(--ac-text-muted)" strokeWidth="2" />
-        </pattern>
-      </defs>
       <line x1={pct(d.min)} x2={pct(d.max)} y1={mid} y2={mid} stroke="var(--ac-text-muted)" strokeWidth="1" />
       <line x1={pct(d.min)} x2={pct(d.min)} y1={mid - 4} y2={mid + 4} stroke="var(--ac-text-muted)" strokeWidth="1" />
       <line x1={pct(d.max)} x2={pct(d.max)} y1={mid - 4} y2={mid + 4} stroke="var(--ac-text-muted)" strokeWidth="1" />
@@ -43,8 +33,8 @@ export function BoxPlot({ d, domain, hatch, height = 18, scale = 'log' }: Props)
         width={`${Math.max(0.4, (x(d.p75) - x(d.p25)) * 100).toFixed(2)}%`}
         height={box}
         rx="2"
-        fill={fill}
-        stroke={stroke}
+        fill="var(--ac-accent-bg)"
+        stroke="var(--ac-accent)"
         strokeWidth="1"
       />
       <line x1={pct(d.median)} x2={pct(d.median)} y1={mid - box / 2} y2={mid + box / 2} stroke="var(--ac-text)" strokeWidth="2" />

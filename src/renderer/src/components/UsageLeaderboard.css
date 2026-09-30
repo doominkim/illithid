@@ -135,13 +135,20 @@
 .lb-table td:first-child {
   position: sticky;
   left: 0;
-  min-width: 64px;
-  width: 64px;
+  min-width: 220px;
   background: var(--ac-surface);
   z-index: 2;
+  border-right: 1px solid var(--ac-border);
 }
-.lb-table th:nth-child(2),
-.lb-table td:nth-child(2) {
+/* Model grouping adds a leading expand column; the model column sticks after it */
+.lb-table-expand th:first-child,
+.lb-table-expand td:first-child {
+  min-width: 64px;
+  width: 64px;
+  border-right: none;
+}
+.lb-table-expand th:nth-child(2),
+.lb-table-expand td:nth-child(2) {
   position: sticky;
   left: 64px;
   min-width: 220px;

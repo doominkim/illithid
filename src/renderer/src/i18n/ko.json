@@ -564,10 +564,11 @@
     "days30": "30일",
     "days90": "90일",
     "all": "전체",
+    "custom": "직접 설정",
+    "from": "시작일",
+    "to": "종료일",
     "allTools": "전체",
     "showSmall": "요청 적은 모델 표시",
-    "compare": "나란히 보기",
-    "compareHint": "두 개를 체크하면 나란히 보기",
     "col": {
       "model": "모델",
       "effort": "effort",
@@ -694,16 +695,6 @@
       "untitled": "(제목 없음)",
       "noProject": "(폴더 정보 없음)",
       "fewRequests": "요청 {{n}}건 · 분포 표시 안 함"
-    },
-    "cmp": {
-      "title": "나란히 보기",
-      "overlap": "겹친 기간 {{from}} ~ {{to}} · 둘 다 쓴 날 {{days}}일. 아래 값은 이 기간만 집계.",
-      "noOverlap": "사용 기간이 겹치지 않아 차이를 계산하지 않음. 두 모델은 다른 시기에 다른 작업에 쓰였음.",
-      "diff": "차이",
-      "interruptsNA": "툴마다 정의가 달라 비교하지 않음",
-      "allErrors": "전체 툴 오류 (참고)",
-      "metric": "지표",
-      "overlapSmall": "겹친 기간({{from}} ~ {{to}}, {{days}}일)의 요청이 적어 차이를 계산하지 않음. 아래 값은 각 모델의 전체 기간."
     },
     "session": {
       "models": "이 세션에서 쓴 모델:",

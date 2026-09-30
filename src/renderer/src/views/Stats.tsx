@@ -1,21 +1,22 @@
 import { formatTokens } from '../lib/tokenFormat'
-import { useContext, useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import {
   Box,
-  Button,
   Group,
   SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
   Switch,
   Table,
   Tabs,
   Text,
+  TextInput,
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
 import { LineChart } from '@mantine/charts'
-import { Info } from 'lucide-react'
+import { Info, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Dist, ModelDetail, ModelKey, ModelSummary, ToolId } from '../../../shared/api'
 import { UsageLeaderboard } from '../components/UsageLeaderboard'
@@ -36,15 +37,20 @@ import { RefreshContext } from '../lib/useApi'
 const MIN_REQUESTS = 30
 const MIN_TOOL_CALLS = 100
 
-type Days = 7 | 30 | 90 | 0
+type Period = '7' | '30' | '90' | '0' | 'custom'
 type Range = { days?: number; from?: string; to?: string }
 type Tr = (k: string, o?: Record<string, unknown>) => string
 
-const rangeOf = (days: Days): Range => (days ? { days } : {})
-const sameKey = (a: ModelKey, b: ModelKey): boolean =>
-  a.tool === b.tool && a.model === b.model && a.effort === b.effort
+/** Presets map to last N days; a custom range is sorted so a swapped start/end still reads as one span */
+const rangeOf = (period: Period, from: string, to: string): Range => {
+  if (period !== 'custom') return Number(period) ? { days: Number(period) } : {}
+  const [a, b] = from && to && from > to ? [to, from] : [from, to]
+  return { ...(a ? { from: a } : {}), ...(b ? { to: b } : {}) }
+}
 const label = modelLabel
 const toolName = (tool: string): string => TOOL_NAME[tool as ToolId] ?? tool
+const toolFilterIcon = (v: string): React.JSX.Element =>
+  v === 'all' ? <Layers size={13} /> : <ToolIcon tool={v as ToolId} size={13} />
 
 // ---------------------------------------------------------------- formatting
 
@@ -194,7 +200,7 @@ function DistTable({
   rows,
   fmt
 }: {
-  rows: { key: DistKey | 'contextPerTurn'; d: Dist | null; hatch?: boolean; tag?: React.ReactNode; max?: React.ReactNode; requests?: number }[]
+  rows: { key: DistKey | 'contextPerTurn'; d: Dist | null; max?: React.ReactNode; requests?: number }[]
   fmt: (k: string) => (n: number) => string
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -228,12 +234,9 @@ function DistTable({
           {rows.map((r, i) => (
             <Table.Tr key={`${r.key}-${i}`}>
               <Table.Td>
-                <Group gap={6} wrap="nowrap">
-                  {r.tag}
-                  <Text size="sm" style={{ whiteSpace: 'nowrap' }}>
-                    {t(`models.detail.metric.${r.key}`)}
-                  </Text>
-                </Group>
+                <Text size="sm" style={{ whiteSpace: 'nowrap' }}>
+                  {t(`models.detail.metric.${r.key}`)}
+                </Text>
               </Table.Td>
               {r.d ? (
                 <>
@@ -244,7 +247,7 @@ function DistTable({
                     </Table.Td>
                   ))}
                   <Table.Td>
-                    <BoxPlot d={r.d} domain={domain(r.key)} hatch={r.hatch} />
+                    <BoxPlot d={r.d} domain={domain(r.key)} />
                   </Table.Td>
                 </>
               ) : (
@@ -679,273 +682,19 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
   )
 }
 
-// ---------------------------------------------------------------- side by side
-
-function Swatch({ b }: { b?: boolean }): React.JSX.Element {
-  return (
-    <svg width="12" height="12" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <rect x="0.5" y="0.5" width="11" height="11" rx="2" fill={b ? 'url(#ac-hatch)' : 'var(--ac-accent-bg)'} stroke={b ? 'var(--ac-text)' : 'var(--ac-accent)'} />
-    </svg>
-  )
-}
-
-function CompareView({ a, b, range }: { a: ModelKey; b: ModelKey; range: Range }): React.JSX.Element {
-  const f = useFmt()
-  const { t } = f
-  // First the chosen range for both, then — when their days overlap — only the overlapping days
-  const first = useStatsLoad<[ModelDetail | null, ModelDetail | null]>([modelKeyStr(a), modelKeyStr(b), JSON.stringify(range)], () =>
-    Promise.all([window.api.modelDetail(a, range), window.api.modelDetail(b, range)])
-  )
-  const overlap = useMemo(() => {
-    const [x, y] = first.data ?? [null, null]
-    if (!x || !y) return null
-    const days = new Set(x.daily.filter((d) => d.turns > 0).map((d) => d.day))
-    const both = y.daily.filter((d) => d.turns > 0 && days.has(d.day)).map((d) => d.day)
-    return both.length ? { from: both[0], to: both[both.length - 1], days: both.length } : null
-  }, [first.data])
-  const second = useStatsLoad<[ModelDetail | null, ModelDetail | null]>([modelKeyStr(a), modelKeyStr(b), overlap?.from, overlap?.to], () =>
-    overlap ? Promise.all([window.api.modelDetail(a, overlap), window.api.modelDetail(b, overlap)]) : Promise.resolve(null)
-  )
-  if (first.data === undefined) return <Loading />
-  if (overlap && second.data === undefined) return <Loading />
-  // The overlap is used only when both sides have enough requests in it; otherwise each model's whole period, without differences
-  const inOverlap = second.data ?? null
-  const enough = !!overlap && !!inOverlap?.[0] && !!inOverlap?.[1] && inOverlap[0].summary.requests >= MIN_REQUESTS && inOverlap[1].summary.requests >= MIN_REQUESTS
-  const pair = enough ? inOverlap : first.data
-  const [x, y] = pair ?? [null, null]
-  if (!x || !y) return <Text c="dimmed">{t('models.indexing')}</Text>
-  const A = x.summary
-  const B = y.summary
-  const showDiff = enough
-  const ratio = (p: number, q: number): string => (q ? `×${(p / q).toFixed(2)}` : '—')
-  const pp = (p: number, q: number): string => `${p - q >= 0 ? '+' : ''}${((p - q) * 100).toFixed(2)}%p`
-  const rate = (m: ModelSummary): number | null => (m.tool === 'claude' && m.toolCalls >= MIN_TOOL_CALLS ? m.errors.mistake / m.toolCalls : null)
-  const allErr = (m: ModelSummary): number => m.errors.mistake + m.errors.command + m.errors.policy + m.errors.userReject + m.errors.other
-  const fmtOf = (key: string): ((n: number) => string) => (key === 'responseSec' ? f.dur : key === 'outputPerRequest' || key === 'contextPerTurn' ? f.tok : f.int)
-  const rows: { name: string; a: string; b: string; diff?: string; muted?: boolean }[] = [
-    { name: t('models.col.period'), a: `${A.first.slice(5)} ~ ${A.last.slice(5)}`, b: `${B.first.slice(5)} ~ ${B.last.slice(5)}` },
-    { name: t('models.detail.sessions'), a: f.int(A.sessions), b: f.int(B.sessions), diff: ratio(A.sessions, B.sessions) },
-    { name: t('models.col.requests'), a: f.int(A.requests), b: f.int(B.requests), diff: ratio(A.requests, B.requests) },
-    { name: t('models.detail.turns'), a: f.int(A.turns), b: f.int(B.turns), diff: ratio(A.turns, B.turns) },
-    { name: t('models.detail.toolCalls'), a: f.int(A.toolCalls), b: f.int(B.toolCalls), diff: ratio(A.toolCalls, B.toolCalls) },
-    {
-      name: `${t('models.detail.mistakes')} (${t('models.col.per100')})`,
-      a: rate(A) === null ? '—' : (rate(A)! * 100).toFixed(2),
-      b: rate(B) === null ? '—' : (rate(B)! * 100).toFixed(2),
-      diff: rate(A) !== null && rate(B) !== null ? pp(rate(A)!, rate(B)!) : '—'
-    },
-    A.tool === B.tool && A.tool !== 'opencode'
-      ? {
-          name: `${t('models.detail.interrupts')} (${t('models.detail.interruptsSub', { n: '' }).trim()})`,
-          a: ((A.interrupts / Math.max(1, A.turns)) * 100).toFixed(2),
-          b: ((B.interrupts / Math.max(1, B.turns)) * 100).toFixed(2)
-        }
-      : { name: t('models.detail.interrupts'), a: t('models.cmp.interruptsNA'), b: '', muted: true },
-    { name: t('models.detail.tk.output'), a: f.tok(A.tokens.output), b: f.tok(B.tokens.output), diff: ratio(A.tokens.output, B.tokens.output) },
-    {
-      name: t('models.col.context'),
-      a: A.median.contextPerTurn === null ? '—' : f.tok(A.median.contextPerTurn),
-      b: B.median.contextPerTurn === null ? '—' : f.tok(B.median.contextPerTurn),
-      diff: A.median.contextPerTurn && B.median.contextPerTurn ? ratio(A.median.contextPerTurn, B.median.contextPerTurn) : '—'
-    },
-    {
-      name: t('models.cmp.allErrors'),
-      a: A.toolCalls ? f.pct(allErr(A) / A.toolCalls) : '—',
-      b: B.toolCalls ? f.pct(allErr(B) / B.toolCalls) : '—',
-      muted: true
-    }
-  ]
-  const toolNames = [...new Set([...x.tools.slice(0, 10).map((q) => q.name), ...y.tools.slice(0, 10).map((q) => q.name)])]
-  const toolOf = (d: ModelDetail, n: string): { calls: number; errors: number } | undefined => d.tools.find((q) => q.name === n)
-
-  return (
-    <Stack gap="xl" data-testid="stats-compare">
-      {a.tool !== b.tool && <Text size="sm" c="dimmed">{t('efficiency.mixedTools')}</Text>}
-      <SimpleGrid cols={2}>
-        {[
-          { k: a, m: A, b: false },
-          { k: b, m: B, b: true }
-        ].map(({ k, m, b: isB }) => (
-          <Box key={modelKeyStr(k)} className="ac-card" p="md">
-            <Group gap={8} wrap="nowrap">
-              <Swatch b={isB} />
-              <Text fw={600} ff="monospace">
-                {label(k)}
-              </Text>
-              <ToolTag tool={k.tool} />
-            </Group>
-            <Text size="xs" c="dimmed" mt={4} style={NUM}>
-              {isB ? 'B' : 'A'} · {m.first} ~ {m.last} · {t('models.activeDays', { n: m.activeDays })}
-            </Text>
-          </Box>
-        ))}
-      </SimpleGrid>
-      <Text size="sm" c="dimmed" className="ac-card" p="sm" data-testid="stats-overlap">
-        {!overlap ? t('models.cmp.noOverlap') : enough ? t('models.cmp.overlap', { from: overlap.from, to: overlap.to, days: overlap.days }) : t('models.cmp.overlapSmall', { from: overlap.from, to: overlap.to, days: overlap.days })}
-      </Text>
-
-      <Box className="ac-card" style={{ overflowX: 'auto' }}>
-        <Table verticalSpacing={7} horizontalSpacing="md">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>
-                <Text size="xs" c="dimmed" fw={600}>
-                  {t('models.cmp.metric')}
-                </Text>
-              </Table.Th>
-              <Table.Th ta="right">
-                <Group gap={4} justify="flex-end">
-                  <Swatch />
-                  <Text size="xs" fw={600}>
-                    A
-                  </Text>
-                </Group>
-              </Table.Th>
-              <Table.Th ta="right">
-                <Group gap={4} justify="flex-end">
-                  <Swatch b />
-                  <Text size="xs" fw={600}>
-                    B
-                  </Text>
-                </Group>
-              </Table.Th>
-              {showDiff && (
-                <Table.Th ta="right">
-                  <Text size="xs" c="dimmed" fw={600}>
-                    {t('models.cmp.diff')}
-                  </Text>
-                </Table.Th>
-              )}
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map((r) => (
-              <Table.Tr key={r.name}>
-                <Table.Td>
-                  <Text size="sm" c={r.muted ? 'dimmed' : undefined}>
-                    {r.name}
-                  </Text>
-                </Table.Td>
-                {r.b === '' ? (
-                  <Table.Td colSpan={showDiff ? 3 : 2} ta="right">
-                    <Text size="sm" c="dimmed">
-                      {r.a}
-                    </Text>
-                  </Table.Td>
-                ) : (
-                  <>
-                    <Table.Td ta="right" style={NUM} c={r.muted ? 'dimmed' : undefined}>
-                      {r.a}
-                    </Table.Td>
-                    <Table.Td ta="right" style={NUM} c={r.muted ? 'dimmed' : undefined}>
-                      {r.b}
-                    </Table.Td>
-                    {showDiff && (
-                      <Table.Td ta="right" style={NUM} c="dimmed">
-                        {r.diff ?? ''}
-                      </Table.Td>
-                    )}
-                  </>
-                )}
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </Box>
-
-      <Box>
-        <SectionTitle>{t('models.detail.dist')}</SectionTitle>
-        <DistTable
-          fmt={fmtOf}
-          rows={DIST_KEYS.flatMap((key) => [
-            { key, d: x.dist[key], tag: <Swatch />, requests: A.requests },
-            { key, d: y.dist[key], hatch: true, tag: <Swatch b />, requests: B.requests }
-          ])}
-        />
-      </Box>
-
-      <Box>
-        <SectionTitle>{t('models.detail.tabTools')}</SectionTitle>
-        <Box className="ac-card">
-          <Table verticalSpacing={5} horizontalSpacing="md">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th />
-                <Table.Th ta="right">
-                  <Group gap={4} justify="flex-end">
-                    <Swatch />
-                    <Text size="xs" fw={600}>
-                      {t('models.detail.calls')}
-                    </Text>
-                  </Group>
-                </Table.Th>
-                <Table.Th ta="right">
-                  <Text size="xs" c="dimmed" fw={600}>
-                    {t('models.detail.errorRate')}
-                  </Text>
-                </Table.Th>
-                <Table.Th ta="right">
-                  <Group gap={4} justify="flex-end">
-                    <Swatch b />
-                    <Text size="xs" fw={600}>
-                      {t('models.detail.calls')}
-                    </Text>
-                  </Group>
-                </Table.Th>
-                <Table.Th ta="right">
-                  <Text size="xs" c="dimmed" fw={600}>
-                    {t('models.detail.errorRate')}
-                  </Text>
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {toolNames.map((n) => {
-                const p = toolOf(x, n)
-                const q = toolOf(y, n)
-                return (
-                  <Table.Tr key={n}>
-                    <Table.Td>
-                      <Text size="sm" ff="monospace">
-                        {n}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td ta="right" style={NUM}>
-                      {p ? f.int(p.calls) : '—'}
-                    </Table.Td>
-                    <Table.Td ta="right" style={NUM} c="dimmed">
-                      {p?.errors ? f.pct(p.errors / p.calls) : '—'}
-                    </Table.Td>
-                    <Table.Td ta="right" style={NUM}>
-                      {q ? f.int(q.calls) : '—'}
-                    </Table.Td>
-                    <Table.Td ta="right" style={NUM} c="dimmed">
-                      {q?.errors ? f.pct(q.errors / q.calls) : '—'}
-                    </Table.Td>
-                  </Table.Tr>
-                )
-              })}
-            </Table.Tbody>
-          </Table>
-        </Box>
-      </Box>
-    </Stack>
-  )
-}
-
 // ---------------------------------------------------------------- screen
 
 function Stats(): React.JSX.Element {
   const { t } = useTranslation()
   const { navigate } = useNav()
-  const [days, setDays] = useState<Days>(30)
+  const [period, setPeriod] = useState<Period>('30')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [showSmall, setShowSmall] = useState(false)
   const [tool, setTool] = useState<string>('all')
-  const [checked, setChecked] = useState<ModelKey[]>([])
   const [selected, setSelected] = useState<ModelKey | null>(null)
-  const [comparing, setComparing] = useState<[ModelKey, ModelKey] | null>(null)
-  const range = rangeOf(days)
-  const { data, indexing } = useStatsLoad<ModelSummary[]>([days], () => window.api.models(range))
+  const range = rangeOf(period, from, to)
+  const { data, indexing } = useStatsLoad<ModelSummary[]>([range], () => window.api.models(range))
   useNavSelect((s) => {
     const k = parseModelKey(s)
     if (k) setSelected(k)
@@ -964,46 +713,78 @@ function Stats(): React.JSX.Element {
         actions={<ReloadButton />}
       />
       <Group gap="sm" mb="sm" wrap="wrap" className="ac-stats-filters">
-        <SegmentedControl
-          size="xs"
-          value={String(days)}
-          onChange={(v) => setDays(Number(v) as Days)}
+        <Select
+          w={120}
+          allowDeselect={false}
+          value={period}
+          onChange={(v) => {
+            if (!v) return
+            if (v === 'custom' && !from && !to) {
+              setFrom(shiftDay(today(), -29))
+              setTo(today())
+            }
+            setPeriod(v as Period)
+          }}
+          aria-label={t('models.detail.colPeriod')}
           data={[
             { value: '7', label: t('models.days7') },
             { value: '30', label: t('models.days30') },
             { value: '90', label: t('models.days90') },
-            { value: '0', label: t('models.all') }
+            { value: '0', label: t('models.all') },
+            { value: 'custom', label: t('models.custom') }
           ]}
           data-testid="stats-days"
         />
-<Group gap="xs" wrap="nowrap">
-<Text size="xs" c="dimmed">{t('efficiency.referenceTool')}</Text>
-        <SegmentedControl
-          size="xs"
-          value={tool}
-          onChange={(v) => { setTool(v); setChecked([]); setComparing(null) }}
-          data={[
-            { value: 'all', label: t('models.allTools') },
-            ...tools.map((x) => ({ value: x, label: toolName(x) }))
-          ]}
-          data-testid="stats-tool"
-        />
-        </Group>
-<Switch size="xs" label={t('models.showSmall')} checked={showSmall} onChange={(e) => { setShowSmall(e.currentTarget.checked); setChecked([]) }} data-testid="stats-show-small" />
-        <Group gap="xs" ml="auto">
+        {period === 'custom' && (
+          <Group gap={6} wrap="nowrap">
+            <TextInput
+              type="date"
+              w={150}
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.currentTarget.value)}
+              aria-label={t('models.from')}
+              data-testid="stats-from"
+            />
+            <Text size="xs" c="dimmed">
+              ~
+            </Text>
+            <TextInput
+              type="date"
+              w={150}
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.currentTarget.value)}
+              aria-label={t('models.to')}
+              data-testid="stats-to"
+            />
+          </Group>
+        )}
+        <Group gap="xs" wrap="nowrap">
           <Text size="xs" c="dimmed">
-            {t('models.compareHint')}
+            {t('efficiency.referenceTool')}
           </Text>
-          <Button
-            size="xs"
-            variant="default"
-            disabled={checked.length !== 2}
-            onClick={() => checked.length === 2 && setComparing([checked[0], checked[1]])}
-            data-testid="stats-compare-open"
-          >
-            {t('models.compare')}
-          </Button>
+          <Select
+            w={170}
+            allowDeselect={false}
+            value={tool}
+            onChange={(v) => setTool(v ?? 'all')}
+            aria-label={t('efficiency.referenceTool')}
+            data={[
+              { value: 'all', label: t('models.allTools') },
+              ...tools.map((x) => ({ value: x, label: toolName(x) }))
+            ]}
+            leftSection={toolFilterIcon(tool)}
+            renderOption={({ option }) => (
+              <Group gap={6} wrap="nowrap">
+                {toolFilterIcon(option.value)}
+                <span>{option.label}</span>
+              </Group>
+            )}
+            data-testid="stats-tool"
+          />
         </Group>
+<Switch size="xs" label={t('models.showSmall')} checked={showSmall} onChange={(e) => setShowSmall(e.currentTarget.checked)} data-testid="stats-show-small" />
       </Group>
 
       {tool === 'all' && tools.length > 1 && <Text size="xs" c="dimmed" mb="sm" data-testid="stats-mixed-tools">{t('efficiency.mixedTools')}</Text>}
@@ -1023,14 +804,6 @@ function Stats(): React.JSX.Element {
           models={models}
           showSmall={showSmall}
           onOpen={setSelected}
-          checked={checked}
-          onCheck={(k, on) =>
-            setChecked((c) =>
-              on
-                ? [...c.filter((x) => !sameKey(x, k)), k].slice(-2)
-                : c.filter((x) => !sameKey(x, k))
-            )
-          }
         />
       )}
 
@@ -1057,14 +830,6 @@ function Stats(): React.JSX.Element {
             onSession={openSession}
           />
         )}
-      </DetailSheet>
-
-      <DetailSheet
-        opened={!!comparing}
-        onClose={() => setComparing(null)}
-        title={t('models.cmp.title')}
-      >
-        {comparing && <CompareView a={comparing[0]} b={comparing[1]} range={range} />}
       </DetailSheet>
     </Stack>
   )

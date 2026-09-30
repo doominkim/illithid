@@ -4,8 +4,15 @@ import { test } from 'node:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { _electron as electron } from 'playwright-core'
+import { _electron as electron, type Page } from 'playwright-core'
 import type { ModelSummary } from '../src/shared/api'
+
+/** Choose an option from a Mantine Select by its input test id */
+async function pick(page: Page, testId: string, label: string): Promise<void> {
+  await page.getByTestId(testId).click()
+  await page.getByRole('option').getByText(label, { exact: true }).click()
+  assert.equal(await page.getByTestId(testId).inputValue(), label)
+}
 
 const base = (
   model: string,
@@ -141,6 +148,8 @@ test(
         ipcMain.removeHandler('api:models')
         ipcMain.handle('api:models', (_event, range) => {
           reads++
+          ;(globalThis as { lastModelRange?: unknown }).lastModelRange = range ?? null
+          if (range?.from && range.from === range.to) return data.slice(0, 1)
           return range?.days === 7 ? data.slice(0, 2) : data
         })
         ipcMain.handle('test:modelReads', () => reads)
@@ -223,13 +232,15 @@ test(
       assert.equal(await rows.count(), 5)
       // REQ-MODEL-EFFICIENCY-16: flat by default, tool headers optional, model hierarchy opt-in.
       assert.equal(await page.getByTestId('stats-model-parent').count(), 0)
+      assert.equal(await rows.first().locator('td').count(), 12)
+      assert.equal(await page.getByTestId('stats-compare-open').count(), 0)
       const flatTokens = page
         .getByTestId('stats-table')
         .getByRole('columnheader')
         .filter({ hasText: '토큰 합계' })
       await flatTokens.getByRole('button').click()
       const flatValues = await rows
-        .locator('td:nth-child(3) [title]')
+        .locator('td:nth-child(2) [title]')
         .evaluateAll((cells) =>
           cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
         )
@@ -239,7 +250,7 @@ test(
       )
       await flatTokens.getByRole('button').click()
       const flatDescending = await rows
-        .locator('td:nth-child(3) [title]')
+        .locator('td:nth-child(2) [title]')
         .evaluateAll((cells) =>
           cells.map((c) => Number(c.getAttribute('title')?.replaceAll(',', '')))
         )
@@ -410,18 +421,41 @@ test(
       assert.equal(await page.getByTestId('stats-cost-daily').locator('.recharts-line').count(), 1)
       assert.equal(await page.getByTestId('stats-cost-distribution').locator('svg').count(), 1)
       await page.getByTestId('detail-sheet').getByRole('button', { name: '뒤로' }).click()
-      await page.getByTestId('stats-days').getByText('7일', { exact: true }).click()
+      await pick(page, 'stats-days', '7일')
       await page.waitForFunction(
         () => document.querySelectorAll('[data-testid="stats-row"]').length === 2
       )
-      await page.getByTestId('stats-days').getByText('30일', { exact: true }).click()
+      await pick(page, 'stats-days', '직접 설정')
+      const day = (d: Date): string =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const now = new Date()
+      assert.equal(await page.getByTestId('stats-to').inputValue(), day(now))
+      assert.equal(
+        await page.getByTestId('stats-from').inputValue(),
+        day(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 12))
+      )
+      const lastRange = (): Promise<unknown> =>
+        app.evaluate(() => (globalThis as { lastModelRange?: unknown }).lastModelRange)
+      await page.getByTestId('stats-from').fill('2026-09-20')
+      await page.getByTestId('stats-to').fill('2026-09-10')
       await page.waitForFunction(
         () => document.querySelectorAll('[data-testid="stats-row"]').length === 6
       )
-      await page.getByTestId('stats-tool').getByText('Codex', { exact: true }).click()
+      assert.deepEqual(await lastRange(), { from: '2026-09-10', to: '2026-09-20' })
+      await page.screenshot({ path: '/tmp/illithid-stats-custom-range.png' })
+      await page.getByTestId('stats-to').fill('2026-09-20')
+      await page.waitForFunction(
+        () => document.querySelectorAll('[data-testid="stats-row"]').length === 1
+      )
+      await pick(page, 'stats-days', '30일')
+      await page.waitForFunction(
+        () => document.querySelectorAll('[data-testid="stats-row"]').length === 6
+      )
+      assert.equal(await page.getByTestId('stats-from').count(), 0)
+      await pick(page, 'stats-tool', 'Codex')
       assert.equal(await rows.count(), 2)
       assert.equal(await page.getByTestId('stats-mixed-tools').count(), 0)
-      await page.getByTestId('stats-tool').locator('label').first().click()
+      await pick(page, 'stats-tool', '전체')
       assert.equal(await rows.count(), 6)
       const unknown = page.locator('[data-testid="stats-row"][data-model="unpriced-model"]')
       assert.ok((await unknown.innerText()).includes('단가 없음'))
