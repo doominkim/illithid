@@ -1,0 +1,109 @@
+.usage-scatter {
+  position: relative;
+}
+.lb-viewport {
+  overflow: auto;
+  max-height: 440px;
+}
+.lb-viewport > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.lb-grid line {
+  stroke: var(--ac-border);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.lb-grid text {
+  fill: var(--ac-text-muted);
+  font-size: 10px;
+}
+.lb-axis-label {
+  fill: var(--ac-text);
+  font-size: 11px;
+}
+.lb-model {
+  font: 10px var(--mantine-font-family-monospace);
+}
+.lb-model {
+  paint-order: stroke;
+  stroke: var(--ac-surface);
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+}
+.lb-labels text {
+  cursor: pointer;
+}
+.lb-point {
+  cursor: pointer;
+  outline: none;
+}
+.lb-point:hover .lb-dot,
+.lb-point:focus .lb-dot {
+  stroke-width: 1.5;
+}
+.lb-point:focus-visible .lb-dot {
+  stroke: var(--ac-text);
+  stroke-dasharray: 3 2;
+}
+.lb-guides line {
+  stroke: var(--guide-color);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.2;
+}
+.lb-guides rect {
+  fill: var(--ac-surface);
+  stroke: var(--guide-color);
+}
+.lb-guides text {
+  fill: var(--ac-text);
+  font-size: 10px;
+}
+.lb-legend button {
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.lb-legend button:focus-visible {
+  outline: 2px solid var(--ac-accent);
+}
+.lb-legend-tool {
+  color: var(--ac-text-muted);
+}
+
+.lb-metric-bar {
+  width: 64px;
+  height: 3px;
+  margin: 4px 0 3px auto;
+  border-radius: 2px;
+  background: var(--ac-border);
+  overflow: hidden;
+}
+.lb-metric-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ac-text-muted);
+}
+
+.lb-parent {
+  background: var(--ac-surface-active);
+}
+
+.lb-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--ac-text);
+  border-radius: 6px;
+}
+.lb-expand:hover {
+  background: var(--ac-border);
+}
+.lb-expand:focus-visible {
+  outline: 2px solid var(--ac-text);
+  outline-offset: 2px;
+}

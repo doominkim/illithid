@@ -1,9 +1,25 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { Box, Button, Checkbox, Group, SegmentedControl, SimpleGrid, Stack, Switch, Table, Tabs, Text, Tooltip, UnstyledButton } from '@mantine/core'
-import { BarChart, LineChart } from '@mantine/charts'
-import { ChevronDown, ChevronRight, Info } from 'lucide-react'
+import {
+  Box,
+  Button,
+  Group,
+  SegmentedControl,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Table,
+  Tabs,
+  Text,
+  Tooltip,
+  UnstyledButton
+} from '@mantine/core'
+import { LineChart } from '@mantine/charts'
+import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Dist, ModelDetail, ModelKey, ModelSummary, ToolId } from '../../../shared/api'
+import { UsageLeaderboard } from '../components/UsageLeaderboard'
+import { ModelCost } from '../components/ModelCost'
+
 import { BoxPlot } from '../components/BoxPlot'
 import { DetailSheet } from '../components/DetailSheet'
 import { Loading } from '../components/Layout'
@@ -24,7 +40,8 @@ type Range = { days?: number; from?: string; to?: string }
 type Tr = (k: string, o?: Record<string, unknown>) => string
 
 const rangeOf = (days: Days): Range => (days ? { days } : {})
-const sameKey = (a: ModelKey, b: ModelKey): boolean => a.tool === b.tool && a.model === b.model && a.effort === b.effort
+const sameKey = (a: ModelKey, b: ModelKey): boolean =>
+  a.tool === b.tool && a.model === b.model && a.effort === b.effort
 const label = modelLabel
 const toolName = (tool: string): string => TOOL_NAME[tool as ToolId] ?? tool
 
@@ -49,8 +66,12 @@ function useFmt(): {
   const dur = (sec: number): string => {
     const s = Math.round(sec)
     if (s < 60) return t('models.dur.s', { s })
-    if (s < 3600) return t('models.dur.ms', { m: Math.floor(s / 60), s: String(s % 60).padStart(2, '0') })
-    return t('models.dur.hm', { h: Math.floor(s / 3600), m: String(Math.floor((s % 3600) / 60)).padStart(2, '0') })
+    if (s < 3600)
+      return t('models.dur.ms', { m: Math.floor(s / 60), s: String(s % 60).padStart(2, '0') })
+    return t('models.dur.hm', {
+      h: Math.floor(s / 3600),
+      m: String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+    })
   }
   const pct = (n: number, digits = 1): string => `${(n * 100).toFixed(digits)}%`
   return { int, tok, dur, pct, t }
@@ -59,7 +80,10 @@ function useFmt(): {
 const NUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }
 
 /** Loads on mount, on Reload, on range change and whenever a session index run finishes */
-function useStatsLoad<T>(deps: unknown[], load: () => Promise<T | null>): { data: T | null | undefined; indexing: boolean } {
+function useStatsLoad<T>(
+  deps: unknown[],
+  load: () => Promise<T | null>
+): { data: T | null | undefined; indexing: boolean } {
   const tick = useContext(RefreshContext)
   // Results are tagged with the deps they were loaded for: a stale result reads as "loading" without resetting state in the effect
   const depKey = JSON.stringify([tick, ...deps])
@@ -74,7 +98,10 @@ function useStatsLoad<T>(deps: unknown[], load: () => Promise<T | null>): { data
       )
     }
     run()
-    window.api.sessionIndexStatus().then((v) => alive && setIndexing(v.running), () => {})
+    window.api.sessionIndexStatus().then(
+      (v) => alive && setIndexing(v.running),
+      () => {}
+    )
     const off = window.api.onSearchIndexEvent((v) => {
       if (!alive) return
       setIndexing(v.running)
@@ -93,7 +120,15 @@ function useStatsLoad<T>(deps: unknown[], load: () => Promise<T | null>): { data
 function Tip({ label: text }: { label: string }): React.JSX.Element {
   return (
     <Tooltip label={text} multiline w={280} withArrow>
-      <Info size={12} style={{ color: 'var(--ac-text-muted)', verticalAlign: '-1px', marginLeft: 3, flexShrink: 0 }} />
+      <Info
+        size={12}
+        style={{
+          color: 'var(--ac-text-muted)',
+          verticalAlign: '-1px',
+          marginLeft: 3,
+          flexShrink: 0
+        }}
+      />
     </Tooltip>
   )
 }
@@ -106,320 +141,6 @@ function ToolTag({ tool }: { tool: string }): React.JSX.Element {
         {toolName(tool)}
       </Text>
     </Group>
-  )
-}
-
-// ---------------------------------------------------------------- list
-
-type SortKey = 'last' | 'requests' | 'tools' | 'turns' | 'response' | 'mistakes' | 'output' | 'context'
-
-interface Row {
-  key: ModelKey
-  models: ModelSummary[]
-  /** Model used at several efforts: expandable group */
-  group: boolean
-}
-
-/** Reasoning levels from low to high; unknown ones go last in name order */
-const EFFORT_ORDER = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
-const effortRank = (e: string): number => {
-  const i = EFFORT_ORDER.indexOf(e)
-  return i < 0 ? EFFORT_ORDER.length : i
-}
-/** Efforts of a grouped model, low to high: "low · medium · high" */
-const effortList = (models: ModelSummary[]): string =>
-  models
-    .map((m) => m.effort || '—')
-    .sort((a, b) => effortRank(a) - effortRank(b) || a.localeCompare(b))
-    .join(' · ')
-
-function sortValue(m: ModelSummary, k: SortKey): number | string | null {
-  switch (k) {
-    case 'last':
-      return m.last
-    case 'requests':
-      return m.requests
-    case 'tools':
-      return m.median.toolsPerRequest
-    case 'turns':
-      return m.median.turnsPerRequest
-    case 'response':
-      return m.median.responseSec
-    case 'mistakes':
-      return m.tool === 'claude' && m.toolCalls >= MIN_TOOL_CALLS ? m.errors.mistake / m.toolCalls : null
-    case 'output':
-      return m.median.outputPerRequest
-    case 'context':
-      return m.median.contextPerTurn
-  }
-}
-
-function compareBy(k: SortKey, dir: 1 | -1) {
-  return (a: ModelSummary, b: ModelSummary): number => {
-    const x = sortValue(a, k)
-    const y = sortValue(b, k)
-    if (x === null && y === null) return 0
-    if (x === null) return 1
-    if (y === null) return -1
-    return (x < y ? -1 : x > y ? 1 : 0) * dir
-  }
-}
-
-function StatsList({
-  models,
-  onOpen,
-  checked,
-  onCheck,
-  showSmall
-}: {
-  models: ModelSummary[]
-  onOpen: (k: ModelKey) => void
-  checked: ModelKey[]
-  onCheck: (k: ModelKey, on: boolean) => void
-  showSmall: boolean
-}): React.JSX.Element {
-  const f = useFmt()
-  const { t } = f
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'last', dir: -1 })
-  const [open, setOpen] = useState<Set<string>>(new Set())
-
-  const visible = models.filter((m) => showSmall || m.requests >= MIN_REQUESTS)
-  const rows = useMemo<Row[]>(() => {
-    const cmp = compareBy(sort.key, sort.dir)
-    const groups = new Map<string, ModelSummary[]>()
-    const out: Row[] = []
-    const gk = (m: ModelSummary): string => `${m.tool}|${m.model}`
-    for (const m of visible) {
-      const list = groups.get(gk(m))
-      if (list) list.push(m)
-      else groups.set(gk(m), [m])
-    }
-    for (const m of visible) {
-      const list = groups.get(gk(m))!
-      if (list.length > 1) {
-        // Rows inside a group follow the effort level, like the list in the group row
-        if (list[0] === m)
-          out.push({ key: { tool: m.tool, model: m.model, effort: '' }, models: [...list].sort((a, b) => effortRank(a.effort) - effortRank(b.effort) || a.effort.localeCompare(b.effort)), group: true })
-        continue
-      }
-      out.push({ key: m, models: [m], group: false })
-    }
-    // Groups sort by their best child for the chosen column
-    return out.sort((a, b) => cmp([...a.models].sort(cmp)[0], [...b.models].sort(cmp)[0]))
-  }, [visible, sort])
-
-  const head = (key: SortKey, text: string, sub?: string, tip?: string): React.JSX.Element => (
-    <Table.Th ta="right" style={{ verticalAlign: 'bottom' }}>
-      <UnstyledButton
-        onClick={() => setSort((s) => ({ key, dir: s.key === key ? ((-s.dir) as 1 | -1) : -1 }))}
-        aria-sort={sort.key === key ? (sort.dir < 0 ? 'descending' : 'ascending') : 'none'}
-        style={{ textAlign: 'right' }}
-      >
-        <Text size="xs" fw={600} c={sort.key === key ? undefined : 'dimmed'} component="span">
-          {text}
-          {tip && <Tip label={tip} />}
-          {sort.key === key ? (sort.dir < 0 ? ' ↓' : ' ↑') : ''}
-        </Text>
-        {sub && (
-          <Text size="xs" c="dimmed" display="block">
-            {sub}
-          </Text>
-        )}
-      </UnstyledButton>
-    </Table.Th>
-  )
-
-  const range = (list: ModelSummary[], f2: (m: ModelSummary) => number | null, fmt: (n: number) => string): string => {
-    const v = list.map(f2).filter((x): x is number => x !== null)
-    if (!v.length) return '—'
-    const lo = Math.min(...v)
-    const hi = Math.max(...v)
-    return lo === hi ? fmt(lo) : `${fmt(lo)}–${fmt(hi)}`
-  }
-  const cells = (list: ModelSummary[]): React.JSX.Element => {
-    const one = list.length === 1 ? list[0] : undefined
-    const first = list.reduce((a, m) => (m.first < a ? m.first : a), list[0].first)
-    const last = list.reduce((a, m) => (m.last > a ? m.last : a), list[0].last)
-    const days = one ? one.activeDays : Math.max(...list.map((m) => m.activeDays))
-    const requests = list.reduce((a, m) => a + m.requests, 0)
-    // Mistakes are only told apart in Claude Code logs; a group adds its efforts up
-    const mistakeCount = list.reduce((a, m) => a + m.errors.mistake, 0)
-    const calls = list.reduce((a, m) => a + m.toolCalls, 0)
-    const mistakes =
-      list[0].tool === 'claude' ? (
-        <>
-          <Text size="sm" style={NUM}>
-            {f.int(mistakeCount)}
-          </Text>
-          {calls >= MIN_TOOL_CALLS && (
-            <Text size="xs" c="dimmed" style={NUM}>
-              {(mistakeCount / (calls / 100)).toFixed(2)}
-            </Text>
-          )}
-        </>
-      ) : (
-        <Tooltip label={t('models.mistakesNA')} withArrow>
-          <Text size="sm" c="dimmed">
-            —
-          </Text>
-        </Tooltip>
-      )
-    return (
-      <>
-        <Table.Td>
-          <Text size="sm" style={NUM}>
-            {first.slice(5)} ~ {last.slice(5)}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {t('models.activeDays', { n: days })}
-          </Text>
-        </Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {f.int(requests)}
-        </Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {range(list, (m) => m.median.toolsPerRequest, f.int)}
-        </Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {range(list, (m) => m.median.turnsPerRequest, f.int)}
-        </Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {range(list, (m) => m.median.responseSec, f.dur)}
-        </Table.Td>
-        <Table.Td ta="right">{mistakes}</Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {range(list, (m) => m.median.outputPerRequest, f.tok)}
-        </Table.Td>
-        <Table.Td ta="right" style={NUM}>
-          {range(list, (m) => m.median.contextPerTurn, f.tok)}
-        </Table.Td>
-      </>
-    )
-  }
-
-  const isChecked = (k: ModelKey): boolean => checked.some((c) => sameKey(c, k))
-  const check = (m: ModelSummary): React.JSX.Element => (
-    <Checkbox
-      size="xs"
-      aria-label={label(m)}
-      checked={isChecked(m)}
-      disabled={!isChecked(m) && checked.length >= 2}
-      onChange={(e) => onCheck(m, e.currentTarget.checked)}
-      onClick={(e) => e.stopPropagation()}
-    />
-  )
-  const small = (m: ModelSummary): React.JSX.Element | null =>
-    m.requests < MIN_REQUESTS ? (
-      <Text size="xs" c="dimmed" span ml={6} style={{ border: '1px solid var(--ac-border)', borderRadius: 4, padding: '0 4px' }}>
-        {t('models.small')}
-      </Text>
-    ) : null
-
-  // Model name above its tool, so long ids don't push the columns apart
-  const modelCell = (k: ModelKey): React.JSX.Element => (
-    <Stack gap={2}>
-      <Text size="sm" fw={600} ff="monospace" style={{ whiteSpace: 'nowrap' }}>
-        {k.model}
-      </Text>
-      <ToolTag tool={k.tool} />
-    </Stack>
-  )
-  const effortCell = (m: ModelSummary): React.JSX.Element => (
-    <Group gap={6} wrap="nowrap">
-      <Text size="sm" ff="monospace" c={m.effort ? undefined : 'dimmed'}>
-        {m.effort || '—'}
-      </Text>
-      {small(m)}
-    </Group>
-  )
-
-  return (
-    <Box className="ac-card" style={{ overflowX: 'auto' }} data-testid="stats-table">
-      <Table highlightOnHover verticalSpacing={8} horizontalSpacing={8} style={{ minWidth: 960 }}>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th w={28} />
-            <Table.Th style={{ verticalAlign: 'bottom' }}>
-              <Text size="xs" fw={600} c="dimmed">
-                {t('models.col.model')}
-              </Text>
-            </Table.Th>
-            <Table.Th w={150} style={{ verticalAlign: 'bottom' }}>
-              <Text size="xs" fw={600} c="dimmed">
-                {t('models.col.effort')}
-              </Text>
-            </Table.Th>
-            <Table.Th style={{ verticalAlign: 'bottom' }}>
-              <UnstyledButton onClick={() => setSort((s) => ({ key: 'last', dir: s.key === 'last' ? ((-s.dir) as 1 | -1) : -1 }))}>
-                <Text size="xs" fw={600} c={sort.key === 'last' ? undefined : 'dimmed'}>
-                  {t('models.col.period')}
-                  {sort.key === 'last' ? (sort.dir < 0 ? ' ↓' : ' ↑') : ''}
-                </Text>
-              </UnstyledButton>
-            </Table.Th>
-            {head('requests', t('models.col.requests'))}
-            {head('tools', t('models.col.toolsPerReq'), t('models.col.median'))}
-            {head('turns', t('models.col.turnsPerReq'), t('models.col.median'), t('models.tip.turns'))}
-            {head('response', t('models.col.response'), t('models.col.median'), t('models.tip.response'))}
-            {head('mistakes', t('models.col.mistakes'), t('models.col.per100'), t('models.tip.mistakes'))}
-            {head('output', t('models.col.outPerReq'), t('models.col.median'))}
-            {head('context', t('models.col.context'), t('models.col.median'), t('models.tip.context'))}
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {rows.map((r) => {
-            const id = modelKeyStr(r.key)
-            if (!r.group) {
-              const m = r.models[0]
-              return (
-                <Table.Tr key={id} onClick={() => onOpen(m)} style={{ cursor: 'pointer', opacity: m.requests < MIN_REQUESTS ? 0.7 : 1 }} data-testid="stats-row">
-                  <Table.Td>{check(m)}</Table.Td>
-                  <Table.Td>{modelCell(m)}</Table.Td>
-                  <Table.Td>{effortCell(m)}</Table.Td>
-                  {cells([m])}
-                </Table.Tr>
-              )
-            }
-            const expanded = open.has(id)
-            return [
-              <Table.Tr
-                key={id}
-                onClick={() =>
-                  setOpen((s) => {
-                    const n = new Set(s)
-                    if (n.has(id)) n.delete(id)
-                    else n.add(id)
-                    return n
-                  })
-                }
-                style={{ cursor: 'pointer' }}
-                data-testid="stats-group"
-              >
-                <Table.Td>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</Table.Td>
-                <Table.Td>{modelCell(r.key)}</Table.Td>
-                {/* Long lists wrap inside a fixed width instead of pushing the number columns apart */}
-                <Table.Td maw={150}>
-                  <Text size="xs" ff="monospace" c="dimmed" style={{ lineHeight: 1.5 }}>
-                    {effortList(r.models)}
-                  </Text>
-                </Table.Td>
-                {cells(r.models)}
-              </Table.Tr>,
-              ...(expanded
-                ? r.models.map((m) => (
-                    <Table.Tr key={modelKeyStr(m)} onClick={() => onOpen(m)} style={{ cursor: 'pointer', opacity: m.requests < MIN_REQUESTS ? 0.7 : 1 }} data-testid="stats-row">
-                      <Table.Td>{check(m)}</Table.Td>
-                      <Table.Td />
-                      <Table.Td>{effortCell(m)}</Table.Td>
-                      {cells([m])}
-                    </Table.Tr>
-                  ))
-                : [])
-            ]
-          })}
-        </Table.Tbody>
-      </Table>
-    </Box>
   )
 }
 
@@ -607,6 +328,8 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
         </Box>
       </Box>
 
+      <ModelCost model={s} detail={data} />
+
       <Box>
         <SectionTitle>{t('models.detail.daily')}</SectionTitle>
         <Box className="ac-card" p="md">
@@ -617,7 +340,7 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
               <Tabs.Tab value="context">{t('models.detail.tabContext')}</Tabs.Tab>
             </Tabs.List>
           </Tabs>
-          <BarChart
+          <LineChart
             h={200}
             data={chart}
             dataKey="day"
@@ -626,7 +349,8 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
             gridAxis="y"
             tickLine="none"
             valueFormatter={(v) => (chartKey === 'turns' ? f.int(v) : f.tok(v))}
-            barProps={{ radius: 2 }}
+            curveType="linear"
+            withDots={false}
           />
         </Box>
       </Box>
@@ -1041,6 +765,7 @@ function CompareView({ a, b, range }: { a: ModelKey; b: ModelKey; range: Range }
 
   return (
     <Stack gap="xl" data-testid="stats-compare">
+      {a.tool !== b.tool && <Text size="sm" c="dimmed">{t('efficiency.mixedTools')}</Text>}
       <SimpleGrid cols={2}>
         {[
           { k: a, m: A, b: false },
@@ -1219,8 +944,8 @@ function Stats(): React.JSX.Element {
   const { t } = useTranslation()
   const { navigate } = useNav()
   const [days, setDays] = useState<Days>(30)
-  const [tool, setTool] = useState<string>('all')
   const [showSmall, setShowSmall] = useState(false)
+  const [tool, setTool] = useState<string>('all')
   const [checked, setChecked] = useState<ModelKey[]>([])
   const [selected, setSelected] = useState<ModelKey | null>(null)
   const [comparing, setComparing] = useState<[ModelKey, ModelKey] | null>(null)
@@ -1233,12 +958,16 @@ function Stats(): React.JSX.Element {
 
   const tools = [...new Set((data ?? []).map((m) => m.tool))]
   const models = (data ?? []).filter((m) => tool === 'all' || m.tool === tool)
-  const openSession = (sessionTool: string, id: string): void => navigate('sessions', { select: `${sessionTool}:${id}` })
-  const hidden = models.filter((m) => m.requests < MIN_REQUESTS).length
+  const openSession = (sessionTool: string, id: string): void =>
+    navigate('sessions', { select: `${sessionTool}:${id}` })
 
   return (
     <Stack gap={0} style={{ flex: 1 }}>
-      <PageHeader title={t('nav.stats')} count={data ? models.length : undefined} actions={<ReloadButton />} />
+      <PageHeader
+        title={t('nav.stats')}
+        count={data ? new Set(models.filter((m) => showSmall || m.requests >= MIN_REQUESTS).map((m) => m.model)).size : undefined}
+        actions={<ReloadButton />}
+      />
       <Group gap="sm" mb="xs" wrap="wrap">
         <SegmentedControl
           size="xs"
@@ -1252,26 +981,36 @@ function Stats(): React.JSX.Element {
           ]}
           data-testid="stats-days"
         />
+<Text size="xs" c="dimmed">{t('efficiency.referenceTool')}</Text>
         <SegmentedControl
           size="xs"
           value={tool}
-          onChange={setTool}
-          data={[{ value: 'all', label: t('models.allTools') }, ...tools.map((x) => ({ value: x, label: toolName(x) }))]}
+          onChange={(v) => { setTool(v); setChecked([]); setComparing(null) }}
+          data={[
+            { value: 'all', label: t('models.allTools') },
+            ...tools.map((x) => ({ value: x, label: toolName(x) }))
+          ]}
           data-testid="stats-tool"
         />
-        <Switch size="sm" checked={showSmall} onChange={(e) => setShowSmall(e.currentTarget.checked)} label={`${t('models.showSmall')}${hidden ? ` (${hidden})` : ''}`} data-testid="stats-small" />
+<Switch size="xs" label={t('models.showSmall')} checked={showSmall} onChange={(e) => { setShowSmall(e.currentTarget.checked); setChecked([]) }} data-testid="stats-show-small" />
         <Group gap="xs" ml="auto">
           <Text size="xs" c="dimmed">
             {t('models.compareHint')}
           </Text>
-          <Button size="xs" variant="default" disabled={checked.length !== 2} onClick={() => checked.length === 2 && setComparing([checked[0], checked[1]])} data-testid="stats-compare-open">
+          <Button
+            size="xs"
+            variant="default"
+            disabled={checked.length !== 2}
+            onClick={() => checked.length === 2 && setComparing([checked[0], checked[1]])}
+            data-testid="stats-compare-open"
+          >
             {t('models.compare')}
           </Button>
         </Group>
       </Group>
-      <Text size="xs" c="dimmed" mb="sm">
-        {t('models.note')}
-      </Text>
+
+      {tool === 'all' && tools.length > 1 && <Text size="xs" c="dimmed" mb="sm" data-testid="stats-mixed-tools">{t('efficiency.mixedTools')}</Text>}
+      {models.some((m) => m.pricing) && <Text size="xs" c="dimmed" mb="sm">{t('efficiency.priceNote', { date: [...new Set(models.flatMap((m) => m.pricing ? [m.pricing.date] : []))].sort().join(' / '), source: [...new Set(models.flatMap((m) => m.pricing ? [t(m.pricing.priceSource === 'cache' ? 'efficiency.cache' : 'efficiency.snapshot')] : []))].join(' / ') })}</Text>}
       {data === undefined ? (
         <Loading />
       ) : data === null ? (
@@ -1282,24 +1021,19 @@ function Stats(): React.JSX.Element {
         <Text size="sm" c="dimmed">
           {indexing ? t('models.indexing') : t('models.none')}
         </Text>
-      ) : models.filter((m) => showSmall || m.requests >= MIN_REQUESTS).length === 0 ? (
-        <Group gap="sm">
-          <Text size="sm" c="dimmed">
-            {t('models.empty')}
-          </Text>
-          {days !== 0 && (
-            <Button size="compact-xs" variant="subtle" onClick={() => setDays(0)}>
-              {t('models.showAll')}
-            </Button>
-          )}
-        </Group>
       ) : (
-        <StatsList
+        <UsageLeaderboard
           models={models}
           showSmall={showSmall}
           onOpen={setSelected}
           checked={checked}
-          onCheck={(k, on) => setChecked((c) => (on ? [...c.filter((x) => !sameKey(x, k)), k].slice(-2) : c.filter((x) => !sameKey(x, k))))}
+          onCheck={(k, on) =>
+            setChecked((c) =>
+              on
+                ? [...c.filter((x) => !sameKey(x, k)), k].slice(-2)
+                : c.filter((x) => !sameKey(x, k))
+            )
+          }
         />
       )}
 
@@ -1309,7 +1043,9 @@ function Stats(): React.JSX.Element {
         title={
           selected ? (
             <Group gap="sm" wrap="nowrap">
-              <span style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>{label(selected)}</span>
+              <span style={{ fontFamily: 'var(--mantine-font-family-monospace)' }}>
+                {label(selected)}
+              </span>
               <ToolTag tool={selected.tool} />
             </Group>
           ) : (
@@ -1317,9 +1053,20 @@ function Stats(): React.JSX.Element {
           )
         }
       >
-        {selected && <ModelDetailView k={selected} range={range} onSession={openSession} />}
+        {selected && (
+          <ModelDetailView
+            k={selected}
+            range={range}
+            onSession={openSession}
+          />
+        )}
       </DetailSheet>
-      <DetailSheet opened={!!comparing} onClose={() => setComparing(null)} title={t('models.cmp.title')}>
+
+      <DetailSheet
+        opened={!!comparing}
+        onClose={() => setComparing(null)}
+        title={t('models.cmp.title')}
+      >
         {comparing && <CompareView a={comparing[0]} b={comparing[1]} range={range} />}
       </DetailSheet>
     </Stack>

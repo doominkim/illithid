@@ -712,5 +712,41 @@
       "ms": "{{m}} 分 {{s}} 秒",
       "hm": "{{h}} 小时 {{m}} 分"
     }
+  },
+  "leaderboard": {
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "zoomReset": "重置",
+    "chart": "费用与响应时间散点图",
+    "xAxis": "每次请求的API折算费用 (USD / 请求) →",
+    "yAxis": "响应时间中位数 (秒 / 请求) ↑",
+    "noPoints": "没有请求至少30次且已设置单价的组合",
+    "days": "活跃天数",
+    "totalCost": "API折算费用合计",
+    "perCost": "API折算费用 / 请求",
+    "editPrice": "编辑单价",
+    "setPrice": "设置单价",
+    "priceUnit": "USD / 百万令牌",
+    "priceError": "请输入有效的非负单价。单价保存失败。",
+    "costTitle": "API折算费用",
+    "costNote": "采用{{date}}标准短上下文单价，缓存写入按5分钟计算。不含订阅账单、快速或长上下文附加费、缓存存储及外部工具费用。期间令牌包含子代理及未完成请求，因此除以已完成请求数得出的每次费用为近似值。"
+  },
+  "efficiency": {
+    "periodDays": "期间／活跃天数",
+    "mixedCost": "记录＋换算费用",
+    "tokens": "令牌合计",
+    "expand": "展开{{model}}",
+    "unpriced": "无单价",
+    "recorded": "OpenCode记录费用",
+    "converted": "API折算费用",
+    "referenceTool": "比较基准工具",
+    "mixedTools": "比较中混有工具差异。请选择相同工具进行比较。",
+    "priceNote": "单价日期：{{date}} · {{source}}。API单价换算，并非订阅实际支出。包含子代理和未完成请求，每次请求的值为估算。",
+    "cache": "本地OpenCode缓存",
+    "snapshot": "内置models.dev快照",
+    "costDistribution": "每次请求的API折算费用分布",
+    "dailyCost": "每日API折算费用",
+    "cost": "费用",
+    "reindexCosts": "会话索引更新后显示费用详情。"
   }
 }

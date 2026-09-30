@@ -712,5 +712,41 @@
       "ms": "{{m}}分{{s}}秒",
       "hm": "{{h}}時間{{m}}分"
     }
+  },
+  "leaderboard": {
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "zoomReset": "リセット",
+    "chart": "費用と応答時間の散布図",
+    "xAxis": "リクエストあたりのAPI換算費用 (USD / リクエスト) →",
+    "yAxis": "応答時間の中央値 (秒 / リクエスト) ↑",
+    "noPoints": "30件以上のリクエストと登録済み単価を持つ組み合わせなし",
+    "days": "利用日数",
+    "totalCost": "API換算費用合計",
+    "perCost": "API換算費用 / リクエスト",
+    "editPrice": "単価を編集",
+    "setPrice": "単価を設定",
+    "priceUnit": "USD / 100万トークン",
+    "priceError": "0以上の有効な単価を入力してください。保存できませんでした。",
+    "costTitle": "API換算費用",
+    "costNote": "{{date}}時点の標準・短いコンテキスト単価、キャッシュ書き込みは5分基準です。サブスクリプション、高速・長文の割増、キャッシュ保存、外部ツール費用は含みません。期間トークンにはサブエージェントと未完了リクエストが含まれるため、完了リクエスト数で割った費用は概算です。"
+  },
+  "efficiency": {
+    "periodDays": "期間／利用日数",
+    "mixedCost": "記録＋換算費用",
+    "tokens": "トークン合計",
+    "expand": "{{model}}を展開",
+    "unpriced": "単価なし",
+    "recorded": "OpenCode記録費用",
+    "converted": "API換算費用",
+    "referenceTool": "比較基準ツール",
+    "mixedTools": "ツールの違いが混在しています。同じツールを選んで比較できます。",
+    "priceNote": "単価基準日: {{date}} · {{source}}。API単価換算でありサブスクリプションの実際の支出ではありません。サブエージェントと未完了リクエストを含む概算です。",
+    "cache": "ローカルOpenCodeキャッシュ",
+    "snapshot": "内蔵models.devスナップショット",
+    "costDistribution": "リクエストあたりのAPI換算費用分布",
+    "dailyCost": "日別API換算費用",
+    "cost": "費用",
+    "reindexCosts": "セッション索引の更新後に費用詳細を表示します。"
   }
 }

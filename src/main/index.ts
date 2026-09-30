@@ -93,6 +93,15 @@ function createWindow(): void {
   })
 
   const win = mainWindow
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.alt || !(process.platform === 'darwin' ? input.meta : input.control)) return
+    const action = input.code === 'Minus' || input.code === 'NumpadSubtract' || input.key === '-' ? -1
+      : input.code === 'Equal' || input.code === 'NumpadAdd' || input.key === '+' || input.key === '=' ? 1
+        : input.code === 'Digit0' || input.code === 'Numpad0' ? 0 : null
+    if (action === null) return
+    event.preventDefault()
+    win.webContents.setZoomLevel(action === 0 ? 0 : Math.max(-3, Math.min(3, win.webContents.getZoomLevel() + action)))
+  })
   win.on('ready-to-show', () => {
     if (!TEST_MODE) win.show()
   })

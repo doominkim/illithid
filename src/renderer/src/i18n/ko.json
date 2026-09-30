@@ -712,5 +712,41 @@
       "ms": "{{m}}분 {{s}}초",
       "hm": "{{h}}시간 {{m}}분"
     }
+  },
+  "leaderboard": {
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "zoomReset": "초기화",
+    "chart": "비용과 응답 시간 산점도",
+    "xAxis": "요청당 API 환산 비용 (USD / 요청) →",
+    "yAxis": "응답 시간 중앙값 (초 / 요청) ↑",
+    "noPoints": "요청 30건 이상이고 단가가 등록된 조합 없음",
+    "days": "활동일",
+    "totalCost": "API 환산 비용 합계",
+    "perCost": "API 환산 비용 / 요청",
+    "editPrice": "단가 편집",
+    "setPrice": "단가 설정",
+    "priceUnit": "USD / 100만 토큰",
+    "priceError": "0 이상의 유효한 단가를 입력하세요. 단가를 저장하지 못했습니다.",
+    "costTitle": "API 환산 비용",
+    "costNote": "{{date}} 기준 일반·짧은 맥락 단가, 캐시 쓰기는 5분 기준입니다. 구독 결제액, 고속·긴 맥락 할증, 캐시 보관과 외부 도구 비용은 포함하지 않습니다. 기간 토큰 합계에 서브에이전트와 미완료 요청이 포함되므로 완료 요청 수로 나눈 요청당 비용은 근사값입니다."
+  },
+  "efficiency": {
+    "periodDays": "기간 / 활동일",
+    "mixedCost": "기록 + 환산 비용",
+    "tokens": "토큰 합계",
+    "expand": "{{model}} 펼치기",
+    "unpriced": "단가 없음",
+    "recorded": "OpenCode 기록 비용",
+    "converted": "API 환산 비용",
+    "referenceTool": "비교 기준 툴",
+    "mixedTools": "툴 차이가 섞여 있음. 같은 툴을 선택하면 동일한 기준으로 비교할 수 있어.",
+    "priceNote": "단가 기준일: {{date}} · {{source}}. API 환산 비용이며 구독 실제 지출이 아님. 하위 에이전트와 미완료 요청이 포함돼 요청당 값은 근사치.",
+    "cache": "로컬 OpenCode 캐시",
+    "snapshot": "내장 models.dev 스냅샷",
+    "costDistribution": "요청당 API 환산 비용 분포",
+    "dailyCost": "일별 API 환산 비용",
+    "cost": "비용",
+    "reindexCosts": "세션 인덱스 갱신 후 비용 상세가 표시돼."
   }
 }

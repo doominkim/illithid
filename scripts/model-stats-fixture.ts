@@ -191,6 +191,8 @@ async function main(): Promise<void> {
 
   const glm = find('opencode', 'glm-5.3-flash')
   check('opencode: tokens, cost, tool error', glm?.tokens.output === 60 && glm?.cost === 0.0123 && glm?.errors.other === 1, JSON.stringify({ t: glm?.tokens, c: glm?.cost, e: glm?.errors }))
+  check('REQ-MODEL-EFFICIENCY-3 OpenCode recorded cost takes priority without a matching price', glm?.pricing?.source === 'recorded' && glm.pricing.total === 0.0123)
+  check('REQ-MODEL-EFFICIENCY-4 daily converted costs reflect token totals', !!d?.costDaily?.length && Math.abs((d.costDaily[0].cost ?? 0) - (d.summary.pricing?.total ?? 0)) < 1e-10)
   check('opencode: request ends at completion', glm?.requests === 1, `${glm?.requests}`)
 
   const shares = sessionModels(home, 'claude', CL) ?? []

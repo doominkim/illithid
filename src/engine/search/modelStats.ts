@@ -7,6 +7,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { StatsHooks, ToolCall, ToolErrorKind, TurnUsage } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 import { classify, dayOf, mcpKey } from './usage'
+import { convertedCost, readPriceBook, ratesFor, type ConvertedCost, type PriceBook, type CostTokens } from './modelPricing'
 
 export const MODEL_SCHEMA = '2'
 
@@ -21,7 +22,14 @@ const ERROR_KINDS: readonly ToolErrorKind[] = ['mistake', 'command', 'policy', '
 
 /** Create (or reset on a version change) the model tables. Returns true when they were (re)created */
 export function ensureModelStats(db: DatabaseSync): boolean {
-  if (tableExists(db, 'model_day') && metaGet(db, 'modelSchema') === MODEL_SCHEMA) return false
+  const costNew = !tableExists(db, 'model_cost_turn')
+  db.exec(`create table if not exists model_cost_turn(
+    sid integer not null, tool text not null, model text not null, effort text not null, day text not null,
+    request_at text, context integer not null,
+    t_input integer not null, t_cache_read integer not null, t_cache_write integer not null, t_output integer not null, t_reasoning integer not null,
+    recorded real
+  ); create index if not exists model_cost_turn_key on model_cost_turn(tool, model, effort, day); create index if not exists model_cost_turn_sid on model_cost_turn(sid);`)
+  if (tableExists(db, 'model_day') && metaGet(db, 'modelSchema') === MODEL_SCHEMA) return costNew
   db.exec(`
     drop table if exists model_day;
     drop table if exists model_request;
@@ -60,7 +68,7 @@ export function ensureModelStats(db: DatabaseSync): boolean {
   return true
 }
 
-export const MODEL_TABLES = ['model_day', 'model_request', 'model_ctx', 'model_tool', 'model_limit'] as const
+export const MODEL_TABLES = ['model_day', 'model_request', 'model_ctx', 'model_tool', 'model_limit', 'model_cost_turn'] as const
 
 /** Same model under a dated id or a provider prefix counts as one; different models are never merged */
 export function normalizeModel(model: string | undefined): string | undefined {
@@ -106,6 +114,7 @@ const time = (at: string | undefined): number | undefined => {
 export class ModelStatsCounter implements StatsHooks {
   readonly days = new Map<string, DayRow>()
   readonly requests: { model: string; effort: string; at: string; day: string; dur: number; turns: number; tools: number; subagents: number; out: number }[] = []
+  readonly costTurns: { model: string; effort: string; day: string; requestAt: string | null; context: number; tokens: TurnUsage; recorded: number | null }[] = []
   readonly ctx: { model: string; effort: string; day: string; ctx: number }[] = []
   readonly tools = new Map<string, { model: string; effort: string; day: string; kind: string; name: string; calls: number; errors: number }>()
   readonly limitRows: { at: string; day: string; usedPercent: number; windowMinutes?: number; plan?: string }[] = []
@@ -196,6 +205,7 @@ export class ModelStatsCounter implements StatsHooks {
     r.cost += t.cost ?? 0
     const ctx = u.input + u.cacheRead + u.cacheWrite
     if (ctx > 0) this.ctx.push({ model, effort, day: r.day, ctx })
+    this.costTurns.push({ model, effort, day: r.day, requestAt: !this.sub && this.cur ? this.cur.startAt : null, context: ctx, tokens: { ...u }, recorded: t.cost ?? null })
     const cur = this.cur
     if (cur && !this.sub) {
       cur.turns++
@@ -309,6 +319,8 @@ export class ModelStatsCounter implements StatsHooks {
       'insert into model_request(sid, tool, model, effort, at, day, dur_sec, turns, tools, subagents, out_tokens) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     for (const r of this.requests) insReq.run(sid, this.tool, r.model, r.effort, r.at, r.day, r.dur, r.turns, r.tools, r.subagents, r.out)
+    const insCost = db.prepare('insert into model_cost_turn(sid, tool, model, effort, day, request_at, context, t_input, t_cache_read, t_cache_write, t_output, t_reasoning, recorded) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    for (const r of this.costTurns) insCost.run(sid, this.tool, r.model, r.effort, r.day, r.requestAt, r.context, r.tokens.input, r.tokens.cacheRead, r.tokens.cacheWrite, r.tokens.output, r.tokens.reasoning, r.recorded)
     const insCtx = db.prepare('insert into model_ctx(sid, tool, model, effort, day, ctx) values (?, ?, ?, ?, ?, ?)')
     for (const r of this.ctx) insCtx.run(sid, this.tool, r.model, r.effort, r.day, r.ctx)
     const insTool = db.prepare('insert into model_tool(sid, tool, model, effort, day, kind, name, calls, errors) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -359,6 +371,7 @@ export interface ModelSummary extends ModelKey {
   first: string
   last: string
   activeDays: number
+  pricing?: ConvertedCost
   /** Main sessions (subagents counted apart) */
   sessions: number
   subagentSessions: number
@@ -399,6 +412,8 @@ export interface SessionRef {
 
 export interface ModelDetail {
   summary: ModelSummary
+  costDaily?: { day: string; cost: number | null; converted: number | null }[]
+  costDist?: Dist | null
   daily: { day: string; turns: number; output: number; context: number }[]
   dist: {
     responseSec: Dist | null
@@ -539,6 +554,42 @@ interface RequestRow {
   out: number
 }
 
+interface CostTurnRow extends CostTokens {
+  sid: number; requestAt: string | null; day: string; context: number; recorded: number | null
+}
+function pricingFor(db: DatabaseSync, summary: ModelSummary, w: { sql: string; args: (string | number)[] }, book: PriceBook): { pricing: ConvertedCost; daily: NonNullable<ModelDetail['costDaily']>; distribution: Dist | null } {
+  const where = `tool = ? and model = ? and effort = ?${w.sql}`
+  const args = [summary.tool, summary.model, summary.effort, ...w.args]
+  const rows = tableExists(db, 'model_cost_turn') ? db.prepare(`select sid, request_at as requestAt, day, context, t_input as input, t_cache_read as cacheRead, t_cache_write as cacheWrite, t_output as output, t_reasoning as reasoning, recorded from model_cost_turn where ${where}`).all(...args) as unknown as CostTurnRow[] : []
+  if (!rows.length) {
+    const pricing = convertedCost(summary.model, summary.tool, summary.tokens, summary.requests, summary.cost && summary.cost > 0 ? summary.cost : null, book)
+    pricing.needsReindex = true
+    const maxContext = Number((db.prepare(`select max(ctx) as max from model_ctx where ${where}`).get(...args) as {max: number | null}).max ?? 0)
+    if (JSON.stringify(ratesFor(summary.model, book, 0)) !== JSON.stringify(ratesFor(summary.model, book, maxContext))) {
+      pricing.converted = null; pricing.parts = null
+      if (pricing.source !== 'recorded') { pricing.total = null; pricing.perRequest = null; pricing.source = 'unpriced' }
+    }
+    return { pricing, daily: [], distribution: null }
+  }
+  const measuredRows = rows.filter((r) => r.input + r.output + r.cacheRead + r.cacheWrite + r.reasoning > 0 || r.recorded !== null)
+  const costs = measuredRows.map((r) => ({ row: r, cost: convertedCost(summary.model, summary.tool, r, 1, r.recorded, book, r.context) }))
+  const sum = (list: typeof costs, field: 'total' | 'converted'): number | null => list.some((c) => c.cost[field] === null) ? null : list.reduce((a, c) => a + c.cost[field]!, 0)
+  const total = costs.length ? sum(costs, 'total') : null, converted = costs.length ? sum(costs, 'converted') : null
+  const recorded = summary.tool === 'opencode' && rows.every((r) => r.recorded !== null)
+  const parts = converted === null ? null : costs.reduce((a, c) => ({ input: a.input + c.cost.parts!.input, output: a.output + c.cost.parts!.output, cacheRead: a.cacheRead + c.cost.parts!.cacheRead, cacheWrite: a.cacheWrite + c.cost.parts!.cacheWrite }), { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+  const days = [...new Set(measuredRows.map((r) => r.day))].sort()
+  const daily = days.map((day) => { const list = costs.filter((c) => c.row.day === day); return { day, cost: list.length ? sum(list, 'total') : null, converted: list.length ? sum(list, 'converted') : null } })
+  const completed = new Set((db.prepare(`select sid, at from model_request where ${where}`).all(...args) as { sid: number; at: string }[]).map((r) => `${r.sid}|${r.at}`))
+  const groups = new Map<string, typeof costs>()
+  for (const c of costs) {
+    const key = `${c.row.sid}|${c.row.requestAt}`
+    if (!c.row.requestAt || !completed.has(key)) continue
+    const list = groups.get(key) ?? []; list.push(c); groups.set(key, list)
+  }
+  const samples = [...groups.values()].map((g) => sum(g, 'total')).filter((c): c is number => c !== null)
+  return { pricing: { total, converted, perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests, source: total === null ? 'unpriced' : recorded ? 'recorded' : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null) ? 'mixed' : 'converted', priceSource: costs[0]?.cost.priceSource ?? book.source, date: costs[0]?.cost.date ?? book.date, parts }, daily, distribution: samples.length >= MIN_REQUESTS ? dist(samples) : null }
+}
+
 /** Every model used in the range. null when the index has no model stats yet (the caller should start an index run) */
 export function modelList(home: string, o: ModelRange = {}): ModelSummary[] | null {
   const db = open(o, home)
@@ -563,9 +614,14 @@ export function modelList(home: string, o: ModelRange = {}): ModelSummary[] | nu
       if (list) list.push(Number(c.ctx))
       else ctx.set(k, [Number(c.ctx)])
     }
+    const book = readPriceBook(home)
     return rows
       .filter((x) => Number(x.turns) > 0)
-      .map((x) => summaryOf(x, reqs.get(keyStr(x)) ?? [], ctx.get(keyStr(x)) ?? []))
+      .map((x) => {
+        const summary = summaryOf(x, reqs.get(keyStr(x)) ?? [], ctx.get(keyStr(x)) ?? [])
+        summary.pricing = pricingFor(db, summary, w, book).pricing
+        return summary
+      })
       .sort((a, b) => b.last.localeCompare(a.last) || b.turns - a.turns)
   } finally {
     db.close()
@@ -603,6 +659,8 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
           []
         )
 
+    const priceData = pricingFor(db, summary, w, readPriceBook(home))
+    summary.pricing = priceData.pricing
     const daily = (
       db
         .prepare(
@@ -697,6 +755,8 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
 
     return {
       summary,
+      costDaily: priceData.daily,
+      costDist: priceData.distribution,
       daily,
       dist: {
         responseSec: reqDist((q) => q.dur),

@@ -712,5 +712,41 @@
       "ms": "{{m}}m {{s}}s",
       "hm": "{{h}}h {{m}}m"
     }
+  },
+  "leaderboard": {
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset",
+    "chart": "Cost and response time scatterplot",
+    "xAxis": "API-equivalent cost (USD / request) →",
+    "yAxis": "Median response time (seconds / request) ↑",
+    "noPoints": "No combinations with at least 30 requests and a known price",
+    "days": "Active days",
+    "totalCost": "Total API-equivalent cost",
+    "perCost": "API-equivalent cost / request",
+    "editPrice": "Edit price",
+    "setPrice": "Set price",
+    "priceUnit": "USD / 1M tokens",
+    "priceError": "Enter valid non-negative prices. The price could not be saved.",
+    "costTitle": "API-equivalent cost",
+    "costNote": "Standard short-context prices as of {{date}}; five-minute cache writes. Subscription bills, fast/long-context premiums, cache storage and external tools are not included. Period token totals include subagents and unfinished requests; divided by completed requests, this is an approximate cost per request."
+  },
+  "efficiency": {
+    "periodDays": "Period / active days",
+    "mixedCost": "Recorded + converted cost",
+    "tokens": "Total tokens",
+    "expand": "Expand {{model}}",
+    "unpriced": "No price",
+    "recorded": "Recorded OpenCode cost",
+    "converted": "API-equivalent cost",
+    "referenceTool": "Reference tool",
+    "mixedTools": "Tool differences are mixed into this comparison.",
+    "priceNote": "Price date: {{date}} · {{source}}. API price equivalent, not subscription spending. Includes subagents and unfinished requests; per-request values are approximate.",
+    "cache": "Local OpenCode cache",
+    "snapshot": "Bundled models.dev snapshot",
+    "costDistribution": "API-equivalent cost per request distribution",
+    "dailyCost": "Daily API-equivalent cost",
+    "cost": "Cost",
+    "reindexCosts": "Cost detail will appear after the session index updates."
   }
 }

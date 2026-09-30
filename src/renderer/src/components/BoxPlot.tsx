@@ -15,11 +15,12 @@ interface Props {
   /** Second model in a side-by-side view: hatched box */
   hatch?: boolean
   height?: number
+  scale?: 'log' | 'linear'
 }
 
 /** One-line box plot: whisker min–max, box p25–p75, median line, mean dot, p90 tick */
-export function BoxPlot({ d, domain, hatch, height = 18 }: Props): React.JSX.Element {
-  const x = logScale(domain[0], domain[1])
+export function BoxPlot({ d, domain, hatch, height = 18, scale = 'log' }: Props): React.JSX.Element {
+  const x = scale === 'linear' ? (v: number): number => Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0] || 1))) : logScale(domain[0], domain[1])
   const pct = (v: number): string => `${(x(v) * 100).toFixed(2)}%`
   const mid = height / 2
   const box = height * 0.62
