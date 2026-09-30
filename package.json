@@ -1,6 +1,6 @@
 {
   "name": "illithid",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "private": true,
   "description": "Illithid — a GUI that manages Claude Code, Codex, and OpenCode settings from a single source library",
   "main": "./out/main/index.js",
