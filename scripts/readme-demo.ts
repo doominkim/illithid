@@ -1,6 +1,8 @@
 /**
  * README demo video from a demo HOME (never the real one).
- * - Reuses the readme-shots demo HOME with all five tools, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
+ * - Reuses the readme-shots demo HOME with all five tools, pre-syncs it and launches out/ (1280x800 window, light theme).
+ * - Records lossless PNG frames at the window's device resolution (2x on Retina) through CDP Page.startScreencast;
+ *   Playwright's recordVideo is 1x JPEG frames in 1 Mbps VP8, which blurs text.
  * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
  * - Scenes, each cut into its own GIF (docs/demo/<scene>.gif): rules (edit → all five tools), skills (off for Gemini),
  *   mcp (off for Copilot, then the usage chart), market (install two skills), sessions (a session's requests), stats
@@ -13,6 +15,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator, type Page } from 'playwright-core'
@@ -351,18 +354,64 @@ function verifyOnDisk(home: string): Record<string, boolean> {
   }
 }
 
+interface Frame {
+  file: string
+  /** Wall clock ms */
+  at: number
+}
+
+/** PNG screencast frames at device resolution; Chrome sends one per repaint once the previous one is acked */
+async function startCapture(page: Page, dir: string): Promise<{ frames: Frame[]; stop: () => Promise<void> }> {
+  const cdp = await page.context().newCDPSession(page)
+  const frames: Frame[] = []
+  const writes: Promise<void>[] = []
+  cdp.on('Page.screencastFrame', (f) => {
+    const file = join(dir, `f${String(frames.length).padStart(6, '0')}.png`)
+    frames.push({ file, at: f.metadata.timestamp ? f.metadata.timestamp * 1000 : Date.now() })
+    writes.push(writeFile(file, Buffer.from(f.data, 'base64')))
+    void cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {})
+  })
+  await cdp.send('Page.startScreencast', { format: 'png', maxWidth: SIZE.width * 2, maxHeight: SIZE.height * 2, everyNthFrame: 1 })
+  return {
+    frames,
+    stop: async () => {
+      await cdp.send('Page.stopScreencast').catch(() => {})
+      await Promise.all(writes)
+    }
+  }
+}
+
+/** Frames → one lossless 30 fps video whose time 0 is t0 (the frame on screen at t0 fills the gap before the next one) */
+function framesToVideo(frames: Frame[], t0: number, end: number, dir: string): string {
+  const shown = frames.filter((f, i) => f.at >= t0 || frames[i + 1]?.at > t0)
+  if (!shown.length) throw new Error('no frames captured')
+  const lines = ['ffconcat version 1.0']
+  shown.forEach((f, i) => {
+    const from = Math.max(f.at, t0)
+    const to = i + 1 < shown.length ? shown[i + 1].at : end
+    lines.push(`file '${f.file}'`, `duration ${Math.max(0.001, (to - from) / 1000).toFixed(3)}`)
+  })
+  lines.push(`file '${shown[shown.length - 1].file}'`)
+  const list = join(dir, 'frames.ffconcat')
+  writeFileSync(list, lines.join('\n') + '\n')
+  const raw = join(dir, 'raw.mkv')
+  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'fps=30', '-c:v', 'libx264', '-qp', '0', '-preset', 'ultrafast', '-pix_fmt', 'yuv444p', raw])
+  return raw
+}
+
 function encode(raw: string, trim: number, duration: number): void {
   const mp4 = join(OUT_DIR, 'illithid-demo.mp4')
   const cut = ['-ss', trim.toFixed(2), '-t', duration.toFixed(2), '-i', raw]
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=1280:-2:flags=lanczos,setpts=PTS-STARTPTS', '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-output_ts_offset', '0', '-an', mp4])
-  // One palette GIF per scene; drop fps until each fits under 6 MB
+  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=2560:-2:flags=lanczos,setpts=PTS-STARTPTS', '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-output_ts_offset', '0', '-an', mp4])
+  // One 256-color palette GIF per scene at 1280 px (the README shows 960, so Retina screens get sharper text); drop fps until
+  // each fits under 9 MB
   for (const sc of SCENES) {
     const gif = join(OUT_DIR, `${sc.name}.gif`)
     const part = ['-ss', sc.from.toFixed(2), '-t', (sc.to - sc.from).toFixed(2), '-i', raw]
-    for (const fps of [12, 10, 8]) {
-      const vf = `fps=${fps},scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`
+    for (const fps of [15, 12, 10, 8]) {
+      const vf = `fps=${fps},scale=1280:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle`
       execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...part, '-vf', vf, gif])
-      if (statSync(gif).size < 6 * 1024 * 1024) break
+      if (statSync(gif).size < 9 * 1024 * 1024) break
     }
   }
 }
@@ -391,7 +440,7 @@ async function main(): Promise<void> {
   if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-demo-userdata-'))
-  const videoDir = mkdtempSync(join(tmpdir(), 'illithid-demo-video-'))
+  const videoDir = mkdtempSync(join(tmpdir(), 'illithid-demo-frames-'))
   let ok = false
   try {
     buildDemoHome(home, { tools: 'all' })
@@ -403,7 +452,7 @@ async function main(): Promise<void> {
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
     writeFileSync(configPath, JSON.stringify({ ...config, allowRealApply: false, ui: { language: 'en', colorScheme: 'light', views: { rules: 'grid', skills: 'grid', mcp: 'grid', agents: 'grid' } } }, null, 2) + '\n')
     const env = { ...baseEnv(home), ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
-    const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env, recordVideo: { dir: videoDir, size: SIZE } })
+    const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
     const errors: string[] = []
     let raw = ''
     let trim = 0
@@ -418,6 +467,7 @@ async function main(): Promise<void> {
         BrowserWindow.getAllWindows()[0]?.setContentSize(s.width, s.height)
       }, SIZE)
       await page.setViewportSize(SIZE).catch(() => {})
+      const capture = await startCapture(page, videoDir)
       await page.waitForSelector('[data-menu="rules"]')
       await page.waitForSelector(`main [data-card="${RULE}"]`)
       await waitLoaded(page)
@@ -426,8 +476,12 @@ async function main(): Promise<void> {
       const start = Date.now()
       gated = await sequence(page, home)
       trim = (start - t0) / 1000
-      duration = (Date.now() - start) / 1000
-      raw = (await page.video()?.path()) ?? ''
+      const end = Date.now()
+      duration = (end - start) / 1000
+      await capture.stop()
+      const size = execFileSync('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', capture.frames[0].file], { encoding: 'utf8' })
+      console.log(JSON.stringify({ frames: capture.frames.length, firstFrame: size.replace(/\s+/g, ' ').trim() }))
+      raw = framesToVideo(capture.frames, t0, end, videoDir)
     } finally {
       await app.close()
     }
