@@ -98,6 +98,37 @@ test('REQ-MODEL-EFFICIENCY-3 REQ-MODEL-EFFICIENCY-4 injected catalog, per-turn t
   assert.ok(Math.abs(detail.costDaily![0].cost! - 27.12) < 1e-9)
 })
 
+test('REQ-STATS-MEDIAN-COST-1 REQ-STATS-MEDIAN-COST-2 per-request median ignores one long request and needs 30 completed requests', () => {
+  const run = (requests: number): ReturnType<typeof modelList> => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-median-cost-'))
+    mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+    writeFileSync(join(home, '.cache/opencode/models.json'), JSON.stringify(book.providers))
+    const db = openDb(searchIndexPath(home))
+    ensureModelStats(db)
+    const counter = new ModelStatsCounter('codex')
+    for (let i = 0; i < requests; i++) {
+      const at = new Date(Date.UTC(2026, 8, 20, 0, i)).toISOString()
+      counter.prompt(at)
+      // One very long request (100x the tokens) among ordinary ones
+      const scale = i === 0 ? 100 : 1
+      counter.turn({ model: 'gpt-test', effort: 'high', at, usage: { input: 300000 * scale, cacheRead: 0, cacheWrite: 0, output: 1000, reasoning: 0 } })
+      counter.requestEnd(at)
+    }
+    counter.write(db, 1)
+    db.close()
+    const list = modelList(home)!
+    if (requests >= 30) {
+      const detail = modelDetail(home, { tool: 'codex', model: 'gpt-test', effort: 'high' })!
+      assert.equal(list[0].pricing?.medianPerRequest, detail.costDist?.median)
+    }
+    return list
+  }
+  const pricing = run(30)![0].pricing!
+  assert.ok(Math.abs(pricing.medianPerRequest! - 0.904) < 1e-9, String(pricing.medianPerRequest))
+  assert.ok(pricing.perRequest! > pricing.medianPerRequest! * 4, String(pricing.perRequest))
+  assert.equal(run(29)![0].pricing?.medianPerRequest, null)
+})
+
 test('REQ-MODEL-EFFICIENCY-3 partial OpenCode recorded cost is labeled mixed', () => {
   const home = mkdtempSync(join(tmpdir(), 'illithid-mixed-cost-'))
   mkdirSync(join(home, '.cache/opencode'), { recursive: true })

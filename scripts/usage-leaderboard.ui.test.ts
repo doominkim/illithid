@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Page } from 'playwright-core'
 import type { ModelSummary } from '../src/shared/api'
+import { usd } from '../src/renderer/src/lib/leaderboard'
 
 /** Choose an option from a Mantine Select by its input test id */
 async function pick(page: Page, testId: string, label: string): Promise<void> {
@@ -14,6 +15,11 @@ async function pick(page: Page, testId: string, label: string): Promise<void> {
   assert.equal(await page.getByTestId(testId).inputValue(), label)
 }
 
+/** The chart and the per-request column use the median of completed requests; fixtures set it to 60% of the mean */
+const withMedian = (p: ReturnType<typeof convertedCost>): ReturnType<typeof convertedCost> => ({
+  ...p,
+  medianPerRequest: p.perRequest === null ? null : p.perRequest * 0.6
+})
 const base = (
   model: string,
   tool: string,
@@ -42,7 +48,7 @@ const base = (
     reasoning: 3000
   },
   cost: null,
-  pricing: convertedCost(
+  pricing: withMedian(convertedCost(
     model,
     tool,
     {
@@ -65,7 +71,7 @@ const base = (
         }
       }
     }
-  ),
+  )),
   median: {
     responseSec: requests >= 30 ? response : null,
     toolsPerRequest: 2,
@@ -84,7 +90,7 @@ const fixtures = [
 ]
 
 test(
-  'REQ-USAGE-LEADERBOARD-3 REQ-USAGE-LEADERBOARD-4 REQ-USAGE-LEADERBOARD-5 REQ-USAGE-LEADERBOARD-6 REQ-USAGE-LEADERBOARD-7 REQ-MODEL-EFFICIENCY-1 REQ-MODEL-EFFICIENCY-2 REQ-MODEL-EFFICIENCY-4 REQ-MODEL-EFFICIENCY-5 REQ-MODEL-EFFICIENCY-6 renderer interaction, shell, filter, reload, detail and price persistence',
+  'REQ-USAGE-LEADERBOARD-3 REQ-USAGE-LEADERBOARD-4 REQ-USAGE-LEADERBOARD-5 REQ-USAGE-LEADERBOARD-6 REQ-USAGE-LEADERBOARD-7 REQ-MODEL-EFFICIENCY-1 REQ-MODEL-EFFICIENCY-2 REQ-MODEL-EFFICIENCY-4 REQ-MODEL-EFFICIENCY-5 REQ-MODEL-EFFICIENCY-6 REQ-STATS-MEDIAN-COST-1 REQ-STATS-MEDIAN-COST-3 REQ-STATS-MEDIAN-COST-4 renderer interaction, shell, filter, reload, detail and price persistence',
   { timeout: 90000 },
   async () => {
     const home = mkdtempSync(join(tmpdir(), 'illithid-leaderboard-home-'))
@@ -271,7 +277,7 @@ test(
       await grouping.getByText('모델별', { exact: true }).click()
       await page
         .getByTestId('stats-table')
-        .getByText('API 환산 비용 / 요청', { exact: true })
+        .getByText('API 환산 비용 / 요청 (중앙값)', { exact: true })
         .click()
       await page.getByTestId('stats-show-small').check()
       assert.equal(await rows.count(), 6)
@@ -395,6 +401,18 @@ test(
         true
       )
       assert.equal(await page.getByTestId('stats-guides').locator('line').count(), 2)
+      // REQ-STATS-MEDIAN-COST-4: the hovered point shows its median context per turn
+      assert.equal(await page.getByTestId('stats-guide-context').textContent(), '컨텍스트 9K / 턴')
+      // REQ-STATS-MEDIAN-COST-1: the point sits at the median cost per request, not the period mean
+      const claudeFixture = fixtures.find((m) => m.model === 'claude-fable-5-1')!
+      assert.ok((await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.medianPerRequest)))
+      assert.ok(!(await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.perRequest)))
+      // REQ-STATS-MEDIAN-COST-3: the per-request column shows the same median
+      assert.ok(
+        (await page.locator('[data-testid="stats-row"][data-model="claude-fable-5-1"] td').last().innerText()).includes(
+          usd(claudeFixture.pricing!.medianPerRequest)
+        )
+      )
       assert.equal(await page.getByTestId('stats-point-tooltip').count(), 0) // REQ-MODEL-EFFICIENCY-6
       assert.equal(await gpt.locator('.lb-dot').getAttribute('fill'), 'var(--ac-text-muted)')
       assert.equal(await rowName.evaluate((e) => getComputedStyle(e).color), rowColor)
@@ -412,6 +430,7 @@ test(
         'gpt-6.1-sol'
       )
       assert.equal(await page.getByTestId('stats-guides').count(), 1)
+      assert.equal(await page.getByTestId('stats-guide-context').count(), 1)
       await page.getByRole('button', { name: '다시 읽기', exact: true }).focus()
       assert.equal(await page.getByTestId('stats-guides').count(), 0)
       await page.screenshot({ path: '/tmp/illithid-leaderboard-light.png', fullPage: true })

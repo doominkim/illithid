@@ -10,6 +10,11 @@ import {
 import { convertedCost, readPriceBook } from '../src/engine/search/modelPricing'
 import { modelGroups } from '../src/renderer/src/lib/modelGroups'
 
+/** Fixtures price the whole period; the median of completed requests is set to 60% of the mean */
+const withMedian = (p: ReturnType<typeof convertedCost>): ReturnType<typeof convertedCost> => ({
+  ...p,
+  medianPerRequest: p.perRequest === null ? null : p.perRequest * 0.6
+})
 const row = (overrides: Partial<ModelSummary> = {}): ModelSummary => ({
   tool: 'codex',
   model: 'gpt-6.1-sol',
@@ -26,7 +31,7 @@ const row = (overrides: Partial<ModelSummary> = {}): ModelSummary => ({
   errors: { mistake: 0, command: 0, policy: 0, userReject: 0, other: 0 },
   tokens: { input: 1e6, cacheRead: 2e6, cacheWrite: 0, output: 1e6, reasoning: 0 },
   cost: null,
-  pricing: convertedCost(
+  pricing: withMedian(convertedCost(
     'gpt-6.1-sol',
     'codex',
     { input: 1e6, cacheRead: 2e6, cacheWrite: 0, output: 1e6, reasoning: 0 },
@@ -39,7 +44,7 @@ const row = (overrides: Partial<ModelSummary> = {}): ModelSummary => ({
         openai: { models: { 'gpt-6.1-sol': { cost: { input: 2, output: 10, cache_read: 0.1 } } } }
       }
     }
-  ),
+  )),
   median: {
     responseSec: 45,
     toolsPerRequest: 2,
@@ -71,6 +76,13 @@ test('REQ-USAGE-LEADERBOARD-2 excludes insufficient samples, missing timing and 
   assert.equal(chartRows(rows).length, 1)
   assert.equal(rows.length, 4)
   assert.equal(chartRows([row({ requests: 0 })]).length, 0)
+})
+
+test('REQ-STATS-MEDIAN-COST-1 REQ-STATS-MEDIAN-COST-2 the chart places models by median cost per request', () => {
+  const base = row()
+  const withMedian = row({ pricing: { ...base.pricing!, medianPerRequest: 0.05 } })
+  assert.deepEqual(chartRows([withMedian]).map((m) => m.x), [0.05])
+  assert.equal(chartRows([row({ pricing: { ...base.pricing!, medianPerRequest: null } })]).length, 0)
 })
 
 test('REQ-USAGE-LEADERBOARD-3 series isolate tools and effort order is stable; colors follow model provider', () => {

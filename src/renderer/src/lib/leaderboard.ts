@@ -25,16 +25,17 @@ export const providerText = (model: string): string =>
 
 export function chartRows(models: ModelSummary[]): (ModelSummary & { x: number; y: number })[] {
   return models.flatMap((m) => {
-    const cost = m.pricing
+    // Median, not the period total over requests: a few very long sessions would otherwise decide the position
+    const x = m.pricing?.medianPerRequest
     const y = m.median.responseSec
     return m.requests >= 30 &&
-      cost?.perRequest !== null &&
-      cost?.perRequest !== undefined &&
-      Number.isFinite(cost.perRequest) &&
+      x !== null &&
+      x !== undefined &&
+      Number.isFinite(x) &&
       y !== null &&
       Number.isFinite(y) &&
       y >= 0
-      ? [{ ...m, x: cost.perRequest, y }]
+      ? [{ ...m, x, y }]
       : []
   })
 }

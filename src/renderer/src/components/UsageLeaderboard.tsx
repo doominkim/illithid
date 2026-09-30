@@ -155,7 +155,7 @@ export function UsageLeaderboard({
       : metric === 'cost'
         ? (costs.get(modelKeyStr(m))?.total ?? null)
         : metric === 'perCost'
-          ? (costs.get(modelKeyStr(m))?.perRequest ?? null)
+          ? (costs.get(modelKeyStr(m))?.medianPerRequest ?? null)
           : metric === 'response'
             ? m.median.responseSec
             : metric === 'tools'
@@ -389,7 +389,7 @@ export function UsageLeaderboard({
                 data-model={m.model}
                 data-series={seriesKey(m)}
                 data-active={active?.series === seriesKey(m)}
-                aria-label={`${modelLabel(m)}, ${toolName(m.tool)}, ${usd(m.x)}, ${Math.round(m.y)}s`}
+                aria-label={`${modelLabel(m)}, ${toolName(m.tool)}, ${usd(m.x)}, ${Math.round(m.y)}s${m.median.contextPerTurn === null ? '' : `, ${t('leaderboard.contextChip', { n: formatTokens(m.median.contextPerTurn, i18n.language) })}`}`}
                 onMouseEnter={() => setPointHover(m)}
                 onFocus={() => moveFocus(m)}
                 onBlur={() => setFocus(null)}
@@ -513,6 +513,25 @@ export function UsageLeaderboard({
                     <text x={x(point.x)} y={404} textAnchor="middle">
                       {usd(point.x)}
                     </text>
+                    {point.median.contextPerTurn !== null &&
+                      (() => {
+                        // Context per turn next to the point: high cost often comes from long sessions, not the model
+                        const text = t('leaderboard.contextChip', {
+                          n: formatTokens(point.median.contextPerTurn, i18n.language)
+                        })
+                        const w = [...text].reduce((a, c) => a + (c.charCodeAt(0) > 0x2e80 ? 10 : 5.8), 14)
+                        const cx = Math.min(Math.max(x(point.x) + 10, 70), 970 - w)
+                        // Below-right of the point: model labels sit above points
+                        const cy = Math.min(y(point.y) + 10, 356)
+                        return (
+                          <g data-testid="stats-guide-context">
+                            <rect x={cx} y={cy} width={w} height={20} rx={3} />
+                            <text x={cx + w / 2} y={cy + 13} textAnchor="middle">
+                              {text}
+                            </text>
+                          </g>
+                        )
+                      })()}
                   </g>
                 )}
                 {labels
@@ -841,7 +860,7 @@ export function UsageLeaderboard({
                             </Table.Td>
                             <Table.Td ta="right">
                               <Text size="sm" fw={600}>
-                                {usd(cost?.perRequest)}
+                                {usd(cost?.medianPerRequest)}
                               </Text>
                               {bar(m, 'perCost')}
                             </Table.Td>

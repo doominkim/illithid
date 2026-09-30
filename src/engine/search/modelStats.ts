@@ -564,6 +564,7 @@ function pricingFor(db: DatabaseSync, summary: ModelSummary, w: { sql: string; a
   if (!rows.length) {
     const pricing = convertedCost(summary.model, summary.tool, summary.tokens, summary.requests, summary.cost && summary.cost > 0 ? summary.cost : null, book)
     pricing.needsReindex = true
+    pricing.medianPerRequest = null
     const maxContext = Number((db.prepare(`select max(ctx) as max from model_ctx where ${where}`).get(...args) as {max: number | null}).max ?? 0)
     if (JSON.stringify(ratesFor(summary.model, book, 0)) !== JSON.stringify(ratesFor(summary.model, book, maxContext))) {
       pricing.converted = null; pricing.parts = null
@@ -587,7 +588,8 @@ function pricingFor(db: DatabaseSync, summary: ModelSummary, w: { sql: string; a
     const list = groups.get(key) ?? []; list.push(c); groups.set(key, list)
   }
   const samples = [...groups.values()].map((g) => sum(g, 'total')).filter((c): c is number => c !== null)
-  return { pricing: { total, converted, perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests, source: total === null ? 'unpriced' : recorded ? 'recorded' : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null) ? 'mixed' : 'converted', priceSource: costs[0]?.cost.priceSource ?? book.source, date: costs[0]?.cost.date ?? book.date, parts }, daily, distribution: samples.length >= MIN_REQUESTS ? dist(samples) : null }
+  const distribution = samples.length >= MIN_REQUESTS ? dist(samples) : null
+  return { pricing: { total, converted, perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests, medianPerRequest: distribution?.median ?? null, source: total === null ? 'unpriced' : recorded ? 'recorded' : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null) ? 'mixed' : 'converted', priceSource: costs[0]?.cost.priceSource ?? book.source, date: costs[0]?.cost.date ?? book.date, parts }, daily, distribution }
 }
 
 /** Every model used in the range. null when the index has no model stats yet (the caller should start an index run) */
