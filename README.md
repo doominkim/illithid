@@ -79,6 +79,12 @@ Browse past Claude Code, Codex, OpenCode, Gemini CLI and Grok CLI conversations 
 
 <p align="center"><img src="docs/demo/sessions.gif" width="960" alt="Walking through the requests of a past session"></p>
 
+### Compare models by cost and speed
+
+See which model and effort level gets your requests done fastest for the money. Illithid prices each request's tokens at API list rates (not your subscription bill) and plots that against median response time, counted from local session logs. Filter by tool or pick any date range, then open a model for its cost breakdown.
+
+<p align="center"><img src="docs/demo/stats.gif" width="960" alt="Cost per request against response time by model, a tool filter, the period list and one model's cost breakdown"></p>
+
 ### Pick your tools
 
 Turn tools on or off in **Settings → Tools in use**. Turning one off removes Illithid's copies from it once you confirm the preview; your own files stay. Grok CLI and GitHub Copilot also read Claude Code's files, so Illithid asks whether to use both before turning them on together.
@@ -100,6 +106,7 @@ Reports, docs and images your agents produce, tagged by the tool that made them.
 - **Memory**: review Claude's auto-memory, promote useful entries to the shared library, trash the rest.
 - **Git backup**: push the library to a private repo and restore any snapshot.
 - **Import**: bring in the rules, skills, subagents and MCP servers you already have.
+- **Settings that stick**: language, theme and grid or list views live in `~/.config/illithid/config.json`, so updates don't reset them.
 
 ## Safe by default
 

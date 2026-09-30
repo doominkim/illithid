@@ -79,6 +79,12 @@ Claude Code, Codex, OpenCode, Gemini CLI, Grok CLI의 지난 대화를 한 목�
 
 <p align="center"><img src="docs/demo/sessions.gif" width="960" alt="지난 세션의 요청 훑어보기"></p>
 
+### 모델별 비용과 속도 비교
+
+어떤 모델과 effort가 같은 돈으로 요청을 가장 빨리 끝내는지 봅니다. 요청마다 쓴 토큰을 API 정가로 환산하고(구독 결제액과는 다릅니다) 응답 시간 중앙값과 함께 그래프로 보여줍니다. 로컬 세션 기록에서 셉니다. 툴이나 기간을 골라 좁히고, 모델을 열면 비용 내역을 볼 수 있습니다.
+
+<p align="center"><img src="docs/demo/stats.gif" width="960" alt="모델별 요청당 비용과 응답 시간, 툴 필터와 기간 목록, 한 모델의 비용 내역"></p>
+
 ### 쓰는 툴 고르기
 
 **설정 → 사용 중인 툴** 에서 툴을 켜고 끕니다. 툴을 끄면 미리보기를 확인한 뒤 Illithid 가 넣어 둔 사본을 그 툴에서 치웁니다. 직접 만든 파일은 그대로 둡니다. Grok CLI 와 GitHub Copilot 은 Claude Code 의 파일도 읽기 때문에, 함께 켤 때 둘 다 쓸지 먼저 묻습니다.
@@ -100,6 +106,7 @@ Claude Code, Codex, OpenCode, Gemini CLI, Grok CLI의 지난 대화를 한 목�
 - **메모리**: Claude 자동 메모리를 검토해 쓸 만한 항목은 공용 라이브러리로 올리고, 나머지는 휴지통으로 보냅니다.
 - **Git 백업**: 라이브러리를 비공개 레포에 올리고, 원하는 시점으로 복원합니다.
 - **가져오기**: 이미 쓰고 있는 룰, 스킬, 서브에이전트, MCP 서버를 그대로 가져옵니다.
+- **설정 유지**: 언어, 테마, 그리드·목록 보기는 `~/.config/illithid/config.json`에 저장되어 업데이트해도 초기화되지 않습니다.
 
 ## 기본값은 안전하게
 

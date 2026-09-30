@@ -38,6 +38,93 @@ const iso = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 6
 export const ALL_TOOLS = ['claude', 'codex', 'opencode', 'gemini', 'copilot'] as const
 
 /** tools: 'all' also sets up Gemini CLI and GitHub Copilot and lists all five in toolsInUse. Default = the three config folders only */
+/** Deterministic 0..1 sequence so the demo chart looks the same on every run */
+function rng(seed: number): () => number {
+  let x = seed
+  return () => {
+    x = (x * 1103515245 + 12345) % 2147483648
+    return x / 2147483648
+  }
+}
+
+/**
+ * Stats demo data: Claude and Codex sessions over the last four weeks, 35+ requests per model and effort so every series
+ * reaches the chart. Each series gets its own response time and token profile (context, output) so the points spread out.
+ */
+export function seedStats(home: string): void {
+  const rand = rng(42)
+  const day = 86_400_000
+  const ts = (ms: number): string => new Date(ms).toISOString()
+  const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]
+  const jitter = (v: number, spread = 0.35): number => Math.max(1, Math.round(v * (1 - spread + rand() * spread * 2)))
+  const prompts = [
+    'Add pagination to the orders endpoint.', 'Why does the cart total round wrong for JPY?', 'Write tests for the refund service.',
+    'Rename the legacy payment flags.', 'Profile the product search query.', 'Fix the flaky webhook retry test.',
+    'Move the email templates to the new renderer.', 'Add an index for the inventory lookup.', 'Explain the session timeout bug.',
+    'Update the API docs for the new filters.', 'Split the checkout controller.', 'Add metrics for the payment worker.'
+  ]
+  const titles = ['Orders API pagination', 'Cart rounding for JPY', 'Refund service tests', 'Payment flag cleanup', 'Search query profiling', 'Webhook retry test', 'Email renderer move', 'Inventory index']
+  const hex = (n: number): string => n.toString(16).padStart(12, '0')
+  let seq = 0
+
+  const claude: { model: string; effort: string; sec: number; ctx: number; out: number }[] = [
+    { model: 'claude-opus-5-5', effort: 'high', sec: 140, ctx: 180_000, out: 1400 },
+    { model: 'claude-opus-5-5', effort: 'medium', sec: 85, ctx: 140_000, out: 900 },
+    { model: 'claude-sonnet-5', effort: 'medium', sec: 55, ctx: 110_000, out: 800 },
+    { model: 'claude-haiku-4-5', effort: '', sec: 18, ctx: 60_000, out: 400 }
+  ]
+  for (const c of claude)
+    for (let sIdx = 0; sIdx < 6; sIdx++) {
+      const sid = `cccccccc-${String(++seq).padStart(4, '0')}-4000-8000-${hex(seq)}`
+      const cwd = '/Users/Shared/alex/shop-api'
+      let t = Date.now() - (2 + sIdx * 4 + rand() * 3) * day
+      const lines: unknown[] = [{ type: 'ai-title', aiTitle: pick(titles), sessionId: sid }]
+      const msg = (id: string, at: number, content: unknown[], out: number): unknown => ({
+        type: 'assistant', sessionId: sid, cwd, timestamp: ts(at), ...(c.effort ? { effort: c.effort } : {}),
+        message: { id, role: 'assistant', model: c.model, usage: { input_tokens: jitter(12), cache_read_input_tokens: jitter(c.ctx), cache_creation_input_tokens: jitter(c.ctx / 40), output_tokens: jitter(out) }, content }
+      })
+      for (let r = 0; r < 7; r++) {
+        const dur = jitter(c.sec) * 1000
+        lines.push({ type: 'user', sessionId: sid, cwd, timestamp: ts(t), message: { role: 'user', content: pick(prompts) } })
+        const tool = `t${seq}-${r}`
+        lines.push(msg(`m${seq}-${r}a`, t + dur * 0.4, [{ type: 'tool_use', id: tool, name: pick(['Read', 'Edit', 'Bash', 'Grep']), input: {} }], c.out / 3))
+        lines.push({ type: 'user', sessionId: sid, cwd, timestamp: ts(t + dur * 0.5), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: tool, content: 'ok' }] } })
+        lines.push(msg(`m${seq}-${r}b`, t + dur, [{ type: 'text', text: 'Done.' }], c.out))
+        t += dur + jitter(240) * 1000
+      }
+      put(home, `.claude/projects/-Users-Shared-alex-shop-api/${sid}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    }
+
+  const codex: { effort: string; sec: number; ctx: number; out: number }[] = [
+    { effort: 'high', sec: 95, ctx: 120_000, out: 1600 },
+    { effort: 'medium', sec: 50, ctx: 90_000, out: 900 },
+    { effort: 'low', sec: 24, ctx: 60_000, out: 450 }
+  ]
+  for (const c of codex)
+    for (let sIdx = 0; sIdx < 6; sIdx++) {
+      const id = `01a0e7${String(++seq).padStart(2, '0')}-0000-7000-8000-${hex(seq)}`
+      const cwd = '/Users/Shared/alex/web'
+      let t = Date.now() - (3 + sIdx * 4 + rand() * 3) * day
+      const start = new Date(t)
+      const d = `${start.getFullYear()}/${String(start.getMonth() + 1).padStart(2, '0')}/${String(start.getDate()).padStart(2, '0')}`
+      const ev = (at: number, payload: unknown): unknown => ({ type: 'event_msg', timestamp: ts(at), payload })
+      const lines: unknown[] = [{ type: 'session_meta', timestamp: ts(t), payload: { id, cwd, timestamp: ts(t) } }]
+      for (let r = 0; r < 7; r++) {
+        const dur = jitter(c.sec) * 1000
+        const ctx = jitter(c.ctx)
+        lines.push(ev(t, { type: 'task_started' }))
+        lines.push({ type: 'turn_context', timestamp: ts(t), payload: { model: 'gpt-6.1-sol', effort: c.effort, cwd } })
+        lines.push({ type: 'response_item', timestamp: ts(t), payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: pick(prompts) }] } })
+        lines.push(ev(t + dur * 0.5, { type: 'token_count', info: { last_token_usage: { input_tokens: ctx, cached_input_tokens: Math.round(ctx * 0.9), output_tokens: jitter(c.out / 3), reasoning_output_tokens: jitter(c.out / 6) } } }))
+        lines.push(ev(t + dur, { type: 'token_count', info: { last_token_usage: { input_tokens: ctx, cached_input_tokens: Math.round(ctx * 0.92), output_tokens: jitter(c.out), reasoning_output_tokens: jitter(c.out / 3) } } }))
+        lines.push({ type: 'response_item', timestamp: ts(t + dur), payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Done.' }] } })
+        lines.push(ev(t + dur + 500, { type: 'task_complete' }))
+        t += dur + jitter(300) * 1000
+      }
+      put(home, `.codex/sessions/${d}/rollout-${d.replace(/\//g, '-')}T10-00-00-${id}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    }
+}
+
 export function buildDemoHome(home: string, opts: { tools?: 'all' } = {}): void {
   const all = opts.tools === 'all'
   const ws = '.illithid/workspaces/default'

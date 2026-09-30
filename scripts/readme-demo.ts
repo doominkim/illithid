@@ -3,7 +3,8 @@
  * - Reuses the readme-shots demo HOME with all five tools, pre-syncs it, launches out/ with Playwright video recording (1280x800, light theme).
  * - Auto apply is off after the pre-sync, so every change goes through the sidebar Sync → apply preview → Apply.
  * - Scenes, each cut into its own GIF (docs/demo/<scene>.gif): rules (edit → all five tools), skills (off for Gemini),
- *   mcp (off for Copilot, then the usage chart), market (install two skills), sessions (a session's requests), tools
+ *   mcp (off for Copilot, then the usage chart), market (install two skills), sessions (a session's requests), stats
+ *   (cost against response time per model on seeded sessions, tool and period filters, a cost detail), tools
  *   (Grok CLI on → the Claude combo dialog → apply; Codex off → the preview lists what leaves, cancelled).
  * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes the full
  *   docs/demo/illithid-demo.mp4 and the per-scene GIFs. The market scene uses the network (public GET APIs).
@@ -17,7 +18,7 @@ import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator, type Page } from 'playwright-core'
 import { syncAll } from '../src/engine'
 import { MD_BEGIN, MD_END } from '../src/engine/targets/codexAgents'
-import { baseEnv, buildDemoHome, put } from './readme-shots'
+import { baseEnv, buildDemoHome, put, seedStats } from './readme-shots'
 
 const ROOT = resolve(__dirname, '..')
 const OUT_DIR = join(ROOT, 'docs/demo')
@@ -257,9 +258,36 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   await page.waitForTimeout(1000)
   })
 
+  // 6. Stats: cost per request against response time by model, a tool filter and the period list, then one model's cost detail
+  await scene(page, 'stats', async () => {
+    await clickSlow(page, page.locator('[data-menu="stats"]'), 300)
+    const point = (model: string): Locator => page.locator(`[data-testid="stats-point"][data-model="${model}"]`).first()
+    await point('claude-opus-5-5').waitFor({ timeout: 60_000 })
+    await page.waitForTimeout(1200)
+    for (const model of ['claude-haiku-4-5', 'gpt-6.1-sol', 'claude-opus-5-5']) {
+      await moveTo(page, point(model))
+      await page.waitForTimeout(900)
+    }
+    const option = (label: string): Locator => page.getByRole('option').getByText(label, { exact: true })
+    await clickSlow(page, page.getByTestId('stats-tool'), 500)
+    await clickSlow(page, option('Codex'), 1800)
+    await clickSlow(page, page.getByTestId('stats-tool'), 500)
+    await clickSlow(page, option('All'), 1200)
+    await clickSlow(page, page.getByTestId('stats-days'), 500)
+    await moveTo(page, option('Custom'))
+    await page.waitForTimeout(600)
+    await clickSlow(page, option('90 days'), 1200)
+    await clickSlow(page, point('claude-opus-5-5'), 300)
+    const cost = page.getByTestId('stats-cost-detail')
+    await cost.waitFor({ timeout: 10_000 })
+    await moveTo(page, cost)
+    await page.waitForTimeout(2200)
+    await page.keyboard.press('Escape')
+  })
+
   const offAfter = offTargets(home)
 
-  // 6. Tools: Grok CLI on → the Claude combo dialog → Use both → apply; Codex off → the preview lists what leaves → Cancel
+  // 7. Tools: Grok CLI on → the Claude combo dialog → Use both → apply; Codex off → the preview lists what leaves → Cancel
   await scene(page, 'tools', async () => {
     await clickSlow(page, page.locator('[data-menu="settings"]'), 500)
     const grok = page.locator('[data-testid="tool-in-use-grok"]')
@@ -368,11 +396,12 @@ async function main(): Promise<void> {
   try {
     buildDemoHome(home, { tools: 'all' })
     seedUsage(home)
+    seedStats(home)
     syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
     // Auto apply off: saves stay in the library until Apply in the preview
     const configPath = join(home, '.config/illithid/config.json')
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    writeFileSync(configPath, JSON.stringify({ ...config, allowRealApply: false }, null, 2) + '\n')
+    writeFileSync(configPath, JSON.stringify({ ...config, allowRealApply: false, ui: { language: 'en', colorScheme: 'light', views: { rules: 'grid', skills: 'grid', mcp: 'grid', agents: 'grid' } } }, null, 2) + '\n')
     const env = { ...baseEnv(home), ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
     const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env, recordVideo: { dir: videoDir, size: SIZE } })
     const errors: string[] = []
@@ -389,11 +418,6 @@ async function main(): Promise<void> {
         BrowserWindow.getAllWindows()[0]?.setContentSize(s.width, s.height)
       }, SIZE)
       await page.setViewportSize(SIZE).catch(() => {})
-      await page.evaluate(() => {
-        localStorage.setItem('illithid-language', 'en')
-        localStorage.setItem('illithid-color-scheme', 'light')
-      })
-      await page.reload()
       await page.waitForSelector('[data-menu="rules"]')
       await page.waitForSelector(`main [data-card="${RULE}"]`)
       await waitLoaded(page)
