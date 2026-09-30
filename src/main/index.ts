@@ -6,6 +6,7 @@ import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shellEnvReady } from './shellEnv'
+import { decideHandoff, readRunningVersion, shouldWaitForLock, waitForLock, writeRunningVersion } from './singleInstance'
 import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, recentSessions, registerIpc, resolveHome, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
@@ -52,6 +53,23 @@ const TEST_MODE = process.env['ILLITHID_TEST'] === '1'
 if (TEST_MODE && process.platform === 'darwin') {
   app.setActivationPolicy('accessory')
   app.dock?.hide()
+}
+
+/** Version used for the single-instance handoff; tests may pose as a newer build */
+const VERSION = (TEST_MODE && process.env['ILLITHID_TEST_VERSION']) || app.getVersion()
+
+/**
+ * One app per userData, so a new build opened while the old one sits in the menu bar does not start a second instance with
+ * empty Chromium storage. A newer build takes over (the running one quits); anything else brings the running window forward.
+ * `npm run dev` skips it: it shares userData with the installed app at the same version and would close right away.
+ */
+const DEV_SERVER = is.dev && !!process.env['ELECTRON_RENDERER_URL']
+async function acquireSingleInstance(): Promise<boolean> {
+  if (DEV_SERVER) return true
+  const data = { version: VERSION }
+  if (app.requestSingleInstanceLock(data)) return true
+  if (!shouldWaitForLock(VERSION, readRunningVersion(app.getPath('userData')))) return false
+  return waitForLock(() => app.requestSingleInstanceLock(data))
 }
 
 /** macOS outside tests: closing the window hides it and the app stays in the menu bar (Cmd+Q quits) */
@@ -142,7 +160,21 @@ function createWindow(): void {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+void acquireSingleInstance().then((locked) => {
+  if (!locked) {
+    app.exit(0)
+    return
+  }
+  if (!DEV_SERVER) writeRunningVersion(app.getPath('userData'), VERSION)
+  app.on('second-instance', (_event, _argv, _cwd, data) => {
+    if (quitting) return
+    if (decideHandoff(VERSION, (data as { version?: unknown } | null)?.version) === 'yield') app.quit()
+    else showMainWindow()
+  })
+  void app.whenReady().then(startApp)
+})
+
+function startApp(): void {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.illithid.app')
   // Dev builds run inside the stock Electron bundle; show the app icon in the Dock anyway
@@ -197,7 +229,7 @@ app.whenReady().then(() => {
     if (MENU_BAR) showMainWindow()
     else if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-})
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

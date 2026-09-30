@@ -59,6 +59,7 @@ import type {
   WriteResult
 } from '../shared/api'
 import type { Op } from './reads'
+import type { UiPrefsPatch } from '../engine/uiPrefs'
 import * as W from './writes'
 import { adoptEditedRule } from '../engine/editedRules'
 import { keepImportedOriginal } from './preview'
@@ -385,6 +386,11 @@ export function registerIpc(): void {
       if (r.ok && patch && typeof patch === 'object' && 'backupRetention' in patch) void runBackupCleanup()
       return r
     },
+    uiPrefsSet: async (patch) => {
+      const r = W.wrap(() => W.uiPrefsSet(home, (patch ?? {}) as UiPrefsPatch))
+      if (r.ok) for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:uiPrefsEvent', r.value)
+      return r
+    },
     toolsInUseGet: async () => W.toolsInUseView(home, await envNow()),
     toolsInUseSet: async (tools, retiring) => {
       const env = await envNow()
@@ -648,6 +654,14 @@ export function registerIpc(): void {
   for (const [channel, fn] of Object.entries(handlers)) {
     ipcMain.handle(`api:${channel}`, (_event, ...args) => fn(...args))
   }
+  // Synchronous on purpose: the renderer needs language and color scheme before its first render
+  ipcMain.on('api:uiPrefsInitial', (event) => {
+    try {
+      event.returnValue = W.uiPrefsGet(home)
+    } catch {
+      event.returnValue = {}
+    }
+  })
 }
 
 /** Finish library setup and workspace migration before opening the window (so the renderer's first read never sees pre-move paths) */

@@ -62,6 +62,7 @@ import {
 } from '../engine'
 import { previewSwitch } from '../engine'
 import { LEGACY_LIBRARY_DIR } from '../engine/config'
+import { mergeUiPrefs, type UiPrefs, type UiPrefsPatch } from '../engine/uiPrefs'
 import { initLibrary } from '../engine/init'
 import { renamePendingPaths } from '../engine/rename'
 import { ensureLibrary } from '../engine/startup'
@@ -406,6 +407,20 @@ export function configView(home: string, fixture: boolean): ConfigView {
       ? { libraryStartError }
       : {})
   }
+}
+
+/** config.json `ui`. Empty when the file is missing or unreadable (the renderer then falls back to its old localStorage values) */
+export function uiPrefsGet(home: string): UiPrefs {
+  return readConfig(home).config.ui ?? {}
+}
+
+/** Merge a preference patch into config.json `ui`; a config.json that fails to read is left alone */
+export function uiPrefsSet(home: string, patch: UiPrefsPatch): UiPrefs {
+  const cur = readConfig(home)
+  if (cur.error) throw new ConfigError(`config.json: ${cur.error}`)
+  const ui = mergeUiPrefs(cur.config.ui, patch)
+  writeConfig(home, { ...cur.config, version: 1, ui })
+  return ui
 }
 
 /** Apply patch over the current settings. undefined values remove the key */

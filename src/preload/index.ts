@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { CHANNELS, type Api } from '../shared/api'
 
-// The invoke channel list is defined by CHANNELS in shared/api.ts. Events are onSyncEvent, onSearchIndexEvent, onTrayAction, onTraySessions, onUpdateEvent and onBackupCleanupEvent (main -> renderer)
+// The invoke channel list is defined by CHANNELS in shared/api.ts. Events are onSyncEvent, onSearchIndexEvent, onTrayAction, onTraySessions, onUpdateEvent, onBackupCleanupEvent and onUiPrefsEvent (main -> renderer)
 const api = {
   ...Object.fromEntries(
     CHANNELS.map((ch) => [ch, (...args: unknown[]) => ipcRenderer.invoke(`api:${ch}`, ...args)])
@@ -40,6 +40,20 @@ const api = {
     ipcRenderer.on('api:updateEvent', listener)
     return () => {
       ipcRenderer.removeListener('api:updateEvent', listener)
+    }
+  },
+  uiPrefsInitial: ((): unknown => {
+    try {
+      return ipcRenderer.sendSync('api:uiPrefsInitial') ?? {}
+    } catch {
+      return {}
+    }
+  })(),
+  onUiPrefsEvent: (cb: (p: unknown) => void): (() => void) => {
+    const listener = (_e: unknown, p: unknown): void => cb(p)
+    ipcRenderer.on('api:uiPrefsEvent', listener)
+    return () => {
+      ipcRenderer.removeListener('api:uiPrefsEvent', listener)
     }
   },
   onBackupCleanupEvent: (cb: (r: unknown) => void): (() => void) => {

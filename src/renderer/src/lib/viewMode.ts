@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { ViewMode } from '../components/ViewToggle'
+import { setUiPrefs, uiPrefs } from './uiPrefs'
 
-/** Grid or list for one screen, remembered across screens and restarts (list until changed) */
+/** Grid or list for one screen, kept in config.json `ui.views` across screens, restarts and updates (list until changed) */
 export function useViewMode(screen: string): [ViewMode, (v: ViewMode) => void] {
-  const key = `illithid-view:${screen}`
-  const [view, setView] = useState<ViewMode>(() => (localStorage.getItem(key) === 'grid' ? 'grid' : 'list'))
+  const [view, setView] = useState<ViewMode>(() => (uiPrefs().views?.[screen] === 'grid' ? 'grid' : 'list'))
   const set = (v: ViewMode): void => {
-    localStorage.setItem(key, v)
+    setUiPrefs({ views: { [screen]: v } })
     setView(v)
   }
   return [view, set]

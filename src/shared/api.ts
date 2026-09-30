@@ -8,6 +8,8 @@ import type {
   AgentDocInput,
   AgentSyncResult,
   AppConfig,
+  UiPrefs,
+  UiPrefsPatch,
   Artifact,
   ArtifactTool,
   BackupStatus,
@@ -88,6 +90,8 @@ export type {
   AgentDocInput,
   AgentSyncResult,
   AppConfig,
+  UiPrefs,
+  UiPrefsPatch,
   Artifact,
   ArtifactTool,
   BackupStatus,
@@ -639,6 +643,11 @@ export interface Api {
   // ---- config·library setup
   configGet(): Promise<ConfigView>
   configSet(patch: Partial<AppConfig>): Promise<WriteResult<ConfigView>>
+  /** config.json `ui` read synchronously by preload before the first render (language, color scheme, view modes) */
+  uiPrefsInitial: UiPrefs
+  /** Merge into config.json `ui` (null removes a key, views merge per screen); every window gets onUiPrefsEvent */
+  uiPrefsSet(patch: UiPrefsPatch): Promise<WriteResult<UiPrefs>>
+  onUiPrefsEvent(cb: (p: UiPrefs) => void): () => void
   /** Tools in use + detection (read-only) */
   toolsInUseGet(): Promise<ToolsInUseView>
   /** Save the tools in use (null = unset, all tools). Writes config only — applying to a newly enabled tool is a separate sync */
@@ -856,6 +865,7 @@ export const CHANNELS = [
   'marketUpdate',
   'configGet',
   'configSet',
+  'uiPrefsSet',
   'toolsInUseGet',
   'toolsInUseSet',
   'detectTools',
@@ -933,6 +943,6 @@ export const CHANNELS = [
   'updateCheckNow',
   'updateSkip',
   'updateOpenTerminal'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent' | 'onTraySessions'>[]
+] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent' | 'onTraySessions' | 'onUiPrefsEvent' | 'uiPrefsInitial'>[]
 
 export type Channel = (typeof CHANNELS)[number]

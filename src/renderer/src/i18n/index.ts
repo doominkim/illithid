@@ -1,6 +1,6 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import { migrateStorageKey } from '../lib/storage'
+import { onUiPrefsChange, setUiPrefs, uiPrefs } from '../lib/uiPrefs'
 import en from './en.json'
 import ko from './ko.json'
 import zh from './zh.json'
@@ -15,15 +15,12 @@ export const LANGUAGES = [
 
 export type Language = (typeof LANGUAGES)[number]['value']
 
-const STORAGE_KEY = 'illithid-language'
-/** Keys from previous app names (most recent first). Values are migrated when the new key is missing */
-const LEGACY_STORAGE_KEYS = ['harnesssync-language']
 const SUPPORTED = LANGUAGES.map((l) => l.value) as readonly string[]
 
+/** The language chosen in config.json `ui.language` (see lib/uiPrefs), else the system language */
 function detectLanguage(): Language {
-  migrateStorageKey(STORAGE_KEY, LEGACY_STORAGE_KEYS)
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored && SUPPORTED.includes(stored)) return stored as Language
+  const stored = uiPrefs().language
+  if (stored && SUPPORTED.includes(stored)) return stored
   const prefix = navigator.language.toLowerCase().split('-')[0]
   if (SUPPORTED.includes(prefix)) return prefix as Language
   return 'en'
@@ -40,9 +37,14 @@ i18n.on('languageChanged', (lng) => {
 
 /** Only a language the user picked is stored. Without a choice, navigator.language keeps applying. */
 export function setLanguage(lng: Language): void {
-  localStorage.setItem(STORAGE_KEY, lng)
+  setUiPrefs({ language: lng })
   void i18n.changeLanguage(lng)
 }
+
+// A language picked in another window (main window vs menu bar popover)
+onUiPrefsChange((p) => {
+  if (p.language && p.language !== i18n.language) void i18n.changeLanguage(p.language)
+})
 
 void i18n.use(initReactI18next).init({
   resources: {

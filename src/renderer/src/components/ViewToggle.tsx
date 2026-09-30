@@ -39,6 +39,7 @@ export function ViewToggle({
         }
       ]}
       styles={{ label: { padding: '4px 8px' } }}
+      data-testid="view-toggle"
     />
   )
 }

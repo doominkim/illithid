@@ -380,7 +380,7 @@ function Settings(): React.JSX.Element {
       <Section title={t('settings.appearance')}>
         <Row
           label={t('settings.language')}
-          control={<Select w={180} data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))} value={i18n.resolvedLanguage} onChange={(value) => value && setLanguage(value as Language)} allowDeselect={false} />}
+          control={<Select w={180} data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))} value={i18n.resolvedLanguage} onChange={(value) => value && setLanguage(value as Language)} allowDeselect={false} data-testid="settings-language" />}
         />
         <Row
           label={t('settings.theme')}
@@ -389,6 +389,7 @@ function Settings(): React.JSX.Element {
             <SegmentedControl
               value={colorScheme}
               onChange={(value) => setColorScheme(value as MantineColorScheme)}
+              data-testid="settings-theme"
               data={[
                 { value: 'light', label: t('settings.themeLight') },
                 { value: 'dark', label: t('settings.themeDark') },

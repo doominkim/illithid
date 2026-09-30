@@ -7,16 +7,14 @@ import './i18n'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MantineProvider, localStorageColorSchemeManager } from '@mantine/core'
+import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import App from './App'
 import { TrayPopover } from './TrayPopover'
 import { cssVariablesResolver, theme } from './theme'
-import { migrateStorageKey } from './lib/storage'
+import { configColorSchemeManager } from './lib/uiPrefs'
 
-const COLOR_SCHEME_KEY = 'illithid-color-scheme'
-migrateStorageKey(COLOR_SCHEME_KEY, ['harnesssync-color-scheme'])
-const colorSchemeManager = localStorageColorSchemeManager({ key: COLOR_SCHEME_KEY })
+const colorSchemeManager = configColorSchemeManager()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

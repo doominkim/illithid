@@ -3,6 +3,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import { toolConfigFound } from './detect'
 import { DEFAULT_TOOLS_IN_USE, TOOL_IDS, type ToolId } from './toolIds'
 import { atomicWrite } from './write'
+import { uiPrefsErrors, type UiPrefs } from './uiPrefs'
 
 /** Artifact source setting (config.json format). root is an absolute path or starts with `~/` */
 export interface ArtifactSourceConfig {
@@ -62,6 +63,8 @@ export interface AppConfig {
    * item off for that tool); a tool leaves this list once nothing of the app is left there, or when it is turned back on
    */
   toolsRetiring?: ToolId[]
+  /** Renderer preferences (language, color scheme, grid/list per screen); see uiPrefs.ts */
+  ui?: UiPrefs
 }
 
 /** Tools that toolsInUse accepts (= TOOL_IDS, in tool order) */
@@ -165,6 +168,7 @@ export function validateConfig(v: unknown): string[] {
         errs.push(`backupRetention.keepRollback must be an integer 1-${RETENTION_KEEP_MAX}`)
     }
   }
+  if (o.ui !== undefined) errs.push(...uiPrefsErrors(o.ui))
   if (o.toolsInUse !== undefined && !isToolList(o.toolsInUse))
     errs.push(`toolsInUse must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   if (o.artifactSources !== undefined) {
@@ -211,6 +215,12 @@ export function readConfig(home: string): ConfigRead {
     const { toolsRetiring: bad, ...rest } = raw as Record<string, unknown>
     const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
     raw = known.length ? { ...rest, toolsRetiring: known } : rest
+  }
+  // A malformed ui (hand edit, a newer app's value) only drops the preferences, never the rest of the config
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'ui' in raw && uiPrefsErrors((raw as Record<string, unknown>).ui).length) {
+    const rest = { ...(raw as Record<string, unknown>) }
+    delete rest.ui
+    raw = rest
   }
   const errs = validateConfig(raw)
   if (errs.length) return { path, exists: true, config: defaultConfig(), error: errs.join('; ') }
