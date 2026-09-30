@@ -4,10 +4,11 @@
  * those stay as written; `secret:` references are resolved to their values (like every other tool that has no Keychain access).
  */
 import { parse as parseToml } from 'smol-toml'
-import { blockBodyMulti, mcpEntries, outsideBlockMulti, removeBlockMulti, spliceBlockMulti, toggleNotes } from '../text'
+import { blockBodyMulti, mcpEntries, outsideBlockMulti, presentMarkers, removeBlockMulti, spliceBlockMulti, toggleNotes } from '../text'
 import type { SecretBackend } from '../secrets'
 import type { Env, McpSource, TargetDef } from '../types'
 import { extractCodexTables, LEGACY_TOML_MCP_MARKERS, stripCodexManagedTables, TOML_MCP_MARKERS } from './codexMcp'
+import { GROK_COMPAT_MARKERS } from './grokCompat'
 import { isServerError, renderHttpHeaders, renderValue } from './mcpRender'
 import { disabledUnownedServers, enabledServerNames, mcpForTool, ownedServerNames, staleServerNames } from './toggles'
 
@@ -90,6 +91,18 @@ export function buildGrokMcpBody(
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/**
+ * Removes app-owned server tables outside the MCP block without touching the compat block: a table is stripped up to the next
+ * `[` line, so comment lines after it — the compat block's BEGIN marker — would go with it
+ */
+function stripOwnedTables(text: string, names: string[]): string {
+  const p = presentMarkers(text, [GROK_COMPAT_MARKERS])
+  if (!p) return stripCodexManagedTables(text, names)
+  const i = text.indexOf(p[0])
+  const j = text.indexOf(p[1]) + p[1].length
+  return stripCodexManagedTables(text.slice(0, i), names) + text.slice(i, j) + stripCodexManagedTables(text.slice(j), names)
+}
+
 export const grokMcp: TargetDef = {
   id: 'grokMcp',
   tool: 'grok',
@@ -99,7 +112,7 @@ export const grokMcp: TargetDef = {
   region: (text) => blockBodyMulti(text, ALL_MARKERS),
   build(before, ctx) {
     const { sources, env } = ctx
-    const stripped = stripCodexManagedTables(outsideBlockMulti(before, ALL_MARKERS), ownedServerNames(sources, 'grok', ctx, 'grokMcp'))
+    const stripped = stripOwnedTables(outsideBlockMulti(before, ALL_MARKERS), ownedServerNames(sources, 'grok', ctx, 'grokMcp'))
     // Grok-only keys on the user's (or the app's previous) tables of the same name are carried over
     const kept: Record<string, Json> = {}
     try {

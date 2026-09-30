@@ -50,6 +50,11 @@ export interface AppConfig {
   marketEnabled?: boolean
   /** New version check against the latest GitHub release. Default on; off = no update requests */
   updateCheck?: boolean
+  /**
+   * Grok CLI also reads Claude Code's skills and MCP servers. Default (absent/true) leaves Grok as is; false writes
+   * `[compat.claude] skills = false, mcps = false` to ~/.grok/config.toml (grokCompat target)
+   */
+  grokReadsClaude?: boolean
   /** Version the user chose to skip in the update notice (asked again only for a newer one) */
   updateSkip?: string
   /**
@@ -143,6 +148,8 @@ export function validateConfig(v: unknown): string[] {
   if (o.marketEnabled !== undefined && typeof o.marketEnabled !== 'boolean')
     errs.push('marketEnabled must be a boolean')
   if (o.updateCheck !== undefined && typeof o.updateCheck !== 'boolean') errs.push('updateCheck must be a boolean')
+  if (o.grokReadsClaude !== undefined && typeof o.grokReadsClaude !== 'boolean')
+    errs.push('grokReadsClaude must be a boolean')
   if (o.updateSkip !== undefined && (typeof o.updateSkip !== 'string' || !/^\d+\.\d+\.\d+/.test(o.updateSkip)))
     errs.push('updateSkip must be a version')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))

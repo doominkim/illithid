@@ -49,7 +49,7 @@ function Row({ label, hint, control }: { label: string; hint?: React.ReactNode; 
 /** Tools in use: on or off → save → apply preview (on adds the library there, off removes the app's copies); cancel restores */
 function ToolsInUse(): React.JSX.Element {
   const { t } = useTranslation()
-  const { refresh } = useConfig()
+  const { config, refresh } = useConfig()
   const { openPreview } = useSync()
   const reload = useReload()
   const [view, setView] = useState<ToolsInUseView | null>(null)
@@ -73,7 +73,8 @@ function ToolsInUse(): React.JSX.Element {
     }
     await save(next)
   }
-  const save = async (next: ToolId[]): Promise<void> => {
+  /** `undo` also runs when the apply preview is cancelled (e.g. the combo dialog's Grok option) */
+  const save = async (next: ToolId[], undo?: () => Promise<unknown>): Promise<void> => {
     if (!view) return
     if (view.configured && next.length === shown.length && next.every((x) => shown.includes(x))) return
     // Restored if the apply preview is dismissed: a never-saved list goes back to unset
@@ -88,7 +89,13 @@ function ToolsInUse(): React.JSX.Element {
     reload()
     window.dispatchEvent(new Event(LIBRARY_CHANGED))
     // Off works like on: the preview lists what leaves that tool (the app's copies); cancelling restores the list and what was retiring
-    openPreview({ onCancel: () => void restore(previous, retiring) })
+    openPreview({
+      onCancel: () =>
+        void (async () => {
+          await undo?.()
+          await restore(previous, retiring)
+        })()
+    })
   }
   const restore = async (previous: ToolId[] | null, retiring: ToolId[]): Promise<void> => {
     setBusy(true)
@@ -122,9 +129,12 @@ function ToolsInUse(): React.JSX.Element {
                 </Text>
               )}
               {tool === 'grok' && shown.includes('grok') && (shown.includes('claude') || !!view?.detected.find((d) => d.tool === 'claude')?.configFound) && (
-                <Text size="xs" c="dimmed" data-testid="grok-reads-claude">
-                  {t(shown.includes('claude') ? 'settings.grokWithClaude' : 'settings.grokReadsClaude')}
-                </Text>
+                <>
+                  <Text size="xs" c="dimmed" data-testid="grok-reads-claude">
+                    {t(shown.includes('claude') ? 'settings.grokWithClaude' : 'settings.grokReadsClaude')}
+                  </Text>
+                  <GrokReadsClaude disabled={!view || busy} />
+                </>
               )}
             </Box>
           </Group>
@@ -134,10 +144,16 @@ function ToolsInUse(): React.JSX.Element {
       <ToolComboDialog
         tools={combo?.tools ?? []}
         onCancel={() => setCombo(null)}
-        onBoth={() => {
+        onBoth={({ grokSkipsClaude }) => {
           const c = combo
           setCombo(null)
-          if (c) void save(c.next)
+          if (!c) return
+          void (async () => {
+            if (!grokSkipsClaude) return save(c.next)
+            const before = config?.config.grokReadsClaude
+            if (!(await runWrite(window.api.configSet({ grokReadsClaude: false })))) return
+            await save(c.next, () => runWrite(window.api.configSet({ grokReadsClaude: before })))
+          })()
         }}
         onDropClaude={() => {
           const c = combo
@@ -146,6 +162,49 @@ function ToolsInUse(): React.JSX.Element {
         }}
       />
     </Section>
+  )
+}
+
+/**
+ * Grok also reads Claude Code's skills and MCP servers: off writes [compat.claude] skills/mcps = false to ~/.grok/config.toml
+ * (applied through the preview like any other change; cancelling restores the previous value)
+ */
+function GrokReadsClaude({ disabled }: { disabled: boolean }): React.JSX.Element {
+  const { t } = useTranslation()
+  const { config, refresh } = useConfig()
+  const { openPreview } = useSync()
+  const reload = useReload()
+  const [busy, setBusy] = useState(false)
+  const reads = config?.config.grokReadsClaude !== false
+  const set = async (on: boolean): Promise<void> => {
+    setBusy(true)
+    const r = await runWrite(window.api.configSet({ grokReadsClaude: on ? undefined : false }), { success: t('settings.saved') })
+    setBusy(false)
+    if (!r) return
+    refresh()
+    reload()
+    window.dispatchEvent(new Event(LIBRARY_CHANGED))
+    openPreview({
+      onCancel: () =>
+        void (async () => {
+          await runWrite(window.api.configSet({ grokReadsClaude: reads ? undefined : false }))
+          refresh()
+          reload()
+          window.dispatchEvent(new Event(LIBRARY_CHANGED))
+        })()
+    })
+  }
+  return (
+    <Switch
+      mt={6}
+      size="xs"
+      checked={reads}
+      disabled={disabled || busy}
+      onChange={(e) => void set(e.currentTarget.checked)}
+      label={t('settings.grokReadsClaudeOpt')}
+      description={t('settings.grokReadsClaudeOptNote')}
+      data-testid="grok-reads-claude-switch"
+    />
   )
 }
 

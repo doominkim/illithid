@@ -70,8 +70,8 @@ function Skills(): React.JSX.Element {
           if (!on)
             return [
               tool,
-              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
-                ? { on: false, problem: true, hint: t('combo.readsClaude') }
+              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false, data.grokReadsClaude !== false)
+                ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
           if (failedIn('skill', name, tool)) return [tool, { on: true, problem: true }]

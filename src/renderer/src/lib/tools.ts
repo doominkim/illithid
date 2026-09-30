@@ -35,6 +35,8 @@ export interface PillState {
   pending?: boolean
   /** Not applicable to this tool → hidden */
   na?: boolean
+  /** Off here but still reaches the tool through another tool's files (Grok reading Claude Code) → dashed outline, not an error */
+  via?: boolean
   /** Tooltip explaining the state (e.g. why it is flagged) */
   hint?: string
 }
@@ -70,8 +72,13 @@ export function dotOfPills(p: PillMap): 'on' | 'off' | 'warn' | 'error' {
 
 /**
  * Grok CLI also reads Claude Code's skills, MCP servers and agents: an item off for Grok but on for Claude still reaches Grok
- * while both are in use. Shown as a flagged off pill with a hint
+ * while both are in use. Shown as an off pill marked "via Claude" with a hint. `reads` is false when Grok's Claude reading is
+ * switched off for that kind (config.grokReadsClaude = false covers skills and MCP servers; agents have no switch in Grok)
  */
-export function grokReadsFromClaude(inUse: readonly ToolId[], onFor: (tool: ToolId) => boolean): boolean {
-  return inUse.includes('grok') && inUse.includes('claude') && !onFor('grok') && onFor('claude')
+export function grokReadsFromClaude(
+  inUse: readonly ToolId[],
+  onFor: (tool: ToolId) => boolean,
+  reads = true
+): boolean {
+  return reads && inUse.includes('grok') && inUse.includes('claude') && !onFor('grok') && onFor('claude')
 }

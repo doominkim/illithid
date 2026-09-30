@@ -39,6 +39,7 @@ export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): 
               aria-pressed={p.on}
               data-problem={p.problem || undefined}
               data-pending={p.pending || undefined}
+              data-via={p.via || undefined}
               data-tool={tool}
               disabled={busy.length > 0}
               onClick={() => onToggle(tool)}
@@ -57,6 +58,14 @@ export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): 
           )
         })}
       </Group>
+      {/* Reasons shown in a tooltip on the list pills are spelled out here (e.g. Grok still reading it through Claude Code) */}
+      {shown
+        .filter((tool) => pills[tool]!.via && pills[tool]!.hint)
+        .map((tool) => (
+          <Text key={tool} size="xs" c="dimmed" data-testid={`${testId}-via-${tool}`}>
+            {TOOL_NAME[tool]}: {pills[tool]!.hint}
+          </Text>
+        ))}
       <Text size="xs" c="dimmed">
         {t('detail.applyOnSync')}
       </Text>

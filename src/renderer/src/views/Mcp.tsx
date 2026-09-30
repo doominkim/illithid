@@ -57,8 +57,8 @@ function Mcp(): React.JSX.Element {
         if (!enabled(s.name, tool))
           return [
             tool,
-            tool === 'grok' && grokReadsFromClaude(inUse, (x) => enabled(s.name, x))
-              ? { on: false, pending: st === 'needsSync', problem: true, hint: t('combo.readsClaude') }
+            tool === 'grok' && grokReadsFromClaude(inUse, (x) => enabled(s.name, x), data.grokReadsClaude !== false)
+              ? { on: false, pending: st === 'needsSync', via: true, hint: t('combo.readsClaude') }
               : { on: false, pending: st === 'needsSync' }
           ]
         return [tool, { ...pillFromCellState(st), on: true, na: false }]

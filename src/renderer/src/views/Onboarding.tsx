@@ -214,9 +214,12 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
       <ToolComboDialog
         tools={combo}
         onCancel={() => setCombo([])}
-        onBoth={() => {
+        onBoth={({ grokSkipsClaude }) => {
           setCombo([])
-          void saveTools(tools, true)
+          void (async () => {
+            if (grokSkipsClaude && !(await runWrite(window.api.configSet({ grokReadsClaude: false })))) return
+            await saveTools(tools, true)
+          })()
         }}
         onDropClaude={() => {
           setCombo([])

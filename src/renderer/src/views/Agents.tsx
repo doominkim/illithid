@@ -86,8 +86,9 @@ function Agents(): React.JSX.Element {
           if (!on)
             return [
               tool,
+              // Grok has no switch for Claude agents: they reach Grok whatever config.grokReadsClaude says
               tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
-                ? { on: false, problem: true, hint: t('combo.readsClaude') }
+                ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
           if (failedIn('agent', name, tool)) return [tool, { on: true, problem: true }]

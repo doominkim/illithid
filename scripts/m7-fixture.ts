@@ -197,7 +197,8 @@ import {
   MD_END,
   MD_MARKERS
 } from '../src/engine/targets/codexAgents'
-import { blockBody, blockBodyMulti, outsideBlockMulti } from '../src/engine/text'
+import { blockBody, blockBodyMulti, outsideBlockMulti, removeBlockMulti } from '../src/engine/text'
+import { GROK_COMPAT_MARKERS } from '../src/engine/targets/grokCompat'
 import {
   LEGACY_APP_RULES_BEGIN,
   LEGACY_APP_RULES_END,
@@ -212,7 +213,8 @@ import {
   LEGACY_HS_TOML_MCP_BEGIN,
   LEGACY_HS_TOML_MCP_END,
   TOML_MCP_BEGIN,
-  TOML_MCP_END
+  TOML_MCP_END,
+  TOML_MCP_MARKERS
 } from '../src/engine/targets/codexMcp'
 import {
   LEGACY_APP_MD_BEGIN,
@@ -1168,6 +1170,70 @@ async function toolSteps(): Promise<void> {
         'aj2. Grok chosen — rules copied flat into ~/.grok/rules (memory as illithid-memory.md, user rules kept, toolRules state), config.toml marker block (${VAR} kept, secret resolved, other tables intact), skills, agents, [models] default, re-sync 0, delete candidate, GROK_HOME',
         !bad.length,
         bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}`
+      )
+    }
+
+    // aj2c. Grok's Claude reading — default writes nothing; grokReadsClaude=false writes [compat.claude] in the app block;
+    // a user [compat.claude] wins; back on and retiring remove the block
+    {
+      const bad: string[] = []
+      const H = cHome('illithid-m7-Gc-', grokFiles, ['claude', 'grok'])
+      seedG(H)
+      const sync = (): void => void syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+      const cfg = join(H, '.grok/config.toml')
+      const compat = (): Json | undefined => ((parseToml(read(cfg)) as Json).compat as Json | undefined)?.claude as Json | undefined
+      sync()
+      const c0 = read(cfg)
+      if (c0.includes('illithid compat') || compat() !== undefined) bad.push('default wrote compat')
+      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending at default')
+
+      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
+      const pc = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokCompat')
+      if (!pc?.changed || pc.error) bad.push(`plan ${pc?.error ?? 'no change'}`)
+      sync()
+      const c1 = read(cfg)
+      if (compat()?.skills !== false || compat()?.mcps !== false) bad.push(`compat ${JSON.stringify(compat())}`)
+      if (removeBlockMulti(c1, [GROK_COMPAT_MARKERS]) !== c0) bad.push('content outside the compat block changed')
+      if (blockBodyMulti(c1, [TOML_MCP_MARKERS]) !== blockBodyMulti(c0, [TOML_MCP_MARKERS])) bad.push('mcp block changed')
+      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending after writing compat')
+      // the Skills/MCP views read what Grok actually does from config.toml
+      if (readsSkills(H, envC).grokReadsClaude !== false || readsMcp(H, envC).grokReadsClaude !== false) bad.push('reads: effective off not reported')
+
+      // an app-owned server table written by hand right before the compat block: stripping it must keep the compat markers
+      const i1 = c1.indexOf(GROK_COMPAT_MARKERS[0])
+      writeFileSync(cfg, `${c1.slice(0, i1)}[mcp_servers."g-stdio"]\ncommand = "hand"\n\n${c1.slice(i1)}`)
+      sync()
+      if (!read(cfg).includes(GROK_COMPAT_MARKERS[0]) || !read(cfg).includes(GROK_COMPAT_MARKERS[1]) || compat()?.skills !== false)
+        bad.push(`compat markers lost when stripping an owned table: ${JSON.stringify(read(cfg).slice(-300))}`)
+      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending after stripping an owned table')
+      writeFileSync(cfg, c1)
+      sync()
+
+      // the user's own [compat.claude] wins: the app block goes, their table stays
+      writeFileSync(cfg, c0.trimEnd() + '\n\n[compat.claude]\nskills = true\n')
+      sync()
+      if (read(cfg).includes('illithid compat') || compat()?.skills !== true || compat()?.mcps !== undefined) bad.push(`user compat ${JSON.stringify(compat())}`)
+      if (readsSkills(H, envC).grokReadsClaude !== undefined) bad.push('reads: user skills = true should read as on')
+      writeFileSync(cfg, c0)
+      sync()
+      if (compat()?.skills !== false) bad.push('block not restored after the user table left')
+
+      // back on → block removed, file as at default
+      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: undefined })
+      sync()
+      if (read(cfg) !== c0) bad.push('turning back on left changes')
+
+      // retiring Grok removes the block
+      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
+      sync()
+      setToolsInUse(H, ['claude'])
+      sync()
+      if (read(cfg).includes('illithid')) bad.push('retire left an app block')
+
+      check(
+        'aj2c. Grok Claude reading — default writes nothing, off writes [compat.claude] skills/mcps=false in its own block (rest byte-identical, re-sync 0), user table wins, back on and retire remove it',
+        !bad.length,
+        bad.length ? bad.join('; ') : 'default 0 bytes, block written/removed, user [compat.claude] kept'
       )
     }
 

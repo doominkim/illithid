@@ -8,6 +8,7 @@ import { codexMcp } from './codexMcp'
 import { codexRules } from './codexRules'
 import { copilotMcp } from './copilotMcp'
 import { geminiMcp } from './geminiMcp'
+import { grokCompat } from './grokCompat'
 import { grokMcp } from './grokMcp'
 import { geminiRules } from './geminiRules'
 import { opencodeMcp } from './opencodeMcp'
@@ -27,7 +28,8 @@ export const TARGETS: readonly TargetDef[] = [
 
 /**
  * Targets added in M7. opencodeRules and opencodeSkills write other keys of the same file as opencodeMcp.
- * The skill-disable targets (claudeSkillOverrides, codexSkillConfig, opencodeSkillPermissions) likewise write other keys of files used by earlier targets
+ * The skill-disable targets (claudeSkillOverrides, codexSkillConfig, opencodeSkillPermissions) likewise write other keys of files used by earlier targets;
+ * grokCompat writes its own block in grokMcp's config.toml
  */
 export const EXTRA_TARGETS: readonly TargetDef[] = [
   opencodeRules,
@@ -36,7 +38,8 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   geminiRules,
   geminiMcp,
   copilotMcp,
-  grokMcp
+  grokMcp,
+  grokCompat
 ]
 
 /** All targets. Targets writing the same file come later */

@@ -85,6 +85,7 @@ export type ExtraTargetId =
   | 'geminiMcp'
   | 'copilotMcp'
   | 'grokMcp'
+  | 'grokCompat'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 

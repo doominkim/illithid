@@ -39,6 +39,7 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
             data-off={!p.on || undefined}
             data-problem={p.problem || undefined}
             data-pending={p.pending || undefined}
+            data-via={p.via || undefined}
             data-tool={tool}
           >
             {icon}

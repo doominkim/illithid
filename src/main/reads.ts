@@ -67,6 +67,7 @@ import type {
   SyncState
 } from '../shared/api'
 import { skillDescriptions, toggles } from './writes'
+import { grokClaudeReading } from '../engine/targets/grokCompat'
 import { applyPreview } from './preview'
 
 export function rules(home: string): RulesData {
@@ -179,7 +180,8 @@ export function skills(home: string, env: Env): SkillsData {
     toggles: toggles(home, 'skills'),
     descriptions: skillDescriptions(home, names),
     ...(geminiOff.length ? { toolDisabled: { gemini: geminiOff } } : {}),
-    market: marketSkills(home)
+    market: marketSkills(home),
+    ...(grokClaudeReading(home).skills ? {} : { grokReadsClaude: false })
   }
 }
 
@@ -334,7 +336,7 @@ export function mcp(home: string, env: Env): McpData {
       tools: Object.fromEntries(perTool.map((t) => [t.tool, stateOf(t, name)]))
     }
   })
-  return { servers, toggles: toggles(home, 'mcp') }
+  return { servers, toggles: toggles(home, 'mcp'), ...(grokClaudeReading(home).mcps ? {} : { grokReadsClaude: false }) }
 }
 
 // ---------------------------------------------------------------- artifacts

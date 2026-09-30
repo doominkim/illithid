@@ -176,6 +176,8 @@ export interface SkillsData {
   toolDisabled?: Partial<Record<ToolId, string[]>>
   /** Skills installed from the Market: library name → `owner/repo/skillId` */
   market?: Record<string, string>
+  /** false when ~/.grok/config.toml turns off Grok's reading of Claude Code skills (compat.claude.skills = false) */
+  grokReadsClaude?: boolean
 }
 
 /** Library agent (agents/<name>.md) */
@@ -220,6 +222,8 @@ export interface McpData {
   servers: McpServerView[]
   toggles: Record<string, ToolToggles>
   error?: string
+  /** false when ~/.grok/config.toml turns off Grok's reading of Claude Code MCP servers (compat.claude.mcps = false) */
+  grokReadsClaude?: boolean
 }
 
 // ---------------------------------------------------------------- write channel types

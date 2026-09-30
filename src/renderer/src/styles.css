@@ -144,6 +144,11 @@ body {
 .ac-pill[data-problem] {
   box-shadow: 0 0 0 2px var(--ac-warning);
 }
+/* Off here but still reaching the tool through another tool's files: a neutral dashed ring, not the warning color */
+.ac-pill[data-via] {
+  outline: 1.5px dashed var(--ac-text-muted);
+  outline-offset: 1px;
+}
 .ac-pill[data-pending]::after {
   content: '';
   position: absolute;
@@ -201,6 +206,9 @@ body {
 }
 .ac-tool-btn[data-problem] {
   border-color: var(--ac-warning);
+}
+.ac-tool-btn[data-via] {
+  border-color: var(--ac-text-muted);
 }
 .ac-tool-btn[data-pending]::after {
   content: '';
