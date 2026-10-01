@@ -137,16 +137,21 @@ export function ApplyPreviewBody({
             size="xs"
             fw={500}
             data-testid={
-              x.kind === 'mcp'
-                ? `apply-preview-mcp-${x.tool}-${x.name}-${x.action}`
+              x.kind === 'mcp' || x.kind === 'hook'
+                ? `apply-preview-${x.kind}-${x.tool}-${x.name}-${x.action}`
                 : `apply-preview-action-${x.action}`
             }
           >
             {t(`preview.action.${x.action}`)}
           </Badge>
+          {x.codexTrust && (
+            <Badge variant="light" color="blue" size="xs" fw={500}>
+              {t('preview.codexTrust')}
+            </Badge>
+          )}
         </>
       }
-      subtitle={x.kind === 'config' || x.kind === 'mcp' ? undefined : x.path}
+      subtitle={x.kind === 'config' || x.kind === 'mcp' || x.kind === 'hook' ? undefined : x.path}
     />
   )
 

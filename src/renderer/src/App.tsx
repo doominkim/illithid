@@ -15,7 +15,8 @@ import {
   Settings as SettingsIcon,
   Sparkles,
   Store,
-  Users
+  Users,
+  Webhook
 } from 'lucide-react'
 import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
 import { clearApiCache, RefreshContext, useApi } from './lib/useApi'
@@ -28,6 +29,7 @@ import Rules from './views/Rules'
 import Memory from './views/Memory'
 import Skills from './views/Skills'
 import Mcp from './views/Mcp'
+import Hooks from './views/Hooks'
 import Agents from './views/Agents'
 import Market from './views/Market'
 import Artifacts from './views/Artifacts'
@@ -53,6 +55,7 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
   memory: <Brain size={16} />,
   skills: <Sparkles size={16} />,
   mcp: <Plug size={16} />,
+  hooks: <Webhook size={16} />,
   agents: <Users size={16} />,
   market: <Store size={16} />,
   artifacts: <FolderOpen size={16} />,
@@ -363,6 +366,7 @@ function App(): React.JSX.Element {
     memory: <Memory />,
     skills: <Skills />,
     mcp: <Mcp />,
+    hooks: <Hooks />,
     agents: <Agents />,
     market: <Market />,
     artifacts: <Artifacts />,

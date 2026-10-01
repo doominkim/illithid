@@ -526,3 +526,13 @@ export {
   deleteHook
 } from './library'
 export type { NewHookInput } from './library'
+export { HOOK_TARGETS, HOOK_TARGET_OF, hookTable, appHookName } from './targets/hooks'
+export { planHookSync, applyHookSync, hookBackupPath } from './hookSync'
+export type { HookSyncItem, HookSyncResult, HookSyncAction } from './hookSync'
+export {
+  hookCopyPath,
+  hookCopyRoot,
+  hookCommand,
+  grokReadsClaudeHooks,
+  hooksForTool
+} from './hookRender'

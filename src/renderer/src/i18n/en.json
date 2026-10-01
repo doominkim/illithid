@@ -10,7 +10,8 @@
     "settings": "Settings",
     "backup": "Backup",
     "memory": "Memory",
-    "stats": "Stats"
+    "stats": "Stats",
+    "hooks": "Hooks"
   },
   "settings": {
     "language": "Language",
@@ -489,7 +490,8 @@
     "planChanged": "The changes were updated since you opened this. Review them again, then apply.",
     "editedIn": "Edited in {{tool}}",
     "keepEdited": "Keep this version",
-    "keptEdited": "Saved to the library"
+    "keptEdited": "Saved to the library",
+    "codexTrust": "Trust again in Codex /hooks after applying"
   },
   "onboarding": {
     "title": "Set up Illithid",
@@ -772,5 +774,93 @@
     "dailyCost": "Daily API-equivalent cost",
     "cost": "Cost",
     "reindexCosts": "Cost detail will appear after the session index updates."
+  },
+  "hooks": {
+    "search": "Search hooks",
+    "new": "New hook",
+    "created": "Hook created",
+    "saved": "Hook saved",
+    "deleted": "Hook deleted (kept in .trash)",
+    "deleteTitle": "Delete hook",
+    "deleteBody": "Moves {{name}} and its scripts to .trash. Its entries leave the tools on the next sync.",
+    "allTools": "All tools",
+    "emptyTitle": "No hooks yet",
+    "emptyHint": "Run a script when a tool is about to run a command, finishes a reply or starts a session.",
+    "timing": {
+      "before-tool": "Before a tool runs",
+      "after-tool": "After a tool runs",
+      "prompt": "Prompt submitted",
+      "stop": "Reply finished",
+      "session-start": "Session starts",
+      "session-end": "Session ends",
+      "notification": "Notification"
+    },
+    "timingHint": {
+      "before-tool": "Right before a command or edit runs. Some tools can stop it here.",
+      "after-tool": "Right after a tool finishes. For formatting, linting and logging.",
+      "prompt": "When you send a message. Add context or check it.",
+      "stop": "When the agent finishes a reply. For notifications.",
+      "session-start": "When a session opens. Check the environment or log it.",
+      "session-end": "When a session closes.",
+      "notification": "When the tool asks for permission or waits for input."
+    },
+    "triggers": "Triggers",
+    "triggersHint": "Each tool has its own event names and options. The same option is not guaranteed to behave the same in every tool.",
+    "event": "Event",
+    "matcher": "Matcher",
+    "matcherAll": "Leave empty for every tool call",
+    "matcherHint": "A pattern of tool names. Tool names differ per tool.",
+    "matcherNone": "This event has no matcher",
+    "timeout": "Timeout (seconds)",
+    "timeoutDefault": "Tool default",
+    "timeoutMs": "Written to Gemini CLI in milliseconds",
+    "script": "Script",
+    "shared": "Shared",
+    "own": "{{tool}} only",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "edit": "Edit",
+    "noEvent": "{{tool}} has no event for this timing",
+    "notConnected": "Not connected",
+    "block": "Stopping it",
+    "blockYes": "This event can stop what triggered it",
+    "blockNo": "This event cannot stop anything",
+    "input": "Script input",
+    "blockHow": "How to stop",
+    "toolInput": {
+      "claude": "JSON on stdin: tool_name, tool_input",
+      "codex": "JSON on stdin: tool_name, tool_input",
+      "gemini": "JSON on stdin: tool_name, tool_input",
+      "copilot": "JSON on stdin: toolName, toolArgs (a JSON string)",
+      "grok": "JSON on stdin: toolName, toolInput"
+    },
+    "toolBlock": {
+      "claude": "exit 2 (stderr is the reason) or JSON hookSpecificOutput.permissionDecision",
+      "codex": "exit 2 or JSON permissionDecision: deny",
+      "gemini": "exit 2 or JSON decision: deny",
+      "copilot": "Any non-zero exit or JSON permissionDecision: deny (errors also stop the tool)",
+      "grok": "exit 2 or JSON decision: deny"
+    },
+    "argHint": "The script gets the tool name (claude, codex, gemini, copilot, grok) as its first argument.",
+    "codexTrust": "Codex runs a new or changed hook only after you trust it in /hooks.",
+    "grokViaClaude": "Grok runs this hook from Claude Code's settings",
+    "scripts": "Scripts",
+    "makeOwn": "Tool-only script",
+    "dropOwn": "Use the shared script",
+    "ownCreated": "Created a {{tool}}-only script from the shared one",
+    "ownDropped": "{{tool}} uses the shared script again",
+    "scriptSaved": "Script saved",
+    "usedBy": "Run by",
+    "description": "Description",
+    "template": "Template",
+    "tools": "Connect to",
+    "templates": {
+      "blank": "Empty script",
+      "guard": "Block dangerous commands",
+      "notify": "macOS notification",
+      "log": "Log to a file"
+    },
+    "timingLabel": "When",
+    "timingPick": "Pick when it runs"
   }
 }

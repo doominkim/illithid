@@ -12,7 +12,8 @@ import {
   Settings,
   Sparkles,
   Store,
-  Users
+  Users,
+  Webhook
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { type Menu, PRIMARY, useNav } from '../lib/nav'
@@ -27,6 +28,7 @@ const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
   memory: Brain,
   skills: Sparkles,
   mcp: Plug,
+  hooks: Webhook,
   agents: Users,
   market: Store,
   artifacts: FolderOpen,

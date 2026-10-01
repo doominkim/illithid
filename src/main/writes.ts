@@ -58,7 +58,17 @@ import {
   type SkillDocInput,
   type SwitchLossItem,
   type ToolId,
-  seedNewToolToggles
+  seedNewToolToggles,
+  createHook,
+  createHookToolScript,
+  deleteHook,
+  dropHookToolScript,
+  readHook,
+  saveHookDef,
+  saveHookScript,
+  isHookTool,
+  type HookDef,
+  type NewHookInput
 } from '../engine'
 import { previewSwitch } from '../engine'
 import { LEGACY_LIBRARY_DIR } from '../engine/config'
@@ -631,7 +641,48 @@ export const lib = {
   memorySave: (home: string, rel: string, content: string) => {
     writeMemoryFile(home, rel, String(content))
   },
-  memoryDelete: (home: string, rel: string) => deleteMemoryFile(home, rel)
+  memoryDelete: (home: string, rel: string) => deleteMemoryFile(home, rel),
+  hookCreate: (home: string, name: string, input: NewHookInput) => {
+    const i = (input ?? {}) as Partial<NewHookInput>
+    createHook(home, name, {
+      description: String(i.description ?? ''),
+      timing: i.timing as NewHookInput['timing'],
+      tools: Array.isArray(i.tools) ? i.tools.filter(isHookTool) : [],
+      script: String(i.script ?? '')
+    })
+    return { name }
+  },
+  hookSave: (home: string, name: string, def: HookDef) => {
+    saveHookDef(home, name, def)
+    return { name }
+  },
+  hookDelete: (home: string, name: string) => deleteHook(home, name),
+  hookScriptSave: (home: string, name: string, file: string, content: string) => {
+    saveHookScript(home, name, file, String(content))
+    return { file }
+  },
+  hookToolScriptCreate: (home: string, name: string, tool: string) => {
+    if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
+    return { file: createHookToolScript(home, name, tool) }
+  },
+  hookToolScriptDrop: (home: string, name: string, tool: string) => {
+    if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
+    return dropHookToolScript(home, name, tool)
+  }
+}
+
+/** hook.json and its scripts for the detail sheet */
+export function hookRead(
+  home: string,
+  name: string
+): { name: string; def: HookDef; scripts: Record<string, string> } {
+  try {
+    const h = readHook(home, name)
+    return { name: h.name, def: h.def, scripts: h.scripts }
+  } catch (e) {
+    if (e instanceof LibraryError) throw e
+    throw new LibraryError('notFound', (e as Error).message)
+  }
 }
 
 export function mcpRead(home: string, name: string): McpEditView {

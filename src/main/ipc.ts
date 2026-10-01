@@ -88,7 +88,13 @@ const MIME: Record<string, string> = {
 }
 
 /** Worker reads that resolve tool files or ${VAR} values and so need the login shell environment */
-const ENV_OPS: ReadonlySet<Op> = new Set<Op>(['status', 'syncPending', 'syncPreview', 'mcp'])
+const ENV_OPS: ReadonlySet<Op> = new Set<Op>([
+  'status',
+  'syncPending',
+  'syncPreview',
+  'mcp',
+  'hooks'
+])
 
 /** Run synchronous scans on a worker thread so the main event loop is not blocked */
 /** Recent sessions for the menu bar item (worker scan; subagent, untitled and non-resumable sessions left out) */
@@ -319,6 +325,7 @@ export function registerIpc(): void {
     skills: () => inWorker('skills', home),
     agents: () => inWorker('agents', home),
     mcp: () => inWorker('mcp', home),
+    hooks: () => inWorker('hooks', home),
     sessions: async () => {
       const r = await inWorker('sessions', home)
       // Session refresh = incremental index (if already running, run once more afterwards)
@@ -580,6 +587,17 @@ export function registerIpc(): void {
     mcpRead: async (name) => W.wrap(() => W.mcpRead(home, str(name))),
     mcpSave: async (name, def) => libWrite(() => W.mcpSave(home, str(name), def as never)),
     mcpDelete: async (name) => libWrite(() => W.lib.mcpDelete(home, str(name))),
+    hookRead: async (name) => W.wrap(() => W.hookRead(home, str(name))),
+    hookCreate: async (name, input) =>
+      libWrite(() => W.lib.hookCreate(home, str(name), input as never)),
+    hookSave: async (name, def) => libWrite(() => W.lib.hookSave(home, str(name), def as never)),
+    hookDelete: async (name) => libWrite(() => W.lib.hookDelete(home, str(name))),
+    hookScriptSave: async (name, file, content) =>
+      libWrite(() => W.lib.hookScriptSave(home, str(name), str(file), str(content))),
+    hookToolScriptCreate: async (name, tool) =>
+      libWrite(() => W.lib.hookToolScriptCreate(home, str(name), str(tool))),
+    hookToolScriptDrop: async (name, tool) =>
+      libWrite(() => W.lib.hookToolScriptDrop(home, str(name), str(tool))),
     memoryFiles: async () => W.wrap(() => W.lib.memoryFiles(home)),
     memoryRead: async (rel) => W.wrap(() => W.lib.memoryRead(home, str(rel))),
     memorySave: async (rel, content) =>

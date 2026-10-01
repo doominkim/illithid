@@ -6,6 +6,11 @@
 import type {
   AgentDoc,
   AgentDocInput,
+  HookDef,
+  HookTiming,
+  HookTool,
+  HookTrigger,
+  NewHookInput,
   AgentSyncResult,
   AppConfig,
   UiPrefs,
@@ -244,6 +249,46 @@ export interface McpData {
   /** false when ~/.grok/config.toml turns off Grok's reading of Claude Code MCP servers (compat.claude.mcps = false) */
   grokReadsClaude?: boolean
 }
+
+/** Per-tool state of one hook: its config entry and script copies */
+export type HookToolState = SyncState | 'notApplicable'
+
+/** One library hook */
+export interface HookView {
+  name: string
+  description: string
+  timing: HookTiming
+  /** Shared script file */
+  script: string
+  /** Tool-specific script files */
+  toolScripts: Partial<Record<HookTool, string>>
+  /** Connected tools and their native event */
+  triggers: Partial<Record<HookTool, HookTrigger>>
+  /** Hook tools in use on this device */
+  tools: Partial<Record<ToolId, HookToolState>>
+  /** Why a tool is in error: a reason code (configUnreadable) or the generator's message */
+  reasons?: Partial<Record<ToolId, string>>
+}
+
+export interface HooksData {
+  /** Library hooks directory (display ~/...) */
+  dir?: string
+  hooks: HookView[]
+  toggles: Record<string, ToolToggles>
+  error?: string
+  /** false when Grok doesn't run Claude Code hooks (config.grokReadsClaude off or compat.claude.hooks = false) */
+  grokReadsClaude?: boolean
+}
+
+/** hook.json and its scripts, for the detail sheet */
+export interface HookEditView {
+  name: string
+  def: HookDef
+  /** Script file → content */
+  scripts: Record<string, string>
+}
+
+export type { HookDef, HookTiming, HookTool, HookTrigger, NewHookInput }
 
 // ---------------------------------------------------------------- write channel types
 
@@ -629,6 +674,7 @@ export interface Api {
   skills(): Promise<SkillsData>
   agents(): Promise<AgentsData>
   mcp(): Promise<McpData>
+  hooks(): Promise<HooksData>
   artifacts(): Promise<Artifact[]>
   artifactPreview(id: string): Promise<ArtifactPreview>
   /** Image or HTML thumbnail (data URL, about 256px; null if there is none) */
@@ -759,6 +805,20 @@ export interface Api {
   mcpRead(name: string): Promise<WriteResult<McpEditView>>
   mcpSave(name: string, def: McpServer): Promise<WriteResult<McpUpsertResult> | Refused>
   mcpDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
+  hookRead(name: string): Promise<WriteResult<HookEditView>>
+  hookCreate(name: string, input: NewHookInput): Promise<WriteResult<{ name: string }> | Refused>
+  hookSave(name: string, def: HookDef): Promise<WriteResult<{ name: string }> | Refused>
+  hookDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
+  hookScriptSave(
+    name: string,
+    file: string,
+    content: string
+  ): Promise<WriteResult<{ file: string }> | Refused>
+  hookToolScriptCreate(
+    name: string,
+    tool: HookTool
+  ): Promise<WriteResult<{ file: string }> | Refused>
+  hookToolScriptDrop(name: string, tool: HookTool): Promise<WriteResult<TrashResult> | Refused>
   memoryFiles(): Promise<WriteResult<string[]>>
   memoryRead(rel: string): Promise<WriteResult<string>>
   memorySave(rel: string, content: string): Promise<WriteResult | Refused>
@@ -898,6 +958,7 @@ export const CHANNELS = [
   'skills',
   'agents',
   'mcp',
+  'hooks',
   'artifacts',
   'artifactPreview',
   'artifactThumb',
@@ -958,6 +1019,13 @@ export const CHANNELS = [
   'mcpRead',
   'mcpSave',
   'mcpDelete',
+  'hookRead',
+  'hookCreate',
+  'hookSave',
+  'hookDelete',
+  'hookScriptSave',
+  'hookToolScriptCreate',
+  'hookToolScriptDrop',
   'memoryFiles',
   'memoryRead',
   'memorySave',

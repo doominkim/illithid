@@ -10,7 +10,8 @@
     "settings": "設定",
     "backup": "バックアップ",
     "memory": "メモリ",
-    "stats": "統計"
+    "stats": "統計",
+    "hooks": "フック"
   },
   "settings": {
     "language": "言語",
@@ -489,7 +490,8 @@
     "planChanged": "表示後に変更内容が更新されました。もう一度確認してから反映してください。",
     "editedIn": "{{tool}} で編集済み",
     "keepEdited": "この版を残す",
-    "keptEdited": "ライブラリに保存しました"
+    "keptEdited": "ライブラリに保存しました",
+    "codexTrust": "反映後に Codex /hooks で再度信頼が必要"
   },
   "onboarding": {
     "title": "Illithid をはじめる",
@@ -772,5 +774,93 @@
     "dailyCost": "日別API換算費用",
     "cost": "費用",
     "reindexCosts": "セッション索引の更新後に費用詳細を表示します。"
+  },
+  "hooks": {
+    "search": "フックを検索",
+    "new": "新しいフック",
+    "created": "フックを作成しました",
+    "saved": "フックを保存しました",
+    "deleted": "フックを削除しました (.trash に保管)",
+    "deleteTitle": "フックを削除",
+    "deleteBody": "{{name}} とスクリプトを .trash に移動します。ツール設定の項目は次の同期で削除されます。",
+    "allTools": "すべてのツール",
+    "emptyTitle": "フックはまだありません",
+    "emptyHint": "ツールがコマンドを実行する前、応答を終えたとき、セッションを開始したときにスクリプトを実行します。",
+    "timing": {
+      "before-tool": "ツール実行前",
+      "after-tool": "ツール実行後",
+      "prompt": "プロンプト送信",
+      "stop": "応答完了",
+      "session-start": "セッション開始",
+      "session-end": "セッション終了",
+      "notification": "通知"
+    },
+    "timingHint": {
+      "before-tool": "コマンドや編集の実行直前。ここで止められるツールもあります。",
+      "after-tool": "ツールの終了直後。整形・リント・記録に。",
+      "prompt": "メッセージ送信時。文脈を加えたり確認したりします。",
+      "stop": "エージェントが応答を終えたとき。通知に。",
+      "session-start": "セッションが開いたとき。環境確認や記録に。",
+      "session-end": "セッションが閉じたとき。",
+      "notification": "許可を求めるときや入力待ちのとき。"
+    },
+    "triggers": "トリガー",
+    "triggersHint": "ツールごとにイベント名とオプションが異なります。同じオプションでも動作が同じとは限りません。",
+    "event": "イベント",
+    "matcher": "対象 (matcher)",
+    "matcherAll": "空ならすべてのツール呼び出し",
+    "matcherHint": "ツール名のパターン。ツール名自体がツールごとに異なります。",
+    "matcherNone": "このイベントは対象を選びません",
+    "timeout": "タイムアウト (秒)",
+    "timeoutDefault": "ツールの既定値",
+    "timeoutMs": "Gemini CLI にはミリ秒で書き込みます",
+    "script": "実行するスクリプト",
+    "shared": "共通",
+    "own": "{{tool}} 専用",
+    "connect": "接続",
+    "disconnect": "接続解除",
+    "edit": "編集",
+    "noEvent": "{{tool}} にはこのタイミングのイベントがありません",
+    "notConnected": "未接続",
+    "block": "止める",
+    "blockYes": "このイベントで止められます",
+    "blockNo": "このイベントでは止められません",
+    "input": "スクリプトの入力",
+    "blockHow": "止め方",
+    "toolInput": {
+      "claude": "stdin の JSON: tool_name, tool_input",
+      "codex": "stdin の JSON: tool_name, tool_input",
+      "gemini": "stdin の JSON: tool_name, tool_input",
+      "copilot": "stdin の JSON: toolName, toolArgs (JSON 文字列)",
+      "grok": "stdin の JSON: toolName, toolInput"
+    },
+    "toolBlock": {
+      "claude": "exit 2 (stderr が理由) または JSON hookSpecificOutput.permissionDecision",
+      "codex": "exit 2 または JSON permissionDecision: deny",
+      "gemini": "exit 2 または JSON decision: deny",
+      "copilot": "0 以外の終了コードまたは JSON permissionDecision: deny (エラーでも止まる)",
+      "grok": "exit 2 または JSON decision: deny"
+    },
+    "argHint": "スクリプトの最初の引数にツール名 (claude, codex, gemini, copilot, grok) が入ります。",
+    "codexTrust": "Codex は新しいフックや変更したフックを /hooks で信頼するまで実行しません。",
+    "grokViaClaude": "Grok は Claude Code の設定からこのフックを実行します",
+    "scripts": "スクリプト",
+    "makeOwn": "ツール専用スクリプト",
+    "dropOwn": "共通スクリプトに戻す",
+    "ownCreated": "共通スクリプトから {{tool}} 専用スクリプトを作りました",
+    "ownDropped": "{{tool}} は再び共通スクリプトを使います",
+    "scriptSaved": "スクリプトを保存しました",
+    "usedBy": "実行するツール",
+    "description": "説明",
+    "template": "テンプレート",
+    "tools": "接続するツール",
+    "templates": {
+      "blank": "空のスクリプト",
+      "guard": "危険なコマンドを止める",
+      "notify": "macOS 通知",
+      "log": "ファイルに記録"
+    },
+    "timingLabel": "実行タイミング",
+    "timingPick": "いつ実行するか選んでください"
   }
 }

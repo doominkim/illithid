@@ -10,7 +10,8 @@
     "settings": "设置",
     "backup": "备份",
     "memory": "记忆",
-    "stats": "统计"
+    "stats": "统计",
+    "hooks": "钩子"
   },
   "settings": {
     "language": "语言",
@@ -489,7 +490,8 @@
     "planChanged": "打开后变更内容已更新。请重新确认后再应用。",
     "editedIn": "已在 {{tool}} 中修改",
     "keepEdited": "保留此版本",
-    "keptEdited": "已保存到库"
+    "keptEdited": "已保存到库",
+    "codexTrust": "应用后需在 Codex /hooks 中重新信任"
   },
   "onboarding": {
     "title": "开始使用 Illithid",
@@ -772,5 +774,93 @@
     "dailyCost": "每日API折算费用",
     "cost": "费用",
     "reindexCosts": "会话索引更新后显示费用详情。"
+  },
+  "hooks": {
+    "search": "搜索钩子",
+    "new": "新建钩子",
+    "created": "已创建钩子",
+    "saved": "钩子已保存",
+    "deleted": "已删除钩子 (保存在 .trash)",
+    "deleteTitle": "删除钩子",
+    "deleteBody": "将 {{name}} 及其脚本移到 .trash。工具配置中的条目会在下次同步时移除。",
+    "allTools": "全部工具",
+    "emptyTitle": "还没有钩子",
+    "emptyHint": "在工具执行命令前、完成回复时或开始会话时运行脚本。",
+    "timing": {
+      "before-tool": "工具运行前",
+      "after-tool": "工具运行后",
+      "prompt": "提交提示",
+      "stop": "回复完成",
+      "session-start": "会话开始",
+      "session-end": "会话结束",
+      "notification": "通知"
+    },
+    "timingHint": {
+      "before-tool": "命令或编辑执行之前。部分工具可在此阻止。",
+      "after-tool": "工具结束之后。用于格式化、检查和记录。",
+      "prompt": "发送消息时。补充上下文或进行检查。",
+      "stop": "代理完成回复时。用于通知。",
+      "session-start": "会话打开时。检查环境或记录。",
+      "session-end": "会话关闭时。",
+      "notification": "请求权限或等待输入时。"
+    },
+    "triggers": "触发器",
+    "triggersHint": "每个工具的事件名称和选项都不同。相同的选项不保证在各工具中行为一致。",
+    "event": "事件",
+    "matcher": "匹配 (matcher)",
+    "matcherAll": "留空则匹配所有工具调用",
+    "matcherHint": "工具名称的模式。工具名称本身因工具而异。",
+    "matcherNone": "此事件没有匹配项",
+    "timeout": "超时 (秒)",
+    "timeoutDefault": "工具默认值",
+    "timeoutMs": "写入 Gemini CLI 时换算为毫秒",
+    "script": "运行的脚本",
+    "shared": "共享",
+    "own": "{{tool}} 专用",
+    "connect": "连接",
+    "disconnect": "断开",
+    "edit": "编辑",
+    "noEvent": "{{tool}} 没有对应此时机的事件",
+    "notConnected": "未连接",
+    "block": "阻止",
+    "blockYes": "此事件可以阻止触发它的操作",
+    "blockNo": "此事件无法阻止",
+    "input": "脚本输入",
+    "blockHow": "阻止方式",
+    "toolInput": {
+      "claude": "stdin JSON: tool_name, tool_input",
+      "codex": "stdin JSON: tool_name, tool_input",
+      "gemini": "stdin JSON: tool_name, tool_input",
+      "copilot": "stdin JSON: toolName, toolArgs (JSON 字符串)",
+      "grok": "stdin JSON: toolName, toolInput"
+    },
+    "toolBlock": {
+      "claude": "exit 2 (stderr 为原因) 或 JSON hookSpecificOutput.permissionDecision",
+      "codex": "exit 2 或 JSON permissionDecision: deny",
+      "gemini": "exit 2 或 JSON decision: deny",
+      "copilot": "非零退出码或 JSON permissionDecision: deny (出错也会阻止)",
+      "grok": "exit 2 或 JSON decision: deny"
+    },
+    "argHint": "脚本的第一个参数是工具名称 (claude, codex, gemini, copilot, grok)。",
+    "codexTrust": "Codex 只有在 /hooks 中信任后才会运行新的或已更改的钩子。",
+    "grokViaClaude": "Grok 通过 Claude Code 的设置运行此钩子",
+    "scripts": "脚本",
+    "makeOwn": "工具专用脚本",
+    "dropOwn": "改用共享脚本",
+    "ownCreated": "已从共享脚本创建 {{tool}} 专用脚本",
+    "ownDropped": "{{tool}} 重新使用共享脚本",
+    "scriptSaved": "脚本已保存",
+    "usedBy": "运行的工具",
+    "description": "描述",
+    "template": "模板",
+    "tools": "连接到",
+    "templates": {
+      "blank": "空脚本",
+      "guard": "阻止危险命令",
+      "notify": "macOS 通知",
+      "log": "记录到文件"
+    },
+    "timingLabel": "运行时机",
+    "timingPick": "选择运行时机"
   }
 }

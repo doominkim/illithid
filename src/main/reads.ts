@@ -54,10 +54,21 @@ import {
   modelList,
   sessionModels,
   sessionTitles,
-  type Artifact
+  type Artifact,
+  HOOK_TARGETS,
+  HOOK_TOOLS,
+  hookTable,
+  hooksDir,
+  planHookSync,
+  readHooks,
+  grokReadsClaudeHooks,
+  type HookSyncItem
 } from '../engine'
 import type {
   AgentsData,
+  HooksData,
+  HookToolState,
+  HookView,
   McpData,
   McpServerView,
   McpToolState,
@@ -425,6 +436,7 @@ function withSessionTitles(home: string, list: Artifact[]): Artifact[] {
 
 export type Op =
   | 'status'
+  | 'hooks'
   | 'rules'
   | 'skills'
   | 'agents'
@@ -560,6 +572,8 @@ export function runOp(
       return agents(home, env)
     case 'mcp':
       return mcp(home, env)
+    case 'hooks':
+      return hooks(home, env)
     case 'artifacts':
       return withSessionTitles(home, scanArtifacts(home))
     case 'sessions':
@@ -570,5 +584,91 @@ export function runOp(
       return pendingSyncCount(home, env)
     case 'syncPreview':
       return applyPreview(home, env)
+  }
+}
+
+/** Hooks with per-tool state: the tool's config entry (before vs after the planned sync) and its script copies */
+export function hooks(home: string, env: Env): HooksData {
+  const dir = tilde(home, hooksDir(home))
+  let changes: FileChange[]
+  let list: ReturnType<typeof readHooks>
+  try {
+    changes = plan(
+      home,
+      env,
+      HOOK_TARGETS.map((x) => x.id)
+    )
+    list = readHooks(home)
+  } catch (e) {
+    return { dir, hooks: [], toggles: {}, error: `${dir} read failed: ${(e as Error).message}` }
+  }
+  let copies: HookSyncItem[] = []
+  try {
+    copies = planHookSync(home, env)
+  } catch {
+    // copies stay unknown; config entries still tell the state
+  }
+  const inUse = toolsInUse(home)
+  const perTool = HOOK_TARGETS.filter((t) => inUse.includes(t.tool)).map((t) => {
+    const c = changes.find((x) => x.id === t.id)
+    const before = c ? hookTable(t.id, c.before) : null
+    const after = c ? hookTable(t.id, c.after) : null
+    return {
+      tool: t.tool as (typeof HOOK_TOOLS)[number],
+      unused: !c,
+      broken: !!c && (!!c.error || before === null || after === null),
+      brokenWhy: c?.error ?? 'configUnreadable',
+      before,
+      after
+    }
+  })
+  const pendingCopy = (tool: string, name: string): boolean =>
+    copies.some(
+      (x) =>
+        x.tool === tool &&
+        x.hook === name &&
+        (x.action === 'copy' || x.action === 'update' || x.action === 'deleteCandidate')
+    )
+  const view: HookView[] = list.map((h) => {
+    const tools: Partial<Record<ToolId, HookToolState>> = {}
+    const reasons: Partial<Record<ToolId, string>> = {}
+    for (const t of perTool) {
+      if (!h.def.triggers[t.tool] || t.unused) {
+        tools[t.tool] = 'notApplicable'
+        continue
+      }
+      if (t.broken) {
+        tools[t.tool] = 'error'
+        reasons[t.tool] = t.brokenWhy
+        continue
+      }
+      const b = t.before!.get(h.name)
+      const a = t.after!.get(h.name)
+      const copy = pendingCopy(t.tool, h.name)
+      tools[t.tool] =
+        a === undefined && b === undefined
+          ? copy
+            ? 'needsSync'
+            : 'notApplicable'
+          : a !== b || copy
+            ? 'needsSync'
+            : 'synced'
+    }
+    return {
+      name: h.name,
+      description: h.def.description,
+      timing: h.def.timing,
+      script: h.def.script,
+      toolScripts: h.def.toolScripts ?? {},
+      triggers: h.def.triggers,
+      tools,
+      ...(Object.keys(reasons).length ? { reasons } : {})
+    }
+  })
+  return {
+    dir,
+    hooks: view,
+    toggles: toggles(home, 'hooks'),
+    ...(grokReadsClaudeHooks(home) ? {} : { grokReadsClaude: false })
   }
 }
