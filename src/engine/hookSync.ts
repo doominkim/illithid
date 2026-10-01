@@ -16,9 +16,10 @@ import { appConfigDir, syncTools } from './config'
 import { deliverFile } from './deliver'
 import { HOOK_TOOLS, isHookTool, type HookTool } from './hookEvents'
 import { hookCopyPath, hookCopyRoot, hooksForTool } from './hookRender'
-import { hooksDir, readHooks, scriptForTool } from './hooks'
+import { HOOK_FILE, hooksDir, readHooks } from './hooks'
+import { toolScript } from './hookScripts'
 import { LibraryError } from './libpath'
-import { saveHookScript } from './library'
+import { convertHookToScript, saveHookScript } from './library'
 import { MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
@@ -85,11 +86,18 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
     const managed = managedAll[tool] ?? {}
     const wanted = new Set<string>()
     for (const th of hooksForTool(home, tool, hooks, mf.manifest)) {
+      // Prompt hooks (ask) have no script copy
+      if (th.kind !== 'command') continue
       const name = `${th.hook.name}/${th.file}`
       wanted.add(name)
       const path = hookCopyPath(home, tool, th.hook.name, th.file)
-      const source = join(hooksDir(home), th.hook.name, th.file)
-      const sourceHash = sha256(th.hook.scripts[th.file])
+      // Built-in actions are rendered per tool; the script action copies its own file
+      const source = join(
+        hooksDir(home),
+        th.hook.name,
+        th.hook.doc.action === 'script' ? th.file : HOOK_FILE
+      )
+      const sourceHash = sha256(th.content)
       const base = { tool, name, hook: th.hook.name, file: th.file, path, source, sourceHash }
       const st = lstatOrNull(path)
       if (!st) {
@@ -171,7 +179,12 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
     writeState(home, state)
   }
   const fresh = planHookSync(home, env)
+  const mf = readPlanManifest(home)
   const hooks = readHooks(home)
+  const contentOf = (tool: HookTool, hook: string, file: string): string | undefined =>
+    hooksForTool(home, tool, hooks, mf.manifest).find(
+      (x) => x.hook.name === hook && x.kind === 'command' && x.file === file
+    )?.content
   for (const it of items) {
     if (it.action === 'skip') {
       out(it, 'skipped', { reason: it.reason ?? 'skip' })
@@ -206,7 +219,7 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
       continue
     }
     try {
-      const content = hooks.find((h) => h.name === f.hook)?.scripts[f.file]
+      const content = contentOf(f.tool, f.hook, f.file)
       if (content === undefined || sha256(content) !== f.sourceHash) {
         out(it, 'refused', { reason: 'changedSinceCheck' })
         continue
@@ -236,16 +249,21 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
 }
 
 /**
- * Keep a tool's edited script copy: it becomes the library script (and reaches the other tools on the next sync).
+ * Keep a tool's edited script copy as the library version. A script hook gets it as that script; a built-in action hook becomes a
+ * script hook running it (the edit is a script now). It reaches the other tools on the next sync.
  * notFound unless the file is the script this tool runs for the hook
  */
 export function keepHookCopy(home: string, tool: HookTool, hook: string, file: string): string {
   const h = readHooks(home).find((x) => x.name === hook)
-  if (!h || !h.def.triggers[tool] || scriptForTool(h.def, tool) !== file)
+  const runs = h ? toolScript(tool, h) : null
+  if (!h || !runs || runs.file !== file)
     throw new LibraryError('notFound', 'not a script this tool runs')
   const path = hookCopyPath(home, tool, hook, file)
   const st = lstatOrNull(path)
   if (!st?.isFile() || st.isSymbolicLink())
     throw new LibraryError('notFound', 'no copy in the tool')
-  return saveHookScript(home, hook, file, readFileSync(path, 'utf8'))
+  const content = readFileSync(path, 'utf8')
+  return h.doc.action === 'script'
+    ? saveHookScript(home, hook, file, content)
+    : convertHookToScript(home, hook, content)
 }

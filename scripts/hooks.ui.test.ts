@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
@@ -8,82 +16,131 @@ import { baseEnv, buildDemoHome } from './readme-shots'
 
 const LIB = '.illithid/workspaces/default'
 
+/** Electron with a demo HOME and the given tools in use */
+async function launch(
+  tools: string[],
+  prefix: string,
+  prepare?: (home: string) => void
+): Promise<{ home: string; app: Awaited<ReturnType<typeof electron.launch>> }> {
+  const home = mkdtempSync(join(tmpdir(), prefix))
+  buildDemoHome(home, { tools: 'all' })
+  const config = join(home, '.config/illithid/config.json')
+  writeFileSync(
+    config,
+    JSON.stringify({
+      ...JSON.parse(readFileSync(config, 'utf8')),
+      toolsInUse: tools,
+      updateCheck: false,
+      marketEnabled: false,
+      ui: { language: 'en', views: { hooks: 'list' } }
+    })
+  )
+  const env = {
+    ...baseEnv(home),
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-hooks-ud-')),
+    ILLITHID_TEST: '1'
+  } as Record<string, string>
+  delete env.ELECTRON_RUN_AS_NODE
+  delete env.ELECTRON_RENDERER_URL
+  prepare?.(home)
+  const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+  return { home, app }
+}
+
 test(
-  'REQ-HOOKS-UI-1 create a hook, edit a trigger and the script, and the tools follow',
+  'REQ-HOOKS-UI-1 pick "notify", fill the message, and every tool gets a generated script; edit and advanced settings follow',
   { timeout: 180000 },
   async () => {
-    const home = mkdtempSync(join(tmpdir(), 'illithid-hooks-ui-'))
-    buildDemoHome(home, { tools: 'all' })
-    const config = join(home, '.config/illithid/config.json')
-    writeFileSync(
-      config,
-      JSON.stringify({
-        ...JSON.parse(readFileSync(config, 'utf8')),
-        toolsInUse: ['claude', 'codex', 'gemini'],
-        updateCheck: false,
-        marketEnabled: false,
-        ui: { language: 'en', views: { hooks: 'list' } }
-      })
-    )
-    const env = {
-      ...baseEnv(home),
-      ILLITHID_HOME: home,
-      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-hooks-ud-')),
-      ILLITHID_TEST: '1'
-    } as Record<string, string>
-    delete env.ELECTRON_RUN_AS_NODE
-    delete env.ELECTRON_RENDERER_URL
-    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    const { home, app } = await launch(['claude', 'codex', 'gemini'], 'illithid-hooks-ui-')
     try {
       const page = await app.firstWindow()
+      const synced = (): Promise<void> =>
+        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
       await page.locator('[data-menu="hooks"]').click()
       await page.getByTestId('empty-import').waitFor()
 
-      // New hook: timing, name, template; every tool in use that has a matching event is connected
+      // New hook: an action card, then a short form with the timing and the name already filled in
       await page.getByTestId('hook-new').click()
-      await page.getByTestId('hook-new-name').fill('notify')
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Reply finished' }).click()
+      await page.locator('[data-card="hook-action-notify"]').click()
+      await page.getByTestId('hook-option-message').fill('All done')
+      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'notify-stop')
       await page.getByTestId('hook-create').click()
 
-      // Detail: one trigger row per tool in use, with the tool's own event. Outside the real HOME a library write syncs at once
-      const rows = page.getByTestId('hook-triggers')
-      await rows.getByText('AfterAgent', { exact: true }).waitFor()
-      await page
-        .locator('[data-testid="sync-button"][data-state="synced"]')
-        .waitFor({ timeout: 30000 })
-      const copy = join(home, '.claude/hooks/illithid/notify/run.sh')
+      // Detail: a one-line summary; outside the real HOME a library write syncs at once
+      await page.getByTestId('hook-summary').getByText('Reply finished').waitFor()
+      await synced()
+      const copy = join(home, '.claude/hooks/illithid/notify-stop/run.sh')
       const claude = (): {
         hooks: { Stop: { hooks: { command: string; timeout?: number }[] }[] }
       } => JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8'))
       assert.equal(claude().hooks.Stop[0].hooks[0].command, `'${copy}' claude`)
       assert.equal(statSync(copy).mode & 0o111, 0o111)
+      assert.match(readFileSync(copy, 'utf8'), /'All done'/)
+      assert.ok(existsSync(join(home, '.gemini/hooks/illithid/notify-stop/run.sh')))
+      assert.deepEqual(readdirSync(join(home, LIB, 'hooks/notify-stop')), ['HOOK.md'])
 
-      // Edit the Claude Code trigger: Stop takes no matcher, a timeout is written in seconds
-      await page.getByTestId('hook-trigger-edit-claude').click()
-      const form = page.getByTestId('hook-trigger-form-claude')
-      await form.getByLabel('Timeout (seconds)').fill('7')
-      await page.getByTestId('hook-trigger-save-claude').click()
+      // Edit: the options form; every tool's script is generated again
+      await page.getByTestId('hook-tab-edit').click()
+      await page.getByTestId('hook-option-message').fill('Finished')
+      await page.getByTestId('hook-save').click()
       await page.getByText('Hook saved').waitFor()
-      await page
-        .locator('[data-testid="sync-button"][data-state="synced"]')
-        .waitFor({ timeout: 30000 })
-      assert.equal(claude().hooks.Stop[0].hooks[0].timeout, 7)
+      await synced()
+      assert.match(readFileSync(copy, 'utf8'), /'Finished'/)
 
-      // Edit the shared script: the library file and every tool copy follow
-      const editor = page.getByTestId('detail-sheet').locator('textarea').first()
-      await editor.fill('#!/bin/sh\necho done\n')
-      await page.getByTestId('editor-save').click()
-      await page.getByText('Script saved').waitFor()
+      // Advanced: a per-tool timeout, then turn the generated script into an own script
+      await page.getByTestId('hook-tab-advanced').click()
+      await page.getByTestId('hook-trigger-edit-claude').click()
+      await page.getByTestId('hook-trigger-form-claude').getByLabel('Timeout (seconds)').fill('7')
+      await page.getByTestId('hook-trigger-save-claude').click()
+      await page.getByText('Hook saved').first().waitFor()
+      await synced()
+      assert.equal(claude().hooks.Stop[0].hooks[0].timeout, 7)
+      await page.getByTestId('hook-script-show-claude').click()
+      await page
+        .getByTestId('hook-script-claude')
+        .getByText(/osascript/)
+        .waitFor()
+      await page.getByTestId('hook-convert-claude').click()
+      await page.getByTestId('confirm-ok').click()
+      await page.getByText('Now runs its own script').waitFor()
+      await synced()
+      const own = readFileSync(join(home, LIB, 'hooks/notify-stop/run.sh'), 'utf8')
+      assert.match(own, /'Finished'/)
+      assert.equal(readFileSync(copy, 'utf8'), own)
+    } finally {
+      await app.close()
+    }
+  }
+)
+
+test(
+  'REQ-HOOKS-UI-3 a natural-language check is Claude Code only: the other tools say why',
+  { timeout: 180000 },
+  async () => {
+    const { home, app } = await launch(['claude', 'gemini'], 'illithid-hooks-ui-ask-')
+    try {
+      const page = await app.firstWindow()
+      await page.locator('[data-menu="hooks"]').click()
+      await page.getByTestId('hook-new').click()
+      await page.locator('[data-card="hook-action-ask"]').getByText('Claude Code only').waitFor()
+      await page.locator('[data-card="hook-action-ask"]').click()
+      await page.getByTestId('hook-new-unsupported-claudeOnly').waitFor()
+      await page.getByTestId('hook-instruction').fill('Keep working until the tests pass.')
+      await page.getByTestId('hook-create').click()
+      await page.getByTestId('hook-unsupported-claudeOnly').waitFor()
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })
-      assert.equal(
-        readFileSync(join(home, LIB, 'hooks/notify/run.sh'), 'utf8'),
-        '#!/bin/sh\necho done\n'
-      )
-      assert.equal(readFileSync(copy, 'utf8'), '#!/bin/sh\necho done\n')
-      assert.ok(existsSync(join(home, '.gemini/hooks/illithid/notify/run.sh')))
+      const s = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: { Stop: { hooks: { type: string; prompt: string }[] }[] }
+      }
+      assert.equal(s.hooks.Stop[0].hooks[0].type, 'prompt')
+      assert.match(s.hooks.Stop[0].hooks[0].prompt, /^Keep working until the tests pass\./)
+      const gemini = JSON.parse(readFileSync(join(home, '.gemini/settings.json'), 'utf8')) as {
+        hooks?: unknown
+      }
+      assert.equal(gemini.hooks, undefined)
     } finally {
       await app.close()
     }
@@ -94,42 +151,26 @@ test(
   'REQ-HOOKS-UI-2 import a Claude Code hook: it joins the library and its original entry is replaced',
   { timeout: 180000 },
   async () => {
-    const home = mkdtempSync(join(tmpdir(), 'illithid-hooks-ui-import-'))
-    buildDemoHome(home, { tools: 'all' })
-    const config = join(home, '.config/illithid/config.json')
-    writeFileSync(
-      config,
-      JSON.stringify({
-        ...JSON.parse(readFileSync(config, 'utf8')),
-        toolsInUse: ['claude'],
-        updateCheck: false,
-        marketEnabled: false,
-        ui: { language: 'en', views: { hooks: 'list' } }
-      })
-    )
-    mkdirSync(join(home, 'bin'), { recursive: true })
-    writeFileSync(join(home, 'bin/guard.sh'), '#!/bin/sh\nexit 0\n')
-    const settingsPath = join(home, '.claude/settings.json')
-    mkdirSync(join(home, '.claude'), { recursive: true })
-    const prev = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {}
-    writeFileSync(
-      settingsPath,
-      JSON.stringify({
-        ...prev,
-        hooks: {
-          PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/bin/guard.sh' }] }]
-        }
-      })
-    )
-    const env = {
-      ...baseEnv(home),
-      ILLITHID_HOME: home,
-      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-hooks-ud-')),
-      ILLITHID_TEST: '1'
-    } as Record<string, string>
-    delete env.ELECTRON_RUN_AS_NODE
-    delete env.ELECTRON_RENDERER_URL
-    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    const settingsPath = (home: string): string => join(home, '.claude/settings.json')
+    const { home, app } = await launch(['claude'], 'illithid-hooks-ui-import-', (home) => {
+      mkdirSync(join(home, 'bin'), { recursive: true })
+      writeFileSync(join(home, 'bin/guard.sh'), '#!/bin/sh\nexit 0\n')
+      mkdirSync(join(home, '.claude'), { recursive: true })
+      const prev = existsSync(settingsPath(home))
+        ? JSON.parse(readFileSync(settingsPath(home), 'utf8'))
+        : {}
+      writeFileSync(
+        settingsPath(home),
+        JSON.stringify({
+          ...prev,
+          hooks: {
+            PreToolUse: [
+              { matcher: 'Bash', hooks: [{ type: 'command', command: '~/bin/guard.sh' }] }
+            ]
+          }
+        })
+      )
+    })
     try {
       const page = await app.firstWindow()
       await page.locator('[data-menu="hooks"]').click()
@@ -147,7 +188,7 @@ test(
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })
-      const s = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
+      const s = JSON.parse(readFileSync(settingsPath(home), 'utf8')) as {
         hooks: { PreToolUse: { hooks: { command: string }[] }[] }
       }
       assert.equal(s.hooks.PreToolUse.length, 1)

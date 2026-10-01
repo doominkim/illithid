@@ -105,8 +105,24 @@ function entryHook(tool: HookTool, entry: unknown): string | null {
   if (HOOK_CATALOG[tool].shape === 'flat') return appHookName(tool, entry.bash)
   const list = entry.hooks
   if (!Array.isArray(list) || !list.length) return null
-  const names = list.map((h) => (isObj(h) ? appHookName(tool, h.command) : null))
+  const names = list.map((h) => (isObj(h) ? handlerHook(tool, h) : null))
   return names.every((n) => n !== null && n === names[0]) ? names[0] : null
+}
+
+/** Marker of an app prompt hook (Claude Code shows it as the spinner text while the hook runs) */
+export const PROMPT_MARK = 'Illithid · '
+
+/** Hook name of one app handler: a command running an app script copy, or a prompt hook carrying the app marker */
+function handlerHook(tool: HookTool, h: Record<string, unknown>): string | null {
+  if (
+    h.type === 'prompt' &&
+    typeof h.statusMessage === 'string' &&
+    h.statusMessage.startsWith(PROMPT_MARK)
+  ) {
+    const name = h.statusMessage.slice(PROMPT_MARK.length)
+    return /^[a-z0-9][a-z0-9._-]{0,63}$/.test(name) ? name : null
+  }
+  return appHookName(tool, h.command)
 }
 
 /** The `hooks` table → app entries per hook name (canonical JSON, events in key order) */
@@ -133,8 +149,20 @@ function regionOf(entries: Map<string, string>): string | null {
 
 /** One config entry for a tool */
 function renderEntry(home: string, tool: HookTool, h: ToolHook): Json {
-  const command = hookCommand(home, tool, h.hook.name, h.file)
   const timeout = toolTimeout(tool, h.trigger.timeout)
+  if (h.kind === 'prompt')
+    return {
+      ...(h.trigger.matcher ? { matcher: h.trigger.matcher } : {}),
+      hooks: [
+        {
+          type: 'prompt',
+          prompt: h.content,
+          statusMessage: `${PROMPT_MARK}${h.hook.name}`,
+          ...(timeout !== undefined ? { timeout } : {})
+        }
+      ]
+    }
+  const command = hookCommand(home, tool, h.hook.name, h.file)
   if (tool === 'copilot')
     return {
       type: 'command',

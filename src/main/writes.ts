@@ -64,11 +64,17 @@ import {
   deleteHook,
   dropHookToolScript,
   readHook,
-  saveHookDef,
+  saveHookDoc,
+  convertHookToScript,
+  HOOK_SCRIPT_TEMPLATE,
+  HOOK_TOOLS,
+  hookTriggers,
+  toolScript,
+  renderAskPrompt,
   saveHookScript,
   isHookTool,
   keepHookCopy,
-  type HookDef,
+  type HookDoc,
   type NewHookInput
 } from '../engine'
 import { previewSwitch } from '../engine'
@@ -112,6 +118,7 @@ import {
   type LibraryInitResult,
   type NotInitializedView,
   type McpEditView,
+  type HookEditView,
   type Refused,
   type SyncStatusView,
   type SyncTargetView,
@@ -647,14 +654,24 @@ export const lib = {
     const i = (input ?? {}) as Partial<NewHookInput>
     createHook(home, name, {
       description: String(i.description ?? ''),
-      timing: i.timing as NewHookInput['timing'],
-      tools: Array.isArray(i.tools) ? i.tools.filter(isHookTool) : [],
-      script: String(i.script ?? '')
+      when: i.when as NewHookInput['when'],
+      action: i.action as NewHookInput['action'],
+      options: (i.options ?? {}) as NewHookInput['options'],
+      ...(typeof i.body === 'string' ? { body: i.body } : {}),
+      ...(typeof i.script === 'string' ? { script: i.script } : {})
     })
     return { name }
   },
-  hookSave: (home: string, name: string, def: HookDef) => {
-    saveHookDef(home, name, def)
+  hookSave: (home: string, name: string, doc: HookDoc) => {
+    saveHookDoc(home, name, doc)
+    return { name }
+  },
+  /** Make a built-in action hook a script hook, starting from what it runs in this tool */
+  hookConvert: (home: string, name: string, tool: string) => {
+    if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
+    const h = readHook(home, name)
+    const runs = toolScript(tool, h)
+    convertHookToScript(home, name, runs?.content ?? HOOK_SCRIPT_TEMPLATE)
     return { name }
   },
   hookDelete: (home: string, name: string) => deleteHook(home, name),
@@ -676,14 +693,21 @@ export const lib = {
   }
 }
 
-/** hook.json and its scripts for the detail sheet */
-export function hookRead(
-  home: string,
-  name: string
-): { name: string; def: HookDef; scripts: Record<string, string> } {
+/** HOOK.md, its scripts and what each tool runs, for the detail sheet */
+export function hookRead(home: string, name: string): HookEditView {
   try {
     const h = readHook(home, name)
-    return { name: h.name, def: h.def, scripts: h.scripts }
+    const triggers = hookTriggers(h.doc)
+    const runs: HookEditView['runs'] = {}
+    for (const tool of HOOK_TOOLS) {
+      const t = triggers[tool]
+      if (!t) continue
+      const script = toolScript(tool, h)
+      runs[tool] = script
+        ? { trigger: t, file: script.file, content: script.content }
+        : { trigger: t, prompt: renderAskPrompt(h.doc) }
+    }
+    return { name: h.name, doc: h.doc, scripts: h.scripts, runs }
   } catch (e) {
     if (e instanceof LibraryError) throw e
     throw new LibraryError('notFound', (e as Error).message)

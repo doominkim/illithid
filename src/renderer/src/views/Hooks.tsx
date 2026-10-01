@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Code,
   Group,
   NumberInput,
   SegmentedControl,
@@ -12,20 +13,37 @@ import {
   Stack,
   Tabs,
   Text,
+  Textarea,
   TextInput
 } from '@mantine/core'
-import { Download, FolderOpen, Layers, Plus, Undo2 } from 'lucide-react'
+import { ArrowLeft, Download, FolderOpen, Layers, Plus, RefreshCw, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  actionMatcher,
+  HOOK_ACTION_INFO,
+  HOOK_ACTIONS,
+  hookSupport,
+  type HookAction,
+  type HookSupport
+} from '../../../engine/hookActions'
+import {
+  defaultHookEvent,
   HOOK_CATALOG,
-  HOOK_TIMINGS,
   HOOK_TOOLS,
   hookEventInfo,
   hookEventsFor,
   type HookTiming,
   type HookTool
 } from '../../../engine/hookEvents'
-import type { HookDef, HookEditView, HookTrigger, HookView, ToolId } from '../../../shared/api'
+import type {
+  HookDoc,
+  HookEditView,
+  HookOptionValue,
+  HookToolSettings,
+  HookTrigger,
+  HookView,
+  ToolId
+} from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary } from '../components/EmptyState'
@@ -48,6 +66,7 @@ import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { problemText } from '../lib/problemReason'
 import { useReload } from '../lib/reload'
+import { useSync } from '../lib/sync'
 import { useToggleBusy } from '../lib/toggleBusy'
 import {
   grokReadsFromClaude,
@@ -63,19 +82,39 @@ const NEW = '__new__'
 const ALL = 'all'
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
-/** Starting scripts for a new hook. The first argument is the tool that ran the hook; its JSON input is on stdin */
-const TEMPLATES: Record<'blank' | 'guard' | 'notify' | 'log', string> = {
-  blank:
-    '#!/usr/bin/env bash\n# $1 is the tool that ran this hook (claude, codex, gemini, copilot, grok).\n# The tool sends its JSON input on stdin; field names differ per tool.\ninput="$(cat)"\nexit 0\n',
-  guard:
-    '#!/usr/bin/env bash\n# Blocks dangerous shell commands before they run. $1 = tool.\ninput="$(cat)"\ncmd="$(printf \'%s\' "$input" | jq -r \'.tool_input.command // .toolInput.command // (.toolArgs | fromjson? | .command) // empty\')"\ncase "$cmd" in\n  *"rm -rf /"* | *"git push --force"* | *"git reset --hard"*)\n    echo "Blocked: $cmd" >&2\n    exit 2\n    ;;\nesac\nexit 0\n',
-  notify:
-    '#!/usr/bin/env bash\n# Shows a macOS notification. $1 = tool.\nosascript -e "display notification \\"Done\\" with title \\"${1:-agent}\\""\nexit 0\n',
-  log: '#!/usr/bin/env bash\n# Appends the time, tool and folder to a log file. $1 = tool.\nmkdir -p "$HOME/.local/state/agent-hooks"\nprintf \'%s\\t%s\\t%s\\n\' "$(date -u +%FT%TZ)" "${1:-}" "$PWD" >> "$HOME/.local/state/agent-hooks/log.tsv"\nexit 0\n'
-}
+type Options = Record<string, HookOptionValue>
 
 const isHookTool = (tool: string): tool is HookTool =>
   (HOOK_TOOLS as readonly string[]).includes(tool)
+
+/** "Reply finished → Notify: All done" */
+function useSummary(): (h: {
+  name: string
+  description: string
+  when: HookTiming
+  action: HookAction
+  options: Options
+  body?: string
+}) => string {
+  const { t } = useTranslation()
+  return (h) => {
+    const o = h.options
+    const detail =
+      h.action === 'notify'
+        ? String(o.message || h.description || h.name)
+        : h.action === 'guard'
+          ? (o.patterns as string[]).join(', ')
+          : h.action === 'format'
+            ? String(o.command)
+            : h.action === 'log'
+              ? String(o.path)
+              : h.action === 'ask'
+                ? (h.body ?? '').trim().split('\n')[0]
+                : ''
+    const head = `${t(`hooks.timing.${h.when}`)} → ${t(`hooks.actions.${h.action}.title`)}`
+    return detail ? `${head}: ${detail}` : head
+  }
+}
 
 function Hooks(): React.JSX.Element {
   const { t } = useTranslation()
@@ -83,6 +122,7 @@ function Hooks(): React.JSX.Element {
   const hookTools = HOOK_TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
   const reload = useReload()
+  const summary = useSummary()
   const { data, error } = useApi('hooks', () => window.api.hooks())
   const [query, setQuery] = useState('')
   const [toolFilter, setToolFilter] = useState<string>(ALL)
@@ -96,15 +136,17 @@ function Hooks(): React.JSX.Element {
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
 
-  const connected = (h: HookView, tool: ToolId): boolean => isHookTool(tool) && !!h.triggers[tool]
+  // A tool runs the hook when it is a hook tool in use that supports the action at that timing
+  const runsIn = (h: HookView, tool: ToolId): boolean =>
+    isHookTool(tool) && inUse.includes(tool) && !h.unsupported?.[tool]
   const enabled = (name: string, tool: ToolId): boolean => data.toggles[name]?.[tool] !== false
   const reads = data.grokReadsClaude !== false
   const pillsOf = (h: HookView): PillMap =>
     Object.fromEntries(
       TOOLS.map((tool) => {
-        if (!connected(h, tool)) return [tool, { on: false, na: true }]
+        if (!runsIn(h, tool)) return [tool, { on: false, na: true }]
         const st = h.tools[tool] ?? 'notApplicable'
-        const onFor = (x: ToolId): boolean => connected(h, x) && enabled(h.name, x)
+        const onFor = (x: ToolId): boolean => runsIn(h, x) && enabled(h.name, x)
         // Off for Grok but on for Claude Code: Grok still runs it from Claude's settings
         if (!enabled(h.name, tool))
           return [
@@ -143,7 +185,7 @@ function Hooks(): React.JSX.Element {
   }
   const toggleAll = async (h: HookView, on: boolean): Promise<void> => {
     for (const tool of hookTools)
-      if (connected(h, tool) && enabled(h.name, tool) !== on)
+      if (runsIn(h, tool) && enabled(h.name, tool) !== on)
         await runWrite(window.api.toggle('hooks', h.name, tool, on))
     reload()
   }
@@ -160,19 +202,25 @@ function Hooks(): React.JSX.Element {
   const q = query.trim().toLowerCase()
   const list = data.hooks.filter(
     (h) =>
-      (toolFilter === ALL || connected(h, toolFilter as ToolId)) &&
+      (toolFilter === ALL || runsIn(h, toolFilter as ToolId)) &&
       (!q ||
         includesCI(h.name, q) ||
         includesCI(h.description, q) ||
-        includesCI(t(`hooks.timing.${h.timing}`), q))
+        includesCI(t(`hooks.timing.${h.when}`), q) ||
+        includesCI(t(`hooks.actions.${h.action}.title`), q))
   )
   const current = data.hooks.find((h) => h.name === selected)
-  const timingTag = (h: { timing: HookTiming }): React.ReactNode => (
-    <Badge variant="default" size="xs" fw={500} c="dimmed">
-      {t(`hooks.timing.${h.timing}`)}
-    </Badge>
+  const tags = (h: HookView): React.ReactNode => (
+    <>
+      <Badge variant="default" size="xs" fw={500} c="dimmed">
+        {t(`hooks.timing.${h.when}`)}
+      </Badge>
+      <Badge variant="light" size="xs" fw={500}>
+        {t(`hooks.actions.${h.action}.title`)}
+      </Badge>
+    </>
   )
-  const cardConnected = (h: HookView): ToolId[] => hookTools.filter((tool) => connected(h, tool))
+  const cardTools = (h: HookView): ToolId[] => hookTools.filter((tool) => runsIn(h, tool))
 
   return (
     <Stack gap={0} style={{ flex: 1 }}>
@@ -254,12 +302,12 @@ function Hooks(): React.JSX.Element {
             <ItemCard
               key={h.name}
               name={h.name}
-              badges={timingTag(h)}
-              description={h.description || h.script}
+              badges={tags(h)}
+              description={h.description || summary(h)}
               switchChecked={
-                cardConnected(h).length > 0 && cardConnected(h).every((x) => enabled(h.name, x))
+                cardTools(h).length > 0 && cardTools(h).every((x) => enabled(h.name, x))
               }
-              switchIndeterminate={cardConnected(h).some((x) => enabled(h.name, x))}
+              switchIndeterminate={cardTools(h).some((x) => enabled(h.name, x))}
               onSwitch={(v) => void toggleAll(h, v)}
               footerRight={
                 <ToolPills
@@ -281,8 +329,8 @@ function Hooks(): React.JSX.Element {
               key={h.name}
               avatar={<Initial text={h.name} />}
               title={h.name}
-              tags={timingTag(h)}
-              subtitle={h.description || h.script}
+              tags={tags(h)}
+              subtitle={h.description || summary(h)}
               right={
                 <ToolPills
                   pills={pillsOf(h)}
@@ -309,14 +357,17 @@ function Hooks(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={t('hooks.new')}
       >
-        <NewHookForm
-          tools={hookTools}
-          onCreated={(name) => {
-            reload()
-            setSelected(name)
-          }}
-          onCancel={() => setSelected(null)}
-        />
+        {selected === NEW && (
+          <NewHookForm
+            tools={hookTools}
+            taken={data.hooks.map((h) => h.name)}
+            onCreated={(name) => {
+              reload()
+              setSelected(name)
+            }}
+            onCancel={() => setSelected(null)}
+          />
+        )}
       </DetailSheet>
 
       <DetailSheet
@@ -324,7 +375,7 @@ function Hooks(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         description={current?.description || undefined}
-        tags={current && timingTag(current)}
+        tags={current && tags(current)}
         meta={
           current &&
           data.dir && (
@@ -370,6 +421,164 @@ function SectionLabel({ children }: { children: React.ReactNode }): React.JSX.El
   )
 }
 
+/** Why each hook tool in use can't run the action at the timing (nothing for the ones that can) */
+function Unsupported({
+  action,
+  when,
+  tools,
+  testPrefix
+}: {
+  action: HookAction
+  when: HookTiming
+  tools: HookTool[]
+  testPrefix: string
+}): React.JSX.Element | null {
+  const { t } = useTranslation()
+  // One line per reason: "Codex, Gemini CLI: no judgment hooks"
+  const byReason = new Map<HookSupport, HookTool[]>()
+  for (const tool of tools) {
+    const why = hookSupport(action, when, tool)
+    if (why !== 'ok') byReason.set(why, [...(byReason.get(why) ?? []), tool])
+  }
+  if (!byReason.size) return null
+  return (
+    <Stack gap={4}>
+      {[...byReason].map(([why, list]) => (
+        <Group key={why} gap={6} wrap="nowrap" data-testid={`${testPrefix}-${why}`}>
+          {list.map((tool) => (
+            <ToolIcon key={tool} tool={tool} size={14} />
+          ))}
+          <Text size="xs" c="dimmed">
+            {t(`hooks.unsupported.${why}`, {
+              tool: list.map((tool) => TOOL_NAME[tool]).join(', ')
+            })}
+          </Text>
+        </Group>
+      ))}
+    </Stack>
+  )
+}
+
+/** The action's options (notify texts, guard patterns, format command, log path) */
+function OptionFields({
+  action,
+  value,
+  onChange,
+  placeholderMessage
+}: {
+  action: HookAction
+  value: Options
+  onChange: (next: Options) => void
+  placeholderMessage?: string
+}): React.JSX.Element | null {
+  const { t } = useTranslation()
+  const set = (k: string, v: HookOptionValue): void => onChange({ ...value, [k]: v })
+  const mono = { input: { fontFamily: 'var(--mantine-font-family-monospace)' } }
+  switch (action) {
+    case 'notify':
+      return (
+        <Stack gap="sm">
+          <TextInput
+            label={t('hooks.opt.title')}
+            value={String(value.title ?? '')}
+            onChange={(e) => set('title', e.currentTarget.value)}
+            data-testid="hook-option-title"
+          />
+          <TextInput
+            label={t('hooks.opt.message')}
+            value={String(value.message ?? '')}
+            placeholder={placeholderMessage}
+            onChange={(e) => set('message', e.currentTarget.value)}
+            data-testid="hook-option-message"
+          />
+          <Checkbox
+            label={t('hooks.opt.sound')}
+            checked={value.sound === true}
+            onChange={(e) => set('sound', e.currentTarget.checked)}
+            data-testid="hook-option-sound"
+          />
+        </Stack>
+      )
+    case 'guard':
+      return (
+        <Textarea
+          label={t('hooks.opt.patterns')}
+          description={t('hooks.opt.patternsHint')}
+          value={((value.patterns as string[]) ?? []).join('\n')}
+          onChange={(e) =>
+            set(
+              'patterns',
+              e.currentTarget.value
+                .split('\n')
+                .filter((x, i, all) => x.trim() || i === all.length - 1)
+            )
+          }
+          autosize
+          minRows={3}
+          styles={mono}
+          data-testid="hook-option-patterns"
+        />
+      )
+    case 'format':
+      return (
+        <TextInput
+          label={t('hooks.opt.command')}
+          description={t('hooks.opt.commandHint')}
+          value={String(value.command ?? '')}
+          onChange={(e) => set('command', e.currentTarget.value)}
+          styles={mono}
+          data-testid="hook-option-command"
+        />
+      )
+    case 'log':
+      return (
+        <TextInput
+          label={t('hooks.opt.path')}
+          value={String(value.path ?? '')}
+          onChange={(e) => set('path', e.currentTarget.value)}
+          styles={mono}
+          data-testid="hook-option-path"
+        />
+      )
+    default:
+      return null
+  }
+}
+
+/** Guard patterns without blank lines; null when an option is left empty that must not be */
+function cleanOptions(action: HookAction, o: Options): Options | null {
+  if (action === 'guard') {
+    const patterns = ((o.patterns as string[]) ?? []).map((x) => x.trim()).filter(Boolean)
+    return patterns.length ? { ...o, patterns } : null
+  }
+  if (action === 'format' && !String(o.command ?? '').trim()) return null
+  if (action === 'log' && !String(o.path ?? '').trim()) return null
+  return o
+}
+
+function InstructionField({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (v: string) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Textarea
+      label={t('hooks.instruction')}
+      description={t('hooks.instructionHint')}
+      placeholder={t('hooks.instructionExample')}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      autosize
+      minRows={4}
+      maxRows={14}
+      data-testid="hook-instruction"
+    />
+  )
+}
+
 function HookDetail({
   hook,
   tools,
@@ -386,11 +595,12 @@ function HookDetail({
   onChanged: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const summary = useSummary()
+  const { openPreview } = useSync()
   const [edit, setEdit] = useState<HookEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [open, setOpen] = useState<HookTool | null>(null)
-  const [tab, setTab] = useState<string | null>(null)
-  // Reload hook.json and scripts whenever the list changes (after a save, toggle or sync)
+  const [tab, setTab] = useState<string | null>('preview')
+  // Reload HOOK.md and scripts whenever the list changes (after a save, toggle or sync)
   useEffect(() => {
     let alive = true
     window.api.hookRead(hook.name).then((r) => {
@@ -405,56 +615,13 @@ function HookDetail({
 
   if (err) return <ErrorAlert message={err} />
   if (!edit) return <Loading />
-  const def = edit.def
+  const doc = edit.doc
 
-  const saveDef = async (next: HookDef): Promise<boolean> => {
+  const saveDoc = async (next: HookDoc): Promise<boolean> => {
     const r = await runWrite(window.api.hookSave(hook.name, next), { success: t('hooks.saved') })
     if (r) onChanged()
     return r !== null
   }
-  const setTrigger = async (tool: HookTool, trigger: HookTrigger | null): Promise<void> => {
-    const triggers = { ...def.triggers }
-    if (trigger) triggers[tool] = trigger
-    else delete triggers[tool]
-    if (await saveDef({ ...def, triggers })) setOpen(trigger ? open : null)
-  }
-  const setOwnScript = async (tool: HookTool, own: boolean): Promise<void> => {
-    const r = own
-      ? await runWrite(window.api.hookToolScriptCreate(hook.name, tool), {
-          success: t('hooks.ownCreated', { tool: TOOL_NAME[tool] })
-        })
-      : await runWrite(window.api.hookToolScriptDrop(hook.name, tool), {
-          success: t('hooks.ownDropped', { tool: TOOL_NAME[tool] })
-        })
-    if (r) {
-      setTab(own ? `own:${tool}` : 'shared')
-      onChanged()
-    }
-  }
-  const saveScript = async (file: string, text: string): Promise<boolean> => {
-    const r = await runWrite(window.api.hookScriptSave(hook.name, file, text), {
-      success: t('hooks.scriptSaved')
-    })
-    if (r) onChanged()
-    return r !== null
-  }
-
-  const connectedTools = tools.filter((tool) => def.triggers[tool])
-  const runners = (file: string): HookTool[] =>
-    connectedTools.filter((tool) => (def.toolScripts?.[tool] ?? def.script) === file)
-  const scriptTabs: { value: string; file: string; label: string; tool?: HookTool }[] = [
-    { value: 'shared', file: def.script, label: t('hooks.shared') },
-    ...tools
-      .filter((tool) => def.toolScripts?.[tool])
-      .map((tool) => ({
-        value: `own:${tool}`,
-        file: def.toolScripts![tool]!,
-        label: t('hooks.own', { tool: TOOL_NAME[tool] }),
-        tool
-      }))
-  ]
-  const activeTab = scriptTabs.some((x) => x.value === tab) ? tab! : 'shared'
-
   const keepCopy = async (tool: HookTool, file: string): Promise<void> => {
     const r = await runWrite(window.api.hookKeepCopy(hook.name, tool, file), {
       success: t('hooks.kept', { tool: TOOL_NAME[tool] })
@@ -464,9 +631,14 @@ function HookDetail({
   const edited = (Object.entries(hook.edited ?? {}) as [ToolId, string][]).filter(([tool]) =>
     isHookTool(tool)
   ) as [HookTool, string][]
+  const runTools = tools.filter((tool) => edit.runs[tool])
+  const waiting = runTools.some((tool) => hook.tools[tool] === 'needsSync')
 
   return (
     <Stack gap="lg">
+      <Text size="md" data-testid="hook-summary">
+        {summary({ ...hook, body: doc.body })}
+      </Text>
       {edited.map(([tool, file]) => (
         <Alert
           key={tool}
@@ -488,32 +660,381 @@ function HookDetail({
           </Group>
         </Alert>
       ))}
-      <ToolToggleRow
-        pills={pills}
-        tools={connectedTools}
-        onToggle={onToggle}
-        busy={busy}
-        testId="hook-detail-tools"
-      />
-
       <Stack gap={8}>
-        <SectionLabel>{t('hooks.triggers')}</SectionLabel>
-        <Text size="xs" c="dimmed">
-          {t('hooks.triggersHint')}
+        <ToolToggleRow
+          pills={pills}
+          tools={runTools}
+          onToggle={onToggle}
+          busy={busy}
+          testId="hook-detail-tools"
+        />
+        {waiting && (
+          <Group>
+            <Button
+              size="compact-xs"
+              variant="default"
+              leftSection={<RefreshCw size={12} />}
+              onClick={() => openPreview()}
+              data-testid="hook-sync"
+            >
+              {t('hooks.syncNow')}
+            </Button>
+          </Group>
+        )}
+        <Unsupported
+          action={doc.action}
+          when={doc.when}
+          tools={tools}
+          testPrefix="hook-unsupported"
+        />
+        {hook.tools.codex !== undefined && edit.runs.codex && (
+          <Text size="xs" c="dimmed" data-testid="hook-codex-trust">
+            {t('hooks.codexTrust')}
+          </Text>
+        )}
+      </Stack>
+
+      <Tabs value={tab} onChange={setTab} keepMounted={false}>
+        <Tabs.List mb="md">
+          <Tabs.Tab value="preview" data-testid="hook-tab-preview">
+            {t('hooks.tabOverview')}
+          </Tabs.Tab>
+          <Tabs.Tab value="edit" data-testid="hook-tab-edit">
+            {t('detail.edit')}
+          </Tabs.Tab>
+          <Tabs.Tab value="advanced" data-testid="hook-tab-advanced">
+            {t('hooks.tabAdvanced')}
+          </Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="preview">
+          <HookOverview edit={edit} />
+        </Tabs.Panel>
+        <Tabs.Panel value="edit">
+          <HookEditForm name={hook.name} edit={edit} onSave={saveDoc} onChanged={onChanged} />
+        </Tabs.Panel>
+        <Tabs.Panel value="advanced">
+          <HookAdvanced
+            name={hook.name}
+            edit={edit}
+            tools={runTools}
+            onSave={saveDoc}
+            onChanged={onChanged}
+          />
+        </Tabs.Panel>
+      </Tabs>
+    </Stack>
+  )
+}
+
+function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
+  const { t } = useTranslation()
+  const doc = edit.doc
+  const o = doc.options
+  const yesNo = (v: boolean): string => (v ? t('detail.on') : t('detail.off'))
+  const rows: [string, React.ReactNode][] = [
+    [t('hooks.timingLabel'), t(`hooks.timing.${doc.when}`)],
+    [t('hooks.actionLabel'), t(`hooks.actions.${doc.action}.title`)]
+  ]
+  if (doc.action === 'notify')
+    rows.push(
+      [t('hooks.opt.title'), String(o.title)],
+      [t('hooks.opt.message'), String(o.message || doc.description || edit.name)],
+      [t('hooks.opt.sound'), yesNo(o.sound === true)]
+    )
+  if (doc.action === 'guard')
+    rows.push([
+      t('hooks.opt.patterns'),
+      <Group key="p" gap={4}>
+        {(o.patterns as string[]).map((p) => (
+          <Code key={p}>{p}</Code>
+        ))}
+      </Group>
+    ])
+  if (doc.action === 'format')
+    rows.push([t('hooks.opt.command'), <Code key="c">{String(o.command)}</Code>])
+  if (doc.action === 'log') rows.push([t('hooks.opt.path'), <Code key="l">{String(o.path)}</Code>])
+  if (doc.action === 'script') rows.push([t('hooks.scripts'), Object.keys(edit.scripts).join(', ')])
+  return (
+    <Stack gap="md">
+      <Box className="ac-card" p="md">
+        <Fields rows={rows} />
+      </Box>
+      {doc.body.trim() && (
+        <Stack gap={6}>
+          <SectionLabel>
+            {doc.action === 'ask' ? t('hooks.instruction') : t('hooks.notes')}
+          </SectionLabel>
+          <Box className="ac-card" p="md">
+            <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+              {doc.body.trim()}
+            </Text>
+          </Box>
+        </Stack>
+      )}
+    </Stack>
+  )
+}
+
+function HookEditForm({
+  name,
+  edit,
+  onSave,
+  onChanged
+}: {
+  name: string
+  edit: HookEditView
+  onSave: (doc: HookDoc) => Promise<boolean>
+  onChanged: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const doc = edit.doc
+  const [description, setDescription] = useState(doc.description)
+  const [when, setWhen] = useState<HookTiming>(doc.when)
+  const [options, setOptions] = useState<Options>(doc.options)
+  const [body, setBody] = useState(doc.body)
+  const [saving, setSaving] = useState(false)
+  const clean = cleanOptions(doc.action, options)
+  const dirty =
+    description !== doc.description ||
+    when !== doc.when ||
+    body !== doc.body ||
+    JSON.stringify(options) !== JSON.stringify(doc.options)
+  const valid = !!clean && (doc.action !== 'ask' || !!body.trim())
+  const save = async (): Promise<void> => {
+    if (!clean) return
+    setSaving(true)
+    await onSave({ ...doc, description: description.trim(), when, options: clean, body })
+    setSaving(false)
+  }
+  const revert = (): void => {
+    setDescription(doc.description)
+    setWhen(doc.when)
+    setOptions(doc.options)
+    setBody(doc.body)
+  }
+  const timings = HOOK_ACTION_INFO[doc.action].timings
+  return (
+    <Stack gap="lg">
+      <Box className="ac-card" p="md">
+        <Stack gap="sm">
+          <TextInput
+            label={t('hooks.description')}
+            value={description}
+            onChange={(e) => setDescription(e.currentTarget.value)}
+            data-testid="hook-description"
+          />
+          <Select
+            label={t('hooks.timingLabel')}
+            data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
+            value={when}
+            onChange={(v) => v && setWhen(v as HookTiming)}
+            allowDeselect={false}
+            disabled={timings.length < 2}
+            description={t(`hooks.timingHint.${when}`)}
+            data-testid="hook-when"
+          />
+          <OptionFields
+            action={doc.action}
+            value={options}
+            onChange={setOptions}
+            placeholderMessage={description || name}
+          />
+          {doc.action === 'ask' ? (
+            <InstructionField value={body} onChange={setBody} />
+          ) : (
+            <Textarea
+              label={t('hooks.notes')}
+              value={body}
+              onChange={(e) => setBody(e.currentTarget.value)}
+              autosize
+              minRows={2}
+              maxRows={10}
+            />
+          )}
+          <Group justify="flex-end" gap="xs">
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Undo2 size={12} />}
+              disabled={!dirty}
+              onClick={revert}
+            >
+              {t('editor.revert')}
+            </Button>
+            <Button
+              size="xs"
+              disabled={!dirty || !valid}
+              loading={saving}
+              onClick={() => void save()}
+              data-testid="hook-save"
+            >
+              {t('common.save')}
+            </Button>
+          </Group>
+        </Stack>
+      </Box>
+      {doc.action === 'script' && <ScriptEditors name={name} edit={edit} onChanged={onChanged} />}
+    </Stack>
+  )
+}
+
+/** Script action: run.sh and the tool-only scripts */
+function ScriptEditors({
+  name,
+  edit,
+  onChanged
+}: {
+  name: string
+  edit: HookEditView
+  onChanged: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const doc = edit.doc
+  const [tab, setTab] = useState<string | null>(null)
+  const files: { value: string; file: string; label: string; tool?: HookTool }[] = [
+    { value: 'shared', file: 'run.sh', label: t('hooks.shared') },
+    ...HOOK_TOOLS.filter((tool) => doc.toolScripts?.[tool]).map((tool) => ({
+      value: `own:${tool}`,
+      file: doc.toolScripts![tool]!,
+      label: t('hooks.own', { tool: TOOL_NAME[tool] }),
+      tool
+    }))
+  ]
+  const active = files.some((x) => x.value === tab) ? tab! : 'shared'
+  const save = async (file: string, text: string): Promise<boolean> => {
+    const r = await runWrite(window.api.hookScriptSave(name, file, text), {
+      success: t('hooks.scriptSaved')
+    })
+    if (r) onChanged()
+    return r !== null
+  }
+  const dropOwn = async (tool: HookTool): Promise<void> => {
+    const r = await runWrite(window.api.hookToolScriptDrop(name, tool), {
+      success: t('hooks.ownDropped', { tool: TOOL_NAME[tool] })
+    })
+    if (r) {
+      setTab('shared')
+      onChanged()
+    }
+  }
+  return (
+    <Stack gap={8}>
+      <SectionLabel>{t('hooks.scripts')}</SectionLabel>
+      <Text size="xs" c="dimmed">
+        {t('hooks.argHint')}
+      </Text>
+      <Tabs value={active} onChange={setTab} keepMounted={false}>
+        <Tabs.List>
+          {files.map((x) => (
+            <Tabs.Tab key={x.value} value={x.value} data-testid={`hook-script-tab-${x.value}`}>
+              <Group gap={6} wrap="nowrap">
+                <span>{x.label}</span>
+                <Text span size="xs" c="dimmed" ff="monospace">
+                  {x.file}
+                </Text>
+              </Group>
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+        {files.map((x) => (
+          <Tabs.Panel key={x.value} value={x.value} pt="md">
+            <Stack gap="sm">
+              {x.tool && (
+                <Group justify="flex-end">
+                  <Button
+                    size="compact-xs"
+                    variant="subtle"
+                    color="gray"
+                    leftSection={<Undo2 size={12} />}
+                    onClick={() => void dropOwn(x.tool!)}
+                    data-testid={`hook-script-drop-${x.tool}`}
+                  >
+                    {t('hooks.dropOwn')}
+                  </Button>
+                </Group>
+              )}
+              <MarkdownEditor
+                value={edit.scripts[x.file] ?? ''}
+                minRows={12}
+                onSave={(text) => save(x.file, text)}
+              />
+            </Stack>
+          </Tabs.Panel>
+        ))}
+      </Tabs>
+    </Stack>
+  )
+}
+
+/** Per tool: event, matcher and timeout, and what the tool runs (generated script or Claude Code prompt) */
+function HookAdvanced({
+  name,
+  edit,
+  tools,
+  onSave,
+  onChanged
+}: {
+  name: string
+  edit: HookEditView
+  tools: HookTool[]
+  onSave: (doc: HookDoc) => Promise<boolean>
+  onChanged: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const doc = edit.doc
+  const [open, setOpen] = useState<HookTool | null>(null)
+  const [shown, setShown] = useState<HookTool | null>(null)
+  const [converting, setConverting] = useState<HookTool | null>(null)
+  const setSettings = async (tool: HookTool, s: HookToolSettings): Promise<void> => {
+    const all = { ...doc.tools }
+    if (Object.keys(s).length) all[tool] = s
+    else delete all[tool]
+    const next: HookDoc = { ...doc, tools: all }
+    if (!Object.keys(all).length) delete next.tools
+    if (await onSave(next)) setOpen(null)
+  }
+  const setOwn = async (tool: HookTool, own: boolean): Promise<void> => {
+    const r = own
+      ? await runWrite(window.api.hookToolScriptCreate(name, tool), {
+          success: t('hooks.ownCreated', { tool: TOOL_NAME[tool] })
+        })
+      : await runWrite(window.api.hookToolScriptDrop(name, tool), {
+          success: t('hooks.ownDropped', { tool: TOOL_NAME[tool] })
+        })
+    if (r) onChanged()
+  }
+  const convert = async (): Promise<void> => {
+    if (!converting) return
+    const r = await runWrite(window.api.hookConvert(name, converting), {
+      success: t('hooks.converted')
+    })
+    setConverting(null)
+    if (r) onChanged()
+  }
+  const builtIn = doc.action !== 'ask' && doc.action !== 'script'
+
+  return (
+    <Stack gap={8}>
+      <Text size="xs" c="dimmed">
+        {t('hooks.triggersHint')}
+      </Text>
+      {tools.length === 0 ? (
+        <Text size="sm" c="dimmed">
+          {t('hooks.noTools')}
         </Text>
+      ) : (
         <Box data-testid="hook-triggers">
           <ListCard>
             {tools.map((tool) => {
-              const trigger = def.triggers[tool]
-              const events = hookEventsFor(tool, def.timing)
-              const own = def.toolScripts?.[tool]
-              const row = (
-                <ListRow
-                  key={tool}
-                  avatar={<ToolIcon tool={tool} size={20} />}
-                  title={TOOL_NAME[tool]}
-                  tags={
-                    trigger ? (
+              const run = edit.runs[tool]!
+              const trigger = run.trigger
+              const own = doc.toolScripts?.[tool]
+              return (
+                <Box key={tool}>
+                  <ListRow
+                    avatar={<ToolIcon tool={tool} size={20} />}
+                    title={TOOL_NAME[tool]}
+                    tags={
                       <>
                         <Badge variant="default" size="xs" fw={500} ff="monospace">
                           {trigger.event}
@@ -523,158 +1044,123 @@ function HookDetail({
                             {trigger.matcher}
                           </Badge>
                         )}
-                        <Badge variant="light" size="xs" fw={500} color={own ? 'grape' : 'accent'}>
-                          {own ? t('hooks.own', { tool: TOOL_NAME[tool] }) : t('hooks.shared')}
-                        </Badge>
+                        {trigger.timeout !== undefined && (
+                          <Badge variant="default" size="xs" fw={500} c="dimmed">
+                            {`${trigger.timeout}s`}
+                          </Badge>
+                        )}
                       </>
-                    ) : undefined
-                  }
-                  subtitle={
-                    events.length === 0
-                      ? t('hooks.noEvent', { tool: TOOL_NAME[tool] })
-                      : trigger
-                        ? (own ?? def.script)
-                        : t('hooks.notConnected')
-                  }
-                  style={events.length === 0 ? { opacity: 0.6 } : undefined}
-                  right={
-                    events.length === 0 ? undefined : trigger ? (
-                      <Button
-                        size="compact-xs"
-                        variant="default"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setOpen(open === tool ? null : tool)
-                        }}
-                        data-testid={`hook-trigger-edit-${tool}`}
-                      >
-                        {t('hooks.edit')}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="compact-xs"
-                        variant="default"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void setTrigger(tool, { event: events[0].event })
-                        }}
-                        data-testid={`hook-trigger-connect-${tool}`}
-                      >
-                        {t('hooks.connect')}
-                      </Button>
-                    )
-                  }
-                />
-              )
-              return open === tool && trigger ? (
-                <Box key={tool}>
-                  {row}
-                  <TriggerForm
-                    tool={tool}
-                    timing={def.timing}
-                    trigger={trigger}
-                    own={!!own}
-                    onSave={(next) => setTrigger(tool, next)}
-                    onOwn={(v) => setOwnScript(tool, v)}
-                    onDisconnect={() => setTrigger(tool, null)}
-                    onCancel={() => setOpen(null)}
+                    }
+                    subtitle={run.prompt !== undefined ? t('hooks.promptHook') : run.file}
+                    right={
+                      <Group gap={4} wrap="nowrap">
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="gray"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShown(shown === tool ? null : tool)
+                          }}
+                          data-testid={`hook-script-show-${tool}`}
+                        >
+                          {shown === tool ? t('hooks.hide') : t('hooks.show')}
+                        </Button>
+                        <Button
+                          size="compact-xs"
+                          variant="default"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOpen(open === tool ? null : tool)
+                          }}
+                          data-testid={`hook-trigger-edit-${tool}`}
+                        >
+                          {t('hooks.edit')}
+                        </Button>
+                      </Group>
+                    }
                   />
+                  {open === tool && (
+                    <TriggerForm
+                      tool={tool}
+                      doc={doc}
+                      trigger={trigger}
+                      own={doc.action === 'script' ? !!own : undefined}
+                      onSave={(s) => setSettings(tool, s)}
+                      onOwn={(v) => setOwn(tool, v)}
+                      onCancel={() => setOpen(null)}
+                    />
+                  )}
+                  {shown === tool && (
+                    <Box
+                      px="md"
+                      py="sm"
+                      style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}
+                      data-testid={`hook-script-${tool}`}
+                    >
+                      <Stack gap={6}>
+                        <Text size="xs" c="dimmed">
+                          {run.prompt !== undefined
+                            ? t('hooks.promptGenerated')
+                            : builtIn
+                              ? t('hooks.generated')
+                              : run.file}
+                        </Text>
+                        <Code
+                          block
+                          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 320 }}
+                        >
+                          {run.prompt ?? run.content ?? ''}
+                        </Code>
+                        {builtIn && (
+                          <Group justify="flex-end">
+                            <Button
+                              size="compact-xs"
+                              variant="default"
+                              onClick={() => setConverting(tool)}
+                              data-testid={`hook-convert-${tool}`}
+                            >
+                              {t('hooks.convert')}
+                            </Button>
+                          </Group>
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
                 </Box>
-              ) : (
-                row
               )
             })}
           </ListCard>
         </Box>
-        <Text size="xs" c="dimmed">
-          {t('hooks.argHint')}
-        </Text>
-        {def.triggers.codex && (
-          <Text size="xs" c="dimmed" data-testid="hook-codex-trust">
-            {t('hooks.codexTrust')}
-          </Text>
-        )}
-      </Stack>
-
-      <Stack gap={8}>
-        <SectionLabel>{t('hooks.scripts')}</SectionLabel>
-        <Tabs value={activeTab} onChange={setTab} keepMounted={false}>
-          <Tabs.List>
-            {scriptTabs.map((x) => (
-              <Tabs.Tab key={x.value} value={x.value} data-testid={`hook-script-tab-${x.value}`}>
-                <Group gap={6} wrap="nowrap">
-                  <span>{x.label}</span>
-                  <Text span size="xs" c="dimmed" ff="monospace">
-                    {x.file}
-                  </Text>
-                </Group>
-              </Tabs.Tab>
-            ))}
-          </Tabs.List>
-          {scriptTabs.map((x) => (
-            <Tabs.Panel key={x.value} value={x.value} pt="md">
-              <Stack gap="sm">
-                <Group justify="space-between" wrap="nowrap">
-                  <Group gap={8} wrap="wrap">
-                    <Text size="xs" c="dimmed">
-                      {t('hooks.usedBy')}
-                    </Text>
-                    {runners(x.file).map((tool) => (
-                      <Group key={tool} gap={4} wrap="nowrap">
-                        <ToolIcon tool={tool} size={14} />
-                        <Text size="xs">{TOOL_NAME[tool]}</Text>
-                      </Group>
-                    ))}
-                    {runners(x.file).length === 0 && (
-                      <Text size="xs" c="dimmed">
-                        {t('common.none')}
-                      </Text>
-                    )}
-                  </Group>
-                  {x.tool && (
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      color="gray"
-                      leftSection={<Undo2 size={12} />}
-                      onClick={() => void setOwnScript(x.tool!, false)}
-                      data-testid={`hook-script-drop-${x.tool}`}
-                    >
-                      {t('hooks.dropOwn')}
-                    </Button>
-                  )}
-                </Group>
-                <MarkdownEditor
-                  value={edit.scripts[x.file] ?? ''}
-                  minRows={12}
-                  onSave={(text) => saveScript(x.file, text)}
-                />
-              </Stack>
-            </Tabs.Panel>
-          ))}
-        </Tabs>
-      </Stack>
+      )}
+      <ConfirmModal
+        opened={!!converting}
+        onClose={() => setConverting(null)}
+        onConfirm={convert}
+        title={t('hooks.convertTitle')}
+        confirmLabel={t('hooks.convert')}
+        message={t('hooks.convertBody', { tool: converting ? TOOL_NAME[converting] : '' })}
+      />
     </Stack>
   )
 }
 
 function TriggerForm({
   tool,
-  timing,
+  doc,
   trigger,
   own,
   onSave,
   onOwn,
-  onDisconnect,
   onCancel
 }: {
   tool: HookTool
-  timing: HookTiming
+  doc: HookDoc
   trigger: HookTrigger
-  own: boolean
-  onSave: (t: HookTrigger) => Promise<void>
+  /** Script action only: whether the tool has its own script */
+  own?: boolean
+  onSave: (s: HookToolSettings) => Promise<void>
   onOwn: (own: boolean) => Promise<void>
-  onDisconnect: () => Promise<void>
   onCancel: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -682,10 +1168,12 @@ function TriggerForm({
   const [matcher, setMatcher] = useState(trigger.matcher ?? '')
   const [timeout, setTimeoutValue] = useState<number | string>(trigger.timeout ?? '')
   const info = hookEventInfo(tool, event)
-  const events = hookEventsFor(tool, timing).map((e) => e.event)
-  const next: HookTrigger = {
-    event,
-    ...(info?.matcher && matcher.trim() ? { matcher: matcher.trim() } : {}),
+  const events = hookEventsFor(tool, doc.when).map((e) => e.event)
+  // Keep only what differs from the timing and action defaults, so later default changes still apply
+  const defaultMatcher = actionMatcher(doc.action, tool) ?? ''
+  const next: HookToolSettings = {
+    ...(event !== defaultHookEvent(tool, doc.when) ? { event } : {}),
+    ...(info?.matcher && matcher.trim() !== defaultMatcher ? { matcher: matcher.trim() } : {}),
     ...(typeof timeout === 'number' ? { timeout } : {})
   }
   return (
@@ -725,165 +1213,218 @@ function TriggerForm({
             placeholder={t('hooks.timeoutDefault')}
             description={HOOK_CATALOG[tool].timeoutUnit === 'ms' ? t('hooks.timeoutMs') : undefined}
           />
-          <Stack gap={4}>
-            <Text size="sm" fw={500}>
-              {t('hooks.script')}
-            </Text>
-            <SegmentedControl
-              value={own ? 'own' : 'shared'}
-              onChange={(v) => void onOwn(v === 'own')}
-              data={[
-                { value: 'shared', label: t('hooks.shared') },
-                { value: 'own', label: t('hooks.own', { tool: TOOL_NAME[tool] }) }
-              ]}
-              data-testid={`hook-trigger-script-${tool}`}
-            />
-          </Stack>
+          {own !== undefined ? (
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                {t('hooks.script')}
+              </Text>
+              <SegmentedControl
+                value={own ? 'own' : 'shared'}
+                onChange={(v) => void onOwn(v === 'own')}
+                data={[
+                  { value: 'shared', label: t('hooks.shared') },
+                  { value: 'own', label: t('hooks.own', { tool: TOOL_NAME[tool] }) }
+                ]}
+                data-testid={`hook-trigger-script-${tool}`}
+              />
+            </Stack>
+          ) : (
+            <Box />
+          )}
         </Group>
-        <Box className="ac-card" p="sm">
-          <Fields
-            rows={[
-              [t('hooks.input'), t(`hooks.toolInput.${tool}`)],
-              [
-                t('hooks.blockHow'),
-                info?.canBlock ? t(`hooks.toolBlock.${tool}`) : t('hooks.blockNo')
-              ]
-            ]}
-          />
-        </Box>
-        <Group justify="space-between">
+        {doc.action === 'script' && (
+          <Box className="ac-card" p="sm">
+            <Fields
+              rows={[
+                [t('hooks.input'), t(`hooks.toolInput.${tool}`)],
+                [
+                  t('hooks.blockHow'),
+                  info?.canBlock ? t(`hooks.toolBlock.${tool}`) : t('hooks.blockNo')
+                ]
+              ]}
+            />
+          </Box>
+        )}
+        <Group justify="flex-end" gap="xs">
+          <Button size="xs" variant="default" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
           <Button
             size="xs"
-            variant="subtle"
-            color="red"
-            onClick={() => void onDisconnect()}
-            data-testid={`hook-trigger-disconnect-${tool}`}
+            onClick={() => void onSave(next)}
+            data-testid={`hook-trigger-save-${tool}`}
           >
-            {t('hooks.disconnect')}
+            {t('common.save')}
           </Button>
-          <Group gap="xs">
-            <Button size="xs" variant="default" onClick={onCancel}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              size="xs"
-              onClick={() => void onSave(next)}
-              data-testid={`hook-trigger-save-${tool}`}
-            >
-              {t('common.save')}
-            </Button>
-          </Group>
         </Group>
       </Stack>
     </Box>
   )
 }
 
+/** New hook: pick what it does, then a short form */
 function NewHookForm({
   tools,
+  taken,
   onCreated,
   onCancel
 }: {
   tools: HookTool[]
+  taken: string[]
   onCreated: (name: string) => void
   onCancel: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [name, setName] = useState('')
+  const [action, setAction] = useState<HookAction | null>(null)
+  const [when, setWhen] = useState<HookTiming>('stop')
+  const [options, setOptions] = useState<Options>({})
+  const [body, setBody] = useState('')
   const [description, setDescription] = useState('')
-  const [timing, setTiming] = useState<HookTiming | null>(null)
-  const [template, setTemplate] = useState<keyof typeof TEMPLATES>('blank')
-  // null = every tool in use that has an event for the timing
-  const [picked, setPicked] = useState<HookTool[] | null>(null)
+  // null = the name follows the action and timing until the user types one
+  const [typedName, setTypedName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const supported = timing ? tools.filter((tool) => hookEventsFor(tool, timing).length > 0) : []
-  const chosen = (picked ?? supported).filter((tool) => supported.includes(tool))
-  const nameOk = NAME_RE.test(name)
+
+  const pick = (a: HookAction): void => {
+    setAction(a)
+    setWhen(HOOK_ACTION_INFO[a].timings[0])
+    setOptions({ ...HOOK_ACTION_INFO[a].defaults })
+    setBody('')
+  }
+
+  if (!action)
+    return (
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          {t('hooks.pickAction')}
+        </Text>
+        <CardGrid>
+          {HOOK_ACTIONS.map((a) => (
+            <ItemCard
+              key={a}
+              testId={`hook-action-${a}`}
+              name={t(`hooks.actions.${a}.title`)}
+              description={t(`hooks.actions.${a}.desc`)}
+              badges={
+                a === 'ask' ? (
+                  <Badge variant="light" size="xs" fw={500} color="orange">
+                    {t('hooks.claudeOnly')}
+                  </Badge>
+                ) : a === 'script' ? (
+                  <Badge variant="default" size="xs" fw={500} c="dimmed">
+                    {t('hooks.advanced')}
+                  </Badge>
+                ) : undefined
+              }
+              onClick={() => pick(a)}
+            />
+          ))}
+        </CardGrid>
+      </Stack>
+    )
+
+  const autoName = (() => {
+    const base = `${action}-${when}`
+    let n = base
+    for (let i = 2; taken.includes(n); i++) n = `${base}-${i}`
+    return n
+  })()
+  const name = typedName ?? autoName
+  const nameOk = NAME_RE.test(name) && !taken.includes(name)
+  const clean = cleanOptions(action, options)
+  const runs = tools.filter((tool) => hookSupport(action, when, tool) === 'ok')
+  const timings = HOOK_ACTION_INFO[action].timings
   const create = async (): Promise<void> => {
-    if (!timing) return
+    if (!clean) return
     setBusy(true)
     const r = await runWrite(
       window.api.hookCreate(name, {
-        description,
-        timing,
-        tools: chosen,
-        script: TEMPLATES[template]
+        description: description.trim(),
+        when,
+        action,
+        options: clean,
+        body
       }),
       { success: t('hooks.created') }
     )
     setBusy(false)
     if (r) onCreated(name)
   }
+
   return (
     <Stack gap="md" maw={560}>
+      <Group gap="xs">
+        <Button
+          size="compact-xs"
+          variant="subtle"
+          color="gray"
+          leftSection={<ArrowLeft size={12} />}
+          onClick={() => setAction(null)}
+          data-testid="hook-new-back"
+        >
+          {t('hooks.back')}
+        </Button>
+        <Text size="sm" fw={600}>
+          {t(`hooks.actions.${action}.title`)}
+        </Text>
+      </Group>
       <Select
         label={t('hooks.timingLabel')}
-        placeholder={t('hooks.timingPick')}
-        data={HOOK_TIMINGS.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
-        value={timing}
-        onChange={(v) => setTiming(v as HookTiming | null)}
+        data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
+        value={when}
+        onChange={(v) => v && setWhen(v as HookTiming)}
         allowDeselect={false}
-        description={timing ? t(`hooks.timingHint.${timing}`) : undefined}
+        disabled={timings.length < 2}
+        description={t(`hooks.timingHint.${when}`)}
         data-testid="hook-new-timing"
       />
-      <TextInput
-        label={t('common.name')}
-        value={name}
-        onChange={(e) => setName(e.currentTarget.value)}
-        error={name && !nameOk ? t('mcp.nameInvalid') : undefined}
-        data-testid="hook-new-name"
+      <OptionFields
+        action={action}
+        value={options}
+        onChange={setOptions}
+        placeholderMessage={description || name}
       />
+      {action === 'ask' && <InstructionField value={body} onChange={setBody} />}
+      {action === 'script' && (
+        <Text size="xs" c="dimmed">
+          {t('hooks.scriptStarter')}
+        </Text>
+      )}
       <TextInput
         label={t('hooks.description')}
         value={description}
         onChange={(e) => setDescription(e.currentTarget.value)}
       />
-      <Select
-        label={t('hooks.template')}
-        data={(Object.keys(TEMPLATES) as (keyof typeof TEMPLATES)[]).map((k) => ({
-          value: k,
-          label: t(`hooks.templates.${k}`)
-        }))}
-        value={template}
-        onChange={(v) => v && setTemplate(v as keyof typeof TEMPLATES)}
-        allowDeselect={false}
+      <TextInput
+        label={t('common.name')}
+        value={name}
+        onChange={(e) => setTypedName(e.currentTarget.value)}
+        error={
+          name && !NAME_RE.test(name)
+            ? t('mcp.nameInvalid')
+            : taken.includes(name)
+              ? t('hooks.nameTaken')
+              : undefined
+        }
+        data-testid="hook-new-name"
       />
       <Stack gap={6}>
         <Text size="sm" fw={500}>
-          {t('hooks.tools')}
+          {t('hooks.runsIn')}
         </Text>
-        {tools.map((tool) => {
-          const ev = timing ? hookEventsFor(tool, timing)[0] : undefined
-          return (
-            <Checkbox
-              key={tool}
-              disabled={!ev}
-              checked={chosen.includes(tool)}
-              onChange={(e) => {
-                const on = e.currentTarget.checked
-                setPicked((on ? [...chosen, tool] : chosen.filter((x) => x !== tool)).sort())
-              }}
-              label={
-                <Group gap={6} wrap="nowrap">
-                  <ToolIcon tool={tool} size={14} />
-                  <span>{TOOL_NAME[tool]}</span>
-                  {ev ? (
-                    <Badge variant="default" size="xs" fw={500} ff="monospace">
-                      {ev.event}
-                    </Badge>
-                  ) : (
-                    timing && (
-                      <Text span size="xs" c="dimmed">
-                        {t('hooks.noEvent', { tool: TOOL_NAME[tool] })}
-                      </Text>
-                    )
-                  )}
-                </Group>
-              }
-              data-testid={`hook-new-tool-${tool}`}
-            />
-          )
-        })}
+        <Group gap={10}>
+          {runs.map((tool) => (
+            <Group key={tool} gap={4} wrap="nowrap">
+              <ToolIcon tool={tool} size={14} />
+              <Text size="sm">{TOOL_NAME[tool]}</Text>
+            </Group>
+          ))}
+          {runs.length === 0 && (
+            <Text size="sm" c="dimmed">
+              {t('common.none')}
+            </Text>
+          )}
+        </Group>
+        <Unsupported action={action} when={when} tools={tools} testPrefix="hook-new-unsupported" />
       </Stack>
       <Group justify="flex-end" gap="xs">
         <Button size="xs" variant="default" onClick={onCancel}>
@@ -893,7 +1434,7 @@ function NewHookForm({
           size="xs"
           onClick={() => void create()}
           loading={busy}
-          disabled={!timing || !nameOk || chosen.length === 0}
+          disabled={!nameOk || !clean || (action === 'ask' && !body.trim())}
           data-testid="hook-create"
         >
           {t('common.create')}

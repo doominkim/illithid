@@ -809,7 +809,6 @@
       "session-end": "セッションが閉じたとき。",
       "notification": "許可を求めるときや入力待ちのとき。"
     },
-    "triggers": "トリガー",
     "triggersHint": "ツールごとにイベント名とオプションが異なります。同じオプションでも動作が同じとは限りません。",
     "event": "イベント",
     "matcher": "対象 (matcher)",
@@ -822,13 +821,7 @@
     "script": "実行するスクリプト",
     "shared": "共通",
     "own": "{{tool}} 専用",
-    "connect": "接続",
-    "disconnect": "接続解除",
     "edit": "編集",
-    "noEvent": "{{tool}} にはこのタイミングのイベントがありません",
-    "notConnected": "未接続",
-    "block": "止める",
-    "blockYes": "このイベントで止められます",
     "blockNo": "このイベントでは止められません",
     "input": "スクリプトの入力",
     "blockHow": "止め方",
@@ -850,25 +843,83 @@
     "codexTrust": "Codex は新しいフックや変更したフックを /hooks で信頼するまで実行しません。",
     "grokViaClaude": "Grok は Claude Code の設定からこのフックを実行します",
     "scripts": "スクリプト",
-    "makeOwn": "ツール専用スクリプト",
     "dropOwn": "共通スクリプトに戻す",
     "ownCreated": "共通スクリプトから {{tool}} 専用スクリプトを作りました",
     "ownDropped": "{{tool}} は再び共通スクリプトを使います",
     "scriptSaved": "スクリプトを保存しました",
-    "usedBy": "実行するツール",
     "description": "説明",
-    "template": "テンプレート",
-    "tools": "接続するツール",
-    "templates": {
-      "blank": "空のスクリプト",
-      "guard": "危険なコマンドを止める",
-      "notify": "macOS 通知",
-      "log": "ファイルに記録"
-    },
     "timingLabel": "実行タイミング",
-    "timingPick": "いつ実行するか選んでください",
     "edited": "{{tool}} でスクリプトが編集されました",
     "editedHint": "同期するとライブラリの版に戻します (編集されたコピーはバックアップ)。",
-    "kept": "{{tool}} の版をライブラリに保存しました"
+    "kept": "{{tool}} の版をライブラリに保存しました",
+    "actionLabel": "すること",
+    "pickAction": "何をしますか?",
+    "actions": {
+      "notify": {
+        "title": "通知する",
+        "desc": "macOS の通知を出します。音も鳴らせます"
+      },
+      "guard": {
+        "title": "危険なコマンドを止める",
+        "desc": "rm -rf / や git push --force などを実行前に止めます"
+      },
+      "format": {
+        "title": "編集したファイルを整形",
+        "desc": "エージェントが編集したファイルごとに Prettier などを実行します"
+      },
+      "log": {
+        "title": "ログを残す",
+        "desc": "時刻・ツール・フォルダをログファイルに追記します"
+      },
+      "ask": {
+        "title": "Claude に判断させる",
+        "desc": "ルールを言葉で書くと、Claude がイベントを読んで判断します"
+      },
+      "script": {
+        "title": "自分で書く",
+        "desc": "ツールの入力をそのまま受け取るシェルスクリプトを書きます"
+      }
+    },
+    "claudeOnly": "Claude Code 専用",
+    "advanced": "上級",
+    "back": "戻る",
+    "opt": {
+      "title": "タイトル",
+      "message": "メッセージ",
+      "sound": "音を鳴らす",
+      "patterns": "止めるコマンド",
+      "patternsHint": "1 行に 1 つ。どれかを含むコマンドを止めます。",
+      "command": "整形コマンド",
+      "commandHint": "末尾に編集したファイルのパスを付けて実行します。",
+      "path": "ログファイル"
+    },
+    "instruction": "指示",
+    "instructionHint": "Claude Code がこの指示とイベントを読んで、続けるかどうかを判断します。",
+    "instructionExample": "テストがまだ通っていなければ作業を続けて。",
+    "notes": "メモ",
+    "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",
+    "nameTaken": "同じ名前のフックがあります",
+    "runsIn": "実行するツール",
+    "unsupported": {
+      "wrongTiming": "{{tool}} はこのタイミングでこの動作を実行できません",
+      "noEvent": "{{tool}} にはこのタイミングのイベントがありません",
+      "noFilePath": "{{tool}} は編集したファイルのパスをフックに渡しません",
+      "claudeOnly": "{{tool}} には判断フックがありません (Claude Code 専用)"
+    },
+    "pending": "まだツールに反映されていません",
+    "pendingHint": "同期するとこのフックがツールの設定に入ります。",
+    "syncNow": "確認して同期",
+    "tabOverview": "概要",
+    "tabAdvanced": "上級",
+    "noTools": "使用中のツールでこのフックを実行できるものがありません。",
+    "show": "表示",
+    "hide": "閉じる",
+    "promptHook": "prompt フック",
+    "generated": "Illithid がオプションから生成したスクリプトです。読み取り専用。",
+    "promptGenerated": "Illithid が Claude Code に書くプロンプト",
+    "convert": "自分で書くに切り替え",
+    "convertTitle": "自分で書くに切り替え",
+    "convertBody": "{{tool}} のスクリプトがこのフックの run.sh になり、すべてのツールがそれを実行します。オプションは適用されなくなります。",
+    "converted": "自分のスクリプトを実行するようになりました"
   }
 }

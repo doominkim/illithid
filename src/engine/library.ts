@@ -36,15 +36,20 @@ import { MANIFEST_FILE, readManifest, renameManifestEntry } from './manifest'
 import { renamePendingRetire } from './pendingRetire'
 import { libraryPaths, MCP_ORDER_FILE, mcpServerNamesInDir, readMcpOrder } from './sources'
 import type { Allowlist, McpServer } from './types'
-import { defaultHookEvent, isHookTool, type HookTiming, type HookTool } from './hookEvents'
+import type { HookAction } from './hookActions'
+import { isHookTool, type HookTiming, type HookTool } from './hookEvents'
 import {
   HOOK_FILE,
+  hookOptions,
   hookScriptFiles,
   hooksDir,
+  parseHookDoc,
+  renderHookDoc,
   SCRIPT_NAME_RE,
   SHARED_SCRIPT,
-  validateHookDef,
-  type HookDef
+  validateHookDoc,
+  type HookDoc,
+  type HookOptionValue
 } from './hooks'
 import { appTmpName, atomicWrite } from './write'
 
@@ -1256,73 +1261,82 @@ export function copySkillIntoLibrary(home: string, name: string, from: string): 
 /** Scripts are executable in the library too, so they can be run by hand */
 const HOOK_SCRIPT_MODE = 0o755
 
+/** Starting script of a new script-action hook */
+export const HOOK_SCRIPT_TEMPLATE =
+  '#!/bin/sh\n# $1 is the tool that ran this hook (claude, codex, gemini, copilot, grok).\n# The tool sends its event as JSON on stdin.\nexit 0\n'
+
 function hookDirPath(home: string, name: string): string {
   checkName(name, 'hook')
   return join(hooksDir(home), name)
 }
 
-function writeHookDef(home: string, name: string, def: HookDef): string {
-  const errors = validateHookDef(def)
+function checkHookDoc(doc: unknown): HookDoc {
+  const errors = validateHookDoc(doc)
   if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
-  return writeLibFile(
-    home,
-    join(hookDirPath(home, name), HOOK_FILE),
-    JSON.stringify(def, null, 2) + '\n'
-  )
+  const d = doc as HookDoc
+  return { ...d, options: hookOptions(d.action, d.options) }
+}
+
+function writeHookDoc(home: string, name: string, doc: HookDoc): string {
+  return writeLibFile(home, join(hookDirPath(home, name), HOOK_FILE), renderHookDoc(name, doc))
+}
+
+function readHookDocFile(home: string, name: string): HookDoc {
+  const p = assertInsideLibrary(home, join(hookDirPath(home, name), HOOK_FILE))
+  if (!existsSync(p)) throw new LibraryError('notFound', 'hook not found')
+  try {
+    return parseHookDoc(readFileSync(p, 'utf8'))
+  } catch (e) {
+    throw new LibraryError('invalidSchema', (e as Error).message)
+  }
 }
 
 export interface NewHookInput {
   description: string
-  timing: HookTiming
-  /** Tools to connect, each with its default event for the timing */
-  tools: HookTool[]
-  /** Shared script content */
-  script: string
+  when: HookTiming
+  action: HookAction
+  /** Action options; left-out ones get the defaults */
+  options?: Record<string, HookOptionValue>
+  /** ask: the instruction */
+  body?: string
+  /** script: run.sh content (a starter script if left out) */
+  script?: string
 }
 
-/** New hook: hooks/<name>/hook.json + run.sh. exists if the folder is there; invalidSchema if a tool has no event for the timing */
+/** New hook: hooks/<name>/HOOK.md (+ run.sh for the script action). exists if the folder is there */
 export function createHook(home: string, name: string, input: NewHookInput): string {
   const dir = hookDirPath(home, name)
   if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
     throw new LibraryError('exists', 'a hook with the same name exists')
-  const triggers: HookDef['triggers'] = {}
-  for (const tool of input.tools) {
-    if (!isHookTool(tool)) throw new LibraryError('invalidSchema', `${String(tool)} has no hooks`)
-    const event = defaultHookEvent(tool, input.timing)
-    if (!event) throw new LibraryError('invalidSchema', `${tool} has no event for ${input.timing}`)
-    triggers[tool] = { event }
-  }
-  const def: HookDef = {
-    description: typeof input.description === 'string' ? input.description.trim() : '',
-    timing: input.timing,
-    script: SHARED_SCRIPT,
-    triggers
-  }
-  const errors = validateHookDef(def)
-  if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
-  writeLibFile(home, join(dir, SHARED_SCRIPT), input.script, HOOK_SCRIPT_MODE)
-  return writeHookDef(home, name, def)
+  const i = (isObj(input) ? input : {}) as Partial<NewHookInput>
+  const doc = checkHookDoc({
+    description: typeof i.description === 'string' ? i.description.trim() : '',
+    when: i.when,
+    action: i.action,
+    options: i.options ?? {},
+    body: typeof i.body === 'string' ? i.body : ''
+  })
+  if (doc.action === 'script')
+    writeLibFile(
+      home,
+      join(dir, SHARED_SCRIPT),
+      typeof i.script === 'string' ? i.script : HOOK_SCRIPT_TEMPLATE,
+      HOOK_SCRIPT_MODE
+    )
+  return writeHookDoc(home, name, doc)
 }
 
-function readHookDefFile(home: string, name: string): HookDef {
-  const p = assertInsideLibrary(home, join(hookDirPath(home, name), HOOK_FILE))
-  if (!existsSync(p)) throw new LibraryError('notFound', 'hook not found')
-  const raw = JSON.parse(readFileSync(p, 'utf8')) as unknown
-  const errors = validateHookDef(raw)
-  if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
-  return raw as HookDef
-}
-
-/** Replace hook.json. Every script it points at must already exist in the hook folder */
-export function saveHookDef(home: string, name: string, def: HookDef): string {
-  readHookDefFile(home, name)
-  const errors = validateHookDef(def)
-  if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
+/** Replace a hook's HOOK.md. A script-action hook must already have every script it points at */
+export function saveHookDoc(home: string, name: string, doc: HookDoc): string {
+  readHookDocFile(home, name)
+  const next = checkHookDoc(doc)
   const dir = hookDirPath(home, name)
-  for (const file of hookScriptFiles(def))
+  if (next.action === 'script' && !existsSync(assertInsideLibrary(home, join(dir, SHARED_SCRIPT))))
+    writeLibFile(home, join(dir, SHARED_SCRIPT), HOOK_SCRIPT_TEMPLATE, HOOK_SCRIPT_MODE)
+  for (const file of hookScriptFiles(next))
     if (!existsSync(assertInsideLibrary(home, join(dir, file))))
       throw new LibraryError('invalidSchema', `script ${file} is not in the hook folder`)
-  return writeHookDef(home, name, def)
+  return writeHookDoc(home, name, next)
 }
 
 function hookScriptPath(home: string, name: string, file: string): string {
@@ -1331,49 +1345,59 @@ function hookScriptPath(home: string, name: string, file: string): string {
   return join(hookDirPath(home, name), file)
 }
 
-/** Write one of the hook's scripts (the shared one or a tool-specific one hook.json points at) */
+/** Write one of a script-action hook's scripts (run.sh or a tool-specific one) */
 export function saveHookScript(home: string, name: string, file: string, content: string): string {
   const p = hookScriptPath(home, name, file)
-  const def = readHookDefFile(home, name)
-  if (!hookScriptFiles(def).includes(file))
+  const doc = readHookDocFile(home, name)
+  if (!hookScriptFiles(doc).includes(file))
     throw new LibraryError('notFound', 'not a script of this hook')
   if (typeof content !== 'string') throw new LibraryError('invalidSchema', 'content must be text')
   return writeLibFile(home, p, content, HOOK_SCRIPT_MODE)
 }
 
-/** Copy the shared script to `<base>.<tool><ext>` and point the tool at it. Returns the new file name */
+/**
+ * Turn a hook into a script-action hook with the given run.sh (e.g. the script a built-in action renders), keeping its timing,
+ * description and per-tool settings
+ */
+export function convertHookToScript(home: string, name: string, script: string): string {
+  const doc = readHookDocFile(home, name)
+  if (typeof script !== 'string') throw new LibraryError('invalidSchema', 'script must be text')
+  const next = checkHookDoc({ ...doc, action: 'script', options: {}, body: doc.body })
+  writeLibFile(home, hookScriptPath(home, name, SHARED_SCRIPT), script, HOOK_SCRIPT_MODE)
+  return writeHookDoc(home, name, next)
+}
+
+/** Script action: copy run.sh to `run.<tool>.sh` and point the tool at it. Returns the new file name */
 export function createHookToolScript(home: string, name: string, tool: HookTool): string {
-  const def = readHookDefFile(home, name)
+  const doc = readHookDocFile(home, name)
   if (!isHookTool(tool)) throw new LibraryError('invalidSchema', `${String(tool)} has no hooks`)
-  if (def.toolScripts?.[tool])
+  if (doc.action !== 'script')
+    throw new LibraryError('invalidSchema', 'only a script hook has scripts of its own')
+  if (doc.toolScripts?.[tool])
     throw new LibraryError('exists', `${tool} already has its own script`)
-  const dot = def.script.lastIndexOf('.')
-  const file =
-    dot > 0
-      ? `${def.script.slice(0, dot)}.${tool}${def.script.slice(dot)}`
-      : `${def.script}.${tool}`
+  const file = `run.${tool}.sh`
   const p = hookScriptPath(home, name, file)
   if (existsSync(assertInsideLibrary(home, p))) throw new LibraryError('exists', `${file} exists`)
   const shared = readFileSync(
-    assertInsideLibrary(home, hookScriptPath(home, name, def.script)),
+    assertInsideLibrary(home, hookScriptPath(home, name, SHARED_SCRIPT)),
     'utf8'
   )
   writeLibFile(home, p, shared, HOOK_SCRIPT_MODE)
-  writeHookDef(home, name, { ...def, toolScripts: { ...def.toolScripts, [tool]: file } })
+  writeHookDoc(home, name, { ...doc, toolScripts: { ...doc.toolScripts, [tool]: file } })
   return file
 }
 
-/** The tool goes back to the shared script; its own script moves to the trash */
+/** Script action: the tool goes back to run.sh; its own script moves to the trash */
 export function dropHookToolScript(home: string, name: string, tool: HookTool): TrashResult {
-  const def = readHookDefFile(home, name)
-  const file = def.toolScripts?.[tool]
+  const doc = readHookDocFile(home, name)
+  const file = doc.toolScripts?.[tool]
   if (!file) throw new LibraryError('notFound', `${String(tool)} has no script of its own`)
-  const rest = { ...def.toolScripts }
+  const rest = { ...doc.toolScripts }
   delete rest[tool]
-  const next: HookDef = { ...def }
+  const next: HookDoc = { ...doc }
   if (Object.keys(rest).length) next.toolScripts = rest
   else delete next.toolScripts
-  writeHookDef(home, name, next)
+  writeHookDoc(home, name, next)
   return moveToTrash(home, hookScriptPath(home, name, file))
 }
 
@@ -1381,13 +1405,13 @@ export function deleteHook(home: string, name: string): TrashResult {
   return moveToTrash(home, hookDirPath(home, name))
 }
 
-/** New hook folder with a given hook.json and shared script (import). exists if the folder is there */
-export function writeNewHook(home: string, name: string, def: HookDef, script: string): string {
+/** New hook folder from a hook and (script action) its run.sh — import. exists if the folder is there */
+export function writeNewHook(home: string, name: string, doc: HookDoc, script?: string): string {
   const dir = hookDirPath(home, name)
   if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
     throw new LibraryError('exists', 'a hook with the same name exists')
-  const errors = validateHookDef(def)
-  if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
-  writeLibFile(home, join(dir, def.script), script, HOOK_SCRIPT_MODE)
-  return writeHookDef(home, name, def)
+  const next = checkHookDoc(doc)
+  if (next.action === 'script')
+    writeLibFile(home, join(dir, SHARED_SCRIPT), script ?? HOOK_SCRIPT_TEMPLATE, HOOK_SCRIPT_MODE)
+  return writeHookDoc(home, name, next)
 }

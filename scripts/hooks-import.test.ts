@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import {
   applyImport,
   createHook,
+  hookTriggers,
   keepHookCopy,
   pendingSyncCount,
   planImport,
@@ -73,8 +74,12 @@ test('REQ-HOOKS-IMPORT-1 Claude hooks come in as library hooks and their origina
     ['imported', 'imported']
   )
   const lib = readHook(home, 'guard')
-  assert.deepEqual(lib.def.triggers, {
-    claude: { event: 'PreToolUse', matcher: 'Bash', timeout: 10 }
+  assert.equal(lib.doc.action, 'script')
+  assert.equal(lib.doc.when, 'before-tool')
+  assert.deepEqual(hookTriggers(lib.doc).claude, {
+    event: 'PreToolUse',
+    matcher: 'Bash',
+    timeout: 10
   })
   assert.equal(lib.scripts['run.sh'], '#!/bin/sh\necho guard\n')
   assert.match(
@@ -107,8 +112,9 @@ test('REQ-HOOKS-IMPORT-2 a hook running the same script as a library hook joins 
   const home = demoHome(['claude', 'gemini'])
   createHook(home, 'guard', {
     description: '',
-    timing: 'before-tool',
-    tools: ['claude'],
+    when: 'before-tool',
+    action: 'script',
+    options: {},
     script: '#!/bin/sh\necho guard\n'
   })
   mkdirSync(join(home, '.gemini'), { recursive: true })
@@ -132,10 +138,14 @@ test('REQ-HOOKS-IMPORT-2 a hook running the same script as a library hook joins 
   assert.equal(c.variants[0].joins, 'guard')
   assert.deepEqual(c.conflicts, [])
   applyImport(home, [{ kind: 'hook', name: 'guard' }], 'tool:gemini')
-  assert.deepEqual(readHook(home, 'guard').def.triggers, {
-    claude: { event: 'PreToolUse' },
-    gemini: { event: 'BeforeTool', matcher: 'run_shell_command', timeout: 5 }
+  const triggers = hookTriggers(readHook(home, 'guard').doc)
+  assert.deepEqual(triggers.claude, { event: 'PreToolUse' })
+  assert.deepEqual(triggers.gemini, {
+    event: 'BeforeTool',
+    matcher: 'run_shell_command',
+    timeout: 5
   })
+  assert.notEqual(readManifest(home).manifest.hooks?.guard?.gemini, false)
 })
 
 test('REQ-HOOKS-IMPORT-3 a Copilot hook comes in turned off for Copilot, its original file stays', () => {
@@ -152,7 +162,10 @@ test('REQ-HOOKS-IMPORT-3 a Copilot hook comes in turned off for Copilot, its ori
   assert.equal(c.name, 'copilot-sessionstart')
   assert.ok(c.variants[0].warnings.includes('originalKept'))
   applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:copilot')
-  assert.deepEqual(readManifest(home).manifest.hooks[c.name], { copilot: false })
+  // On only for the tool it came from, and off there too while the original file stays
+  const toggles = readManifest(home).manifest.hooks[c.name]
+  assert.equal(toggles.copilot, false)
+  assert.ok(Object.values(toggles).every((v) => v === false))
   approved(home)
   assert.equal(readFileSync(mine, 'utf8'), original)
   assert.equal(existsSync(join(home, '.copilot/hooks/illithid.json')), false)
@@ -162,8 +175,9 @@ test('REQ-HOOKS-KEEP-1 a script copy edited in a tool survives automatic syncs a
   const home = demoHome(['claude'])
   createHook(home, 'fmt', {
     description: '',
-    timing: 'after-tool',
-    tools: ['claude'],
+    when: 'after-tool',
+    action: 'script',
+    options: {},
     script: 'v1\n'
   })
   approved(home)
@@ -174,4 +188,30 @@ test('REQ-HOOKS-KEEP-1 a script copy edited in a tool survives automatic syncs a
   keepHookCopy(home, 'claude', 'fmt', 'run.sh')
   assert.equal(readHook(home, 'fmt').scripts['run.sh'], 'edited in Claude\n')
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+})
+
+test('REQ-HOOKS-IMPORT-4 a Claude Code prompt hook comes in as a natural-language check, its prompt kept as is', () => {
+  const home = demoHome(['claude', 'gemini'])
+  const settings = join(home, '.claude/settings.json')
+  mkdirSync(join(home, '.claude'), { recursive: true })
+  const prompt = 'Check the tests. $ARGUMENTS Reply {"decision":"block"} if they fail.'
+  writeFileSync(
+    settings,
+    JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'prompt', prompt, timeout: 20 }] }] } })
+  )
+  const plan = planImport(home, 'tool:claude')
+  const [c] = plan.hooks
+  assert.equal(c.variants[0].action, 'ask')
+  applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:claude')
+  const doc = readHook(home, c.name).doc
+  assert.equal(doc.action, 'ask')
+  assert.equal(doc.options.verbatim, true)
+  assert.equal(doc.body.trim(), prompt)
+  approved(home)
+  const stop = (json(settings) as { hooks: { Stop: { hooks: Record<string, unknown>[] }[] } }).hooks
+    .Stop
+  assert.equal(stop.length, 1)
+  assert.equal(stop[0].hooks[0].prompt, prompt)
+  assert.equal(stop[0].hooks[0].timeout, 20)
+  assert.equal(stop[0].hooks[0].statusMessage, `Illithid · ${c.name}`)
 })

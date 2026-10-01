@@ -5,16 +5,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   createHook,
+  createHookToolScript,
   defaultHookEvent,
+  deleteHook,
+  dropHookToolScript,
+  hookSupport,
+  hookTriggers,
   LibraryError,
   libraryRoot,
   readHook,
   readHooks,
-  createHookToolScript,
-  deleteHook,
-  dropHookToolScript,
   readManifest,
-  saveHookDef,
+  saveHookDoc,
   saveHookScript,
   setToggle
 } from '../src/engine'
@@ -24,6 +26,15 @@ function demoHome(): string {
   const home = mkdtempSync(join(tmpdir(), 'illithid-hooks-lib-'))
   buildDemoHome(home, { tools: 'all' })
   return home
+}
+
+const code = (fn: () => unknown): string | undefined => {
+  try {
+    fn()
+  } catch (e) {
+    return e instanceof LibraryError ? e.code : `not a LibraryError: ${String(e)}`
+  }
+  return undefined
 }
 
 test('REQ-HOOKS-LIB-1 each tool maps a timing to its own native event', () => {
@@ -36,52 +47,119 @@ test('REQ-HOOKS-LIB-1 each tool maps a timing to its own native event', () => {
   assert.equal(defaultHookEvent('codex', 'notification'), null)
 })
 
-test('REQ-HOOKS-LIB-2 a new hook writes hook.json and its script, connected to the chosen tools', () => {
-  const home = demoHome()
-  createHook(home, 'guard', {
-    description: 'Block dangerous commands',
-    timing: 'before-tool',
-    tools: ['claude', 'gemini', 'codex'],
-    script: '#!/usr/bin/env bash\nexit 0\n'
-  })
-  const dir = join(libraryRoot(home), 'hooks/guard')
-  assert.ok(existsSync(join(dir, 'hook.json')))
-  assert.equal(readFileSync(join(dir, 'run.sh'), 'utf8'), '#!/usr/bin/env bash\nexit 0\n')
-  const [hook] = readHooks(home)
-  assert.equal(hook.name, 'guard')
-  assert.equal(hook.def.timing, 'before-tool')
-  assert.equal(hook.def.script, 'run.sh')
-  assert.deepEqual(hook.def.triggers, {
-    claude: { event: 'PreToolUse' },
-    codex: { event: 'PreToolUse' },
-    gemini: { event: 'BeforeTool' }
-  })
-  assert.equal(hook.scripts['run.sh'], '#!/usr/bin/env bash\nexit 0\n')
+test('REQ-HOOKS-LIB-2 each action says which tools can run it and why not', () => {
+  assert.equal(hookSupport('guard', 'before-tool', 'copilot'), 'ok')
+  // Codex apply_patch hands over no file path
+  assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')
+  // Only Claude Code has LLM-judged (prompt) hooks
+  assert.equal(hookSupport('ask', 'stop', 'gemini'), 'claudeOnly')
+  assert.equal(hookSupport('ask', 'stop', 'claude'), 'ok')
+  assert.equal(hookSupport('notify', 'notification', 'codex'), 'noEvent')
+  assert.equal(hookSupport('guard', 'stop', 'claude'), 'wrongTiming')
 })
 
-const code = (fn: () => unknown): string | undefined => {
-  try {
-    fn()
-  } catch (e) {
-    return e instanceof LibraryError ? e.code : `not a LibraryError: ${String(e)}`
-  }
-  return undefined
-}
-
-test('REQ-HOOKS-LIB-3 invalid names, events, matchers and timeouts are refused', () => {
+test('REQ-HOOKS-LIB-3 a new hook is one HOOK.md with when, action and options; no script for built-in actions', () => {
   const home = demoHome()
-  const base = {
+  createHook(home, 'done', {
+    description: 'Tell me when the reply is done',
+    when: 'stop',
+    action: 'notify',
+    options: { message: 'Done' }
+  })
+  const dir = join(libraryRoot(home), 'hooks/done')
+  assert.ok(existsSync(join(dir, 'HOOK.md')))
+  assert.equal(existsSync(join(dir, 'run.sh')), false)
+  assert.match(readFileSync(join(dir, 'HOOK.md'), 'utf8'), /^---\nname: done\n/)
+  const [h] = readHooks(home)
+  assert.equal(h.name, 'done')
+  assert.equal(h.doc.when, 'stop')
+  assert.equal(h.doc.action, 'notify')
+  // Missing options get the action defaults
+  assert.deepEqual(h.doc.options, { title: 'Illithid', message: 'Done', sound: false })
+})
+
+test('REQ-HOOKS-LIB-4 triggers come from the action: the shell tool of each tool for guard, nothing where unsupported', () => {
+  const home = demoHome()
+  createHook(home, 'guard', { description: '', when: 'before-tool', action: 'guard', options: {} })
+  createHook(home, 'fmt', {
     description: '',
-    timing: 'stop' as const,
-    tools: ['claude' as const],
-    script: 'exit 0\n'
-  }
+    when: 'after-tool',
+    action: 'format',
+    options: { command: 'npx prettier --write' }
+  })
+  assert.deepEqual(hookTriggers(readHook(home, 'guard').doc), {
+    claude: { event: 'PreToolUse', matcher: 'Bash' },
+    codex: { event: 'PreToolUse', matcher: 'Bash' },
+    gemini: { event: 'BeforeTool', matcher: 'run_shell_command' },
+    copilot: { event: 'preToolUse', matcher: 'bash' },
+    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' }
+  })
+  const fmt = hookTriggers(readHook(home, 'fmt').doc)
+  assert.deepEqual(fmt.claude, { event: 'PostToolUse', matcher: 'Write|Edit' })
+  assert.equal(fmt.codex, undefined)
+  // Advanced per-tool settings override the action's
+  const doc = readHook(home, 'fmt').doc
+  saveHookDoc(home, 'fmt', { ...doc, tools: { gemini: { timeout: 10 } } })
+  assert.deepEqual(hookTriggers(readHook(home, 'fmt').doc).gemini, {
+    event: 'AfterTool',
+    matcher: 'write_file|replace',
+    timeout: 10
+  })
+})
+
+test('REQ-HOOKS-LIB-5 ask keeps its instruction in the body; script keeps a run.sh', () => {
+  const home = demoHome()
+  createHook(home, 'tests-pass', {
+    description: '',
+    when: 'stop',
+    action: 'ask',
+    options: {},
+    body: 'Keep working until the tests pass.'
+  })
+  assert.equal(readHook(home, 'tests-pass').doc.body, 'Keep working until the tests pass.\n')
+  createHook(home, 'mine', {
+    description: '',
+    when: 'session-start',
+    action: 'script',
+    options: {},
+    script: '#!/bin/sh\necho hi\n'
+  })
+  const mine = readHook(home, 'mine')
+  assert.equal(mine.scripts['run.sh'], '#!/bin/sh\necho hi\n')
+  assert.equal(statSync(join(libraryRoot(home), 'hooks/mine/run.sh')).mode & 0o111, 0o111)
+  saveHookScript(home, 'mine', 'run.sh', '#!/bin/sh\necho bye\n')
+  assert.equal(readHook(home, 'mine').scripts['run.sh'], '#!/bin/sh\necho bye\n')
+  // A tool-only script stays an advanced option of the script action
+  assert.equal(createHookToolScript(home, 'mine', 'copilot'), 'run.copilot.sh')
+  assert.deepEqual(readHook(home, 'mine').doc.toolScripts, { copilot: 'run.copilot.sh' })
+  dropHookToolScript(home, 'mine', 'copilot')
+  assert.equal(readHook(home, 'mine').doc.toolScripts, undefined)
+})
+
+test('REQ-HOOKS-LIB-6 invalid names, timings, options and empty instructions are refused', () => {
+  const home = demoHome()
+  const base = { description: '', when: 'stop' as const, action: 'notify' as const, options: {} }
   assert.equal(
     code(() => createHook(home, 'Bad Name', base)),
     'invalidName'
   )
   assert.equal(
-    code(() => createHook(home, 'n1', { ...base, tools: ['codex'], timing: 'notification' })),
+    code(() => createHook(home, 'g', { ...base, action: 'guard' })),
+    'invalidSchema'
+  )
+  assert.equal(
+    code(() => createHook(home, 'a', { ...base, action: 'ask', body: '  ' })),
+    'invalidSchema'
+  )
+  assert.equal(
+    code(() =>
+      createHook(home, 'p', {
+        ...base,
+        when: 'before-tool',
+        action: 'guard',
+        options: { patterns: 'rm' }
+      })
+    ),
     'invalidSchema'
   )
   createHook(home, 'ok', base)
@@ -89,90 +167,24 @@ test('REQ-HOOKS-LIB-3 invalid names, events, matchers and timeouts are refused',
     code(() => createHook(home, 'ok', base)),
     'exists'
   )
-  const def = readHook(home, 'ok').def
+  const doc = readHook(home, 'ok').doc
   assert.equal(
-    code(() => saveHookDef(home, 'ok', { ...def, triggers: { claude: { event: 'BeforeTool' } } })),
+    code(() => saveHookDoc(home, 'ok', { ...doc, tools: { claude: { event: 'BeforeTool' } } })),
     'invalidSchema'
   )
   assert.equal(
-    code(() =>
-      saveHookDef(home, 'ok', { ...def, triggers: { claude: { event: 'Stop', matcher: 'Bash' } } })
-    ),
+    code(() => saveHookDoc(home, 'ok', { ...doc, tools: { claude: { timeout: 0 } } })),
     'invalidSchema'
   )
   assert.equal(
-    code(() =>
-      saveHookDef(home, 'ok', { ...def, triggers: { claude: { event: 'Stop', timeout: 0 } } })
-    ),
-    'invalidSchema'
-  )
-  assert.equal(
-    code(() => saveHookDef(home, 'ok', { ...def, script: '../x.sh' })),
-    'invalidSchema'
-  )
-  assert.equal(
-    code(() => saveHookScript(home, 'ok', '../escape.sh', 'x')),
-    'invalidName'
+    code(() => saveHookScript(home, 'ok', 'run.sh', 'x')),
+    'notFound'
   )
 })
 
-test('REQ-HOOKS-LIB-4 triggers and scripts can be edited', () => {
+test('REQ-HOOKS-LIB-7 hooks have per-tool on/off in illithid.json, and deleting moves the folder to the trash', () => {
   const home = demoHome()
-  createHook(home, 'fmt', {
-    description: 'Format',
-    timing: 'after-tool',
-    tools: ['claude', 'gemini'],
-    script: 'exit 0\n'
-  })
-  const def = readHook(home, 'fmt').def
-  saveHookDef(home, 'fmt', {
-    ...def,
-    description: 'Format edited files',
-    triggers: {
-      ...def.triggers,
-      claude: { event: 'PostToolUse', matcher: 'Edit|Write', timeout: 30 }
-    }
-  })
-  saveHookScript(home, 'fmt', 'run.sh', 'npx prettier --write "$1"\n')
-  const h = readHook(home, 'fmt')
-  assert.equal(h.def.description, 'Format edited files')
-  assert.deepEqual(h.def.triggers.claude, {
-    event: 'PostToolUse',
-    matcher: 'Edit|Write',
-    timeout: 30
-  })
-  assert.deepEqual(h.def.triggers.gemini, { event: 'AfterTool' })
-  assert.equal(h.scripts['run.sh'], 'npx prettier --write "$1"\n')
-})
-
-test('REQ-HOOKS-LIB-5 a tool gets its own script copied from the shared one, and can go back to the shared one', () => {
-  const home = demoHome()
-  createHook(home, 'guard', {
-    description: '',
-    timing: 'before-tool',
-    tools: ['claude', 'copilot'],
-    script: 'shared\n'
-  })
-  const file = createHookToolScript(home, 'guard', 'copilot')
-  assert.equal(file, 'run.copilot.sh')
-  let h = readHook(home, 'guard')
-  assert.deepEqual(h.def.toolScripts, { copilot: 'run.copilot.sh' })
-  assert.equal(h.scripts['run.copilot.sh'], 'shared\n')
-  assert.equal(statSync(join(libraryRoot(home), 'hooks/guard/run.copilot.sh')).mode & 0o111, 0o111)
-  dropHookToolScript(home, 'guard', 'copilot')
-  h = readHook(home, 'guard')
-  assert.equal(h.def.toolScripts, undefined)
-  assert.equal(existsSync(join(libraryRoot(home), 'hooks/guard/run.copilot.sh')), false)
-})
-
-test('REQ-HOOKS-LIB-6 hooks have per-tool on/off in illithid.json, and deleting moves the folder to the trash', () => {
-  const home = demoHome()
-  createHook(home, 'notify', {
-    description: '',
-    timing: 'stop',
-    tools: ['claude', 'gemini'],
-    script: 'x\n'
-  })
+  createHook(home, 'notify', { description: '', when: 'stop', action: 'notify', options: {} })
   setToggle(home, 'hooks', 'notify', 'gemini', false)
   assert.deepEqual(readManifest(home).manifest.hooks, { notify: { gemini: false } })
   assert.throws(() => setToggle(home, 'hooks', 'notify', 'opencode', false))

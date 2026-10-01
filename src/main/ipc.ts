@@ -590,7 +590,9 @@ export function registerIpc(): void {
     hookRead: async (name) => W.wrap(() => W.hookRead(home, str(name))),
     hookCreate: async (name, input) =>
       libWrite(() => W.lib.hookCreate(home, str(name), input as never)),
-    hookSave: async (name, def) => libWrite(() => W.lib.hookSave(home, str(name), def as never)),
+    hookSave: async (name, doc) => libWrite(() => W.lib.hookSave(home, str(name), doc as never)),
+    hookConvert: async (name, tool) =>
+      libWrite(() => W.lib.hookConvert(home, str(name), str(tool))),
     hookDelete: async (name) => libWrite(() => W.lib.hookDelete(home, str(name))),
     hookScriptSave: async (name, file, content) =>
       libWrite(() => W.lib.hookScriptSave(home, str(name), str(file), str(content))),

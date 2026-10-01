@@ -6,9 +6,13 @@
 import type {
   AgentDoc,
   AgentDocInput,
-  HookDef,
+  HookAction,
+  HookDoc,
+  HookOptionValue,
+  HookSupport,
   HookTiming,
   HookTool,
+  HookToolSettings,
   HookTrigger,
   NewHookInput,
   AgentSyncResult,
@@ -257,15 +261,13 @@ export type HookToolState = SyncState | 'notApplicable'
 export interface HookView {
   name: string
   description: string
-  timing: HookTiming
-  /** Shared script file */
-  script: string
-  /** Tool-specific script files */
-  toolScripts: Partial<Record<HookTool, string>>
-  /** Connected tools and their native event */
-  triggers: Partial<Record<HookTool, HookTrigger>>
+  when: HookTiming
+  action: HookAction
+  options: Record<string, HookOptionValue>
   /** Hook tools in use on this device */
   tools: Partial<Record<ToolId, HookToolState>>
+  /** Hook tools in use that can't run this hook, and why */
+  unsupported?: Partial<Record<ToolId, HookSupport>>
   /** Why a tool is in error: a reason code (configUnreadable) or the generator's message */
   reasons?: Partial<Record<ToolId, string>>
   /** Script copies edited in a tool since the last sync: tool → file */
@@ -282,15 +284,29 @@ export interface HooksData {
   grokReadsClaude?: boolean
 }
 
-/** hook.json and its scripts, for the detail sheet */
+/** HOOK.md, its scripts and what each tool runs, for the detail sheet */
 export interface HookEditView {
   name: string
-  def: HookDef
-  /** Script file → content */
+  doc: HookDoc
+  /** Script action: script file → content */
   scripts: Record<string, string>
+  /** Each tool that can run the hook: its trigger and the generated script (or the Claude Code prompt) */
+  runs: Partial<
+    Record<HookTool, { trigger: HookTrigger; file?: string; content?: string; prompt?: string }>
+  >
 }
 
-export type { HookDef, HookTiming, HookTool, HookTrigger, NewHookInput }
+export type {
+  HookAction,
+  HookDoc,
+  HookOptionValue,
+  HookSupport,
+  HookTiming,
+  HookTool,
+  HookToolSettings,
+  HookTrigger,
+  NewHookInput
+}
 
 // ---------------------------------------------------------------- write channel types
 
@@ -809,7 +825,8 @@ export interface Api {
   mcpDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   hookRead(name: string): Promise<WriteResult<HookEditView>>
   hookCreate(name: string, input: NewHookInput): Promise<WriteResult<{ name: string }> | Refused>
-  hookSave(name: string, def: HookDef): Promise<WriteResult<{ name: string }> | Refused>
+  hookSave(name: string, doc: HookDoc): Promise<WriteResult<{ name: string }> | Refused>
+  hookConvert(name: string, tool: HookTool): Promise<WriteResult<{ name: string }> | Refused>
   hookDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   hookScriptSave(
     name: string,
@@ -1025,6 +1042,7 @@ export const CHANNELS = [
   'hookRead',
   'hookCreate',
   'hookSave',
+  'hookConvert',
   'hookDelete',
   'hookScriptSave',
   'hookToolScriptCreate',

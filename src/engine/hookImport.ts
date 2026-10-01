@@ -17,12 +17,19 @@ import { basename, join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { activeWorkspaceId } from './config'
 import { hookEventInfo, isHookTool, type HookTiming, type HookTool } from './hookEvents'
-import { readHooks, SHARED_SCRIPT, type HookDef, type HookTrigger } from './hooks'
+import { HOOK_TOOLS } from './hookEvents'
+import {
+  hookTriggers,
+  readHooks,
+  type HookDoc,
+  type HookToolSettings,
+  type HookTrigger
+} from './hooks'
 import { LibraryError } from './libpath'
 import { setToggle } from './manifest'
 import { addPending, importedBackupRoot, importStamp, type PendingRetire } from './pendingRetire'
 import { readState, writeState } from './state'
-import { appHookName, hookEntryHash, TOML_HOOK_MARKERS } from './targets/hooks'
+import { appHookName, hookEntryHash, PROMPT_MARK, TOML_HOOK_MARKERS } from './targets/hooks'
 import { outsideBlockMulti } from './text'
 import type { ToolId } from './toolIds'
 
@@ -46,8 +53,12 @@ export interface HookImportVariant {
   command: string
   /** Script file the command runs (absolute), when it is a single existing file */
   scriptPath?: string
-  /** Script stored in the library */
+  /** What the hook becomes: a script running the command, or (Claude Code prompt hooks) a natural-language check */
+  action: 'script' | 'ask'
+  /** script: run.sh stored in the library */
   script: string
+  /** ask: the original prompt */
+  prompt?: string
   /** Library hook this one connects to instead of making a new hook */
   joins?: string
   warnings: HookImportWarning[]
@@ -73,6 +84,8 @@ interface FoundEntry {
   matcher?: string
   /** Handler object as written ({ type, command, timeout } or a flat Copilot entry) */
   handler: Json
+  /** Claude Code prompt hook text (command is then '') */
+  prompt?: string
   command: string
   configPath: string
 }
@@ -99,7 +112,24 @@ function nested(tool: HookTool, table: unknown, configPath: string): FoundEntry[
       if (!isObj(g) || !Array.isArray(g.hooks)) continue
       const matcher = typeof g.matcher === 'string' && g.matcher ? g.matcher : undefined
       for (const h of g.hooks) {
-        if (!isObj(h) || h.type !== 'command' || typeof h.command !== 'string') continue
+        if (!isObj(h)) continue
+        if (
+          tool === 'claude' &&
+          h.type === 'prompt' &&
+          typeof h.prompt === 'string' &&
+          !(typeof h.statusMessage === 'string' && h.statusMessage.startsWith(PROMPT_MARK))
+        ) {
+          out.push({
+            event,
+            ...(matcher ? { matcher } : {}),
+            handler: h,
+            command: '',
+            prompt: h.prompt,
+            configPath
+          })
+          continue
+        }
+        if (h.type !== 'command' || typeof h.command !== 'string') continue
         if (appHookName(tool, h.command)) continue
         out.push({
           event,
@@ -237,12 +267,21 @@ export function hookImportCandidates(
       notes.push(`${tool} ${e.event}: no matching hook timing — not offered`)
       continue
     }
-    const scriptPath = scriptFileOf(home, e.command) ?? undefined
-    const script = scriptPath
-      ? readFileSync(scriptPath, 'utf8')
-      : `#!/usr/bin/env bash\n${e.command}\n`
+    const ask = e.prompt !== undefined
+    if (ask && !['stop', 'before-tool', 'prompt'].includes(info.timing)) {
+      notes.push(
+        `${tool} ${e.event}: prompt hook at a timing Illithid has no check for — not offered`
+      )
+      continue
+    }
+    const scriptPath = ask ? undefined : (scriptFileOf(home, e.command) ?? undefined)
+    const script = ask
+      ? ''
+      : scriptPath
+        ? readFileSync(scriptPath, 'utf8')
+        : `#!/usr/bin/env bash\n${e.command}\n`
     const warnings: HookImportWarning[] = []
-    if (!scriptPath) warnings.push('inlineCommand')
+    if (!ask && !scriptPath) warnings.push('inlineCommand')
     if (/\b(CLAUDE|GEMINI|CODEX)_[A-Z_]*DIR\b/.test(e.command)) warnings.push('toolVariable')
     if (!HOOK_REPLACE_TOOLS.includes(tool)) warnings.push('originalKept')
     const timeout = seconds(tool, e.handler)
@@ -251,12 +290,15 @@ export function hookImportCandidates(
       ...(e.matcher && info.matcher ? { matcher: e.matcher } : {}),
       ...(timeout !== undefined ? { timeout } : {})
     }
-    const joins = library.find(
-      (h) =>
-        h.def.timing === info.timing &&
-        !h.def.triggers[tool] &&
-        Object.values(h.scripts).includes(script)
-    )?.name
+    // A library script hook at the same timing running the same script: this original is that hook in another tool
+    const joins = ask
+      ? undefined
+      : library.find(
+          (h) =>
+            h.doc.action === 'script' &&
+            h.doc.when === info.timing &&
+            Object.values(h.scripts).includes(script)
+        )?.name
     let name =
       joins ??
       (scriptPath ? slug(basename(scriptPath).replace(/\.[^.]+$/, '')) : slug(`${tool}-${e.event}`))
@@ -283,7 +325,9 @@ export function hookImportCandidates(
           trigger,
           command: e.command,
           ...(scriptPath ? { scriptPath } : {}),
+          action: ask ? 'ask' : 'script',
           script,
+          ...(ask ? { prompt: e.prompt } : {}),
           ...(joins ? { joins } : {}),
           warnings,
           configPath: e.configPath,
@@ -298,14 +342,24 @@ export function hookImportCandidates(
 }
 
 export interface HookImportDeps {
-  createHookFiles: (name: string, def: HookDef, script: string) => void
-  saveDef: (name: string, def: HookDef) => void
+  createHookFiles: (name: string, doc: HookDoc, script?: string) => void
+  saveDoc: (name: string, doc: HookDoc) => void
   trashHook: (name: string) => string
+}
+
+/** The trigger as advanced per-tool settings (only what differs from what the hook would pick itself) */
+function toolSettings(doc: HookDoc, tool: HookTool, t: HookTrigger): HookToolSettings {
+  const auto = hookTriggers({ ...doc, tools: {} })[tool]
+  return {
+    ...(t.event !== auto?.event ? { event: t.event } : {}),
+    ...(t.matcher !== auto?.matcher && t.matcher !== undefined ? { matcher: t.matcher } : {}),
+    ...(t.timeout !== undefined ? { timeout: t.timeout } : {})
+  }
 }
 
 /**
  * Add one candidate to the library. Library writes go through deps (library.ts) so this module stays free of library internals.
- * Returns where an overwritten hook went
+ * A new hook is on only for the tool it came from (like other imports). Returns where an overwritten hook went
  */
 export function applyHookCandidate(
   home: string,
@@ -320,17 +374,30 @@ export function applyHookCandidate(
   if (v.joins) {
     const h = readHooks(home).find((x) => x.name === v.joins)
     if (!h) throw new LibraryError('notFound', 'hook to join is gone')
-    deps.saveDef(h.name, { ...h.def, triggers: { ...h.def.triggers, [tool]: v.trigger } })
+    const s = toolSettings(h.doc, tool, v.trigger)
+    const tools = { ...h.doc.tools }
+    if (Object.keys(s).length) tools[tool] = s
+    else delete tools[tool]
+    deps.saveDoc(h.name, { ...h.doc, ...(Object.keys(tools).length ? { tools } : {}) })
+    setToggle(home, 'hooks', h.name, tool, true)
   } else {
     if (c.conflicts.includes('existsInLibrary')) {
       if (!overwrite) throw new LibraryError('exists', 'a hook with the same name exists')
       trashPath = deps.trashHook(c.name)
     }
-    deps.createHookFiles(
-      c.name,
-      { description: '', timing: v.timing, script: SHARED_SCRIPT, triggers: { [tool]: v.trigger } },
-      v.script
-    )
+    const base: HookDoc = {
+      description: '',
+      when: v.timing,
+      action: v.action,
+      options: v.action === 'ask' ? { verbatim: true } : {},
+      body: v.prompt ?? ''
+    }
+    const s = toolSettings(base, tool, v.trigger)
+    const doc: HookDoc = { ...base, ...(Object.keys(s).length ? { tools: { [tool]: s } } : {}) }
+    deps.createHookFiles(c.name, doc, v.action === 'script' ? v.script : undefined)
+    // Like other imports: on only for the tool it came from
+    for (const other of HOOK_TOOLS)
+      if (other !== tool && hookTriggers(doc)[other]) setToggle(home, 'hooks', c.name, other, false)
   }
   // A copy of the original entry, before anything on the tool side changes
   const ts = importStamp()

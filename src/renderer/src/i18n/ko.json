@@ -809,7 +809,6 @@
       "session-end": "세션이 닫힐 때.",
       "notification": "권한을 묻거나 입력을 기다릴 때."
     },
-    "triggers": "트리거",
     "triggersHint": "툴마다 이벤트 이름과 옵션이 다릅니다. 같은 옵션이라도 툴마다 동작이 같다고 보장하지 않습니다.",
     "event": "이벤트",
     "matcher": "대상 (matcher)",
@@ -822,13 +821,7 @@
     "script": "실행할 스크립트",
     "shared": "공통",
     "own": "{{tool}} 전용",
-    "connect": "연결",
-    "disconnect": "연결 해제",
     "edit": "편집",
-    "noEvent": "{{tool}} 에는 이 시점에 맞는 이벤트가 없습니다",
-    "notConnected": "연결 안 됨",
-    "block": "막기",
-    "blockYes": "이 이벤트에서 막을 수 있습니다",
     "blockNo": "이 이벤트에서는 막을 수 없습니다",
     "input": "스크립트 입력",
     "blockHow": "막는 방법",
@@ -850,25 +843,83 @@
     "codexTrust": "Codex 는 새로 쓰거나 바뀐 훅을 /hooks 에서 신뢰해야 실행합니다.",
     "grokViaClaude": "Grok 은 Claude Code 설정에서 이 훅을 실행합니다",
     "scripts": "스크립트",
-    "makeOwn": "툴 전용 스크립트",
     "dropOwn": "공통 스크립트로 합치기",
     "ownCreated": "공통 스크립트를 복사해 {{tool}} 전용 스크립트를 만들었습니다",
     "ownDropped": "{{tool}} 이 다시 공통 스크립트를 씁니다",
     "scriptSaved": "스크립트 저장됨",
-    "usedBy": "실행하는 툴",
     "description": "설명",
-    "template": "템플릿",
-    "tools": "연결할 툴",
-    "templates": {
-      "blank": "빈 스크립트",
-      "guard": "위험한 명령 막기",
-      "notify": "macOS 알림",
-      "log": "파일에 기록"
-    },
     "timingLabel": "실행 시점",
-    "timingPick": "언제 실행할지 고르세요",
     "edited": "{{tool}} 에서 스크립트를 고쳤습니다",
     "editedHint": "동기화하면 라이브러리 버전으로 되돌립니다 (고친 사본은 백업).",
-    "kept": "{{tool}} 의 버전을 라이브러리에 저장했습니다"
+    "kept": "{{tool}} 의 버전을 라이브러리에 저장했습니다",
+    "actionLabel": "할 일",
+    "pickAction": "무엇을 할까요?",
+    "actions": {
+      "notify": {
+        "title": "알림 띄우기",
+        "desc": "macOS 알림을 띄웁니다. 소리도 낼 수 있습니다"
+      },
+      "guard": {
+        "title": "위험한 명령 막기",
+        "desc": "rm -rf /, git push --force 같은 명령을 실행 전에 막습니다"
+      },
+      "format": {
+        "title": "편집한 파일 포맷",
+        "desc": "에이전트가 고친 파일마다 Prettier 같은 포맷터를 돌립니다"
+      },
+      "log": {
+        "title": "기록 남기기",
+        "desc": "시각, 툴, 폴더를 로그 파일에 한 줄씩 남깁니다"
+      },
+      "ask": {
+        "title": "Claude 에게 판단 맡기기",
+        "desc": "규칙을 말로 쓰면 Claude 가 이벤트를 읽고 판단합니다"
+      },
+      "script": {
+        "title": "직접 작성",
+        "desc": "툴 입력을 그대로 받는 셸 스크립트를 직접 씁니다"
+      }
+    },
+    "claudeOnly": "Claude Code 전용",
+    "advanced": "고급",
+    "back": "뒤로",
+    "opt": {
+      "title": "제목",
+      "message": "문구",
+      "sound": "소리 내기",
+      "patterns": "막을 명령",
+      "patternsHint": "한 줄에 하나. 이 중 하나라도 들어간 명령은 막습니다.",
+      "command": "포맷 명령",
+      "commandHint": "끝에 편집한 파일 경로를 붙여 실행합니다.",
+      "path": "로그 파일"
+    },
+    "instruction": "지시문",
+    "instructionHint": "Claude Code 가 이 지시문과 이벤트를 읽고 계속할지 판단합니다.",
+    "instructionExample": "테스트가 아직 통과하지 않았으면 작업을 계속해.",
+    "notes": "메모",
+    "scriptStarter": "템플릿 스크립트로 시작합니다. 만든 뒤 고치세요.",
+    "nameTaken": "같은 이름의 훅이 있습니다",
+    "runsIn": "실행할 툴",
+    "unsupported": {
+      "wrongTiming": "{{tool}} 은 이 시점에 이 동작을 실행할 수 없습니다",
+      "noEvent": "{{tool}} 에는 이 시점의 이벤트가 없습니다",
+      "noFilePath": "{{tool}} 은 훅에 편집한 파일 경로를 알려 주지 않습니다",
+      "claudeOnly": "{{tool}} 에는 판단 훅이 없습니다 (Claude Code 전용)"
+    },
+    "pending": "툴에 아직 반영 안 됨",
+    "pendingHint": "동기화하면 이 훅이 툴 설정에 들어갑니다.",
+    "syncNow": "확인하고 동기화",
+    "tabOverview": "개요",
+    "tabAdvanced": "고급",
+    "noTools": "사용 중인 툴 중 이 훅을 실행할 수 있는 툴이 없습니다.",
+    "show": "보기",
+    "hide": "접기",
+    "promptHook": "prompt 훅",
+    "generated": "Illithid 가 옵션으로 만든 스크립트입니다. 읽기 전용.",
+    "promptGenerated": "Illithid 가 Claude Code 에 쓰는 프롬프트",
+    "convert": "직접 작성으로 전환",
+    "convertTitle": "직접 작성으로 전환",
+    "convertBody": "{{tool}} 스크립트가 이 훅의 run.sh 가 되고 모든 툴이 그것을 실행합니다. 옵션은 더 이상 적용되지 않습니다.",
+    "converted": "이제 직접 작성한 스크립트를 실행합니다"
   }
 }

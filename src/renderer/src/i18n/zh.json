@@ -809,7 +809,6 @@
       "session-end": "会话关闭时。",
       "notification": "请求权限或等待输入时。"
     },
-    "triggers": "触发器",
     "triggersHint": "每个工具的事件名称和选项都不同。相同的选项不保证在各工具中行为一致。",
     "event": "事件",
     "matcher": "匹配 (matcher)",
@@ -822,13 +821,7 @@
     "script": "运行的脚本",
     "shared": "共享",
     "own": "{{tool}} 专用",
-    "connect": "连接",
-    "disconnect": "断开",
     "edit": "编辑",
-    "noEvent": "{{tool}} 没有对应此时机的事件",
-    "notConnected": "未连接",
-    "block": "阻止",
-    "blockYes": "此事件可以阻止触发它的操作",
     "blockNo": "此事件无法阻止",
     "input": "脚本输入",
     "blockHow": "阻止方式",
@@ -850,25 +843,83 @@
     "codexTrust": "Codex 只有在 /hooks 中信任后才会运行新的或已更改的钩子。",
     "grokViaClaude": "Grok 通过 Claude Code 的设置运行此钩子",
     "scripts": "脚本",
-    "makeOwn": "工具专用脚本",
     "dropOwn": "改用共享脚本",
     "ownCreated": "已从共享脚本创建 {{tool}} 专用脚本",
     "ownDropped": "{{tool}} 重新使用共享脚本",
     "scriptSaved": "脚本已保存",
-    "usedBy": "运行的工具",
     "description": "描述",
-    "template": "模板",
-    "tools": "连接到",
-    "templates": {
-      "blank": "空脚本",
-      "guard": "阻止危险命令",
-      "notify": "macOS 通知",
-      "log": "记录到文件"
-    },
     "timingLabel": "运行时机",
-    "timingPick": "选择运行时机",
     "edited": "脚本在 {{tool}} 中被修改",
     "editedHint": "同步会恢复为库中的版本 (修改过的副本会备份)。",
-    "kept": "已将 {{tool}} 的版本保存到库"
+    "kept": "已将 {{tool}} 的版本保存到库",
+    "actionLabel": "动作",
+    "pickAction": "要做什么?",
+    "actions": {
+      "notify": {
+        "title": "发送通知",
+        "desc": "显示 macOS 通知，可选播放声音"
+      },
+      "guard": {
+        "title": "阻止危险命令",
+        "desc": "在 rm -rf /、git push --force 等命令运行前阻止"
+      },
+      "format": {
+        "title": "格式化编辑的文件",
+        "desc": "对代理编辑的每个文件运行 Prettier 等格式化工具"
+      },
+      "log": {
+        "title": "记录日志",
+        "desc": "把时间、工具和文件夹追加到日志文件"
+      },
+      "ask": {
+        "title": "让 Claude 判断",
+        "desc": "用自然语言写规则，Claude 读取事件后做出判断"
+      },
+      "script": {
+        "title": "自己编写",
+        "desc": "编写直接接收工具原始输入的 shell 脚本"
+      }
+    },
+    "claudeOnly": "仅 Claude Code",
+    "advanced": "高级",
+    "back": "返回",
+    "opt": {
+      "title": "标题",
+      "message": "消息",
+      "sound": "播放声音",
+      "patterns": "要阻止的命令",
+      "patternsHint": "每行一个。包含其中任一项的命令会被阻止。",
+      "command": "格式化命令",
+      "commandHint": "运行时会在末尾加上编辑的文件路径。",
+      "path": "日志文件"
+    },
+    "instruction": "指令",
+    "instructionHint": "Claude Code 会读取此指令和事件，判断是否继续。",
+    "instructionExample": "如果测试还没通过，就继续工作。",
+    "notes": "备注",
+    "scriptStarter": "从模板脚本开始。创建后再编辑。",
+    "nameTaken": "已有同名钩子",
+    "runsIn": "运行于",
+    "unsupported": {
+      "wrongTiming": "{{tool}} 不能在此时机运行此动作",
+      "noEvent": "{{tool}} 没有此时机的事件",
+      "noFilePath": "{{tool}} 不会把编辑的文件路径传给钩子",
+      "claudeOnly": "{{tool}} 没有判断钩子 (仅 Claude Code)"
+    },
+    "pending": "尚未写入工具",
+    "pendingHint": "同步后此钩子会写入工具设置。",
+    "syncNow": "检查并同步",
+    "tabOverview": "概览",
+    "tabAdvanced": "高级",
+    "noTools": "正在使用的工具中没有能运行此钩子的。",
+    "show": "显示",
+    "hide": "收起",
+    "promptHook": "prompt 钩子",
+    "generated": "由 Illithid 根据选项生成。只读。",
+    "promptGenerated": "Illithid 写入 Claude Code 的提示",
+    "convert": "改为自己编写",
+    "convertTitle": "改为自己编写的脚本",
+    "convertBody": "{{tool}} 的脚本会成为此钩子的 run.sh，所有工具都运行它。选项将不再生效。",
+    "converted": "现在运行自己的脚本"
   }
 }

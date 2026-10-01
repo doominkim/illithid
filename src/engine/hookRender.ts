@@ -11,7 +11,8 @@
 import { join } from 'node:path'
 import { readConfig, toolInUse } from './config'
 import { HOOK_CATALOG, type HookTool } from './hookEvents'
-import { scriptForTool, type HookTrigger, type LibraryHook } from './hooks'
+import { hookTriggers, type HookTrigger, type LibraryHook } from './hooks'
+import { renderAskPrompt, toolScript } from './hookScripts'
 import { isEnabled, type Manifest } from './manifest'
 import { grokClaudeReading } from './targets/grokCompat'
 
@@ -60,13 +61,21 @@ export function grokReadsClaudeHooks(home: string): boolean {
 export interface ToolHook {
   hook: LibraryHook
   trigger: HookTrigger
-  /** Script file this tool runs */
+  /** command: run a script copy; prompt: a Claude Code prompt hook */
+  kind: 'command' | 'prompt'
+  /** command: script copy file name */
   file: string
+  /** command: script content; prompt: the prompt */
+  content: string
 }
 
+/** Whether a hook runs in a tool: the tool can run it and it is on in illithid.json */
+const runsIn = (h: LibraryHook, tool: HookTool, manifest: Manifest | undefined): boolean =>
+  !!hookTriggers(h.doc)[tool] && isEnabled(manifest, 'hooks', h.name, tool)
+
 /**
- * Hooks a tool gets, sorted by name: connected (a trigger), on in illithid.json, and — for Grok — not already reaching it
- * through Claude Code's settings. Retiring tools get none (offTools in the manifest)
+ * Hooks a tool gets, sorted by name: the tool can run them, they are on in illithid.json, and — for Grok — they don't already
+ * reach it through Claude Code's settings. Retiring tools get none (offTools in the manifest)
  */
 export function hooksForTool(
   home: string,
@@ -76,12 +85,15 @@ export function hooksForTool(
 ): ToolHook[] {
   const viaClaude = tool === 'grok' && grokReadsClaudeHooks(home) && toolInUse(home, 'claude')
   return hooks
-    .filter((h) => h.def.triggers[tool] && isEnabled(manifest, 'hooks', h.name, tool))
-    .filter(
-      (h) =>
-        !viaClaude || !(h.def.triggers.claude && isEnabled(manifest, 'hooks', h.name, 'claude'))
-    )
-    .map((h) => ({ hook: h, trigger: h.def.triggers[tool]!, file: scriptForTool(h.def, tool) }))
+    .filter((h) => runsIn(h, tool, manifest))
+    .filter((h) => !viaClaude || !runsIn(h, 'claude', manifest))
+    .map((h): ToolHook => {
+      const trigger = hookTriggers(h.doc)[tool]!
+      const script = toolScript(tool, h)
+      return script
+        ? { hook: h, trigger, kind: 'command', file: script.file, content: script.content }
+        : { hook: h, trigger, kind: 'prompt', file: '', content: renderAskPrompt(h.doc) }
+    })
     .sort((a, b) => a.hook.name.localeCompare(b.hook.name))
 }
 

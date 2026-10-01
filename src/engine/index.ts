@@ -509,17 +509,33 @@ export {
   readHook,
   hookNames,
   hooksDir,
-  validateHookDef,
+  validateHookDoc,
+  parseHookDoc,
+  renderHookDoc,
+  hookTriggers,
+  hookOptions,
   hookScriptFiles,
   scriptForTool,
   HOOKS_DIR,
   HOOK_FILE,
   SHARED_SCRIPT
 } from './hooks'
-export type { HookDef, HookTrigger, LibraryHook } from './hooks'
+export type { HookDoc, HookTrigger, HookToolSettings, HookOptionValue, LibraryHook } from './hooks'
+export {
+  HOOK_ACTIONS,
+  HOOK_ACTION_INFO,
+  hookSupport,
+  isHookAction,
+  actionMatcher,
+  DEFAULT_GUARD_PATTERNS
+} from './hookActions'
+export type { HookAction, HookActionInfo, HookSupport } from './hookActions'
+export { renderActionScript, renderAskPrompt, toolScript } from './hookScripts'
 export {
   createHook,
-  saveHookDef,
+  saveHookDoc,
+  convertHookToScript,
+  HOOK_SCRIPT_TEMPLATE,
   saveHookScript,
   createHookToolScript,
   dropHookToolScript,

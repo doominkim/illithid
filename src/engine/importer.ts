@@ -38,7 +38,7 @@ import {
   agentNormalizedText,
   deleteAgent,
   deleteHook,
-  saveHookDef,
+  saveHookDoc,
   writeNewHook,
   listAgents,
   readAgentDoc,
@@ -2760,8 +2760,8 @@ export function applyImport(
       } else if (cand.kind === 'hook') {
         const v = variant as unknown as HookImportVariant
         const r = applyHookCandidate(home, cand, v, !!sel.overwrite, {
-          createHookFiles: (name, def, script) => void writeNewHook(home, name, def, script),
-          saveDef: (name, def) => void saveHookDef(home, name, def),
+          createHookFiles: (name, doc, script) => void writeNewHook(home, name, doc, script),
+          saveDoc: (name, doc) => void saveHookDoc(home, name, doc),
           trashHook: (name) => deleteHook(home, name).trashPath
         })
         results.push({

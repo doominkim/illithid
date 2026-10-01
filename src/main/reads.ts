@@ -62,6 +62,8 @@ import {
   planHookSync,
   readHooks,
   grokReadsClaudeHooks,
+  hookSupport,
+  type HookSupport,
   type HookSyncItem
 } from '../engine'
 import type {
@@ -632,8 +634,11 @@ export function hooks(home: string, env: Env): HooksData {
   const view: HookView[] = list.map((h) => {
     const tools: Partial<Record<ToolId, HookToolState>> = {}
     const reasons: Partial<Record<ToolId, string>> = {}
+    const unsupported: Partial<Record<ToolId, HookSupport>> = {}
     for (const t of perTool) {
-      if (!h.def.triggers[t.tool] || t.unused) {
+      const support = hookSupport(h.doc.action, h.doc.when, t.tool)
+      if (support !== 'ok') unsupported[t.tool] = support
+      if (support !== 'ok' || t.unused) {
         tools[t.tool] = 'notApplicable'
         continue
       }
@@ -660,12 +665,12 @@ export function hooks(home: string, env: Env): HooksData {
     return {
       ...(Object.keys(edited).length ? { edited } : {}),
       name: h.name,
-      description: h.def.description,
-      timing: h.def.timing,
-      script: h.def.script,
-      toolScripts: h.def.toolScripts ?? {},
-      triggers: h.def.triggers,
+      description: h.doc.description,
+      when: h.doc.when,
+      action: h.doc.action,
+      options: h.doc.options,
       tools,
+      ...(Object.keys(unsupported).length ? { unsupported } : {}),
       ...(Object.keys(reasons).length ? { reasons } : {})
     }
   })
