@@ -24,13 +24,19 @@ import {
   LibraryError,
   NAME_RE,
   readMcpServer,
-  upsertMcpServer
+  saveHookDoc,
+  saveHookScript,
+  upsertMcpServer,
+  writeNewHook
 } from '../library'
 import { assertInsideLibrary } from '../libpath'
 import { MANIFEST_TOOLS, setToggle, type ManifestKind } from '../manifest'
 import type { SecretBackend } from '../secrets'
 import type { McpServer } from '../types'
 import { instructionBody, listInstructions, type MarketRuleItem } from './awesomeCopilot'
+import { HOOKS_REPO, type PreparedHookPack } from './awesomeHooks'
+import { HOOK_TOOLS } from '../hookEvents'
+import { readHook, SHARED_SCRIPT, type HookDoc } from '../hooks'
 import { dirSha, findSkillDir, listTree, rawFile, resolveSha, skillFilePlan } from './github'
 import { MarketError, type FetchFn } from './http'
 import {
@@ -55,7 +61,8 @@ import { SKILL_ID_RE } from './skillsSh'
 const MANIFEST_KIND: Record<MarketKind, ManifestKind> = {
   skill: 'skills',
   mcp: 'mcp',
-  rule: 'rules'
+  rule: 'rules',
+  hook: 'hooks'
 }
 
 /** Turn a new item off for tools not in use (missing key = on) */
@@ -352,6 +359,53 @@ export function commitRule(
   return { name: file }
 }
 
+// ---------------------------------------------------------------- hooks (awesome-copilot packs)
+
+/**
+ * Add a prepared pack: one script hook per installable entry, on for Copilot only (the scripts read Copilot's input), with the
+ * entry's timeout. update: replace the scripts and timeouts of hooks already there (their toggles stay); new entries are added.
+ * invalid when nothing in the pack can be installed; exists when a new hook's name is taken
+ */
+export function commitHookPack(
+  home: string,
+  prep: PreparedHookPack,
+  opts: { update?: boolean } = {}
+): { names: string[] } {
+  const usable = prep.hooks.filter((h) => !h.problem)
+  if (!usable.length) throw new MarketError('invalid', 'nothing in this pack can be installed')
+  const fresh = usable.filter((h) => !(opts.update && itemExists(home, 'hook', h.name)))
+  for (const h of fresh) assertFree(home, 'hook', h.name)
+  for (const h of usable) {
+    const doc: HookDoc = {
+      description: prep.pack.description,
+      when: h.when,
+      action: 'script',
+      options: { use: '' },
+      ...(h.timeout !== undefined ? { tools: { copilot: { timeout: h.timeout } } } : {}),
+      body: `From github/awesome-copilot hooks/${prep.pack.id} (Copilot ${h.event}).`
+    }
+    if (fresh.includes(h)) {
+      writeNewHook(home, h.name, doc, h.content)
+      for (const tool of HOOK_TOOLS)
+        if (tool !== 'copilot') setToggle(home, 'hooks', h.name, tool, false)
+    } else {
+      saveHookScript(home, h.name, SHARED_SCRIPT, h.content)
+      const cur = readHook(home, h.name).doc
+      saveHookDoc(home, h.name, { ...cur, tools: { ...cur.tools, ...doc.tools } })
+    }
+    recordOrigin(home, {
+      kind: 'hook',
+      name: h.name,
+      source: 'awesome-copilot',
+      id: prep.pack.id,
+      ref: prep.pack.treeSha,
+      choice: h.event,
+      installedAt: new Date().toISOString()
+    })
+  }
+  return { names: usable.map((h) => h.name) }
+}
+
 // ---------------------------------------------------------------- updates
 
 export interface MarketUpdate {
@@ -411,6 +465,14 @@ async function latestRef(
     return dirSha(await trees.get(repo)!, o.path ?? '') || undefined
   }
   if (o.kind === 'mcp') return (await serverDetail(fetchFn, o.id)).version
+  if (o.kind === 'hook') {
+    if (!trees.has(HOOKS_REPO))
+      trees.set(
+        HOOKS_REPO,
+        resolveSha(fetchFn, HOOKS_REPO).then((sha) => listTree(fetchFn, HOOKS_REPO, sha))
+      )
+    return dirSha(await trees.get(HOOKS_REPO)!, `hooks/${o.id}`) || undefined
+  }
   return (await rules()).find((r) => r.id === o.id)?.lastUpdated
 }
 

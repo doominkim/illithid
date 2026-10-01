@@ -10,7 +10,7 @@ import { atomicWrite } from '../write'
 
 export const MARKET_FILE = 'market.json'
 
-export type MarketKind = 'skill' | 'mcp' | 'rule'
+export type MarketKind = 'skill' | 'mcp' | 'rule' | 'hook'
 export type MarketSource = 'skills.sh' | 'mcp-registry' | 'awesome-copilot'
 
 export interface MarketOrigin {
@@ -18,13 +18,13 @@ export interface MarketOrigin {
   /** Library name (rules include .md) */
   name: string
   source: MarketSource
-  /** Source id: `owner/repo/skillId`, registry server name, or rule id */
+  /** Source id: `owner/repo/skillId`, registry server name, rule id, or hook pack id */
   id: string
-  /** Version marker: skill folder tree SHA, server version, or rule lastUpdated */
+  /** Version marker: skill folder tree SHA, server version, rule lastUpdated, or hook pack folder tree SHA */
   ref: string
   /** Skills only: folder in the repository ('' = root) */
   path?: string
-  /** MCP only: install option (`package:<i>` / `remote:<i>`) */
+  /** MCP: install option (`package:<i>` / `remote:<i>`). Hooks: the pack entry's Copilot event */
   choice?: string
   /** MCP package installs: registry type and identifier (OCI without tag), used to match across versions */
   pkg?: { type: string; id: string }
@@ -70,6 +70,7 @@ export function itemPath(home: string, kind: MarketKind, name: string): string {
   const root = libraryRoot(home)
   if (kind === 'skill') return join(root, 'skills', name)
   if (kind === 'rule') return join(root, 'rules', name)
+  if (kind === 'hook') return join(root, 'hooks', name)
   return join(root, 'mcps', `${name}.json`)
 }
 
@@ -77,7 +78,7 @@ export function itemExists(home: string, kind: MarketKind, name: string): boolea
   return existsSync(itemPath(home, kind, name))
 }
 
-const KINDS: readonly MarketKind[] = ['skill', 'mcp', 'rule']
+const KINDS: readonly MarketKind[] = ['skill', 'mcp', 'rule', 'hook']
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
 /** market.json can arrive in an imported zip: only well-formed entries are looked at */

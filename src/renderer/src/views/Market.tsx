@@ -39,7 +39,12 @@ import { runWrite } from '../lib/mutate'
 import type { Menu } from '../lib/nav'
 import { useNav } from '../lib/nav'
 
-const MENU: Record<MarketKind, Menu> = { skill: 'skills', mcp: 'mcp', rule: 'rules' }
+const MENU: Record<MarketKind, Menu> = {
+  skill: 'skills',
+  mcp: 'mcp',
+  rule: 'rules',
+  hook: 'hooks'
+}
 const RISK_COLOR: Record<string, string> = {
   safe: 'green',
   low: 'green',
