@@ -45,6 +45,13 @@ test('REQ-SETTINGS-PERSISTENCE-1 REQ-SETTINGS-PERSISTENCE-2 REQ-SETTINGS-PERSIST
   assert.deepEqual(mergeUiPrefs(undefined, { language: 'en' }), { language: 'en' })
 })
 
+test('REQ-LIST-USAGE-7 list sort per screen merges and validates like view modes', () => {
+  assert.deepEqual(mergeUiPrefs({ sorts: { skills: 'usage' } }, { sorts: { mcp: 'name' } }), { sorts: { skills: 'usage', mcp: 'name' } })
+  assert.deepEqual(validateConfig({ version: 1, ui: { sorts: { skills: 'usage', mcp: 'name' } } }), [])
+  for (const sorts of [[], 'usage', { skills: 'calls' }])
+    assert.ok(validateConfig({ version: 1, ui: { sorts } }).length > 0, JSON.stringify(sorts))
+})
+
 test('REQ-SETTINGS-PERSISTENCE-7 REQ-SETTINGS-PERSISTENCE-8 only a newer version (or an unknown running one) waits for the lock', () => {
   assert.equal(shouldWaitForLock('0.2.27', '0.2.26'), true)
   assert.equal(shouldWaitForLock('0.3.0', '0.2.30'), true)

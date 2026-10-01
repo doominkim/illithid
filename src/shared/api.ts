@@ -41,7 +41,7 @@ import type {
 } from '../engine'
 
 import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
-import type { ModelDetail, ModelKey, ModelSummary, UsageKind, UsageStats } from '../engine'
+import type { ModelDetail, ModelKey, ModelSummary, UsageKind, UsageStats, UsageSummary } from '../engine'
 import type {
   AuditPartner,
   MarketInstallChoice,
@@ -572,7 +572,7 @@ export interface MarketInstallOptions {
 }
 
 /** Skill / MCP usage from local session logs */
-export type { UsageKind, UsageStats } from '../engine'
+export type { UsageKind, UsageStats, UsageSummary } from '../engine'
 
 /** Model usage from local session logs */
 export type { Dist, ModelDetail, ModelKey, ModelSummary, SessionRef } from '../engine'
@@ -630,6 +630,8 @@ export interface Api {
   marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
   /** Skill or MCP call counts from local session logs, by model, tool and day. null = not indexed yet (an index run starts) */
   usage(kind: UsageKind, name: string): Promise<UsageStats | null>
+  /** Last 30 days for many skills or MCP servers at once (lists). null until the usage index exists */
+  usageSummary(kind: UsageKind, names: string[]): Promise<Record<string, UsageSummary> | null>
   /** Models used in the range with counts, tokens and request medians. null = not indexed yet (an index run starts) */
   models(range?: ModelRangeArg): Promise<ModelSummary[] | null>
   /** One model: daily trend, distributions, tools, skills, MCP, projects, sessions, Codex limits. null = not indexed yet */
@@ -857,6 +859,7 @@ export const CHANNELS = [
   'marketDetail',
   'marketInstall',
   'usage',
+  'usageSummary',
   'models',
   'modelDetail',
   'sessionModels',

@@ -546,7 +546,12 @@
     "others": "其他",
     "none": "本地会话记录中没有调用",
     "indexing": "正在读取会话记录…",
-    "since": "自 {{day}} 起"
+    "since": "自 {{day}} 起",
+    "count": "{{n}} 次",
+    "recentTitle": "最近 30 天调用 {{n}} 次",
+    "sort": "排序",
+    "sortName": "按名称",
+    "sortUsage": "按使用量"
   },
   "combo": {
     "title": "同时使用 Claude Code？",

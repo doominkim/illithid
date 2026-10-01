@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Box, Button, Code, Stack, Tabs } from '@mantine/core'
+import { Badge, Box, Button, Code, Group, Stack, Tabs } from '@mantine/core'
 import { Download, Globe, Plus, Terminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
@@ -26,6 +26,9 @@ import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
+import { SortToggle, UsageSpark } from '../components/UsageSpark'
+import { sortByUsage, useListSort } from '../lib/listSort'
+import { useUsageSummary } from '../lib/useUsageSummary'
 
 const NEW = '__new__'
 
@@ -44,6 +47,8 @@ function Mcp(): React.JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
+  const [sort, setSort] = useListSort('mcp')
+  const usage = useUsageSummary('mcp', data?.servers.map((s) => s.name) ?? [])
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -92,7 +97,11 @@ function Mcp(): React.JSX.Element {
   }
 
   const q = query.trim().toLowerCase()
-  const servers = data.servers.filter((s) => !q || includesCI(s.name, q) || includesCI(s.url, q) || includesCI(s.command, q))
+  const servers = sortByUsage(
+    data.servers.filter((s) => !q || includesCI(s.name, q) || includesCI(s.url, q) || includesCI(s.command, q)),
+    sort,
+    usage
+  )
   const current = data.servers.find((s) => s.name === selected)
   const endpoint = (s: McpServerView): string => s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ')
   const none = t('common.none')
@@ -124,7 +133,15 @@ function Mcp(): React.JSX.Element {
           <ErrorAlert message={data.error} />
         </Box>
       )}
-      <Toolbar left={<SearchInput value={query} onChange={setQuery} placeholder={t('mcp.search')} />} right={<ViewToggle value={view} onChange={setView} />} />
+      <Toolbar
+        left={<SearchInput value={query} onChange={setQuery} placeholder={t('mcp.search')} />}
+        right={
+          <>
+            <SortToggle value={sort} onChange={setSort} />
+            <ViewToggle value={view} onChange={setView} />
+          </>
+        }
+      />
       {data.servers.length === 0 ? (
         <EmptyLibrary onImport={() => setImportOpen(true)} />
       ) : servers.length === 0 ? (
@@ -143,6 +160,7 @@ function Mcp(): React.JSX.Element {
                 switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))}
                 switchIndeterminate={cardTools.some((tool) => enabled(s.name, tool))}
                 onSwitch={(v) => void toggleAll(s, v)}
+                footerLeft={<UsageSpark summary={usage?.[s.name]} />}
                 footerRight={<ToolPills pills={p} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
                 selected={s.name === selected}
                 onClick={() => setSelected(s.name)}
@@ -159,7 +177,12 @@ function Mcp(): React.JSX.Element {
               title={s.name}
               tags={transportTag(s)}
               subtitle={endpoint(s) || none}
-              right={<ToolPills pills={pillsOf(s)} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
+              right={
+                <Group gap="md" wrap="nowrap">
+                  <UsageSpark summary={usage?.[s.name]} />
+                  <ToolPills pills={pillsOf(s)} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />
+                </Group>
+              }
               active={s.name === selected}
               onClick={() => setSelected(s.name)}
             />

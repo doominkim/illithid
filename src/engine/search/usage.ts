@@ -215,26 +215,80 @@ export function mcpKey(name: string): string {
 }
 
 /**
+ * Rows that belong to one skill or MCP server. usageOf filters in SQL and usageSummaries in code; both live here so the
+ * list and the detail always count the same calls. SQLite LIKE is case-insensitive for ASCII, and MCP names are ASCII
+ */
+function usageFilter(kind: UsageKind, name: string): { sql: string; args: string[]; test: (r: { kind: string; name: string }) => boolean } {
+  if (kind === 'skill') return { sql: `kind = 'skill' and name = ?`, args: [name], test: (r) => r.kind === 'skill' && r.name === name }
+  const key = mcpKey(name)
+  const prefixes = [`${name}_`, `${key}_`].map((p) => p.toLowerCase())
+  return {
+    sql: `((kind = 'mcp' and name in (?, ?)) or (kind = 'mcpRaw' and (name like ? escape '\\' or name like ? escape '\\')))`,
+    args: [name, key, `${escLike(name)}\\_%`, `${escLike(key)}\\_%`],
+    test: (r) =>
+      (r.kind === 'mcp' && (r.name === name || r.name === key)) ||
+      (r.kind === 'mcpRaw' && prefixes.some((p) => r.name.toLowerCase().startsWith(p)))
+  }
+}
+
+/** The last `days` local calendar days, oldest first (not now − i·24h: a DST change would repeat or skip a day) */
+function dailyKeysOf(days: number, now: number): string[] {
+  const today = new Date(now)
+  const keys: string[] = []
+  for (let i = days - 1; i >= 0; i--) keys.push(dayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i, 12).toISOString(), undefined))
+  return keys
+}
+
+export interface UsageSummary {
+  /** Calls in the last `days` days */
+  recent: number
+  /** One count per day for the same days, oldest first */
+  daily: number[]
+}
+
+/**
+ * Recent usage of many skills or MCP servers in one query, for the lists. Same counts as usageOf's recent/daily.
+ * null while there is nothing to read yet (no index, another schema)
+ */
+export function usageSummaries(home: string, kind: UsageKind, names: string[], opts: { days?: number; now?: number; dbPath?: string } = {}): Record<string, UsageSummary> | null {
+  const keys = dailyKeysOf(opts.days ?? 30, opts.now ?? Date.now())
+  const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
+  if (!db) return null
+  try {
+    if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return null
+    const kinds = kind === 'skill' ? ['skill'] : ['mcp', 'mcpRaw']
+    const rows = db
+      .prepare(`select kind, name, day, sum(n) as n from usage where kind in (${kinds.map(() => '?').join(', ')}) and day >= ? and day <= ? group by kind, name, day`)
+      .all(...kinds, keys[0], keys[keys.length - 1]) as { kind: string; name: string; day: string; n: number }[]
+    const slot = new Map(keys.map((d, i) => [d, i]))
+    const out: Record<string, UsageSummary> = {}
+    for (const name of names) {
+      const { test } = usageFilter(kind, name)
+      const daily = keys.map(() => 0)
+      for (const r of rows) {
+        const i = slot.get(r.day)
+        if (i !== undefined && test(r)) daily[i] += Number(r.n)
+      }
+      out[name] = { recent: daily.reduce((a, n) => a + n, 0), daily }
+    }
+    return out
+  } finally {
+    db.close()
+  }
+}
+
+/**
  * Usage of one skill or MCP server. null while there is nothing to read yet (no index, another schema, usage not built) —
  * the caller should start an index run. Never creates or migrates the index
  */
 export function usageOf(home: string, kind: UsageKind, name: string, opts: { days?: number; now?: number; dbPath?: string } = {}): UsageStats | null {
   const days = opts.days ?? 30
-  const now = opts.now ?? Date.now()
-  // Calendar days (not now − i·24h: a DST change would repeat or skip a day)
-  const today = new Date(now)
-  const dailyKeys: string[] = []
-  for (let i = days - 1; i >= 0; i--) dailyKeys.push(dayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i, 12).toISOString(), undefined))
+  const dailyKeys = dailyKeysOf(days, opts.now ?? Date.now())
   const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
   if (!db) return null
   try {
     if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return null
-    const key = mcpKey(name)
-    const where =
-      kind === 'skill'
-        ? `kind = 'skill' and name = ?`
-        : `((kind = 'mcp' and name in (?, ?)) or (kind = 'mcpRaw' and (name like ? escape '\\' or name like ? escape '\\')))`
-    const args = kind === 'skill' ? [name] : [name, key, `${escLike(name)}\\_%`, `${escLike(key)}\\_%`]
+    const { sql: where, args } = usageFilter(kind, name)
     const rows = db.prepare(`select tool, model, day, sum(n) as n from usage where ${where} group by tool, model, day`).all(...args) as {
       tool: string
       model: string

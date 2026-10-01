@@ -308,6 +308,11 @@ export function registerIpc(): void {
       if (r === null) runSearchIndex()
       return r
     },
+    usageSummary: async (kind, names) => {
+      const r = await inWorker('usageSummary', home, [kind, names])
+      if (r === null) runSearchIndex()
+      return r
+    },
     models: async (range) => {
       const r = await inWorker<ModelSummary[] | null>('models', home, [range ?? {}])
       if (r === null) runSearchIndex()

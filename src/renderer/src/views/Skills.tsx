@@ -28,6 +28,9 @@ import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, SKILL
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
+import { SortToggle, UsageSpark } from '../components/UsageSpark'
+import { sortByUsage, useListSort } from '../lib/listSort'
+import { useUsageSummary } from '../lib/useUsageSummary'
 
 
 interface Row {
@@ -57,6 +60,8 @@ function Skills(): React.JSX.Element {
   /** Keep the detail open right after a rename until the list is reloaded */
   const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null)
   useNavSelect(setSelected)
+  const [sort, setSort] = useListSort('skills')
+  const usage = useUsageSummary('skill', data?.names ?? [])
 
   const enabled = (name: string, tool: ToolId): boolean => data?.toggles[name]?.[tool] !== false
 
@@ -94,7 +99,11 @@ function Skills(): React.JSX.Element {
         {t('nav.market')}
       </Badge>
     ) : null
-  const visible = rows.filter((r) => !q || includesCI(r.name, q) || includesCI(r.description, q))
+  const visible = sortByUsage(
+    rows.filter((r) => !q || includesCI(r.name, q) || includesCI(r.description, q)),
+    sort,
+    usage
+  )
   const prev = renamed && renamed.to === selected ? rows.find((r) => r.name === renamed.from) : undefined
   const current = rows.find((r) => r.name === selected) ?? (prev && { ...prev, name: renamed!.to })
 
@@ -160,6 +169,7 @@ function Skills(): React.JSX.Element {
             <Text size="sm" c="dimmed">
               {t('common.shown', { shown: visible.length, total: rows.length })}
             </Text>
+            <SortToggle value={sort} onChange={setSort} />
             <ViewToggle value={view} onChange={setView} />
           </>
         }
@@ -181,6 +191,7 @@ function Skills(): React.JSX.Element {
               switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
               switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
+              footerLeft={<UsageSpark summary={usage?.[r.name]} />}
               footerRight={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
               selected={r.name === selected}
               onClick={() => setSelected(r.name)}
@@ -196,7 +207,12 @@ function Skills(): React.JSX.Element {
               title={r.name}
               tags={marketTag(r.name)}
               subtitle={r.description}
-              right={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
+              right={
+                <Group gap="md" wrap="nowrap">
+                  <UsageSpark summary={usage?.[r.name]} />
+                  <ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />
+                </Group>
+              }
               active={r.name === selected}
               onClick={() => setSelected(r.name)}
             />

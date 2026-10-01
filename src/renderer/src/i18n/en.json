@@ -546,7 +546,12 @@
     "others": "Others",
     "none": "No calls in local session logs",
     "indexing": "Reading session logs…",
-    "since": "Since {{day}}"
+    "since": "Since {{day}}",
+    "count": "{{n}} calls",
+    "recentTitle": "{{n}} calls in the last 30 days",
+    "sort": "Sort",
+    "sortName": "Name",
+    "sortUsage": "Most used"
   },
   "combo": {
     "title": "Also use Claude Code?",

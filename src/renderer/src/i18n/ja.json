@@ -546,7 +546,12 @@
     "others": "その他",
     "none": "ローカルのセッション記録に呼び出しなし",
     "indexing": "セッション記録を読み込み中…",
-    "since": "{{day}} から"
+    "since": "{{day}} から",
+    "count": "{{n}}回",
+    "recentTitle": "直近30日の呼び出し {{n}}回",
+    "sort": "並び替え",
+    "sortName": "名前順",
+    "sortUsage": "使用量順"
   },
   "combo": {
     "title": "Claude Code も一緒に使いますか？",

@@ -7,12 +7,15 @@ export type UiLanguage = (typeof UI_LANGUAGES)[number]
 export const UI_COLOR_SCHEMES = ['light', 'dark', 'auto'] as const
 export type UiColorScheme = (typeof UI_COLOR_SCHEMES)[number]
 export type UiViewMode = 'grid' | 'list'
+export type UiListSort = 'name' | 'usage'
 
 export interface UiPrefs {
   language?: UiLanguage
   colorScheme?: UiColorScheme
   /** Grid or list per screen key (skills, mcp, ...) */
   views?: Record<string, UiViewMode>
+  /** List order per screen key (skills, mcp) */
+  sorts?: Record<string, UiListSort>
 }
 
 /** Patch for uiPrefsSet: null removes a key, views merge per screen */
@@ -20,6 +23,7 @@ export interface UiPrefsPatch {
   language?: UiLanguage | null
   colorScheme?: UiColorScheme | null
   views?: Record<string, UiViewMode>
+  sorts?: Record<string, UiListSort>
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -33,6 +37,8 @@ export function uiPrefsErrors(v: unknown): string[] {
     errs.push(`ui.colorScheme must be ${UI_COLOR_SCHEMES.join(' | ')}`)
   if (v.views !== undefined && (!isObj(v.views) || !Object.values(v.views).every((x) => x === 'grid' || x === 'list')))
     errs.push('ui.views must map screens to grid | list')
+  if (v.sorts !== undefined && (!isObj(v.sorts) || !Object.values(v.sorts).every((x) => x === 'name' || x === 'usage')))
+    errs.push('ui.sorts must map screens to name | usage')
   return errs
 }
 
@@ -47,5 +53,6 @@ export function mergeUiPrefs(cur: UiPrefs | undefined, patch: UiPrefsPatch): UiP
     else next.colorScheme = patch.colorScheme
   }
   if (patch.views) next.views = { ...cur?.views, ...patch.views }
+  if (patch.sorts) next.sorts = { ...cur?.sorts, ...patch.sorts }
   return next
 }

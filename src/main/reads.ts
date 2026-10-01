@@ -49,6 +49,7 @@ import {
   type ToolId,
   marketLiveOrigins,
   usageOf,
+  usageSummaries,
   modelDetail,
   modelList,
   sessionModels,
@@ -374,6 +375,7 @@ export type Op =
   | 'searchSessions'
   | 'searchStatus'
   | 'usage'
+  | 'usageSummary'
   | 'models'
   | 'modelDetail'
   | 'sessionModels'
@@ -442,6 +444,11 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
       const [kind, name] = args
       if ((kind !== 'skill' && kind !== 'mcp') || typeof name !== 'string' || !name) return null
       return usageOf(home, kind, name)
+    }
+    case 'usageSummary': {
+      const [kind, names] = args
+      if ((kind !== 'skill' && kind !== 'mcp') || !Array.isArray(names)) return null
+      return usageSummaries(home, kind, names.filter((n): n is string => typeof n === 'string' && !!n).slice(0, 2000))
     }
     case 'searchDocs': {
       const [q, filters] = args as [unknown, DocSearchFilters | undefined]
