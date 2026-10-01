@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { skills } from '../src/main/reads'
+import { mcp, skills } from '../src/main/reads'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
 function homeUsing(tools: string[]): string {
@@ -25,4 +25,22 @@ test('REQ-SKILL-STATUS-2 with OpenCode in use the state comes from its sync plan
   const home = homeUsing(['claude', 'codex', 'opencode'])
   const data = skills(home, baseEnv(home))
   for (const name of data.names) assert.ok(['synced', 'needsSync'].includes(data.state[name]?.opencode ?? ''), `${name}: ${data.state[name]?.opencode}`)
+})
+
+test('REQ-TOOL-PROBLEM-REASONS-2 error cells carry their reason (OpenCode skill config, Claude MCP config)', () => {
+  const home = homeUsing(['claude', 'codex', 'opencode'])
+  writeFileSync(join(home, '.config/opencode/opencode.json'), '{ "skills": ')
+  writeFileSync(join(home, '.claude.json'), '{ not json')
+  const s = skills(home, baseEnv(home))
+  for (const name of s.names) {
+    assert.equal(s.state[name]?.opencode, 'error', name)
+    assert.ok(s.reasons?.[name]?.opencode, `${name} has an OpenCode reason`)
+  }
+  const m = mcp(home, baseEnv(home))
+  assert.ok(m.servers.length > 0)
+  for (const server of m.servers) {
+    assert.equal(server.tools.claude, 'error', server.name)
+    assert.ok(server.reasons?.claude, `${server.name} has a Claude reason`)
+    assert.equal(server.reasons?.codex, undefined, `${server.name} codex is fine`)
+  }
 })

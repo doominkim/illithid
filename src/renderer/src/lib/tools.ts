@@ -63,13 +63,6 @@ export function pillFromCellState(state: string | undefined): PillState {
 }
 
 /** Card status dot among enabled tools: error > needs sync > on > off */
-export function dotOfPills(p: PillMap): 'on' | 'off' | 'warn' | 'error' {
-  const v = Object.values(p).filter((x) => x && !x.na && x.on)
-  if (v.some((x) => x?.problem)) return 'error'
-  if (v.some((x) => x?.pending)) return 'warn'
-  return v.length ? 'on' : 'off'
-}
-
 /**
  * Grok CLI also reads Claude Code's skills, MCP servers and agents: an item off for Grok but on for Claude still reaches Grok
  * while both are in use. Shown as an off pill marked "via Claude" with a hint. `reads` is false when Grok's Claude reading is

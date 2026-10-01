@@ -22,10 +22,11 @@ import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
-import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
+import { grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
+import { problemText } from '../lib/problemReason'
 import { SortToggle, UsageSpark } from '../components/UsageSpark'
 import { sortByUsage, useListSort } from '../lib/listSort'
 import { useUsageSummary } from '../lib/useUsageSummary'
@@ -66,7 +67,7 @@ function Mcp(): React.JSX.Element {
               ? { on: false, pending: st === 'needsSync', via: true, hint: t('combo.readsClaude') }
               : { on: false, pending: st === 'needsSync' }
           ]
-        return [tool, { ...pillFromCellState(st), on: true, na: false }]
+        return [tool, { ...pillFromCellState(st), on: true, na: false, ...(st === 'error' ? { hint: problemText(t, s.reasons?.[tool]) } : {}) }]
       })
     ) as PillMap
 
@@ -156,7 +157,6 @@ function Mcp(): React.JSX.Element {
                 name={s.name}
                 badges={transportTag(s)}
                 description={endpoint(s) || none}
-                dot={dotOfPills(p)}
                 switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))}
                 switchIndeterminate={cardTools.some((tool) => enabled(s.name, tool))}
                 onSwitch={(v) => void toggleAll(s, v)}

@@ -218,7 +218,26 @@
     "notInitialized": "Run {{tool}} once, then apply again",
     "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written",
     "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written",
-    "jsoncUnsupported": "opencode.jsonc has comments — {{tool}} settings are not written until they are removed"
+    "jsoncUnsupported": "opencode.jsonc has comments — {{tool}} settings are not written until they are removed",
+    "why": {
+      "lastSyncFailed": "Last sync failed: {{reason}}",
+      "userOwned": "A file of yours with the same name is there, so it was left alone",
+      "invalidName": "The name does not follow the naming rule",
+      "sourceUnreadable": "The library copy could not be read",
+      "notRegularFile": "The target is not a regular file",
+      "notDirectory": "The target is not a folder",
+      "reservedName": "The name is reserved",
+      "hashMismatch": "The file changed after Illithid last wrote it",
+      "changedSinceCheck": "The file changed after the preview",
+      "stateError": "The sync state file could not be read",
+      "diverged": "The app copy and the original both changed",
+      "userEdited": "You edited the file Illithid wrote",
+      "configUnreadable": "The tool's config file could not be read",
+      "noPlan": "No sync plan could be made",
+      "failed": "Failed",
+      "refused": "Refused",
+      "unknown": "Unknown error"
+    }
   },
   "app": {
     "name": "Illithid"

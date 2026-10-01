@@ -218,7 +218,26 @@
     "notInitialized": "{{tool}} を一度起動してから再度反映してください",
     "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "grokHomeOverride": "GROK_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
-    "jsoncUnsupported": "opencode.jsonc にコメントがあるため {{tool}} の設定は書き込みません — コメントを削除すると反映されます"
+    "jsoncUnsupported": "opencode.jsonc にコメントがあるため {{tool}} の設定は書き込みません — コメントを削除すると反映されます",
+    "why": {
+      "lastSyncFailed": "前回の同期に失敗: {{reason}}",
+      "userOwned": "同じ名前のユーザーファイルがあるためそのままにした",
+      "invalidName": "名前が命名規則に合っていない",
+      "sourceUnreadable": "ライブラリの元ファイルを読めない",
+      "notRegularFile": "対象が通常のファイルではない",
+      "notDirectory": "対象がフォルダではない",
+      "reservedName": "予約された名前のため使えない",
+      "hashMismatch": "アプリが最後に書き込んだ後にファイルが変更された",
+      "changedSinceCheck": "プレビューの後にファイルが変更された",
+      "stateError": "同期状態ファイルを読めない",
+      "diverged": "アプリのコピーと元の両方が変更された",
+      "userEdited": "アプリが書いたファイルが直接編集された",
+      "configUnreadable": "ツールの設定ファイルを読めない",
+      "noPlan": "同期計画を作れない",
+      "failed": "失敗",
+      "refused": "拒否",
+      "unknown": "不明なエラー"
+    }
   },
   "app": {
     "name": "Illithid"

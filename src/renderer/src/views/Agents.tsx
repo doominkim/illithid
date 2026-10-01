@@ -37,7 +37,8 @@ import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { useToolsInUse } from '../lib/config'
-import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, TOOL_NAME, TOOLS } from '../lib/tools'
+import { grokReadsFromClaude, pillFromCellState, type PillMap, TOOL_NAME, TOOLS } from '../lib/tools'
+import { lastSyncFailedText, problemText } from '../lib/problemReason'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
@@ -91,9 +92,10 @@ function Agents(): React.JSX.Element {
                 ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
-          if (failedIn('agent', name, tool)) return [tool, { on: true, problem: true }]
+          const failure = failedIn('agent', name, tool)
+          if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
-          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true }]
+          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true, ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {}) }]
         })
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
@@ -197,7 +199,6 @@ function Agents(): React.JSX.Element {
               key={r.name}
               name={r.name}
               description={r.description}
-              dot={dotOfPills(r.pills)}
               switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
               switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}

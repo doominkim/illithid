@@ -1,33 +1,8 @@
 import { Box, Checkbox, Group, Text } from '@mantine/core'
 
-export type Dot = 'on' | 'off' | 'warn' | 'error'
-
-const DOT_COLOR: Record<Dot, string> = {
-  on: 'var(--ac-accent)',
-  off: 'var(--ac-border)',
-  warn: 'var(--ac-warning)',
-  error: 'var(--ac-danger)'
-}
-
-export function StatusDot({ state }: { state: Dot }): React.JSX.Element {
-  return (
-    <span
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: DOT_COLOR[state],
-        display: 'inline-block',
-        flexShrink: 0
-      }}
-    />
-  )
-}
-
 interface Props {
   name: string
   description?: string
-  dot?: Dot
   /** Top-right bulk toggle (all tools). Indeterminate if only some are on. Display-only disabled without onSwitch */
   switchChecked?: boolean
   switchIndeterminate?: boolean
@@ -43,11 +18,10 @@ interface Props {
   testId?: string
 }
 
-/** Library card: top (dot, name, switch) / one-line description / divider / footer */
+/** Library card: top (name, switch) / one-line description / divider / footer */
 export function ItemCard({
   name,
   description,
-  dot = 'off',
   switchChecked,
   switchIndeterminate,
   onSwitch,
@@ -92,7 +66,6 @@ export function ItemCard({
       <Box p="md" pb="sm" style={{ flex: 1 }}>
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group gap={8} wrap="nowrap" style={{ minWidth: 0 }}>
-            <StatusDot state={dot} />
             <Text fw={600} size="lg" truncate="end" style={{ minWidth: 0 }}>
               {name}
             </Text>

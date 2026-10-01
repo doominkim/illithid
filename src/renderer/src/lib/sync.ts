@@ -30,17 +30,20 @@ export function useSync(): SyncCtx {
   return useContext(SyncContext)
 }
 
-/** Items failed or refused in the last sync, queried by (kind, name, tool). Used for the red dot on cards */
-export function useSyncFailures(): (kind: 'rule' | 'skill' | 'agent', name: string, tool: ToolId) => boolean {
+/**
+ * Items failed or refused in the last sync, queried by (kind, name, tool): the reason (code or message), or null when the item
+ * did not fail. Shown in the tool pill's tooltip
+ */
+export function useSyncFailures(): (kind: 'rule' | 'skill' | 'agent', name: string, tool: ToolId) => string | null {
   const { status } = useSync()
   return useMemo(() => {
-    const bad = new Set<string>()
+    const bad = new Map<string, string>()
     const failed = (x: { status: string; reason?: string }): boolean =>
       x.status === 'failed' || (x.status === 'refused' && x.reason !== 'changedSinceCheck')
-    for (const x of status?.rules ?? []) if (failed(x)) bad.add(`rule:${x.tool ?? 'claude'}:${x.name}`)
-    for (const x of status?.skills ?? []) if (failed(x)) bad.add(`skill:${x.tool}:${x.name}`)
-    for (const x of status?.agents ?? []) if (failed(x)) bad.add(`agent:${x.tool}:${x.name}`)
-    return (kind: 'rule' | 'skill' | 'agent', name: string, tool: ToolId): boolean =>
-      bad.has(`${kind}:${tool}:${name}`)
+    for (const x of status?.rules ?? []) if (failed(x)) bad.set(`rule:${x.tool ?? 'claude'}:${x.name}`, x.reason || x.status)
+    for (const x of status?.skills ?? []) if (failed(x)) bad.set(`skill:${x.tool}:${x.name}`, x.reason || x.status)
+    for (const x of status?.agents ?? []) if (failed(x)) bad.set(`agent:${x.tool}:${x.name}`, x.reason || x.status)
+    return (kind: 'rule' | 'skill' | 'agent', name: string, tool: ToolId): string | null =>
+      bad.get(`${kind}:${tool}:${name}`) ?? null
   }, [status])
 }

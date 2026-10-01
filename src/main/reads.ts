@@ -90,6 +90,13 @@ export function rules(home: string): RulesData {
 }
 
 const SEVERITY: SyncState[] = ['error', 'needsSync', 'skipped', 'synced']
+
+/** Why a (name, tool) cell is in error: a plan reason code or an error message. The first one recorded wins */
+type Reasons = Record<string, Partial<Record<ToolId, string>>>
+function noteReason(reasons: Reasons, name: string, tool: ToolId, why: string | undefined): void {
+  const cur = (reasons[name] ??= {})
+  cur[tool] ??= why || 'unknown'
+}
 const worse = (a: SyncState | undefined, b: SyncState): SyncState =>
   a && SEVERITY.indexOf(a) < SEVERITY.indexOf(b) ? a : b
 
@@ -106,18 +113,19 @@ function skillItemState(i: SkillSyncItem): SyncState {
 }
 
 /** OpenCode puts a single library skills path into opencode.json -> every skill has the same status */
-function opencodeSkillsState(home: string, env: Env): SyncState {
+function opencodeSkillsState(home: string, env: Env): { state: SyncState; error?: string } {
   try {
     const c = plan(home, env, ['opencodeSkills'])[0]
-    if (!c || c.error) return 'error'
-    return c.changed ? 'needsSync' : 'synced'
-  } catch {
-    return 'error'
+    if (!c) return { state: 'error', error: 'noPlan' }
+    if (c.error) return { state: 'error', error: c.error }
+    return { state: c.changed ? 'needsSync' : 'synced' }
+  } catch (e) {
+    return { state: 'error', error: (e as Error).message }
   }
 }
 
 /** Library skills disabled by the tool's own settings (skillOverrides etc.) -> needsSync. On a target error, the whole tool is error */
-function markSkillOverrides(home: string, env: Env, state: SkillsData['state']): void {
+function markSkillOverrides(home: string, env: Env, state: SkillsData['state'], reasons: Reasons): void {
   const ids = Object.values(SKILL_OVERRIDE_TARGET_OF)
   let changes: FileChange[]
   let sources: ReturnType<typeof readSources>
@@ -138,8 +146,10 @@ function markSkillOverrides(home: string, env: Env, state: SkillsData['state']):
       hits = []
     }
     for (const [name, cur] of Object.entries(state)) {
-      if (c.error) cur[tool] = worse(cur[tool], 'error')
-      else if (hits.includes(name)) cur[tool] = worse(cur[tool], 'needsSync')
+      if (c.error) {
+        cur[tool] = worse(cur[tool], 'error')
+        noteReason(reasons, name, tool, c.error)
+      } else if (hits.includes(name)) cur[tool] = worse(cur[tool], 'needsSync')
     }
   }
 }
@@ -157,17 +167,22 @@ export function skills(home: string, env: Env): SkillsData {
   const names = canonicalSkills(home)
   // A tool not in use has no sync plan at all; like the other tools it gets no state rather than an error
   const oc = toolsInUse(home).includes('opencode') ? opencodeSkillsState(home, env) : undefined
-  const state: SkillsData['state'] = Object.fromEntries(names.map((n) => [n, oc ? { opencode: oc } : {}]))
+  const state: SkillsData['state'] = Object.fromEntries(names.map((n) => [n, oc ? { opencode: oc.state } : {}]))
+  const reasons: Reasons = {}
+  if (oc?.error) for (const n of names) noteReason(reasons, n, 'opencode', oc.error)
   let syncError: string | undefined
   try {
     for (const i of planSkillSync(home, env)) {
       const cur = state[i.name]
-      if (cur) cur[i.tool] = worse(cur[i.tool], skillItemState(i))
+      if (!cur) continue
+      const s = skillItemState(i)
+      cur[i.tool] = worse(cur[i.tool], s)
+      if (s === 'error') noteReason(reasons, i.name, i.tool, i.reason)
     }
   } catch (e) {
     syncError = (e as Error).message
   }
-  markSkillOverrides(home, env, state)
+  markSkillOverrides(home, env, state, reasons)
   let geminiOff: string[] = []
   try {
     if (toolsInUse(home).includes('gemini')) geminiOff = geminiDisabledSkillsOf(home, readSources(home))
@@ -178,6 +193,7 @@ export function skills(home: string, env: Env): SkillsData {
     dir: tilde(home, canonicalPaths(home).skills),
     names,
     state,
+    ...(Object.keys(reasons).length ? { reasons } : {}),
     ...(syncError ? { syncError } : {}),
     toggles: toggles(home, 'skills'),
     descriptions: skillDescriptions(home, names),
@@ -211,10 +227,14 @@ export function agents(home: string, env: Env): AgentsData {
       // No description — the sync plan surfaces it as sourceUnreadable
     }
   }
+  const reasons: Reasons = {}
   try {
     for (const i of planAgentSync(home, env)) {
       const cur = state[i.name]
-      if (cur) cur[i.tool] = worse(cur[i.tool], agentItemState(i))
+      if (!cur) continue
+      const s = agentItemState(i)
+      cur[i.tool] = worse(cur[i.tool], s)
+      if (s === 'error') noteReason(reasons, i.name, i.tool, i.reason)
     }
   } catch (e) {
     syncError = (e as Error).message
@@ -223,6 +243,7 @@ export function agents(home: string, env: Env): AgentsData {
     dir: tilde(home, libraryPaths(home).agentsDir),
     names,
     state,
+    ...(Object.keys(reasons).length ? { reasons } : {}),
     ...(syncError ? { syncError } : {}),
     toggles: toggles(home, 'agents'),
     descriptions
@@ -307,6 +328,8 @@ export function mcp(home: string, env: Env): McpData {
       // No plan for a tool that isn't in use (plan() leaves it out): not applicable, not an error
       unused: !c,
       broken: !!c && (!!c.error || before === null || after === null),
+      // Why the tool's config can't be used: the generator's message, else it doesn't parse
+      brokenWhy: c?.error ?? 'configUnreadable',
       before,
       after,
       serverErrors: c?.serverErrors ?? {}
@@ -323,6 +346,16 @@ export function mcp(home: string, env: Env): McpData {
     return JSON.stringify(a) === JSON.stringify(b) ? 'synced' : 'needsSync'
   }
 
+  const mcpReasons = (tools: typeof perTool, name: string): Pick<McpServerView, 'reasons'> => {
+    const reasons: Partial<Record<ToolId, string>> = {}
+    for (const t of tools) {
+      if (t.unused) continue
+      if (t.broken) reasons[t.tool] = t.brokenWhy
+      else if (t.serverErrors[name]) reasons[t.tool] = t.serverErrors[name]
+    }
+    return Object.keys(reasons).length ? { reasons } : {}
+  }
+
   const servers: McpServerView[] = source.map(([name, s]) => {
     const url = typeof s.url === 'string' ? (safeUrl(s.url) ?? '(not a URL)') : undefined
     return {
@@ -335,7 +368,8 @@ export function mcp(home: string, env: Env): McpData {
       envKeys: keysOf(s.env),
       ...(typeof s.bearerEnv === 'string' ? { bearerEnv: s.bearerEnv } : {}),
       ...(typeof s.bearerToken === 'string' ? { bearerToken: true } : {}),
-      tools: Object.fromEntries(perTool.map((t) => [t.tool, stateOf(t, name)]))
+      tools: Object.fromEntries(perTool.map((t) => [t.tool, stateOf(t, name)])),
+      ...mcpReasons(perTool, name)
     }
   })
   return {

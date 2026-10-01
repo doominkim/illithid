@@ -172,6 +172,8 @@ export interface SkillsData {
   names: string[]
   /** Per-skill tool sync state */
   state: Record<string, Partial<Record<ToolId, SyncState>>>
+  /** Why a cell is in error: a plan reason code (invalidName, sourceUnreadable, …) or an error message */
+  reasons?: Record<string, Partial<Record<ToolId, string>>>
   syncError?: string
   toggles: Record<string, ToolToggles>
   /** SKILL.md frontmatter description */
@@ -191,6 +193,8 @@ export interface AgentsData {
   names: string[]
   /** Per-agent tool sync state */
   state: Record<string, Partial<Record<ToolId, SyncState>>>
+  /** Why a cell is in error: a plan reason code or an error message */
+  reasons?: Record<string, Partial<Record<ToolId, string>>>
   syncError?: string
   toggles: Record<string, ToolToggles>
   descriptions: Record<string, string>
@@ -220,6 +224,8 @@ export interface McpServerView {
   /** Bearer token is in the keychain (no value) */
   bearerToken?: boolean
   tools: Partial<Record<ToolId, McpToolState>>
+  /** Why a tool is in error: a reason code (configUnreadable) or the generator's message */
+  reasons?: Partial<Record<ToolId, string>>
 }
 
 export interface McpData {

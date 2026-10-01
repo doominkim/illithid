@@ -24,10 +24,11 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
-import { dotOfPills, grokReadsFromClaude, pillFromCellState, type PillMap, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS } from '../lib/tools'
+import { grokReadsFromClaude, pillFromCellState, type PillMap, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS } from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
+import { lastSyncFailedText, problemText } from '../lib/problemReason'
 import { SortToggle, UsageSpark } from '../components/UsageSpark'
 import { sortByUsage, useListSort } from '../lib/listSort'
 import { useUsageSummary } from '../lib/useUsageSummary'
@@ -79,10 +80,11 @@ function Skills(): React.JSX.Element {
                 ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
-          if (failedIn('skill', name, tool)) return [tool, { on: true, problem: true }]
+          const failure = failedIn('skill', name, tool)
+          if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
           if (data.toolDisabled?.[tool]?.includes(name)) return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
-          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true }]
+          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true, ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {}) }]
         })
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
@@ -187,7 +189,6 @@ function Skills(): React.JSX.Element {
               name={r.name}
               badges={marketTag(r.name)}
               description={r.description}
-              dot={dotOfPills(r.pills)}
               switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
               switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}

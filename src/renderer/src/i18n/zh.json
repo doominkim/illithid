@@ -218,7 +218,26 @@
     "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
     "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
-    "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用"
+    "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用",
+    "why": {
+      "lastSyncFailed": "上次同步失败: {{reason}}",
+      "userOwned": "已有同名的用户文件，因此保持不动",
+      "invalidName": "名称不符合命名规则",
+      "sourceUnreadable": "无法读取库中的原文件",
+      "notRegularFile": "目标不是普通文件",
+      "notDirectory": "目标不是文件夹",
+      "reservedName": "该名称为保留名称，不能使用",
+      "hashMismatch": "应用上次写入后文件已被修改",
+      "changedSinceCheck": "预览之后文件已被修改",
+      "stateError": "无法读取同步状态文件",
+      "diverged": "应用副本和原文件都已被修改",
+      "userEdited": "应用写入的文件被手动修改",
+      "configUnreadable": "无法读取工具的配置文件",
+      "noPlan": "无法生成同步计划",
+      "failed": "失败",
+      "refused": "已拒绝",
+      "unknown": "未知错误"
+    }
   },
   "app": {
     "name": "Illithid"

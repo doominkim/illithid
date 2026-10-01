@@ -23,7 +23,8 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
-import { dotOfPills, pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
+import { lastSyncFailedText } from '../lib/problemReason'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
@@ -74,7 +75,9 @@ function Rules(): React.JSX.Element {
   /** Per-tool sync state (status cells) */
   const injection = useMemo<PillMap>(() => {
     const cells = status.data?.cells.filter((c) => c.resource === 'rules') ?? []
-    return Object.fromEntries(cells.map((c) => [c.tool, pillFromCellState(c.state)])) as PillMap
+    return Object.fromEntries(
+      cells.map((c) => [c.tool, { ...pillFromCellState(c.state), ...(c.state === 'error' && c.detail ? { hint: c.detail } : {}) }])
+    ) as PillMap
   }, [status.data])
 
   const error = rules.error ?? status.error ?? rules.data?.error
@@ -89,7 +92,8 @@ function Rules(): React.JSX.Element {
       TOOLS.map((tool) => {
         const on = enabled(name, tool)
         const inj = injection[tool]
-        if (on && (tool === 'claude' || tool === 'copilot' || tool === 'grok') && failedIn('rule', name, tool)) return [tool, { on: true, problem: true }]
+        const failure = on && (tool === 'claude' || tool === 'copilot' || tool === 'grok') ? failedIn('rule', name, tool) : null
+        if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
         return [tool, on ? { ...inj, on: true } : { on: false }]
       })
     ) as PillMap
@@ -181,7 +185,6 @@ function Rules(): React.JSX.Element {
               key={f.name}
               name={f.name}
               description={cardTitle(f.name, f.text)}
-              dot={dotOfPills(pillsOf(f.name))}
               switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(f.name, tool))}
               switchIndeterminate={cardTools.some((tool) => enabled(f.name, tool))}
               onSwitch={(v) => void toggleAll(f.name, v)}

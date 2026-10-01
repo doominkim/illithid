@@ -218,7 +218,26 @@
     "notInitialized": "{{tool}} 를 한 번 실행한 뒤 다시 반영하세요",
     "copilotHomeOverride": "COPILOT_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
     "grokHomeOverride": "GROK_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
-    "jsoncUnsupported": "opencode.jsonc 에 주석이 있어 {{tool}} 설정은 쓰지 않습니다 — 주석을 지우면 반영됩니다"
+    "jsoncUnsupported": "opencode.jsonc 에 주석이 있어 {{tool}} 설정은 쓰지 않습니다 — 주석을 지우면 반영됩니다",
+    "why": {
+      "lastSyncFailed": "마지막 동기화 실패: {{reason}}",
+      "userOwned": "같은 이름의 사용자 파일이 있어 그대로 둠",
+      "invalidName": "이름이 이름 규칙에 맞지 않음",
+      "sourceUnreadable": "라이브러리 원본을 읽지 못함",
+      "notRegularFile": "대상이 일반 파일이 아님",
+      "notDirectory": "대상이 폴더가 아님",
+      "reservedName": "예약된 이름이라 쓸 수 없음",
+      "hashMismatch": "앱이 마지막으로 쓴 뒤 파일이 바뀜",
+      "changedSinceCheck": "미리보기 뒤에 파일이 바뀜",
+      "stateError": "동기화 상태 파일을 읽지 못함",
+      "diverged": "앱 사본과 원본이 둘 다 바뀜",
+      "userEdited": "앱이 쓴 파일을 직접 수정함",
+      "configUnreadable": "도구 설정 파일을 읽지 못함",
+      "noPlan": "동기화 계획을 만들지 못함",
+      "failed": "실패",
+      "refused": "거부됨",
+      "unknown": "알 수 없는 오류"
+    }
   },
   "app": {
     "name": "Illithid"
