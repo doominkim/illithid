@@ -145,6 +145,13 @@ function Hooks(): React.JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
+  // NEW, or NEW:<action> to open the new hook form on that action (from the scripts menu)
+  const isNew = selected === NEW || !!selected?.startsWith(`${NEW}:`)
+  const startAction =
+    selected?.startsWith(`${NEW}:`) &&
+    (HOOK_ACTIONS as readonly string[]).includes(selected.slice(NEW.length + 1))
+      ? (selected.slice(NEW.length + 1) as HookAction)
+      : null
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -365,13 +372,11 @@ function Hooks(): React.JSX.Element {
         onImported={reload}
         kind="hook"
       />
-      <DetailSheet
-        opened={selected === NEW}
-        onClose={() => setSelected(null)}
-        title={t('hooks.new')}
-      >
-        {selected === NEW && (
+      <DetailSheet opened={isNew} onClose={() => setSelected(null)} title={t('hooks.new')}>
+        {isNew && (
           <NewHookForm
+            key={selected}
+            initialAction={startAction}
             tools={hookTools}
             taken={data.hooks.map((h) => h.name)}
             onCreated={(name) => {
@@ -1499,20 +1504,27 @@ function TriggerForm({
 
 /** New hook: pick what it does, then a short form */
 function NewHookForm({
+  initialAction,
   tools,
   taken,
   onCreated,
   onCancel
 }: {
+  /** Open on this action's form instead of the action cards */
+  initialAction?: HookAction | null
   tools: HookTool[]
   taken: string[]
   onCreated: (name: string) => void
   onCancel: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [action, setAction] = useState<HookAction | null>(null)
-  const [when, setWhen] = useState<HookTiming>('stop')
-  const [options, setOptions] = useState<Options>({})
+  const [action, setAction] = useState<HookAction | null>(initialAction ?? null)
+  const [when, setWhen] = useState<HookTiming>(
+    initialAction ? HOOK_ACTION_INFO[initialAction].timings[0] : 'stop'
+  )
+  const [options, setOptions] = useState<Options>(
+    initialAction ? { ...HOOK_ACTION_INFO[initialAction].defaults } : {}
+  )
   const [body, setBody] = useState('')
   const [description, setDescription] = useState('')
   // null = the name follows the action and timing until the user types one
