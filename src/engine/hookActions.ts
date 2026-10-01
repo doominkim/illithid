@@ -14,11 +14,12 @@ import { defaultHookEvent, type HookTiming, type HookTool } from './hookEvents'
 export const HOOK_ACTIONS = [
   'notify',
   'verify',
+  'format',
   'protect',
   'context',
+  'checkpoint',
   'guard',
   'ask',
-  'format',
   'log',
   'script'
 ] as const
@@ -141,14 +142,20 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
     unsupported: { grok: 'noContext' },
     defaults: { git: true }
   },
+  // snapshot: a commit object under refs/illithid/checkpoints (work tree, index and branch untouched); commit: a WIP commit
+  checkpoint: {
+    timings: ['stop'],
+    choices: { mode: ['snapshot', 'commit'] },
+    defaults: { mode: 'snapshot' }
+  },
   guard: {
     timings: ['before-tool'],
     matcher: SHELL,
     defaults: { patterns: DEFAULT_GUARD_PATTERNS }
   },
-  // after-tool: the edited file; stop: once on every file changed in the git work tree (works without a file path)
+  // stop (default): once on every file changed in the git work tree (works without a file path); after-tool: the edited file
   format: {
-    timings: ['after-tool', 'stop'],
+    timings: ['stop', 'after-tool'],
     matcher: EDIT,
     unsupportedAt: { 'after-tool': { codex: 'noFilePath' } },
     defaults: { command: 'npx --yes prettier --write --ignore-unknown' }

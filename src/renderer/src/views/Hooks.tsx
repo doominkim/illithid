@@ -116,6 +116,7 @@ function useSummary(): (h: {
       verify: String(o.command || t('hooks.opt.testCommandAuto')),
       protect: ((o.patterns as string[]) ?? []).join(', '),
       context: firstLine,
+      checkpoint: t(`hooks.opt.modes.${String(o.mode || 'snapshot')}`),
       guard: ((o.patterns as string[]) ?? []).join(', '),
       ask: firstLine,
       format: String(o.command),
@@ -588,6 +589,26 @@ function OptionFields({
         t('hooks.opt.protectPatternsHint'),
         'hook-option-patterns'
       )
+    case 'checkpoint':
+      return (
+        <Stack gap={4}>
+          <Text size="sm" fw={500}>
+            {t('hooks.opt.mode')}
+          </Text>
+          <SegmentedControl
+            value={String(value.mode || 'snapshot')}
+            onChange={(v) => set('mode', v)}
+            data={['snapshot', 'commit'].map((m) => ({
+              value: m,
+              label: t(`hooks.opt.modes.${m}`)
+            }))}
+            data-testid="hook-option-mode"
+          />
+          <Text size="xs" c="dimmed">
+            {t(`hooks.opt.modeHint.${String(value.mode || 'snapshot')}`)}
+          </Text>
+        </Stack>
+      )
     case 'context':
       return (
         <Checkbox
@@ -870,6 +891,8 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
       o.command ? <Code key="v">{String(o.command)}</Code> : t('hooks.opt.testCommandAuto')
     ])
   if (doc.action === 'context') rows.push([t('hooks.opt.git'), yesNo(o.git !== false)])
+  if (doc.action === 'checkpoint')
+    rows.push([t('hooks.opt.mode'), t(`hooks.opt.modes.${String(o.mode || 'snapshot')}`)])
   if (doc.action === 'guard' || doc.action === 'protect')
     rows.push([
       doc.action === 'protect' ? t('hooks.opt.protectPatterns') : t('hooks.opt.patterns'),
@@ -1524,7 +1547,7 @@ function NewHookForm({
                   <Badge variant="light" size="xs" fw={500} color="orange">
                     {t('hooks.claudeOnly')}
                   </Badge>
-                ) : a === 'script' || a === 'format' ? (
+                ) : a === 'script' ? (
                   <Badge variant="default" size="xs" fw={500} c="dimmed">
                     {t('hooks.advanced')}
                   </Badge>

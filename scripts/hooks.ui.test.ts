@@ -254,3 +254,42 @@ test(
     }
   }
 )
+
+test(
+  'REQ-HOOKS-UI-5 format and checkpoint are everyday cards that run when a reply ends',
+  { timeout: 180000 },
+  async () => {
+    const { home, app } = await launch(['claude'], 'illithid-hooks-ui-ckpt-')
+    try {
+      const page = await app.firstWindow()
+      await page.locator('[data-menu="hooks"]').click()
+      await page.getByTestId('hook-new').click()
+      // Format is no longer marked advanced
+      assert.equal(
+        await page.locator('[data-card="hook-action-format"]').getByText('Advanced').count(),
+        0
+      )
+      await page.locator('[data-card="hook-action-checkpoint"]').click()
+      await page.getByTestId('hook-option-mode').getByText('Snapshot', { exact: true }).waitFor()
+      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'checkpoint-stop')
+      await page.getByTestId('hook-create').click()
+      await page
+        .getByTestId('hook-summary')
+        .getByText(/Checkpoint each reply/)
+        .waitFor()
+      await page
+        .locator('[data-testid="sync-button"][data-state="synced"]')
+        .waitFor({ timeout: 30000 })
+      const s = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: { Stop: { hooks: { command: string }[] }[] }
+      }
+      assert.match(s.hooks.Stop[0].hooks[0].command, /checkpoint-stop\/run\.sh' claude$/)
+      await page.keyboard.press('Escape')
+      await page.getByTestId('hook-new').click()
+      await page.locator('[data-card="hook-action-format"]').click()
+      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'format-stop')
+    } finally {
+      await app.close()
+    }
+  }
+)

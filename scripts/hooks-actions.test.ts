@@ -5,6 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import {
+  HOOK_ACTION_INFO,
   hookEventInfo,
   hookOptions,
   hookSupport,
@@ -482,4 +483,75 @@ test('REQ-HOOKS-ACTIONS-15 format at the end of a reply runs once on the changed
   assert.deepEqual(calls[0].slice(1).sort(), ['a.ts', 'new file.ts'])
   assert.equal(hookSupport('format', 'stop', 'codex'), 'ok')
   assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')
+})
+
+/** A git repo with one commit, a changed tracked file and a new untracked one */
+function dirtyRepo(): string {
+  const repo = mkdtempSync(join(tmpdir(), 'illithid-ckpt-'))
+  const git = (...args: string[]): void => {
+    spawnSync('git', ['-c', 'user.email=a@b', '-c', 'user.name=a', ...args], { cwd: repo })
+  }
+  git('init', '-q')
+  writeFileSync(join(repo, 'a.ts'), 'a\n')
+  git('add', '.')
+  git('commit', '-qm', 'first')
+  writeFileSync(join(repo, 'a.ts'), 'a2\n')
+  writeFileSync(join(repo, 'b.ts'), 'b\n')
+  return repo
+}
+const gitOut = (repo: string, ...args: string[]): string =>
+  spawnSync('git', args, { cwd: repo, encoding: 'utf8' }).stdout.trim()
+
+test('REQ-HOOKS-ACTIONS-16 checkpoint: a snapshot ref of the work tree (new files too) at the end of a reply, without touching files or the index', () => {
+  const repo = dirtyRepo()
+  const script = renderActionScript('claude', 'ckpt', doc('checkpoint', 'stop'))
+  const status = gitOut(repo, 'status', '--porcelain')
+  assert.equal(run(script, 'claude', {}, { cwd: repo }).code, 0)
+  assert.equal(gitOut(repo, 'status', '--porcelain'), status, 'work tree and index unchanged')
+  const refs = gitOut(repo, 'for-each-ref', '--format=%(refname)', 'refs/illithid/checkpoints')
+    .split('\n')
+    .filter(Boolean)
+  assert.equal(refs.length, 1)
+  assert.equal(gitOut(repo, 'show', `${refs[0]}:a.ts`), 'a2')
+  assert.equal(gitOut(repo, 'show', `${refs[0]}:b.ts`), 'b')
+  assert.equal(gitOut(repo, 'rev-list', '--count', 'HEAD'), '1', 'no commit on the branch')
+  // Nothing changed since: no new snapshot
+  run(script, 'claude', {}, { cwd: repo })
+  assert.equal(
+    gitOut(repo, 'for-each-ref', '--format=%(refname)', 'refs/illithid/checkpoints').split('\n')
+      .length,
+    1
+  )
+  // Not a git repo: nothing happens
+  assert.equal(run(script, 'claude', {}, { cwd: mkdtempSync(join(tmpdir(), 'nogit-')) }).code, 0)
+  assert.equal(hookSupport('checkpoint', 'stop', 'codex'), 'ok')
+})
+
+test('REQ-HOOKS-ACTIONS-17 checkpoint as a WIP commit: everything changed goes into one commit on the branch', () => {
+  const repo = dirtyRepo()
+  const script = renderActionScript('codex', 'ckpt', doc('checkpoint', 'stop', { mode: 'commit' }))
+  assert.equal(
+    run(
+      script,
+      'codex',
+      {},
+      {
+        cwd: repo,
+        env: {
+          GIT_AUTHOR_NAME: 'a',
+          GIT_AUTHOR_EMAIL: 'a@b',
+          GIT_COMMITTER_NAME: 'a',
+          GIT_COMMITTER_EMAIL: 'a@b'
+        }
+      }
+    ).code,
+    0
+  )
+  assert.equal(gitOut(repo, 'rev-list', '--count', 'HEAD'), '2')
+  assert.match(gitOut(repo, 'log', '-1', '--format=%s'), /^WIP: checkpoint/)
+  assert.equal(gitOut(repo, 'status', '--porcelain'), '')
+})
+
+test('REQ-HOOKS-ACTIONS-18 format runs at the end of a reply by default', () => {
+  assert.equal(HOOK_ACTION_INFO.format.timings[0], 'stop')
 })

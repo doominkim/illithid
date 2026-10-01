@@ -878,7 +878,7 @@
       },
       "format": {
         "title": "Format edited files",
-        "desc": "Run a formatter on edited files, after each edit or once at the end"
+        "desc": "Run a formatter on the changed files once a reply ends (or after each edit)"
       },
       "log": {
         "title": "Keep a log",
@@ -903,6 +903,10 @@
       "context": {
         "title": "Brief the agent at session start",
         "desc": "Tell it the current branch, uncommitted changes and your notes"
+      },
+      "checkpoint": {
+        "title": "Checkpoint each reply",
+        "desc": "Save the work tree when a reply ends, so you can go back to any point"
       }
     },
     "claudeOnly": "Claude Code only",
@@ -937,7 +941,16 @@
       "protectPatterns": "Protected files",
       "protectPatternsHint": "One file pattern per line (* and ? work). Patterns with / match the path.",
       "git": "Include the git branch and uncommitted changes",
-      "commandHintStop": "Runs once at the end of a reply, with every changed file at the end."
+      "commandHintStop": "Runs once at the end of a reply, with every changed file at the end.",
+      "mode": "How",
+      "modes": {
+        "snapshot": "Snapshot",
+        "commit": "WIP commit"
+      },
+      "modeHint": {
+        "snapshot": "Saved under refs/illithid/checkpoints without touching your files, index or branch; the latest 50 are kept. Go back with: git restore --source <checkpoint> -- .",
+        "commit": "Commits everything changed on the current branch (git add -A). Check your .gitignore so secrets are not committed."
+      }
     },
     "instruction": "Instruction",
     "instructionHint": "Claude Code reads the event with this instruction and decides whether to let it go on.",

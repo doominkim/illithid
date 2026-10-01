@@ -878,7 +878,7 @@
       },
       "format": {
         "title": "편집한 파일 포맷",
-        "desc": "편집한 파일에 포맷터를 돌립니다. 편집마다 또는 응답 끝에 한 번"
+        "desc": "응답이 끝나면 바뀐 파일에 포맷터를 한 번 돌립니다 (편집마다도 가능)"
       },
       "log": {
         "title": "기록 남기기",
@@ -903,6 +903,10 @@
       "context": {
         "title": "세션 시작 때 알려주기",
         "desc": "현재 브랜치, 커밋 안 된 변경, 내 메모를 에이전트에게 먼저 알려 줍니다"
+      },
+      "checkpoint": {
+        "title": "응답마다 체크포인트",
+        "desc": "응답이 끝날 때 작업 상태를 저장해서 언제든 그 시점으로 되돌릴 수 있게 합니다"
       }
     },
     "claudeOnly": "Claude Code 전용",
@@ -937,7 +941,16 @@
       "protectPatterns": "보호할 파일",
       "protectPatternsHint": "한 줄에 파일 패턴 하나 (* 와 ? 사용 가능). / 가 들어가면 경로로 맞춥니다.",
       "git": "git 브랜치와 커밋 안 된 변경 포함",
-      "commandHintStop": "응답 끝에 한 번, 바뀐 파일을 모두 끝에 붙여 실행합니다."
+      "commandHintStop": "응답 끝에 한 번, 바뀐 파일을 모두 끝에 붙여 실행합니다.",
+      "mode": "방식",
+      "modes": {
+        "snapshot": "스냅샷",
+        "commit": "WIP 커밋"
+      },
+      "modeHint": {
+        "snapshot": "파일, 스테이징, 브랜치는 그대로 두고 refs/illithid/checkpoints 에 저장합니다. 최근 50개를 보관합니다. 되돌리기: git restore --source <체크포인트> -- .",
+        "commit": "바뀐 파일을 모두 현재 브랜치에 커밋합니다 (git add -A). 비밀값이 커밋되지 않게 .gitignore 를 확인하세요."
+      }
     },
     "instruction": "지시문",
     "instructionHint": "Claude Code 가 이 지시문과 이벤트를 읽고 계속할지 판단합니다.",

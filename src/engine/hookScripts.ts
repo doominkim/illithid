@@ -116,6 +116,51 @@ function contextLines(tool: HookTool, doc: HookDoc): string[] {
   return out
 }
 
+/** Ref folder the checkpoint snapshots go to, and how many are kept */
+export const CHECKPOINT_REF = 'refs/illithid/checkpoints'
+export const CHECKPOINT_KEEP = 50
+
+/**
+ * checkpoint, at the end of a reply:
+ * - snapshot (default): the whole work tree, new files included, as a commit under refs/illithid/checkpoints/<UTC time>,
+ *   built in a temporary index — files, the index and the branch stay as they are. Skipped when nothing changed since the
+ *   last snapshot (or since HEAD). The newest CHECKPOINT_KEEP are kept. Restore: git restore --source <ref> -- .
+ * - commit: a WIP commit of everything changed on the current branch
+ * Commits need an author: the repository's, else "Illithid"
+ */
+function checkpointLines(doc: HookDoc): string[] {
+  const who =
+    'git -c user.name="$(git config user.name || echo Illithid)" -c user.email="$(git config user.email || echo illithid@localhost)"'
+  const head = [
+    'top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0',
+    'cd "$top" || exit 0',
+    'stamp=$(date -u +%Y%m%dT%H%M%SZ)'
+  ]
+  if (doc.options.mode === 'commit')
+    return [
+      ...head,
+      '[ -n "$(git status --porcelain 2>/dev/null)" ] || exit 0',
+      'git add -A >/dev/null 2>&1 || exit 0',
+      `${who} commit -q -m "WIP: checkpoint $stamp ($1)" >/dev/null 2>&1`
+    ]
+  return [
+    ...head,
+    'idx="${TMPDIR:-/tmp}/illithid-ckpt-$$"',
+    'cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null || rm -f "$idx"',
+    'GIT_INDEX_FILE="$idx" git add -A >/dev/null 2>&1 || { rm -f "$idx"; exit 0; }',
+    'tree=$(GIT_INDEX_FILE="$idx" git write-tree 2>/dev/null)',
+    'rm -f "$idx"',
+    '[ -n "$tree" ] || exit 0',
+    `last=$(git for-each-ref --sort=-refname --count=1 --format='%(objectname)' ${CHECKPOINT_REF})`,
+    'if [ -n "$last" ]; then [ "$(git rev-parse "$last^{tree}")" = "$tree" ] && exit 0',
+    'elif git rev-parse -q --verify HEAD >/dev/null; then [ "$(git rev-parse "HEAD^{tree}")" = "$tree" ] && exit 0; fi',
+    'parent=$(git rev-parse -q --verify HEAD)',
+    `commit=$(${who} commit-tree "$tree" \${parent:+-p "$parent"} -m "Illithid checkpoint $stamp ($1)" 2>/dev/null) || exit 0`,
+    `git update-ref "${CHECKPOINT_REF}/$stamp" "$commit"`,
+    `git for-each-ref --sort=-refname --format='%(refname)' ${CHECKPOINT_REF} | tail -n +${CHECKPOINT_KEEP + 1} | while read -r r; do git update-ref -d "$r"; done`
+  ]
+}
+
 /** Times one session may be sent back before the check lets the agent finish */
 export const VERIFY_MAX_TRIES = 3
 
@@ -219,6 +264,9 @@ export function renderActionScript(tool: HookTool, name: string, doc: HookDoc): 
     }
     case 'context':
       out.push(...contextLines(tool, doc))
+      break
+    case 'checkpoint':
+      out.push(...checkpointLines(doc))
       break
     case 'log': {
       out.push(

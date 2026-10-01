@@ -878,7 +878,7 @@
       },
       "format": {
         "title": "格式化编辑的文件",
-        "desc": "对编辑的文件运行格式化工具，每次编辑后或回复结束时一次"
+        "desc": "回复结束时对更改的文件运行一次格式化工具 (也可每次编辑后运行)"
       },
       "log": {
         "title": "记录日志",
@@ -903,6 +903,10 @@
       "context": {
         "title": "会话开始时告知",
         "desc": "先告诉代理当前分支、未提交的更改和你的备注"
+      },
+      "checkpoint": {
+        "title": "每次回复保存检查点",
+        "desc": "每次回复结束时保存工作状态，可随时回到那个时间点"
       }
     },
     "claudeOnly": "仅 Claude Code",
@@ -937,7 +941,16 @@
       "protectPatterns": "要保护的文件",
       "protectPatternsHint": "每行一个文件模式 (可用 * 和 ?)。含 / 的模式按路径匹配。",
       "git": "包含 git 分支和未提交的更改",
-      "commandHintStop": "在回复结束时运行一次，所有更改的文件附在末尾。"
+      "commandHintStop": "在回复结束时运行一次，所有更改的文件附在末尾。",
+      "mode": "方式",
+      "modes": {
+        "snapshot": "快照",
+        "commit": "WIP 提交"
+      },
+      "modeHint": {
+        "snapshot": "保存到 refs/illithid/checkpoints，不改动文件、暂存区和分支。保留最近 50 个。恢复: git restore --source <检查点> -- .",
+        "commit": "把所有更改提交到当前分支 (git add -A)。请检查 .gitignore，避免提交机密。"
+      }
     },
     "instruction": "指令",
     "instructionHint": "Claude Code 会读取此指令和事件，判断是否继续。",
