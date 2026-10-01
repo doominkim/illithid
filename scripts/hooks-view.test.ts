@@ -64,6 +64,8 @@ test('REQ-HOOKS-VIEW-2 a tool that cannot run the action is not applicable, with
   assert.equal(fmt.tools.codex, 'notApplicable')
   assert.equal(fmt.tools.gemini, 'needsSync')
   const ask = data.hooks.find((h) => h.name === 'tests')!
-  assert.deepEqual(ask.unsupported, { codex: 'claudeOnly', gemini: 'claudeOnly' })
+  // An AI check runs everywhere now (a judging script outside Claude Code)
+  assert.equal(ask.unsupported, undefined)
   assert.equal(ask.tools.claude, 'needsSync')
+  assert.equal(ask.tools.codex, 'needsSync')
 })

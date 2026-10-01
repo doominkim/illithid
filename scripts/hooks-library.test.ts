@@ -52,7 +52,8 @@ test('REQ-HOOKS-LIB-2 each action says which tools can run it and why not', () =
   // Codex apply_patch hands over no file path
   assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')
   // Only Claude Code has LLM-judged (prompt) hooks
-  assert.equal(hookSupport('ask', 'stop', 'gemini'), 'claudeOnly')
+  // Every tool can judge: Claude Code with its prompt hook, the others by asking a CLI
+  assert.equal(hookSupport('ask', 'stop', 'gemini'), 'ok')
   assert.equal(hookSupport('ask', 'stop', 'claude'), 'ok')
   assert.equal(hookSupport('notify', 'notification', 'codex'), 'noEvent')
   assert.equal(hookSupport('guard', 'stop', 'claude'), 'wrongTiming')

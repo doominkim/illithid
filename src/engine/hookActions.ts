@@ -98,6 +98,10 @@ const WAITING: Partial<Record<HookTool, string>> = {
   grok: 'permission_prompt|idle_prompt'
 }
 
+/** CLIs that can judge for an ask hook ('same' = the tool running the hook) */
+export const JUDGE_CLIS = ['same', 'claude', 'codex', 'gemini', 'copilot', 'grok'] as const
+export type JudgeCli = (typeof JUDGE_CLIS)[number]
+
 export const NOTIFY_CHANNELS = ['mac', 'ntfy', 'slack'] as const
 export type NotifyChannel = (typeof NOTIFY_CHANNELS)[number]
 
@@ -164,16 +168,14 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
     timings: ALL_TIMINGS,
     defaults: { path: '~/.local/state/illithid/hooks.log' }
   },
+  // Claude Code judges with its own prompt hook. The other tools run a script that asks a CLI to judge (judge: 'same' = the
+  // tool's own CLI; model: '' = the CLI's default, haiku for Claude Code) and enforce its answer.
+  // verbatim: the body is a complete Claude Code prompt (imported) — written as is, without the reply-format wrapper
   ask: {
     timings: ['stop', 'before-tool', 'prompt'],
-    unsupported: {
-      codex: 'claudeOnly',
-      gemini: 'claudeOnly',
-      copilot: 'claudeOnly',
-      grok: 'claudeOnly'
-    },
-    // verbatim: the body is a complete Claude Code prompt (imported) — written as is, without the reply-format wrapper
-    defaults: { verbatim: false }
+    timeout: 120,
+    choices: { judge: JUDGE_CLIS },
+    defaults: { verbatim: false, judge: 'same', model: '' }
   },
   // use: a library script (scripts/<name>.sh) instead of the hook's own run.sh
   script: { timings: ALL_TIMINGS, defaults: { use: '' } }

@@ -21,8 +21,12 @@ const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 /** Shell expression for a path that may start with ~/ */
 const homePath = (p: string): string => (p.startsWith('~/') ? `"$HOME"/${q(p.slice(2))}` : q(p))
 
+/** Every generated script steps aside inside a judging run (an ask hook's nested CLI), so hooks never judge recursively */
+const JUDGE_GUARD = '[ -n "${ILLITHID_JUDGE:-}" ] && exit 0'
+
 /** Reads the event (stdin) once; field <path> prints one value of it */
 const READ_INPUT = [
+  JUDGE_GUARD,
   'input=$(cat)',
   `field() { printf '%s' "$input" | /usr/bin/plutil -extract "$1" raw -o - - 2>/dev/null; }`
 ]
@@ -172,6 +176,86 @@ function checkpointLines(doc: HookDoc): string[] {
   ]
 }
 
+/** What a judging CLI is asked to answer, per timing */
+const JUDGE_REPLY: Record<'before-tool' | 'stop' | 'prompt', string> = {
+  'before-tool':
+    'Decide whether the tool call above may run under the rule. Reply with JSON only: {"ok": <true or false>, "reason": "<one sentence>"}. ok false blocks the call.',
+  stop: 'Decide whether the agent may finish now under the rule. Reply with JSON only: {"ok": <true or false>, "reason": "<what is left to do>"}. ok false sends the agent back to work with the reason.',
+  prompt:
+    'Decide whether the prompt above may be sent under the rule. Reply with JSON only: {"ok": <true or false>, "reason": "<one sentence>"}. ok false blocks the prompt.'
+}
+
+const JUDGE_SCHEMA =
+  '{"type":"object","properties":{"ok":{"type":"boolean"},"reason":{"type":"string"}},"required":["ok","reason"],"additionalProperties":false}'
+
+/** The judging CLI call, run with ILLITHID_JUDGE=1 and, where the CLI allows, with hooks and tools off. Sets $out */
+function judgeCall(cli: HookTool): string[] {
+  switch (cli) {
+    case 'claude':
+      return [
+        `out=$(ILLITHID_JUDGE=1 claude --model "\${model:-haiku}" --tools "" --output-format json --json-schema "$schema" --settings '{"disableAllHooks":true}' -p "$prompt" 2>/dev/null)`
+      ]
+    case 'codex':
+      return [
+        'sf="${TMPDIR:-/tmp}/illithid-judge-$$.json"; of="${TMPDIR:-/tmp}/illithid-judge-$$.out"',
+        `printf '%s' "$schema" > "$sf"`,
+        'ILLITHID_JUDGE=1 codex exec --ephemeral --skip-git-repo-check --disable hooks --sandbox read-only ${model:+-m "$model"} --output-schema "$sf" -o "$of" "$prompt" >/dev/null 2>&1',
+        'out=$(cat "$of" 2>/dev/null); rm -f "$sf" "$of"'
+      ]
+    case 'gemini':
+      return [
+        'out=$(ILLITHID_JUDGE=1 gemini -p "$prompt" --approval-mode plan -o json ${model:+-m "$model"} 2>/dev/null)'
+      ]
+    case 'copilot':
+      return [
+        'out=$(ILLITHID_JUDGE=1 copilot -p "$prompt" -s --no-ask-user --output-format json ${model:+--model "$model"} 2>/dev/null)'
+      ]
+    case 'grok':
+      return [
+        'out=$(ILLITHID_JUDGE=1 grok -p "$prompt" --json-schema "$schema" --permission-mode plan ${model:+-m "$model"} 2>/dev/null)'
+      ]
+  }
+}
+
+/**
+ * ask in a tool without LLM-judged hooks (and the all-tools library script): a CLI judges the event against the instruction.
+ * The verdict is the last "ok": true|false (and "reason") anywhere in the CLI's output, so each CLI's JSON wrapping works
+ * the same. Anything else — no CLI, an error, no verdict — lets the event through. "No" is enforced the tool's way:
+ * exit 2 with the reason, or Copilot's block decision at the end of a reply
+ */
+function askLines(tool: HookTool, doc: HookDoc): string[] {
+  const o = doc.options
+  const cli = (o.judge && o.judge !== 'same' ? o.judge : tool) as HookTool
+  const timing = (doc.when in JUDGE_REPLY ? doc.when : 'stop') as keyof typeof JUDGE_REPLY
+  const instruction =
+    o.verbatim === true
+      ? doc.body.trim().replace(/\$ARGUMENTS/g, '(the event JSON below)')
+      : doc.body.trim()
+  const out: string[] = []
+  if (timing === 'stop')
+    out.push(
+      'active=$(field stop_hook_active); [ -n "$active" ] || active=$(field stopHookActive)',
+      '[ "$active" = "true" ] && exit 0'
+    )
+  out.push(
+    `command -v ${cli} >/dev/null 2>&1 || exit 0`,
+    `model=${q(String(o.model || ''))}`,
+    `schema=${q(JUDGE_SCHEMA)}`,
+    'ev=$(printf \'%s\' "$input" | head -c 20000)',
+    `prompt="$(printf '%s\\n\\nThe event, as JSON:\\n%s\\n\\n%s' ${q(instruction)} "$ev" ${q(JUDGE_REPLY[timing])})"`,
+    ...judgeCall(cli),
+    `flat=$(printf '%s' "$out" | tr -d '\\\\')`,
+    `ok=$(printf '%s' "$flat" | grep -oE '"ok"[[:space:]]*:[[:space:]]*(true|false)' | tail -n 1 | grep -oE '(true|false)$')`,
+    '[ "$ok" = "false" ] || exit 0',
+    `reason=$(printf '%s' "$flat" | grep -oE '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' | tail -n 1 | sed -E 's/^"reason"[[:space:]]*:[[:space:]]*"//; s/"$//')`,
+    `[ -n "$reason" ] || reason=${q('The AI check said no.')}`
+  )
+  if (tool === 'copilot' && timing === 'stop')
+    out.push(JESC, `printf '{"decision":"block","reason":"%s"}\\n' "$(jesc "$reason")"`, 'exit 0')
+  else out.push(`printf '%s\\n' "$reason" >&2`, 'exit 2')
+  return out
+}
+
 /** Times one session may be sent back before the check lets the agent finish */
 export const VERIFY_MAX_TRIES = 3
 
@@ -297,6 +381,9 @@ function actionBody(tool: HookTool, name: string, doc: HookDoc): string[] {
     case 'context':
       out.push(...contextLines(tool, doc))
       break
+    case 'ask':
+      out.push(...askLines(tool, doc))
+      break
     case 'checkpoint':
       out.push(...checkpointLines(doc))
       break
@@ -374,7 +461,8 @@ export function toolScript(
   hook: LibraryHook
 ): { file: string; content: string } | null {
   const { doc } = hook
-  if (doc.action === 'ask') return null
+  // Claude Code judges with its own prompt hook; the other tools run the judging script
+  if (doc.action === 'ask' && tool === 'claude') return null
   if (doc.action === 'script') {
     const file = scriptForTool(doc, tool)
     return { file, content: hook.scripts[file] ?? '' }

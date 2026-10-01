@@ -592,3 +592,135 @@ test("REQ-HOOKS-ACTIONS-19 the all-tools script behaves like each tool's own scr
   // An unknown tool name: nothing happens
   assert.equal(run(all, 'opencode' as HookTool, shell('claude', 'git push --force')).code, 0)
 })
+
+/**
+ * Fake judging CLIs in each tool's output shape. FAKE_OK=true|false sets the verdict; every call records its arguments
+ * and whether ILLITHID_JUDGE was set
+ */
+function fakeJudges(ok: boolean): { path: string; calls: (name: string) => string[] } {
+  const dir = mkdtempSync(join(tmpdir(), 'illithid-fake-judge-'))
+  const verdict = `{"ok": ${ok}, "reason": "Tests still fail"}`
+  const esc = verdict.replace(/"/g, '\\"')
+  const out: Record<string, string> = {
+    claude: `printf '%s\\n' '{"type":"result","result":"","structured_output":${verdict}}'`,
+    // Codex writes the last message to the -o file
+    codex: `while [ $# -gt 0 ]; do [ "$1" = -o ] && { printf '%s' '${verdict}' > "$2"; shift; }; shift; done`,
+    gemini: `printf '%s\\n' '{"response":"${esc}","stats":{}}'`,
+    copilot: `printf '%s\\n' '{"type":"session.start"}' '{"type":"assistant.message","data":{"content":"${esc}"}}'`,
+    grok: `printf '%s\\n' '{"result":${verdict}}'`
+  }
+  for (const [name, body] of Object.entries(out)) {
+    const f = join(dir, name)
+    writeFileSync(
+      f,
+      `#!/bin/sh\nprintf '%s|%s\\n' "\${ILLITHID_JUDGE:-}" "$*" >> '${dir}/${name}.calls'\n${body}\n`
+    )
+    chmodSync(f, 0o755)
+  }
+  return {
+    path: `${dir}:/usr/bin:/bin`,
+    calls: (n) => {
+      const p = join(dir, `${n}.calls`)
+      return existsSync(p) ? readFileSync(p, 'utf8').split('\n').filter(Boolean) : []
+    }
+  }
+}
+
+test('REQ-HOOKS-ACTIONS-20 AI judgment in every tool: the tool\'s own CLI judges with hooks off, and a "no" stops the agent the tool\'s way', () => {
+  const d = { ...doc('ask', 'stop'), body: 'Keep working until the tests pass.' }
+  const stopInput = (tool: HookTool): unknown =>
+    tool === 'copilot' || tool === 'grok' ? { stopHookActive: false } : { stop_hook_active: false }
+  for (const tool of TOOLS) {
+    const no = fakeJudges(false)
+    const r = run(renderActionScript(tool, 'tests', d), tool, stopInput(tool), {
+      env: { PATH: no.path }
+    })
+    const [call] = no.calls(tool)
+    assert.ok(call, `${tool} calls its own CLI`)
+    assert.match(call, /^1\|/, `${tool}: the nested run is marked`)
+    assert.match(call, /Keep working until the tests pass\./, tool)
+    if (tool === 'copilot') {
+      assert.equal(r.code, 0)
+      assert.deepEqual(JSON.parse(r.out), { decision: 'block', reason: 'Tests still fail' })
+    } else {
+      assert.equal(r.code, 2, tool)
+      assert.match(r.err, /Tests still fail/, tool)
+    }
+    const yes = fakeJudges(true)
+    assert.equal(
+      run(renderActionScript(tool, 'tests', d), tool, stopInput(tool), { env: { PATH: yes.path } })
+        .code,
+      0,
+      tool
+    )
+  }
+  // Hooks are off in the nested run where the CLI allows it
+  const f = fakeJudges(false)
+  run(renderActionScript('claude', 'tests', d), 'claude', {}, { env: { PATH: f.path } })
+  run(renderActionScript('codex', 'tests', d), 'codex', {}, { env: { PATH: f.path } })
+  assert.match(f.calls('claude')[0], /--settings \{"disableAllHooks":true\}/)
+  assert.match(f.calls('claude')[0], /--model haiku/)
+  assert.match(f.calls('codex')[0], /--disable hooks/)
+})
+
+test("REQ-HOOKS-ACTIONS-21 AI judgment lets things through when it can't judge, never loops, and can use another tool's CLI", () => {
+  const d = { ...doc('ask', 'stop'), body: 'Keep working until the tests pass.' }
+  const f = fakeJudges(false)
+  // Inside a judging run: every Illithid hook steps aside
+  assert.equal(
+    run(
+      renderActionScript('codex', 'tests', d),
+      'codex',
+      {},
+      { env: { PATH: f.path, ILLITHID_JUDGE: '1' } }
+    ).code,
+    0
+  )
+  // Already continuing because of a stop hook
+  assert.equal(
+    run(
+      renderActionScript('codex', 'tests', d),
+      'codex',
+      { stop_hook_active: true },
+      { env: { PATH: f.path } }
+    ).code,
+    0
+  )
+  assert.equal(f.calls('codex').length, 0)
+  // No CLI installed, or an answer that isn't a verdict
+  assert.equal(
+    run(renderActionScript('gemini', 'tests', d), 'gemini', {}, { env: { PATH: '/usr/bin:/bin' } })
+      .code,
+    0
+  )
+  const junk = mkdtempSync(join(tmpdir(), 'illithid-junk-'))
+  writeFileSync(join(junk, 'gemini'), '#!/bin/sh\necho "rate limited"\n')
+  chmodSync(join(junk, 'gemini'), 0o755)
+  assert.equal(
+    run(
+      renderActionScript('gemini', 'tests', d),
+      'gemini',
+      {},
+      { env: { PATH: `${junk}:/usr/bin:/bin` } }
+    ).code,
+    0
+  )
+  // Codex hook judged by Claude Code
+  const g = fakeJudges(false)
+  const r = run(
+    renderActionScript('codex', 'tests', {
+      ...d,
+      options: hookOptions('ask', { judge: 'claude' })
+    }),
+    'codex',
+    {},
+    { env: { PATH: g.path } }
+  )
+  assert.equal(r.code, 2)
+  assert.equal(g.calls('codex').length, 0)
+  // One call (its prompt spans several lines of the record)
+  assert.equal(g.calls('claude').filter((l) => /^1\|/.test(l)).length, 1)
+  // Every tool can run it now; Claude Code keeps its built-in prompt hook
+  assert.equal(hookSupport('ask', 'stop', 'codex'), 'ok')
+  assert.equal(hookTriggers(doc('ask', 'stop')).codex?.timeout, 120)
+})

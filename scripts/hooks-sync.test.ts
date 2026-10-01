@@ -106,7 +106,7 @@ test('REQ-HOOKS-SYNC-2 each tool gets its own format: Gemini ms and a name, Copi
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
 })
 
-test('REQ-HOOKS-SYNC-3 a natural-language check becomes a Claude Code prompt hook and reaches no other tool', () => {
+test('REQ-HOOKS-SYNC-3 an AI check is a prompt hook in Claude Code and a judging script in the other tools', () => {
   const home = demoHome(['claude', 'gemini'])
   const settings = join(home, '.claude/settings.json')
   mkdirSync(join(home, '.claude'), { recursive: true })
@@ -129,7 +129,15 @@ test('REQ-HOOKS-SYNC-3 a natural-language check becomes a Claude Code prompt hoo
   assert.equal(mine.statusMessage, 'Illithid · tests')
   assert.match(String(mine.prompt), /^Keep working until the tests pass\.\n[\s\S]*\$ARGUMENTS/)
   assert.equal(existsSync(copyPath(home, 'claude', 'tests')), false)
-  assert.equal((json(join(home, '.gemini/settings.json')) as { hooks?: unknown }).hooks, undefined)
+  const gemini = json(join(home, '.gemini/settings.json')) as {
+    hooks: { AfterAgent: { hooks: { command: string; timeout: number }[] }[] }
+  }
+  assert.equal(gemini.hooks.AfterAgent[0].hooks[0].command, command(home, 'gemini', 'tests'))
+  assert.equal(gemini.hooks.AfterAgent[0].hooks[0].timeout, 120000)
+  assert.match(
+    readFileSync(copyPath(home, 'gemini', 'tests'), 'utf8'),
+    /ILLITHID_JUDGE=1 gemini -p/
+  )
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
   // Turning it off removes only the app entry
   setToggle(home, 'hooks', 'tests', 'claude', false)
