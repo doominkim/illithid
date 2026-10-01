@@ -64,9 +64,14 @@ import {
   grokReadsClaudeHooks,
   hookSupport,
   type HookSupport,
-  type HookSyncItem
+  type HookSyncItem,
+  readPermissions,
+  permissionRules,
+  PERMISSION_HOOK,
+  type Allowlist
 } from '../engine'
 import type {
+  PermissionsData,
   AgentsData,
   HooksData,
   HookToolState,
@@ -443,6 +448,7 @@ export type Op =
   | 'skills'
   | 'agents'
   | 'mcp'
+  | 'permissions'
   | 'artifacts'
   | 'sessions'
   | 'toolMemory'
@@ -576,6 +582,8 @@ export function runOp(
       return mcp(home, env)
     case 'hooks':
       return hooks(home, env)
+    case 'permissions':
+      return permissions(home, env)
     case 'artifacts':
       return withSessionTitles(home, scanArtifacts(home))
     case 'sessions':
@@ -679,5 +687,112 @@ export function hooks(home: string, env: Env): HooksData {
     hooks: view,
     toggles: toggles(home, 'hooks'),
     ...(grokReadsClaudeHooks(home) ? {} : { grokReadsClaude: false })
+  }
+}
+
+// ---------------------------------------------------------------- permissions
+
+/** Targets that carry the permission rules into each tool (Copilot: the deny check hook) */
+const PERMISSION_TARGET: Partial<Record<ToolId, TargetId>> = {
+  claude: 'claudePermissions',
+  codex: 'codexRules',
+  gemini: 'geminiPolicy',
+  copilot: 'copilotHooks'
+}
+
+export function permissions(home: string, env: Env): PermissionsData {
+  const file = libraryPaths(home).permissions
+  const dir = tilde(home, file)
+  let allowlist: Allowlist | null
+  try {
+    allowlist = readPermissions(home)
+  } catch (e) {
+    return {
+      file: dir,
+      rules: { commands: [], mcp: [] },
+      claudeOnly: 0,
+      tools: {},
+      guards: [],
+      error: `${dir}: ${(e as Error).message}`
+    }
+  }
+  const rules = allowlist ? permissionRules(allowlist) : { commands: [], mcp: [] }
+  const inUse = toolsInUse(home)
+  const ids = Object.values(PERMISSION_TARGET).filter((id): id is TargetId => !!id)
+  let changes: FileChange[] = []
+  try {
+    changes = plan(home, env, ids)
+  } catch {
+    // states stay unknown (shown as waiting)
+  }
+  let copies: HookSyncItem[] = []
+  try {
+    copies = planHookSync(home, env)
+  } catch {
+    // copies unknown
+  }
+  const hasDeny = rules.commands.some((r) => r.decision === 'deny')
+  const tools: PermissionsData['tools'] = {}
+  const reasons: Partial<Record<ToolId, string>> = {}
+  for (const tool of inUse) {
+    const id = PERMISSION_TARGET[tool]
+    if (tool === 'grok') {
+      tools.grok = inUse.includes('claude') ? 'viaClaude' : 'notApplicable'
+      continue
+    }
+    if (!id) {
+      tools[tool] = 'notApplicable'
+      continue
+    }
+    const c = changes.find((x) => x.id === id)
+    if (tool === 'copilot') {
+      // Only the deny check hook belongs to permissions
+      const entry = (text: string | undefined): string | undefined =>
+        text ? hookTable('copilotHooks', text)?.get(PERMISSION_HOOK) : undefined
+      const copy = copies.some(
+        (x) => x.tool === 'copilot' && x.hook === PERMISSION_HOOK && x.action !== 'inSync'
+      )
+      const b = entry(c?.before)
+      const a = entry(c?.after)
+      tools.copilot = c?.error
+        ? 'error'
+        : a !== b || copy
+          ? 'needsSync'
+          : hasDeny
+            ? 'synced'
+            : 'notApplicable'
+      if (c?.error) reasons.copilot = c.error
+      continue
+    }
+    tools[tool] = !c
+      ? 'notApplicable'
+      : c.error
+        ? 'error'
+        : c.changed
+          ? 'needsSync'
+          : c.skip === 'nothingToWrite'
+            ? 'notApplicable'
+            : 'synced'
+    if (c?.error) reasons[tool] = c.error
+  }
+  let guards: PermissionsData['guards'] = []
+  try {
+    guards = readHooks(home)
+      .filter((h) => h.doc.action === 'guard')
+      .map((h) => ({ name: h.name, patterns: h.doc.options.patterns as string[] }))
+  } catch {
+    // a broken hook shows in the hooks menu
+  }
+  return {
+    file: dir,
+    rules,
+    claudeOnly: allowlist
+      ? allowlist.claudeOnly.allow.length +
+        allowlist.claudeOnly.deny.length +
+        (allowlist.claudeOnly.ask?.length ?? 0)
+      : 0,
+    tools,
+    ...(Object.keys(reasons).length ? { reasons } : {}),
+    guards
   }
 }

@@ -552,7 +552,8 @@ export {
   hookCopyRoot,
   hookCommand,
   grokReadsClaudeHooks,
-  hooksForTool
+  hooksForTool,
+  PERMISSION_HOOK
 } from './hookRender'
 export {
   PERMISSION_DECISIONS,

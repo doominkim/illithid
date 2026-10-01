@@ -11,7 +11,8 @@
     "backup": "Backup",
     "memory": "Memory",
     "stats": "Stats",
-    "hooks": "Hooks"
+    "hooks": "Hooks",
+    "permissions": "Permissions"
   },
   "settings": {
     "language": "Language",
@@ -921,5 +922,42 @@
     "convertTitle": "Switch to your own script",
     "convertBody": "The {{tool}} script becomes this hook's run.sh and every tool runs it. The options no longer apply.",
     "converted": "Now runs its own script"
+  },
+  "permissions": {
+    "new": "New rule",
+    "search": "Search rules",
+    "created": "Rule added",
+    "saved": "Rule saved",
+    "deleted": "Rule deleted",
+    "deleteTitle": "Delete rule",
+    "deleteBody": "Removes the rule for {{command}}. The tools drop it on the next sync.",
+    "empty": "No permission rules yet",
+    "emptyHint": "Add a rule to block, ask about or allow a shell command in every tool.",
+    "decision": {
+      "deny": "Block",
+      "ask": "Ask",
+      "allow": "Allow"
+    },
+    "decisionHint": {
+      "deny": "The agent can't run these.",
+      "ask": "The agent asks you before running these.",
+      "allow": "The agent runs these without asking."
+    },
+    "decisionLabel": "What to do",
+    "exact": "Exact",
+    "exactLabel": "Only this exact command",
+    "exactHint": "Off: also every command that starts with it (git push --force origin main).",
+    "command": "Command",
+    "commandHint": "The words a command starts with. Quotes group words, like in a shell.",
+    "note": "Note",
+    "duplicate": "This command already has a rule",
+    "guards": "Hooks that block commands",
+    "guardsHint": "These hooks check commands too, matching any part of the command. Edit them in Hooks.",
+    "claudeOnly": "{{count}} Claude Code-only rules in permissions.json are kept as they are.",
+    "restartHint": "Codex and Grok CLI read the rules when a session starts. Copilot keeps no block rules, so Illithid blocks them with a check hook.",
+    "copilotHook": "Blocked by an Illithid check hook (Copilot keeps no block rules)",
+    "copilotNo": "Copilot can't keep ask or allow rules",
+    "grokViaClaude": "Grok CLI reads these from Claude Code's settings",
+    "codexPrefix": "Codex matches the start of the command, so this also covers longer commands"
   }
 }

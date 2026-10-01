@@ -11,7 +11,8 @@
     "backup": "备份",
     "memory": "记忆",
     "stats": "统计",
-    "hooks": "钩子"
+    "hooks": "钩子",
+    "permissions": "权限"
   },
   "settings": {
     "language": "语言",
@@ -921,5 +922,42 @@
     "convertTitle": "改为自己编写的脚本",
     "convertBody": "{{tool}} 的脚本会成为此钩子的 run.sh，所有工具都运行它。选项将不再生效。",
     "converted": "现在运行自己的脚本"
+  },
+  "permissions": {
+    "new": "新建规则",
+    "search": "搜索规则",
+    "created": "已添加规则",
+    "saved": "已保存规则",
+    "deleted": "已删除规则",
+    "deleteTitle": "删除规则",
+    "deleteBody": "删除 {{command}} 的规则。下次同步时也会从工具中移除。",
+    "empty": "还没有权限规则",
+    "emptyHint": "添加规则后，在所有工具中阻止、询问或允许某个 shell 命令。",
+    "decision": {
+      "deny": "阻止",
+      "ask": "询问",
+      "allow": "允许"
+    },
+    "decisionHint": {
+      "deny": "代理无法运行这些命令。",
+      "ask": "代理运行前会先询问你。",
+      "allow": "代理不询问直接运行。"
+    },
+    "decisionLabel": "处理方式",
+    "exact": "精确",
+    "exactLabel": "仅与此命令完全相同时",
+    "exactHint": "关闭时也包括以此开头的命令 (git push --force origin main)。",
+    "command": "命令",
+    "commandHint": "命令开头的词。可以用引号把词组合起来 (与 shell 相同)。",
+    "note": "备注",
+    "duplicate": "此命令已有规则",
+    "guards": "阻止命令的钩子",
+    "guardsHint": "这些钩子也会检查命令，只要命令中任何位置出现就阻止。在钩子菜单中编辑。",
+    "claudeOnly": "permissions.json 中 {{count}} 条仅 Claude Code 的规则保持不变。",
+    "restartHint": "Codex 和 Grok CLI 在会话开始时读取规则。Copilot 无法保存阻止规则，因此由 Illithid 用检查钩子阻止。",
+    "copilotHook": "由 Illithid 检查钩子阻止 (Copilot 无法保存阻止规则)",
+    "copilotNo": "Copilot 无法保存询问或允许规则",
+    "grokViaClaude": "Grok CLI 从 Claude Code 的设置中读取这些规则",
+    "codexPrefix": "Codex 按命令开头匹配，因此也包括更长的命令"
   }
 }

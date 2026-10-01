@@ -75,7 +75,9 @@ import {
   isHookTool,
   keepHookCopy,
   type HookDoc,
-  type NewHookInput
+  type NewHookInput,
+  savePermissionRules,
+  type PermissionRules
 } from '../engine'
 import { previewSwitch } from '../engine'
 import { LEGACY_LIBRARY_DIR } from '../engine/config'
@@ -597,6 +599,9 @@ export function toolsInUseSet(
 // ---------------------------------------------------------------- Library
 
 export const lib = {
+  permissionsSave: (home: string, rules: PermissionRules) => ({
+    path: savePermissionRules(home, rules)
+  }),
   toggle: (home: string, kind: ManifestKind, name: string, tool: ToolId, on: boolean) =>
     setToggle(home, kind, name, tool, !!on),
   ruleRead: (home: string, name: string) => readRule(home, name),
@@ -690,6 +695,7 @@ export const lib = {
   hookKeepCopy: (home: string, name: string, tool: string, file: string) => {
     if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
     keepHookCopy(home, tool, name, file)
+    return { file }
   }
 }
 

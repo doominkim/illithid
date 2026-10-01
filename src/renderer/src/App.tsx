@@ -16,6 +16,7 @@ import {
   Sparkles,
   Store,
   Users,
+  ShieldCheck,
   Webhook
 } from 'lucide-react'
 import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
@@ -30,6 +31,7 @@ import Memory from './views/Memory'
 import Skills from './views/Skills'
 import Mcp from './views/Mcp'
 import Hooks from './views/Hooks'
+import Permissions from './views/Permissions'
 import Agents from './views/Agents'
 import Market from './views/Market'
 import Artifacts from './views/Artifacts'
@@ -56,6 +58,7 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
   skills: <Sparkles size={16} />,
   mcp: <Plug size={16} />,
   hooks: <Webhook size={16} />,
+  permissions: <ShieldCheck size={16} />,
   agents: <Users size={16} />,
   market: <Store size={16} />,
   artifacts: <FolderOpen size={16} />,
@@ -367,6 +370,7 @@ function App(): React.JSX.Element {
     skills: <Skills />,
     mcp: <Mcp />,
     hooks: <Hooks />,
+    permissions: <Permissions />,
     agents: <Agents />,
     market: <Market />,
     artifacts: <Artifacts />,

@@ -4,6 +4,7 @@
  * Raw target files and secrets are never sent to the renderer (owned-region excerpts + masked values).
  */
 import type {
+  PermissionRules,
   AgentDoc,
   AgentDocInput,
   HookAction,
@@ -284,6 +285,24 @@ export interface HooksData {
   grokReadsClaude?: boolean
 }
 
+/** How a tool gets the permission rules: its own file (sync state), through Claude Code's settings (Grok), or not at all */
+export type PermissionToolState = SyncState | 'notApplicable' | 'viaClaude'
+
+/** The permissions menu */
+export interface PermissionsData {
+  /** permissions.json (display ~/...) */
+  file: string
+  rules: PermissionRules
+  /** Claude Code-only raw rules kept in permissions.json (claudeOnly), shown as a count */
+  claudeOnly: number
+  /** Per tool in use */
+  tools: Partial<Record<ToolId, PermissionToolState>>
+  reasons?: Partial<Record<ToolId, string>>
+  /** Hooks that block commands too (the guard action) */
+  guards: { name: string; patterns: string[] }[]
+  error?: string
+}
+
 /** HOOK.md, its scripts and what each tool runs, for the detail sheet */
 export interface HookEditView {
   name: string
@@ -296,6 +315,7 @@ export interface HookEditView {
   >
 }
 
+export type { CommandRule, McpRule, PermissionDecision, PermissionRules } from '../engine'
 export type {
   HookAction,
   HookDoc,
@@ -693,6 +713,7 @@ export interface Api {
   agents(): Promise<AgentsData>
   mcp(): Promise<McpData>
   hooks(): Promise<HooksData>
+  permissions(): Promise<PermissionsData>
   artifacts(): Promise<Artifact[]>
   artifactPreview(id: string): Promise<ArtifactPreview>
   /** Image or HTML thumbnail (data URL, about 256px; null if there is none) */
@@ -826,6 +847,7 @@ export interface Api {
   hookRead(name: string): Promise<WriteResult<HookEditView>>
   hookCreate(name: string, input: NewHookInput): Promise<WriteResult<{ name: string }> | Refused>
   hookSave(name: string, doc: HookDoc): Promise<WriteResult<{ name: string }> | Refused>
+  permissionsSave(rules: PermissionRules): Promise<WriteResult<{ path: string }> | Refused>
   hookConvert(name: string, tool: HookTool): Promise<WriteResult<{ name: string }> | Refused>
   hookDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   hookScriptSave(
@@ -838,7 +860,11 @@ export interface Api {
     tool: HookTool
   ): Promise<WriteResult<{ file: string }> | Refused>
   hookToolScriptDrop(name: string, tool: HookTool): Promise<WriteResult<TrashResult> | Refused>
-  hookKeepCopy(name: string, tool: HookTool, file: string): Promise<WriteResult | Refused>
+  hookKeepCopy(
+    name: string,
+    tool: HookTool,
+    file: string
+  ): Promise<WriteResult<{ file: string }> | Refused>
   memoryFiles(): Promise<WriteResult<string[]>>
   memoryRead(rel: string): Promise<WriteResult<string>>
   memorySave(rel: string, content: string): Promise<WriteResult | Refused>
@@ -979,6 +1005,7 @@ export const CHANNELS = [
   'agents',
   'mcp',
   'hooks',
+  'permissions',
   'artifacts',
   'artifactPreview',
   'artifactThumb',
@@ -1042,6 +1069,7 @@ export const CHANNELS = [
   'hookRead',
   'hookCreate',
   'hookSave',
+  'permissionsSave',
   'hookConvert',
   'hookDelete',
   'hookScriptSave',

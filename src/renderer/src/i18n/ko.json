@@ -11,7 +11,8 @@
     "backup": "백업",
     "memory": "메모리",
     "stats": "통계",
-    "hooks": "훅"
+    "hooks": "훅",
+    "permissions": "권한"
   },
   "settings": {
     "language": "언어",
@@ -921,5 +922,42 @@
     "convertTitle": "직접 작성으로 전환",
     "convertBody": "{{tool}} 스크립트가 이 훅의 run.sh 가 되고 모든 툴이 그것을 실행합니다. 옵션은 더 이상 적용되지 않습니다.",
     "converted": "이제 직접 작성한 스크립트를 실행합니다"
+  },
+  "permissions": {
+    "new": "새 규칙",
+    "search": "규칙 검색",
+    "created": "규칙을 추가했습니다",
+    "saved": "규칙을 저장했습니다",
+    "deleted": "규칙을 삭제했습니다",
+    "deleteTitle": "규칙 삭제",
+    "deleteBody": "{{command}} 규칙을 지웁니다. 다음 동기화 때 툴에서도 빠집니다.",
+    "empty": "권한 규칙이 없습니다",
+    "emptyHint": "규칙을 추가하면 모든 툴에서 셸 명령을 막거나, 묻거나, 허용합니다.",
+    "decision": {
+      "deny": "막기",
+      "ask": "물어보기",
+      "allow": "허용"
+    },
+    "decisionHint": {
+      "deny": "에이전트가 실행할 수 없습니다.",
+      "ask": "실행 전에 에이전트가 물어봅니다.",
+      "allow": "묻지 않고 실행합니다."
+    },
+    "decisionLabel": "처리",
+    "exact": "정확히",
+    "exactLabel": "이 명령과 정확히 같을 때만",
+    "exactHint": "끄면 이 명령으로 시작하는 명령도 포함합니다 (git push --force origin main).",
+    "command": "명령",
+    "commandHint": "명령이 시작하는 단어들. 따옴표로 단어를 묶을 수 있습니다 (셸과 같음).",
+    "note": "메모",
+    "duplicate": "이 명령에는 이미 규칙이 있습니다",
+    "guards": "명령을 막는 훅",
+    "guardsHint": "이 훅들도 명령을 검사합니다. 명령 어디에 있든 찾아 막습니다. 훅 메뉴에서 고칩니다.",
+    "claudeOnly": "permissions.json 의 Claude Code 전용 규칙 {{count}}개는 그대로 둡니다.",
+    "restartHint": "Codex, Grok CLI 는 세션을 시작할 때 규칙을 읽습니다. Copilot 은 막기 규칙을 저장하지 못해서 Illithid 가 검사 훅으로 막습니다.",
+    "copilotHook": "Illithid 검사 훅으로 막음 (Copilot 은 막기 규칙을 저장 못 함)",
+    "copilotNo": "Copilot 은 물어보기·허용 규칙을 저장 못 함",
+    "grokViaClaude": "Grok CLI 는 Claude Code 설정에서 이 규칙을 읽음",
+    "codexPrefix": "Codex 는 명령 앞부분으로 맞춰서, 더 긴 명령도 포함됨"
   }
 }

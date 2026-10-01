@@ -93,7 +93,8 @@ const ENV_OPS: ReadonlySet<Op> = new Set<Op>([
   'syncPending',
   'syncPreview',
   'mcp',
-  'hooks'
+  'hooks',
+  'permissions'
 ])
 
 /** Run synchronous scans on a worker thread so the main event loop is not blocked */
@@ -326,6 +327,7 @@ export function registerIpc(): void {
     agents: () => inWorker('agents', home),
     mcp: () => inWorker('mcp', home),
     hooks: () => inWorker('hooks', home),
+    permissions: () => inWorker('permissions', home),
     sessions: async () => {
       const r = await inWorker('sessions', home)
       // Session refresh = incremental index (if already running, run once more afterwards)
@@ -591,6 +593,7 @@ export function registerIpc(): void {
     hookCreate: async (name, input) =>
       libWrite(() => W.lib.hookCreate(home, str(name), input as never)),
     hookSave: async (name, doc) => libWrite(() => W.lib.hookSave(home, str(name), doc as never)),
+    permissionsSave: async (rules) => libWrite(() => W.lib.permissionsSave(home, rules as never)),
     hookConvert: async (name, tool) =>
       libWrite(() => W.lib.hookConvert(home, str(name), str(tool))),
     hookDelete: async (name) => libWrite(() => W.lib.hookDelete(home, str(name))),

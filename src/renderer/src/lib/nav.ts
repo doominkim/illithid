@@ -6,6 +6,7 @@ export const PRIMARY = [
   'skills',
   'mcp',
   'hooks',
+  'permissions',
   'agents',
   'market',
   'artifacts',
