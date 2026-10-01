@@ -77,7 +77,7 @@ commands
   config           Show app config (~/${APP_CONFIG_DIR}/config.json)·library location·on/off summary
   toggle <kind> <name> <tool> on|off
                    Save on/off to the library ${MANIFEST_FILE} (--home fixture only; apply writes to tools)
-                   kind: rules|skills|mcp|agents, tool: claude|codex|opencode|gemini|copilot
+                   kind: rules|skills|mcp|agents|hooks, tool: claude|codex|opencode|gemini|copilot
   rename-migrate   Plan moving old app-name paths (${LEGACY_APP_LIBRARY_DIRS.map((d) => '~/' + d).join(', ')},
                    ${LEGACY_APP_CONFIG_DIRS.map((d) => '~/' + d).join(', ')}) → new paths.
                    Run with --apply. On the real HOME it runs only together with --i-understand
@@ -828,7 +828,7 @@ function runToggle(home: string, homeExplicit: boolean, json: boolean, args: str
   const [kind, name, tool, state] = args
   if (args.length !== 4 || (state !== 'on' && state !== 'off'))
     throw new Error(
-      'usage: toggle <rules|skills|mcp|agents> <name> <claude|codex|opencode|gemini|copilot> on|off --home <dir>'
+      'usage: toggle <rules|skills|mcp|agents|hooks> <name> <claude|codex|opencode|gemini|copilot> on|off --home <dir>'
     )
   if (!(MANIFEST_KINDS as readonly string[]).includes(kind))
     throw new Error(`kind must be ${MANIFEST_KINDS.join('|')}`)

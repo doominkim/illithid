@@ -15,13 +15,15 @@ export const TOOL_IDS: readonly ToolId[] = IDS
  */
 export const DEFAULT_TOOLS_IN_USE: readonly ToolId[] = ['claude', 'codex', 'opencode']
 
-export type ManifestKind = 'rules' | 'skills' | 'mcp' | 'agents'
-export const MANIFEST_KINDS: readonly ManifestKind[] = ['rules', 'skills', 'mcp', 'agents']
+export type ManifestKind = 'rules' | 'skills' | 'mcp' | 'agents' | 'hooks'
+export const MANIFEST_KINDS: readonly ManifestKind[] = ['rules', 'skills', 'mcp', 'agents', 'hooks']
 
 /** Tools that can be toggled per kind. OpenCode reads the whole library skills folder; its off skills get a permission "deny" */
 export const MANIFEST_TOOLS: Readonly<Record<ManifestKind, readonly ToolId[]>> = {
   rules: TOOL_IDS,
   skills: TOOL_IDS,
   mcp: TOOL_IDS,
-  agents: TOOL_IDS
+  agents: TOOL_IDS,
+  // OpenCode has no command hooks (JS plugins only)
+  hooks: ['claude', 'codex', 'gemini', 'copilot', 'grok']
 }

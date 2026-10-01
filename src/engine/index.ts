@@ -493,3 +493,36 @@ export type {
   SessionRef
 } from './search/modelStats'
 export { seedNewToolToggles } from './manifest'
+export {
+  HOOK_TOOLS,
+  HOOK_TIMINGS,
+  HOOK_CATALOG,
+  HOOK_CHECKED,
+  isHookTool,
+  hookEventsFor,
+  defaultHookEvent,
+  hookEventInfo
+} from './hookEvents'
+export type { HookTool, HookTiming, HookEventInfo, HookToolInfo } from './hookEvents'
+export {
+  readHooks,
+  readHook,
+  hookNames,
+  hooksDir,
+  validateHookDef,
+  hookScriptFiles,
+  scriptForTool,
+  HOOKS_DIR,
+  HOOK_FILE,
+  SHARED_SCRIPT
+} from './hooks'
+export type { HookDef, HookTrigger, LibraryHook } from './hooks'
+export {
+  createHook,
+  saveHookDef,
+  saveHookScript,
+  createHookToolScript,
+  dropHookToolScript,
+  deleteHook
+} from './library'
+export type { NewHookInput } from './library'

@@ -23,6 +23,7 @@ export interface Manifest {
   skills: Record<string, ToolToggles>
   mcp: Record<string, ToolToggles>
   agents: Record<string, ToolToggles>
+  hooks: Record<string, ToolToggles>
   [key: string]: unknown
 }
 
@@ -48,7 +49,7 @@ export function manifestPath(home: string): string {
 }
 
 export function emptyManifest(): Manifest {
-  return { version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }
+  return { version: 1, rules: {}, skills: {}, mcp: {}, agents: {}, hooks: {} }
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -59,7 +60,15 @@ function isObj(v: unknown): v is Record<string, unknown> {
 export function parseManifest(raw: unknown): Manifest | string {
   if (!isObj(raw)) return 'top level is not an object'
   if (raw.version !== 1) return 'unsupported version'
-  const out: Manifest = { ...raw, version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }
+  const out: Manifest = {
+    ...raw,
+    version: 1,
+    rules: {},
+    skills: {},
+    mcp: {},
+    agents: {},
+    hooks: {}
+  }
   for (const kind of MANIFEST_KINDS) {
     const sec = raw[kind] ?? {}
     if (!isObj(sec)) return `${kind} is not an object`
