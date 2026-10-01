@@ -109,7 +109,8 @@ const MODES: Record<TargetId, number> = {
   codexHooks: 0o600, // same file as codexMcp (not a default target)
   geminiHooks: 0o600, // same file as geminiMcp (not a default target)
   copilotHooks: 0o600, // not a default target
-  grokHooks: 0o600 // not a default target
+  grokHooks: 0o600, // not a default target
+  geminiPolicy: 0o644 // not a default target
 }
 const rel = (id: TargetId): string => TARGETS.find((t) => t.id === id)!.rel
 

@@ -95,7 +95,7 @@ const TARGET_OF: Partial<Record<Resource, Partial<Record<ToolId, TargetId>>>> = 
   rules: { codex: 'codexAgents', opencode: 'opencodeRules', gemini: 'geminiRules' },
   skills: { opencode: 'opencodeSkills' }, // withSkillOverride merges in the tool's own skill-disable settings
   mcp: MCP_TARGET_OF,
-  permissions: { claude: 'claudePermissions', codex: 'codexRules' }
+  permissions: { claude: 'claudePermissions', codex: 'codexRules', gemini: 'geminiPolicy' }
 }
 
 /** Ordered by severity (when mixed, the earlier one wins) */

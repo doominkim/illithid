@@ -12,9 +12,11 @@ import { join } from 'node:path'
 import { readConfig, toolInUse } from './config'
 import { HOOK_CATALOG, type HookTool } from './hookEvents'
 import { hookTriggers, type HookTrigger, type LibraryHook } from './hooks'
-import { renderAskPrompt, toolScript } from './hookScripts'
+import { renderAskPrompt, renderPermissionGuard, toolScript } from './hookScripts'
 import { isEnabled, type Manifest } from './manifest'
 import { grokClaudeReading } from './targets/grokCompat'
+import { normalizeEntry } from './text'
+import type { Allowlist } from './types'
 
 /** Tool home relative to HOME */
 const TOOL_HOME: Readonly<Record<HookTool, string>> = {
@@ -77,14 +79,40 @@ const runsIn = (h: LibraryHook, tool: HookTool, manifest: Manifest | undefined):
  * Hooks a tool gets, sorted by name: the tool can run them, they are on in illithid.json, and — for Grok — they don't already
  * reach it through Claude Code's settings. Retiring tools get none (offTools in the manifest)
  */
+/** Name of the check hook that carries permission deny rules into tools that can't keep them (not a valid library hook name) */
+export const PERMISSION_HOOK = '_permissions'
+
+/** Tools whose deny rules go through a check hook, and the trigger it uses */
+const PERMISSION_HOOK_TRIGGER: Partial<Record<HookTool, HookTrigger>> = {
+  copilot: { event: 'preToolUse', matcher: 'bash' }
+}
+
+function permissionHook(tool: HookTool, allowlist: Allowlist | null): ToolHook[] {
+  const trigger = PERMISSION_HOOK_TRIGGER[tool]
+  const deny = (allowlist?.bashDeny ?? []).map(normalizeEntry)
+  if (!trigger || !deny.length) return []
+  const hook: LibraryHook = {
+    name: PERMISSION_HOOK,
+    doc: { description: '', when: 'before-tool', action: 'script', options: {}, body: '' },
+    scripts: {}
+  }
+  const content = renderPermissionGuard(
+    tool,
+    deny.map((d) => ({ argv: d.argv, exact: d.claudeExact }))
+  )
+  return [{ hook, trigger, kind: 'command', file: 'run.sh', content }]
+}
+
 export function hooksForTool(
   home: string,
   tool: HookTool,
   hooks: readonly LibraryHook[],
-  manifest: Manifest | undefined
+  manifest: Manifest | undefined,
+  /** permissions.json (null when absent): deny rules for tools that keep none become a check hook */
+  allowlist: Allowlist | null = null
 ): ToolHook[] {
   const viaClaude = tool === 'grok' && grokReadsClaudeHooks(home) && toolInUse(home, 'claude')
-  return hooks
+  const library = hooks
     .filter((h) => runsIn(h, tool, manifest))
     .filter((h) => !viaClaude || !runsIn(h, 'claude', manifest))
     .map((h): ToolHook => {
@@ -95,6 +123,7 @@ export function hooksForTool(
         : { hook: h, trigger, kind: 'prompt', file: '', content: renderAskPrompt(h.doc) }
     })
     .sort((a, b) => a.hook.name.localeCompare(b.hook.name))
+  return [...permissionHook(tool, allowlist), ...library]
 }
 
 /** Timeout in the tool's own unit */

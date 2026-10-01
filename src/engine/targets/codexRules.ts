@@ -37,8 +37,14 @@ export const LEGACY_RULES_MARKERS: readonly MarkerPair[] = [
 ]
 const ALL_RULES_MARKERS: readonly MarkerPair[] = [RULES_MARKERS, ...LEGACY_RULES_MARKERS]
 
-export function toPrefixRule(argv: string[]): string {
-  return `prefix_rule(pattern=[${argv.map((a) => JSON.stringify(a)).join(', ')}], decision="allow")`
+/** Codex decision per rule list: allow, prompt (ask) and forbidden (deny) */
+const CODEX_DECISION = { bash: 'allow', bashAsk: 'prompt', bashDeny: 'forbidden' } as const
+
+export function toPrefixRule(
+  argv: string[],
+  decision: 'allow' | 'prompt' | 'forbidden' = 'allow'
+): string {
+  return `prefix_rule(pattern=[${argv.map((a) => JSON.stringify(a)).join(', ')}], decision="${decision}")`
 }
 
 export function buildCodexRulesBody(
@@ -49,11 +55,13 @@ export function buildCodexRulesBody(
   const outside = outsideBlockMulti(currentText, ALL_RULES_MARKERS)
   const kept: { argv: string[]; line: string }[] = []
   const skipped: { argv: string[]; line: string }[] = []
-  for (const entry of allowlist.bash) {
-    const { argv } = normalizeEntry(entry)
-    const line = toPrefixRule(argv)
-    ;(outside.includes(line) ? skipped : kept).push({ argv, line })
-  }
+  // Codex matches argv prefixes only: an exact rule is written as a prefix rule
+  for (const key of ['bash', 'bashAsk', 'bashDeny'] as const)
+    for (const entry of allowlist[key] ?? []) {
+      const { argv } = normalizeEntry(entry)
+      const line = toPrefixRule(argv, CODEX_DECISION[key])
+      ;(outside.includes(line) ? skipped : kept).push({ argv, line })
+    }
   const body = kept.length
     ? kept.map((r) => r.line).join('\n')
     : '# (all entries already exist elsewhere in this file)'

@@ -6,7 +6,7 @@ import {
   toJsonText,
   untouchedKeysSame
 } from '../text'
-import { type Allowlist, type McpSource, type TargetDef } from '../types'
+import { type Allowlist, type AllowlistEntry, type McpSource, type TargetDef } from '../types'
 
 type Json = Record<string, unknown>
 /** permissions subkeys owned by the app */
@@ -17,17 +17,16 @@ type Permissions = { allow?: string[]; deny?: string[]; ask?: string[]; [k: stri
 export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, settings: Json): Json {
   const next = structuredClone(settings) as Json & { permissions?: Permissions }
   next.permissions = next.permissions ?? {}
-  next.permissions.allow = [
-    ...allowlist.bash.map((e) => {
+  const bash = (list: AllowlistEntry[] | undefined): string[] =>
+    (list ?? []).map((e) => {
       const { argv, claudeExact } = normalizeEntry(e)
       return `Bash(${argv.join(' ')}${claudeExact ? '' : ':*'})`
-    }),
-    ...allowlist.claudeOnly.allow
-  ]
-  next.permissions.deny = [...allowlist.claudeOnly.deny]
+    })
+  next.permissions.allow = [...bash(allowlist.bash), ...allowlist.claudeOnly.allow]
+  next.permissions.deny = [...bash(allowlist.bashDeny), ...allowlist.claudeOnly.deny]
   // Mirrors Codex MCP tool approval (approve/prompt/writes) into Claude permissions.ask,
   // so both tools gate the same MCP write tools the same way (gate alignment 2026-09-20).
-  const ask: string[] = []
+  const ask: string[] = bash(allowlist.bashAsk)
   for (const [name, s] of mcpEntries(mcp)) {
     for (const [tool, mode] of Object.entries(s.codex?.toolApprovals ?? {})) {
       if (mode !== 'auto') ask.push(`mcp__${name}__${tool}`)

@@ -182,7 +182,13 @@ function renderEntry(home: string, tool: HookTool, h: ToolHook): Json {
 /** Hooks this target writes (none for a retiring tool or a missing home) */
 function wanted(tool: HookTool, ctx: BuildContext): ToolHook[] {
   if (ctx.retiring || !ctx.home) return []
-  return hooksForTool(ctx.home, tool, ctx.sources.hooks ?? [], ctx.sources.manifest)
+  return hooksForTool(
+    ctx.home,
+    tool,
+    ctx.sources.hooks ?? [],
+    ctx.sources.manifest,
+    ctx.sources.hasPermissions ? ctx.sources.allowlist : null
+  )
 }
 
 /**

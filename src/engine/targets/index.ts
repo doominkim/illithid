@@ -8,6 +8,7 @@ import { codexMcp } from './codexMcp'
 import { codexRules } from './codexRules'
 import { copilotMcp } from './copilotMcp'
 import { geminiMcp } from './geminiMcp'
+import { geminiPolicy } from './geminiPolicy'
 import { grokCompat } from './grokCompat'
 import { HOOK_TARGETS } from './hooks'
 import { grokMcp } from './grokMcp'
@@ -41,6 +42,7 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   copilotMcp,
   grokMcp,
   grokCompat,
+  geminiPolicy,
   // After the targets that write the same files (settings.json, config.toml)
   ...HOOK_TARGETS
 ]

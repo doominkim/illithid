@@ -15,7 +15,7 @@ import { toolHomeOverride } from './agents'
 import { appConfigDir, syncTools } from './config'
 import { deliverFile } from './deliver'
 import { HOOK_TOOLS, isHookTool, type HookTool } from './hookEvents'
-import { hookCopyPath, hookCopyRoot, hooksForTool } from './hookRender'
+import { hookCopyPath, hookCopyRoot, hooksForTool, PERMISSION_HOOK } from './hookRender'
 import { HOOK_FILE, hooksDir, readHooks } from './hooks'
 import { toolScript } from './hookScripts'
 import { LibraryError } from './libpath'
@@ -23,7 +23,8 @@ import { convertHookToScript, saveHookScript } from './library'
 import { MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
-import type { Env } from './types'
+import { libraryPaths, readPermissionsFile } from './sources'
+import type { Allowlist, Env } from './types'
 import { ConcurrentChangeError, fileHash } from './write'
 
 export const HOOK_SCRIPT_MODE = 0o755
@@ -71,6 +72,15 @@ function lstatOrNull(p: string): Stats | null {
   }
 }
 
+/** permissions.json, or null when absent or unreadable (the permission targets report a broken file) */
+function permissionsOrNull(home: string): Allowlist | null {
+  try {
+    return readPermissionsFile(home)
+  } catch {
+    return null
+  }
+}
+
 const executable = (st: Stats): boolean => (st.mode & 0o111) === 0o111
 
 /** Plan. Read-only */
@@ -78,6 +88,7 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
   const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const hooks = readHooks(home)
+  const perms = permissionsOrNull(home)
   const managedAll = readState(home).state.hookScripts ?? {}
   const items: HookSyncItem[] = []
   for (const tool of syncTools(home).filter(isHookTool)) {
@@ -85,18 +96,21 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
     if (toolHomeOverride(home, tool, env)) continue
     const managed = managedAll[tool] ?? {}
     const wanted = new Set<string>()
-    for (const th of hooksForTool(home, tool, hooks, mf.manifest)) {
+    for (const th of hooksForTool(home, tool, hooks, mf.manifest, perms)) {
       // Prompt hooks (ask) have no script copy
       if (th.kind !== 'command') continue
       const name = `${th.hook.name}/${th.file}`
       wanted.add(name)
       const path = hookCopyPath(home, tool, th.hook.name, th.file)
       // Built-in actions are rendered per tool; the script action copies its own file
-      const source = join(
-        hooksDir(home),
-        th.hook.name,
-        th.hook.doc.action === 'script' ? th.file : HOOK_FILE
-      )
+      const source =
+        th.hook.name === PERMISSION_HOOK
+          ? libraryPaths(home).permissions
+          : join(
+              hooksDir(home),
+              th.hook.name,
+              th.hook.doc.action === 'script' ? th.file : HOOK_FILE
+            )
       const sourceHash = sha256(th.content)
       const base = { tool, name, hook: th.hook.name, file: th.file, path, source, sourceHash }
       const st = lstatOrNull(path)
@@ -181,8 +195,9 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
   const fresh = planHookSync(home, env)
   const mf = readPlanManifest(home)
   const hooks = readHooks(home)
+  const perms = permissionsOrNull(home)
   const contentOf = (tool: HookTool, hook: string, file: string): string | undefined =>
-    hooksForTool(home, tool, hooks, mf.manifest).find(
+    hooksForTool(home, tool, hooks, mf.manifest, perms).find(
       (x) => x.hook.name === hook && x.kind === 'command' && x.file === file
     )?.content
   for (const it of items) {

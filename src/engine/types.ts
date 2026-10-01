@@ -108,6 +108,7 @@ export type ExtraTargetId =
   | 'geminiHooks'
   | 'copilotHooks'
   | 'grokHooks'
+  | 'geminiPolicy'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 
