@@ -81,6 +81,7 @@ import {
   saveScript,
   deleteScript,
   convertHookToLibraryScript,
+  renderUniversalScript,
   type PermissionRules
 } from '../engine'
 import { previewSwitch } from '../engine'
@@ -680,7 +681,15 @@ export const lib = {
     if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
     const h = readHook(home, name)
     const content = toolScript(tool, h)?.content ?? HOOK_SCRIPT_TEMPLATE
-    if (script) convertHookToLibraryScript(home, name, script, content)
+    // A library script runs in every tool: built-in actions are saved as their all-tools version
+    const builtIn = h.doc.action !== 'script' && h.doc.action !== 'ask'
+    if (script)
+      convertHookToLibraryScript(
+        home,
+        name,
+        script,
+        builtIn ? renderUniversalScript(name, h.doc) : content
+      )
     else convertHookToScript(home, name, content)
     return { name }
   },

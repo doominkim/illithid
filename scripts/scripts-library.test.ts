@@ -11,10 +11,12 @@ import {
   keepHookCopy,
   readHook,
   readScripts,
+  renderUniversalScript,
   saveScript,
   scriptUsers,
   syncAll
 } from '../src/engine'
+import { lib } from '../src/main/writes'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
 const LIB = '.illithid/workspaces/default'
@@ -130,4 +132,15 @@ test('REQ-SCRIPTS-4 a generated hook script can be saved to the library and the 
     readFileSync(join(home, '.claude/hooks/illithid/done/run.sh'), 'utf8'),
     '#!/bin/sh\necho done\n'
   )
+})
+
+test("REQ-SCRIPTS-5 saving a recipe hook's script to the library keeps one script that works in every tool", () => {
+  const home = demoHome()
+  createHook(home, 'guard', { description: '', when: 'before-tool', action: 'guard', options: {} })
+  const before = readHook(home, 'guard').doc
+  lib.hookConvert(home, 'guard', 'claude', 'guard-all')
+  const content = readFileSync(join(home, LIB, 'scripts/guard-all.sh'), 'utf8')
+  assert.equal(content, renderUniversalScript('guard', before))
+  assert.match(content, /case "\$1" in/)
+  assert.equal(readHook(home, 'guard').doc.options.use, 'guard-all')
 })

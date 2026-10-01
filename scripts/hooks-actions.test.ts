@@ -13,6 +13,7 @@ import {
   validateHookDoc,
   renderActionScript,
   renderAskPrompt,
+  renderUniversalScript,
   type HookAction,
   type HookDoc,
   type HookTiming,
@@ -554,4 +555,40 @@ test('REQ-HOOKS-ACTIONS-17 checkpoint as a WIP commit: everything changed goes i
 
 test('REQ-HOOKS-ACTIONS-18 format runs at the end of a reply by default', () => {
   assert.equal(HOOK_ACTION_INFO.format.timings[0], 'stop')
+})
+
+test("REQ-HOOKS-ACTIONS-19 the all-tools script behaves like each tool's own script, picked by the tool name in $1", () => {
+  const guard = doc('guard', 'before-tool')
+  const all = renderUniversalScript('guard', guard)
+  for (const tool of TOOLS) {
+    const own = renderActionScript(tool, 'guard', guard)
+    for (const cmd of ['git push --force origin main', 'ls -la']) {
+      const a = run(all, tool, shell(tool, cmd))
+      const b = run(own, tool, shell(tool, cmd))
+      assert.equal(a.code, b.code, `${tool} ${cmd}`)
+      assert.equal(a.err, b.err, `${tool} ${cmd}`)
+      assert.equal(a.out, b.out, `${tool} ${cmd}`)
+    }
+  }
+  // A tool the recipe can't run in does nothing
+  const protect = renderUniversalScript('protect', doc('protect', 'before-tool'))
+  assert.equal(run(protect, 'codex', { tool_input: { command: 'x' } }).code, 0)
+  assert.equal(
+    run(protect, 'claude', { tool_name: 'Edit', tool_input: { file_path: '/p/.env' } }).code,
+    2
+  )
+  // Copilot's own reply format survives (check before finishing)
+  const { dir, bin } = nodeProject()
+  const v = run(
+    renderUniversalScript('verify', doc('verify', 'stop')),
+    'copilot',
+    { sessionId: 'u1' },
+    {
+      env: { PATH: bin.path, FAIL: '1', TMPDIR: mkdtempSync(join(tmpdir(), 'illithid-tmp-')) },
+      cwd: dir
+    }
+  )
+  assert.equal((JSON.parse(v.out) as { decision: string }).decision, 'block')
+  // An unknown tool name: nothing happens
+  assert.equal(run(all, 'opencode' as HookTool, shell('claude', 'git push --force')).code, 0)
 })

@@ -539,7 +539,12 @@ export {
   DEFAULT_GUARD_PATTERNS
 } from './hookActions'
 export type { HookAction, HookActionInfo, HookSupport } from './hookActions'
-export { renderActionScript, renderAskPrompt, toolScript } from './hookScripts'
+export {
+  renderActionScript,
+  renderAskPrompt,
+  renderUniversalScript,
+  toolScript
+} from './hookScripts'
 export {
   createHook,
   saveHookDoc,
