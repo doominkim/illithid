@@ -8,7 +8,7 @@ import {
   type MarkerPair
 } from '../text'
 import { isSecretRef, type SecretBackend } from '../secrets'
-import type { Env, McpSource, TargetDef } from '../types'
+import type { Env, McpPermissionEntry, McpSource, TargetDef } from '../types'
 import { bareEnvName, httpHeaders, isServerError, renderValue, secretValue } from './mcpRender'
 import {
   disabledUnownedServers,
@@ -86,7 +86,12 @@ export function buildCodexMcpBody(
   mcp: McpSource,
   env: Env,
   secrets?: SecretBackend,
-  prevBody = ''
+  prevBody = '',
+  /**
+   * Permission rules for MCP tools (permissions.json mcp). Block → disabled_tools (a whole server: enabled = false); ask →
+   * approval_mode "prompt". Allow is left to the server's own Codex settings: Codex approval modes don't map one to one
+   */
+  rules: readonly McpPermissionEntry[] = []
 ): CodexMcpBody {
   const lines: string[] = []
   const warnings: string[] = []
@@ -107,12 +112,21 @@ export function buildCodexMcpBody(
         if (s.bearerEnv) out.push(`bearer_token_env_var = ${tomlString(s.bearerEnv)}`)
       }
       const cx = s.codex ?? {}
-      if (cx.defaultToolsApprovalMode) {
-        out.push(`default_tools_approval_mode = ${tomlString(cx.defaultToolsApprovalMode)}`)
+      const mine = rules.filter((r) => r.server === name)
+      const ruled = (d: string, all: boolean): McpPermissionEntry[] =>
+        mine.filter((r) => r.decision === d && (r.tool === '*') === all)
+      if (ruled('deny', true).length) out.push('enabled = false')
+      const defaultMode = ruled('ask', true).length ? 'prompt' : cx.defaultToolsApprovalMode
+      if (defaultMode) {
+        out.push(`default_tools_approval_mode = ${tomlString(defaultMode)}`)
       }
       if (cx.enabledTools) {
         out.push(`enabled_tools = [${cx.enabledTools.map(tomlString).join(', ')}]`)
       }
+      const disabled = ruled('deny', false).map((r) => r.tool)
+      if (disabled.length) out.push(`disabled_tools = [${disabled.map(tomlString).join(', ')}]`)
+      const approvals: Record<string, string> = { ...(cx.toolApprovals ?? {}) }
+      for (const r of ruled('ask', false)) approvals[r.tool] = 'prompt'
       // Codex only accepts literals for stdio env — env vars and secrets are resolved in place.
       if (s.transport === 'stdio' && s.env) {
         out.push('', `[mcp_servers.${key}.env]`)
@@ -139,7 +153,7 @@ export function buildCodexMcpBody(
           for (const [k, envName] of envMapped) out.push(`${k} = ${tomlString(envName)}`)
         }
       }
-      for (const [tool, mode] of Object.entries(cx.toolApprovals ?? {})) {
+      for (const [tool, mode] of Object.entries(approvals)) {
         out.push('', `[mcp_servers.${key}.tools.${tool}]`, `approval_mode = ${tomlString(mode)}`)
       }
     } catch (e) {
@@ -189,7 +203,8 @@ export const codexMcp: TargetDef = {
       mcpForTool(sources, 'codex'),
       env,
       ctx.secrets,
-      blockBodyMulti(before, ALL_TOML_MCP_MARKERS) ?? ''
+      blockBodyMulti(before, ALL_TOML_MCP_MARKERS) ?? '',
+      sources.hasPermissions ? (sources.allowlist.mcp ?? []) : []
     )
     // With no enabled servers, don't create an empty block and remove any previously written one
     const none = !enabledServerNames(sources, 'codex').length

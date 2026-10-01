@@ -22,11 +22,24 @@ export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, set
       const { argv, claudeExact } = normalizeEntry(e)
       return `Bash(${argv.join(' ')}${claudeExact ? '' : ':*'})`
     })
-  next.permissions.allow = [...bash(allowlist.bash), ...allowlist.claudeOnly.allow]
-  next.permissions.deny = [...bash(allowlist.bashDeny), ...allowlist.claudeOnly.deny]
+  // MCP tool rules: mcp__<server>__<tool>, or mcp__<server> for every tool of the server
+  const mcpRules = (d: 'allow' | 'ask' | 'deny'): string[] =>
+    (allowlist.mcp ?? [])
+      .filter((m) => m.decision === d)
+      .map((m) => (m.tool === '*' ? `mcp__${m.server}` : `mcp__${m.server}__${m.tool}`))
+  next.permissions.allow = [
+    ...bash(allowlist.bash),
+    ...mcpRules('allow'),
+    ...allowlist.claudeOnly.allow
+  ]
+  next.permissions.deny = [
+    ...bash(allowlist.bashDeny),
+    ...mcpRules('deny'),
+    ...allowlist.claudeOnly.deny
+  ]
   // Mirrors Codex MCP tool approval (approve/prompt/writes) into Claude permissions.ask,
   // so both tools gate the same MCP write tools the same way (gate alignment 2026-09-20).
-  const ask: string[] = bash(allowlist.bashAsk)
+  const ask: string[] = [...bash(allowlist.bashAsk), ...mcpRules('ask')]
   for (const [name, s] of mcpEntries(mcp)) {
     for (const [tool, mode] of Object.entries(s.codex?.toolApprovals ?? {})) {
       if (mode !== 'auto') ask.push(`mcp__${name}__${tool}`)

@@ -67,6 +67,7 @@ import {
   type HookSyncItem,
   readPermissions,
   permissionRules,
+  listMcpServers,
   PERMISSION_HOOK,
   type Allowlist
 } from '../engine'
@@ -713,6 +714,7 @@ export function permissions(home: string, env: Env): PermissionsData {
       claudeOnly: 0,
       tools: {},
       guards: [],
+      servers: [],
       error: `${dir}: ${(e as Error).message}`
     }
   }
@@ -793,6 +795,7 @@ export function permissions(home: string, env: Env): PermissionsData {
       : 0,
     tools,
     ...(Object.keys(reasons).length ? { reasons } : {}),
-    guards
+    guards,
+    servers: listMcpServers(home)
   }
 }

@@ -300,6 +300,8 @@ export interface PermissionsData {
   reasons?: Partial<Record<ToolId, string>>
   /** Hooks that block commands too (the guard action) */
   guards: { name: string; patterns: string[] }[]
+  /** Library MCP servers (Codex applies MCP rules to these only) */
+  servers: string[]
   error?: string
 }
 

@@ -958,6 +958,20 @@
     "copilotHook": "Illithid 검사 훅으로 막음 (Copilot 은 막기 규칙을 저장 못 함)",
     "copilotNo": "Copilot 은 물어보기·허용 규칙을 저장 못 함",
     "grokViaClaude": "Grok CLI 는 Claude Code 설정에서 이 규칙을 읽음",
-    "codexPrefix": "Codex 는 명령 앞부분으로 맞춰서, 더 긴 명령도 포함됨"
+    "codexPrefix": "Codex 는 명령 앞부분으로 맞춰서, 더 긴 명령도 포함됨",
+    "tabCommands": "명령",
+    "tabMcp": "MCP 툴",
+    "mcpNew": "새 MCP 규칙",
+    "mcpEmpty": "MCP 툴 규칙이 없습니다",
+    "mcpEmptyHint": "MCP 툴 하나, 또는 서버의 모든 툴을 막거나, 묻거나, 허용합니다.",
+    "server": "MCP 서버",
+    "tool": "툴",
+    "toolHint": "비우면 서버의 모든 툴에 적용합니다.",
+    "allMcpTools": "모든 툴",
+    "mcpHint": "Codex 는 Illithid 가 관리하는 서버에만 MCP 규칙을 쓰고, 허용은 자체 기본값을 따릅니다. Copilot 은 MCP 규칙을 저장하지 못합니다.",
+    "codexMcpAllow": "Codex 는 허용 툴에 자체 승인 기본값을 씀",
+    "codexMcpUnmanaged": "Codex: Illithid 가 관리하는 서버만 적용",
+    "geminiUnderscore": "Gemini CLI 는 이름에 \"_\" 가 있는 서버를 받지 않음",
+    "copilotMcpNo": "Copilot 은 MCP 규칙을 저장 못 함"
   }
 }

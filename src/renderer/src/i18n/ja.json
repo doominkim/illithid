@@ -958,6 +958,20 @@
     "copilotHook": "Illithid のチェックフックで止める (Copilot は止めるルールを保存できない)",
     "copilotNo": "Copilot は確認・許可ルールを保存できない",
     "grokViaClaude": "Grok CLI は Claude Code の設定からこのルールを読む",
-    "codexPrefix": "Codex はコマンドの先頭で照合するため、長いコマンドも含まれる"
+    "codexPrefix": "Codex はコマンドの先頭で照合するため、長いコマンドも含まれる",
+    "tabCommands": "コマンド",
+    "tabMcp": "MCP ツール",
+    "mcpNew": "新しい MCP ルール",
+    "mcpEmpty": "MCP ツールのルールはまだありません",
+    "mcpEmptyHint": "MCP ツール 1 つ、またはサーバーのすべてのツールを止める・確認する・許可します。",
+    "server": "MCP サーバー",
+    "tool": "ツール",
+    "toolHint": "空にするとサーバーのすべてのツールに適用します。",
+    "allMcpTools": "すべてのツール",
+    "mcpHint": "Codex は Illithid が管理するサーバーにだけ MCP ルールを書き、許可は自身の既定値に従います。Copilot は MCP ルールを保存できません。",
+    "codexMcpAllow": "Codex は許可したツールに自身の承認既定値を使う",
+    "codexMcpUnmanaged": "Codex: Illithid が管理するサーバーのみ",
+    "geminiUnderscore": "Gemini CLI は名前に \"_\" を含むサーバーを受け付けない",
+    "copilotMcpNo": "Copilot は MCP ルールを保存できない"
   }
 }
