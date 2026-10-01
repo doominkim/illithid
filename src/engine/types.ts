@@ -7,11 +7,25 @@ import type { SecretBackend } from './secrets'
 /** Environment variable lookup. Defaults to process.env; fixture checks pass an arbitrary object. */
 export type Env = Record<string, string | undefined>
 
-/** An allowlist.bash entry is either an argv array or an {argv, claudeExact} object. */
-export type AllowlistEntry = string[] | { argv: string[]; claudeExact?: boolean }
+/**
+ * A command rule entry is either an argv array or an {argv, claudeExact, note} object. claudeExact: match the whole command,
+ * not just its start (the name predates the other tools)
+ */
+export type AllowlistEntry = string[] | { argv: string[]; claudeExact?: boolean; note?: string }
 
+/** MCP tool rule; tool '*' = every tool of the server */
+export interface McpPermissionEntry {
+  decision: 'allow' | 'ask' | 'deny'
+  server: string
+  tool: string
+}
+
+/** permissions.json. bash is the allow list (as before); ask, deny and MCP rules were added beside it so older versions still read it */
 export interface Allowlist {
   bash: AllowlistEntry[]
+  bashAsk?: AllowlistEntry[]
+  bashDeny?: AllowlistEntry[]
+  mcp?: McpPermissionEntry[]
   claudeOnly: {
     allow: string[]
     deny: string[]

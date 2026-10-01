@@ -312,6 +312,7 @@ export {
   readPermissions,
   writePermissions,
   validatePermissions,
+  savePermissionRules,
   looksLikeSecret,
   isSecretPair,
   LibraryError,
@@ -553,3 +554,11 @@ export {
   grokReadsClaudeHooks,
   hooksForTool
 } from './hookRender'
+export {
+  PERMISSION_DECISIONS,
+  parseCommand,
+  permissionRules,
+  ruleProblems,
+  withPermissionRules
+} from './permissions'
+export type { CommandRule, McpRule, PermissionDecision, PermissionRules } from './permissions'

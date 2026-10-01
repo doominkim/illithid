@@ -34,7 +34,19 @@ import {
 } from './secrets'
 import { MANIFEST_FILE, readManifest, renameManifestEntry } from './manifest'
 import { renamePendingRetire } from './pendingRetire'
-import { libraryPaths, MCP_ORDER_FILE, mcpServerNamesInDir, readMcpOrder } from './sources'
+import {
+  emptyAllowlist,
+  libraryPaths,
+  MCP_ORDER_FILE,
+  mcpServerNamesInDir,
+  readMcpOrder
+} from './sources'
+import {
+  permissionRules,
+  ruleProblems,
+  withPermissionRules,
+  type PermissionRules
+} from './permissions'
 import type { Allowlist, McpServer } from './types'
 import type { HookAction } from './hookActions'
 import { isHookTool, type HookTiming, type HookTool } from './hookEvents'
@@ -1183,15 +1195,26 @@ export function deleteMcpServer(
 export function validatePermissions(v: unknown): string[] {
   const errs: string[] = []
   if (!isObj(v)) return ['top level is not an object']
-  if (!Array.isArray(v.bash)) errs.push('bash must be an array')
-  else
-    v.bash.forEach((e, i) => {
+  const checkList = (key: 'bash' | 'bashAsk' | 'bashDeny', list: unknown): void => {
+    if (!Array.isArray(list)) {
+      errs.push(`${key} must be an array`)
+      return
+    }
+    list.forEach((e, i) => {
       const argv = Array.isArray(e) ? e : isObj(e) ? e.argv : undefined
       if (!Array.isArray(argv) || !argv.length || !argv.every((a) => typeof a === 'string' && a))
-        errs.push(`bash[${i}] must be a non-empty string argv array or {argv, claudeExact}`)
+        errs.push(`${key}[${i}] must be a non-empty string argv array or {argv, claudeExact}`)
       if (isObj(e) && e.claudeExact !== undefined && typeof e.claudeExact !== 'boolean')
-        errs.push(`bash[${i}].claudeExact must be a boolean`)
+        errs.push(`${key}[${i}].claudeExact must be a boolean`)
+      if (isObj(e) && e.note !== undefined && typeof e.note !== 'string')
+        errs.push(`${key}[${i}].note must be a string`)
     })
+  }
+  checkList('bash', v.bash)
+  if (v.bashAsk !== undefined) checkList('bashAsk', v.bashAsk)
+  if (v.bashDeny !== undefined) checkList('bashDeny', v.bashDeny)
+  if (v.mcp !== undefined && !Array.isArray(v.mcp)) errs.push('mcp must be an array')
+  if (!errs.length) errs.push(...ruleProblems(permissionRules(v as unknown as Allowlist)))
   if (!isObj(v.claudeOnly)) errs.push('claudeOnly must be an object')
   else {
     for (const k of ['allow', 'deny'] as const) {
@@ -1229,6 +1252,16 @@ export function writePermissions(home: string, allowlist: Allowlist): string {
     home,
     libraryPaths(home).permissions,
     JSON.stringify(allowlist, null, 2) + '\n'
+  )
+}
+
+/** Save the command and MCP rules (the permissions menu). claudeOnly and other keys stay. invalidSchema on bad or conflicting rules */
+export function savePermissionRules(home: string, rules: PermissionRules): string {
+  const errs = ruleProblems(rules)
+  if (errs.length) throw new LibraryError('invalidSchema', errs.join('; '))
+  return writePermissions(
+    home,
+    withPermissionRules(readPermissions(home) ?? emptyAllowlist(), rules)
   )
 }
 
