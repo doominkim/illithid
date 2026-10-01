@@ -115,7 +115,7 @@ test(
 )
 
 test(
-  'REQ-HOOKS-UI-3 a natural-language check is Claude Code only: the other tools say why',
+  'REQ-HOOKS-UI-3 an AI check runs in every tool: a prompt hook in Claude Code, a judging CLI elsewhere',
   { timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'gemini'], 'illithid-hooks-ui-ask-')
@@ -123,12 +123,22 @@ test(
       const page = await app.firstWindow()
       await page.locator('[data-menu="hooks"]').click()
       await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-ask"]').getByText('Claude Code only').waitFor()
+      assert.equal(
+        await page.locator('[data-card="hook-action-ask"]').getByText('Claude Code only').count(),
+        0
+      )
       await page.locator('[data-card="hook-action-ask"]').click()
-      await page.getByTestId('hook-new-unsupported-claudeOnly').waitFor()
+      assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
+      await page.getByTestId('hook-option-judge').waitFor()
+      // Judging before every tool call is slow: the form says so
+      await page.getByTestId('hook-new-timing').click()
+      await page.getByRole('option', { name: 'Before a tool runs' }).click()
+      await page.getByTestId('hook-ask-slow').waitFor()
+      await page.getByTestId('hook-new-timing').click()
+      await page.getByRole('option', { name: 'Reply finished' }).click()
       await page.getByTestId('hook-instruction').fill('Keep working until the tests pass.')
       await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-unsupported-claudeOnly').waitFor()
+      await page.getByTestId('hook-summary').waitFor()
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })
@@ -138,9 +148,9 @@ test(
       assert.equal(s.hooks.Stop[0].hooks[0].type, 'prompt')
       assert.match(s.hooks.Stop[0].hooks[0].prompt, /^Keep working until the tests pass\./)
       const gemini = JSON.parse(readFileSync(join(home, '.gemini/settings.json'), 'utf8')) as {
-        hooks?: unknown
+        hooks: { AfterAgent: { hooks: { command: string }[] }[] }
       }
-      assert.equal(gemini.hooks, undefined)
+      assert.match(gemini.hooks.AfterAgent[0].hooks[0].command, /ask-stop\/run\.sh' gemini$/)
     } finally {
       await app.close()
     }

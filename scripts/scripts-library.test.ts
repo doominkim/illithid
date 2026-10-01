@@ -152,7 +152,7 @@ test("REQ-SCRIPTS-6 the scripts menu lists Illithid's recipe scripts with the ho
   const data = scriptsView(home)
   assert.deepEqual(
     data.builtins.map((b) => b.action),
-    ['notify', 'verify', 'format', 'protect', 'context', 'checkpoint', 'guard']
+    ['notify', 'verify', 'format', 'protect', 'context', 'checkpoint', 'guard', 'ask']
   )
   const verify = data.builtins.find((b) => b.action === 'verify')!
   assert.deepEqual(verify.users, ['verify-stop'])
@@ -167,5 +167,5 @@ test("REQ-SCRIPTS-6 the scripts menu lists Illithid's recipe scripts with the ho
   const mine = readFileSync(join(home, LIB, 'scripts/my-check.sh'), 'utf8')
   assert.match(mine, /case "\$1" in/)
   assert.match(mine, /npm test --silent/)
-  assert.throws(() => lib.scriptFromRecipe(home, 'ask', 'nope'), { code: 'invalidSchema' })
+  assert.throws(() => lib.scriptFromRecipe(home, 'log', 'nope'), { code: 'invalidSchema' })
 })

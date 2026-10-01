@@ -478,7 +478,8 @@ export const SCRIPT_RECIPES = [
   'protect',
   'context',
   'checkpoint',
-  'guard'
+  'guard',
+  'ask'
 ] as const satisfies readonly HookAction[]
 export type ScriptRecipe = (typeof SCRIPT_RECIPES)[number]
 
@@ -493,6 +494,6 @@ export function recipeDoc(action: ScriptRecipe): HookDoc {
     when: HOOK_ACTION_INFO[action].timings[0],
     action,
     options: hookOptions(action, {}),
-    body: ''
+    body: action === 'ask' ? 'Keep working until the tests pass.' : ''
   }
 }

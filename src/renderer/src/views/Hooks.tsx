@@ -24,6 +24,7 @@ import {
   HOOK_ACTION_INFO,
   HOOK_ACTIONS,
   hookSupport,
+  JUDGE_CLIS,
   NOTIFY_CHANNELS,
   NOTIFY_URL_ENV,
   PROTECT_PATTERN_RE,
@@ -612,6 +613,39 @@ function OptionFields({
           <Text size="xs" c="dimmed">
             {t(`hooks.opt.modeHint.${String(value.mode || 'snapshot')}`)}
           </Text>
+        </Stack>
+      )
+    case 'ask':
+      return (
+        <Stack gap="sm">
+          <Group grow align="flex-start">
+            <Select
+              label={t('hooks.opt.judge')}
+              description={t('hooks.opt.judgeHint')}
+              value={String(value.judge || 'same')}
+              onChange={(v) => v && set('judge', v)}
+              allowDeselect={false}
+              data={JUDGE_CLIS.map((c) => ({
+                value: c,
+                label: c === 'same' ? t('hooks.opt.judgeSame') : TOOL_NAME[c]
+              }))}
+              data-testid="hook-option-judge"
+            />
+            <TextInput
+              label={t('hooks.opt.model')}
+              description={t('hooks.opt.modelHint')}
+              placeholder={value.judge === 'claude' ? 'haiku' : undefined}
+              value={String(value.model ?? '')}
+              onChange={(e) => set('model', e.currentTarget.value.trim())}
+              styles={mono}
+              data-testid="hook-option-model"
+            />
+          </Group>
+          {when === 'before-tool' && (
+            <Text size="xs" c="orange" data-testid="hook-ask-slow">
+              {t('hooks.opt.judgeSlow')}
+            </Text>
+          )}
         </Stack>
       )
     case 'context':
@@ -1555,11 +1589,7 @@ function NewHookForm({
               name={t(`hooks.actions.${a}.title`)}
               description={t(`hooks.actions.${a}.desc`)}
               badges={
-                a === 'ask' ? (
-                  <Badge variant="light" size="xs" fw={500} color="orange">
-                    {t('hooks.claudeOnly')}
-                  </Badge>
-                ) : a === 'script' ? (
+                a === 'script' ? (
                   <Badge variant="default" size="xs" fw={500} c="dimmed">
                     {t('hooks.advanced')}
                   </Badge>

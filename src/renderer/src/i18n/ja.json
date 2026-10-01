@@ -885,8 +885,8 @@
         "desc": "時刻・ツール・フォルダをログファイルに追記します"
       },
       "ask": {
-        "title": "Claude に判断させる",
-        "desc": "ルールを言葉で書くと、Claude がイベントを読んで判断します"
+        "title": "AI に判断させる",
+        "desc": "ルールを言葉で書くと、AI がイベントを読んで続けるかを判断します"
       },
       "script": {
         "title": "自分で書く",
@@ -950,10 +950,16 @@
       "modeHint": {
         "snapshot": "ファイル・インデックス・ブランチはそのままで refs/illithid/checkpoints に保存します。最新 50 件を保持します。戻す: git restore --source <チェックポイント> -- .",
         "commit": "変更をすべて現在のブランチにコミットします (git add -A)。秘密情報がコミットされないよう .gitignore を確認してください。"
-      }
+      },
+      "judge": "判断する CLI",
+      "judgeSame": "そのツール自身",
+      "judgeHint": "Claude Code は内蔵の prompt フックですぐ判断します。他のツールはこの CLI をもう一度実行して判断します (遅く、プランの使用量を使います)。",
+      "model": "モデル",
+      "modelHint": "空なら CLI の既定モデルを使います。",
+      "judgeSlow": "ツール実行前にすると、すべてのコマンドが判断を待ちます。必要でなければ「応答完了」を使ってください。"
     },
     "instruction": "指示",
-    "instructionHint": "Claude Code がこの指示とイベントを読んで、続けるかどうかを判断します。",
+    "instructionHint": "AI がこの指示とイベントを読み、続けてよいか判断します。",
     "instructionExample": "テストがまだ通っていなければ作業を続けて。",
     "notes": "メモ",
     "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",

@@ -885,8 +885,8 @@
         "desc": "Append the time, tool and folder to a log file"
       },
       "ask": {
-        "title": "Let Claude judge",
-        "desc": "Write a rule in plain words; Claude reads the event and decides"
+        "title": "Let AI judge",
+        "desc": "Write a rule in plain words; an AI reads the event and decides whether it goes on"
       },
       "script": {
         "title": "Write your own",
@@ -950,10 +950,16 @@
       "modeHint": {
         "snapshot": "Saved under refs/illithid/checkpoints without touching your files, index or branch; the latest 50 are kept. Go back with: git restore --source <checkpoint> -- .",
         "commit": "Commits everything changed on the current branch (git add -A). Check your .gitignore so secrets are not committed."
-      }
+      },
+      "judge": "Judged by",
+      "judgeSame": "The tool itself",
+      "judgeHint": "Claude Code judges with its built-in prompt hook. Other tools run this CLI once more to judge (slower, uses your plan).",
+      "model": "Model",
+      "modelHint": "Leave empty for the CLI's default.",
+      "judgeSlow": "Before a tool runs, every command waits for the judgment. Prefer “Reply finished” unless you need it."
     },
     "instruction": "Instruction",
-    "instructionHint": "Claude Code reads the event with this instruction and decides whether to let it go on.",
+    "instructionHint": "The AI reads this rule with the event and decides whether it may go on.",
     "instructionExample": "If the tests have not passed yet, keep working.",
     "notes": "Notes",
     "scriptStarter": "Starts with a template script. Edit it after creating.",

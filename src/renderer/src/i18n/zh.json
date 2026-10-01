@@ -885,8 +885,8 @@
         "desc": "把时间、工具和文件夹追加到日志文件"
       },
       "ask": {
-        "title": "让 Claude 判断",
-        "desc": "用自然语言写规则，Claude 读取事件后做出判断"
+        "title": "让 AI 判断",
+        "desc": "用自然语言写规则，AI 读取事件后判断是否继续"
       },
       "script": {
         "title": "自己编写",
@@ -950,10 +950,16 @@
       "modeHint": {
         "snapshot": "保存到 refs/illithid/checkpoints，不改动文件、暂存区和分支。保留最近 50 个。恢复: git restore --source <检查点> -- .",
         "commit": "把所有更改提交到当前分支 (git add -A)。请检查 .gitignore，避免提交机密。"
-      }
+      },
+      "judge": "判断用的 CLI",
+      "judgeSame": "工具本身",
+      "judgeHint": "Claude Code 用内置的 prompt 钩子直接判断。其他工具会再运行一次这个 CLI 来判断 (较慢，会消耗订阅用量)。",
+      "model": "模型",
+      "modelHint": "留空则使用 CLI 的默认模型。",
+      "judgeSlow": "放在工具运行前时，每条命令都要等待判断。非必要请使用“回复完成”。"
     },
     "instruction": "指令",
-    "instructionHint": "Claude Code 会读取此指令和事件，判断是否继续。",
+    "instructionHint": "AI 会读取此指令和事件，判断是否可以继续。",
     "instructionExample": "如果测试还没通过，就继续工作。",
     "notes": "备注",
     "scriptStarter": "从模板脚本开始。创建后再编辑。",

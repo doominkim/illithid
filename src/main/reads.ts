@@ -72,6 +72,7 @@ import {
   SCRIPT_RECIPES,
   recipeDoc,
   renderActionScript,
+  renderAskPrompt,
   renderUniversalScript,
   hookNames,
   readHook,
@@ -830,7 +831,11 @@ export function scripts(home: string): ScriptsData {
         const perTool: Partial<Record<(typeof HOOK_TOOLS)[number], string>> = {}
         for (const tool of HOOK_TOOLS)
           if (hookSupport(action, doc.when, tool) === 'ok')
-            perTool[tool] = renderActionScript(tool, action, doc)
+            // Claude Code judges with its prompt hook: show the prompt it gets
+            perTool[tool] =
+              action === 'ask' && tool === 'claude'
+                ? renderAskPrompt(doc)
+                : renderActionScript(tool, action, doc)
         return {
           action,
           users: hooksWith.filter((h) => h.action === action).map((h) => h.name),
