@@ -155,8 +155,9 @@ function marketSkills(home: string): Record<string, string> {
 
 export function skills(home: string, env: Env): SkillsData {
   const names = canonicalSkills(home)
-  const oc = opencodeSkillsState(home, env)
-  const state: SkillsData['state'] = Object.fromEntries(names.map((n) => [n, { opencode: oc }]))
+  // A tool not in use has no sync plan at all; like the other tools it gets no state rather than an error
+  const oc = toolsInUse(home).includes('opencode') ? opencodeSkillsState(home, env) : undefined
+  const state: SkillsData['state'] = Object.fromEntries(names.map((n) => [n, oc ? { opencode: oc } : {}]))
   let syncError: string | undefined
   try {
     for (const i of planSkillSync(home, env)) {
