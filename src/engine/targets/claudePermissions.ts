@@ -46,7 +46,11 @@ export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, set
     }
   }
   ask.push(...(allowlist.claudeOnly.ask ?? []))
-  if (ask.length) next.permissions.ask = ask
+  // The same entry can come from a rule and from a server's Codex approvals: write it once
+  const once = (list: string[]): string[] => [...new Set(list)]
+  next.permissions.allow = once(next.permissions.allow)
+  next.permissions.deny = once(next.permissions.deny)
+  if (ask.length) next.permissions.ask = once(ask)
   else delete next.permissions.ask
   return next
 }
