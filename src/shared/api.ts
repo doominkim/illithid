@@ -285,6 +285,21 @@ export interface HooksData {
   grokReadsClaude?: boolean
 }
 
+/** One library script and the hooks that run it */
+export interface ScriptView {
+  name: string
+  description: string
+  content: string
+  users: string[]
+}
+
+export interface ScriptsData {
+  /** Library scripts directory (display ~/...) */
+  dir: string
+  scripts: ScriptView[]
+  error?: string
+}
+
 /** How a tool gets the permission rules: its own file (sync state), through Claude Code's settings (Grok), or not at all */
 export type PermissionToolState = SyncState | 'notApplicable' | 'viaClaude'
 
@@ -716,6 +731,7 @@ export interface Api {
   mcp(): Promise<McpData>
   hooks(): Promise<HooksData>
   permissions(): Promise<PermissionsData>
+  scripts(): Promise<ScriptsData>
   artifacts(): Promise<Artifact[]>
   artifactPreview(id: string): Promise<ArtifactPreview>
   /** Image or HTML thumbnail (data URL, about 256px; null if there is none) */
@@ -850,7 +866,16 @@ export interface Api {
   hookCreate(name: string, input: NewHookInput): Promise<WriteResult<{ name: string }> | Refused>
   hookSave(name: string, doc: HookDoc): Promise<WriteResult<{ name: string }> | Refused>
   permissionsSave(rules: PermissionRules): Promise<WriteResult<{ path: string }> | Refused>
-  hookConvert(name: string, tool: HookTool): Promise<WriteResult<{ name: string }> | Refused>
+  scriptCreate(name: string, content?: string): Promise<WriteResult<{ name: string }> | Refused>
+  scriptSave(name: string, content: string): Promise<WriteResult<{ name: string }> | Refused>
+  /** Hooks using it get their own copy first */
+  scriptDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
+  /** With script: save what the tool runs as a new library script and use it; without: as the hook's own run.sh */
+  hookConvert(
+    name: string,
+    tool: HookTool,
+    script?: string
+  ): Promise<WriteResult<{ name: string }> | Refused>
   hookDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   hookScriptSave(
     name: string,
@@ -1008,6 +1033,7 @@ export const CHANNELS = [
   'mcp',
   'hooks',
   'permissions',
+  'scripts',
   'artifacts',
   'artifactPreview',
   'artifactThumb',
@@ -1072,6 +1098,9 @@ export const CHANNELS = [
   'hookCreate',
   'hookSave',
   'permissionsSave',
+  'scriptCreate',
+  'scriptSave',
+  'scriptDelete',
   'hookConvert',
   'hookDelete',
   'hookScriptSave',

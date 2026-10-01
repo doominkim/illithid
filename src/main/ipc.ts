@@ -328,6 +328,7 @@ export function registerIpc(): void {
     mcp: () => inWorker('mcp', home),
     hooks: () => inWorker('hooks', home),
     permissions: () => inWorker('permissions', home),
+    scripts: () => inWorker('scripts', home),
     sessions: async () => {
       const r = await inWorker('sessions', home)
       // Session refresh = incremental index (if already running, run once more afterwards)
@@ -594,8 +595,22 @@ export function registerIpc(): void {
       libWrite(() => W.lib.hookCreate(home, str(name), input as never)),
     hookSave: async (name, doc) => libWrite(() => W.lib.hookSave(home, str(name), doc as never)),
     permissionsSave: async (rules) => libWrite(() => W.lib.permissionsSave(home, rules as never)),
-    hookConvert: async (name, tool) =>
-      libWrite(() => W.lib.hookConvert(home, str(name), str(tool))),
+    scriptCreate: async (name, content) =>
+      libWrite(() =>
+        W.lib.scriptCreate(home, str(name), typeof content === 'string' ? content : undefined)
+      ),
+    scriptSave: async (name, content) =>
+      libWrite(() => W.lib.scriptSave(home, str(name), str(content))),
+    scriptDelete: async (name) => libWrite(() => W.lib.scriptDelete(home, str(name))),
+    hookConvert: async (name, tool, script) =>
+      libWrite(() =>
+        W.lib.hookConvert(
+          home,
+          str(name),
+          str(tool),
+          typeof script === 'string' ? script : undefined
+        )
+      ),
     hookDelete: async (name) => libWrite(() => W.lib.hookDelete(home, str(name))),
     hookScriptSave: async (name, file, content) =>
       libWrite(() => W.lib.hookScriptSave(home, str(name), str(file), str(content))),

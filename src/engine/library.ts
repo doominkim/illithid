@@ -52,6 +52,7 @@ import type { HookAction } from './hookActions'
 import { isHookTool, type HookTiming, type HookTool } from './hookEvents'
 import {
   HOOK_FILE,
+  hookNames,
   hookOptions,
   hookScriptFiles,
   hooksDir,
@@ -59,11 +60,13 @@ import {
   renderHookDoc,
   SCRIPT_NAME_RE,
   SHARED_SCRIPT,
+  usedScript,
   validateHookDoc,
   type HookDoc,
   type HookOptionValue
 } from './hooks'
 import { appTmpName, atomicWrite } from './write'
+import { LIBRARY_SCRIPT_RE, readScript, SCRIPT_TEMPLATE, scriptPath } from './scripts'
 
 export { LibraryError } from './libpath'
 export type { LibraryErrorCode } from './libpath'
@@ -1349,7 +1352,8 @@ export function createHook(home: string, name: string, input: NewHookInput): str
     options: i.options ?? {},
     body: typeof i.body === 'string' ? i.body : ''
   })
-  if (doc.action === 'script')
+  checkUsedScript(home, doc)
+  if (doc.action === 'script' && !usedScript(doc))
     writeLibFile(
       home,
       join(dir, SHARED_SCRIPT),
@@ -1359,13 +1363,29 @@ export function createHook(home: string, name: string, input: NewHookInput): str
   return writeHookDoc(home, name, doc)
 }
 
+/** A hook may only point at a library script that exists */
+function checkUsedScript(home: string, doc: HookDoc): void {
+  const use = usedScript(doc)
+  if (use && !readScript(home, use))
+    throw new LibraryError('notFound', `library script ${use} not found`)
+}
+
 /** Replace a hook's HOOK.md. A script-action hook must already have every script it points at */
 export function saveHookDoc(home: string, name: string, doc: HookDoc): string {
-  readHookDocFile(home, name)
+  const prev = readHookDocFile(home, name)
   const next = checkHookDoc(doc)
   const dir = hookDirPath(home, name)
-  if (next.action === 'script' && !existsSync(assertInsideLibrary(home, join(dir, SHARED_SCRIPT))))
-    writeLibFile(home, join(dir, SHARED_SCRIPT), HOOK_SCRIPT_TEMPLATE, HOOK_SCRIPT_MODE)
+  checkUsedScript(home, next)
+  if (
+    next.action === 'script' &&
+    !usedScript(next) &&
+    !existsSync(assertInsideLibrary(home, join(dir, SHARED_SCRIPT)))
+  ) {
+    // Leaving a library script: the hook's own run.sh starts as a copy of it
+    const was = usedScript(prev)
+    const seed = (was && readScript(home, was)?.content) || HOOK_SCRIPT_TEMPLATE
+    writeLibFile(home, join(dir, SHARED_SCRIPT), seed, HOOK_SCRIPT_MODE)
+  }
   for (const file of hookScriptFiles(next))
     if (!existsSync(assertInsideLibrary(home, join(dir, file))))
       throw new LibraryError('invalidSchema', `script ${file} is not in the hook folder`)
@@ -1411,10 +1431,10 @@ export function createHookToolScript(home: string, name: string, tool: HookTool)
   const file = `run.${tool}.sh`
   const p = hookScriptPath(home, name, file)
   if (existsSync(assertInsideLibrary(home, p))) throw new LibraryError('exists', `${file} exists`)
-  const shared = readFileSync(
-    assertInsideLibrary(home, hookScriptPath(home, name, SHARED_SCRIPT)),
-    'utf8'
-  )
+  const use = usedScript(doc)
+  const shared = use
+    ? (readScript(home, use)?.content ?? HOOK_SCRIPT_TEMPLATE)
+    : readFileSync(assertInsideLibrary(home, hookScriptPath(home, name, SHARED_SCRIPT)), 'utf8')
   writeLibFile(home, p, shared, HOOK_SCRIPT_MODE)
   writeHookDoc(home, name, { ...doc, toolScripts: { ...doc.toolScripts, [tool]: file } })
   return file
@@ -1434,6 +1454,75 @@ export function dropHookToolScript(home: string, name: string, tool: HookTool): 
   return moveToTrash(home, hookScriptPath(home, name, file))
 }
 
+/** Turn a hook into one that runs a new library script with the given content (e.g. what a built-in action renders) */
+export function convertHookToLibraryScript(
+  home: string,
+  name: string,
+  script: string,
+  content: string
+): string {
+  const doc = readHookDocFile(home, name)
+  createScript(home, script, content)
+  return writeHookDoc(
+    home,
+    name,
+    checkHookDoc({ ...doc, action: 'script', options: { use: script }, body: doc.body })
+  )
+}
+
+// ---------------------------------------------------------------- library scripts (scripts/<name>.sh)
+
+function libScriptPath(home: string, name: string): string {
+  if (typeof name !== 'string' || !LIBRARY_SCRIPT_RE.test(name))
+    throw new LibraryError('invalidName', 'invalid script name')
+  return scriptPath(home, name)
+}
+
+/** New library script (a template when no content is given). exists if the name is taken */
+export function createScript(home: string, name: string, content?: string): string {
+  const p = libScriptPath(home, name)
+  if (existsSync(assertInsideLibrary(home, p)))
+    throw new LibraryError('exists', 'a script with the same name exists')
+  return writeLibFile(
+    home,
+    p,
+    typeof content === 'string' ? content : SCRIPT_TEMPLATE,
+    HOOK_SCRIPT_MODE
+  )
+}
+
+export function saveScript(home: string, name: string, content: string): string {
+  const p = libScriptPath(home, name)
+  if (!existsSync(assertInsideLibrary(home, p)))
+    throw new LibraryError('notFound', 'script not found')
+  if (typeof content !== 'string') throw new LibraryError('invalidSchema', 'content must be text')
+  return writeLibFile(home, p, content, HOOK_SCRIPT_MODE)
+}
+
+/** Hooks that run a library script, sorted. Hooks whose HOOK.md can't be read are left out */
+export function scriptUsers(home: string, name: string): string[] {
+  return hookNames(home).filter((h) => {
+    try {
+      return usedScript(readHookDocFile(home, h)) === name
+    } catch {
+      return false
+    }
+  })
+}
+
+/** Delete a library script. Each hook using it first gets the content as its own run.sh, so it keeps working */
+export function deleteScript(home: string, name: string): TrashResult {
+  const p = libScriptPath(home, name)
+  const lib = readScript(home, name)
+  if (!lib) throw new LibraryError('notFound', 'script not found')
+  for (const h of scriptUsers(home, name)) {
+    const doc = readHookDocFile(home, h)
+    writeLibFile(home, hookScriptPath(home, h, SHARED_SCRIPT), lib.content, HOOK_SCRIPT_MODE)
+    writeHookDoc(home, h, { ...doc, options: { ...doc.options, use: '' } })
+  }
+  return moveToTrash(home, p)
+}
+
 export function deleteHook(home: string, name: string): TrashResult {
   return moveToTrash(home, hookDirPath(home, name))
 }
@@ -1444,7 +1533,8 @@ export function writeNewHook(home: string, name: string, doc: HookDoc, script?: 
   if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
     throw new LibraryError('exists', 'a hook with the same name exists')
   const next = checkHookDoc(doc)
-  if (next.action === 'script')
+  checkUsedScript(home, next)
+  if (next.action === 'script' && !usedScript(next))
     writeLibFile(home, join(dir, SHARED_SCRIPT), script ?? HOOK_SCRIPT_TEMPLATE, HOOK_SCRIPT_MODE)
   return writeHookDoc(home, name, next)
 }

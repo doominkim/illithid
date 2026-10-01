@@ -12,7 +12,8 @@
     "memory": "Memory",
     "stats": "Stats",
     "hooks": "Hooks",
-    "permissions": "Permissions"
+    "permissions": "Permissions",
+    "scripts": "Scripts"
   },
   "settings": {
     "language": "Language",
@@ -921,7 +922,15 @@
     "convert": "Edit as my own script",
     "convertTitle": "Switch to your own script",
     "convertBody": "The {{tool}} script becomes this hook's run.sh and every tool runs it. The options no longer apply.",
-    "converted": "Now runs its own script"
+    "converted": "Now runs its own script",
+    "useLabel": "Script",
+    "useOwn": "Write one for this hook",
+    "libScript": "Library script",
+    "libScriptHint": "Runs a script from Scripts. Edit it there; every hook using it follows.",
+    "openScript": "Open in Scripts",
+    "convertOwn": "This hook's own script",
+    "convertLibrary": "Save to Scripts",
+    "scriptName": "Script name"
   },
   "permissions": {
     "new": "New rule",
@@ -973,5 +982,24 @@
     "codexMcpUnmanaged": "Codex: only for servers Illithid manages",
     "geminiUnderscore": "Gemini CLI rejects server names with \"_\"",
     "copilotMcpNo": "Copilot keeps no MCP rules"
+  },
+  "scripts": {
+    "search": "Search scripts",
+    "new": "New script",
+    "created": "Script created",
+    "saved": "Script saved",
+    "deleted": "Script deleted (kept in .trash)",
+    "deleteTitle": "Delete script",
+    "deleteBody": "Moves {{name}} to .trash.",
+    "deleteUsed": "Moves {{name}} to .trash. The {{count}} hooks using it each keep a copy as their own script.",
+    "empty": "No scripts yet",
+    "emptyHint": "Scripts here can be shared by hooks: write one once, pick it from any \"Write your own\" hook.",
+    "users": "Hooks using it",
+    "noUsers": "No hook uses this script yet.",
+    "usedBy": "{{count}} hooks",
+    "argHint": "The tool name comes as the first argument, the event as JSON on stdin.",
+    "nameHint": "Saved as scripts/<name>.sh",
+    "nameTaken": "A script with this name exists",
+    "description": "Description"
   }
 }

@@ -12,7 +12,8 @@
     "memory": "メモリ",
     "stats": "統計",
     "hooks": "フック",
-    "permissions": "権限"
+    "permissions": "権限",
+    "scripts": "スクリプト"
   },
   "settings": {
     "language": "言語",
@@ -921,7 +922,15 @@
     "convert": "自分で書くに切り替え",
     "convertTitle": "自分で書くに切り替え",
     "convertBody": "{{tool}} のスクリプトがこのフックの run.sh になり、すべてのツールがそれを実行します。オプションは適用されなくなります。",
-    "converted": "自分のスクリプトを実行するようになりました"
+    "converted": "自分のスクリプトを実行するようになりました",
+    "useLabel": "スクリプト",
+    "useOwn": "このフック専用に書く",
+    "libScript": "ライブラリのスクリプト",
+    "libScriptHint": "スクリプトメニューのスクリプトを実行します。そこで編集すると、使っているすべてのフックに反映されます。",
+    "openScript": "スクリプトメニューで開く",
+    "convertOwn": "このフック専用のスクリプト",
+    "convertLibrary": "スクリプトライブラリに保存",
+    "scriptName": "スクリプト名"
   },
   "permissions": {
     "new": "新しいルール",
@@ -973,5 +982,24 @@
     "codexMcpUnmanaged": "Codex: Illithid が管理するサーバーのみ",
     "geminiUnderscore": "Gemini CLI は名前に \"_\" を含むサーバーを受け付けない",
     "copilotMcpNo": "Copilot は MCP ルールを保存できない"
+  },
+  "scripts": {
+    "search": "スクリプトを検索",
+    "new": "新しいスクリプト",
+    "created": "スクリプトを作成しました",
+    "saved": "スクリプトを保存しました",
+    "deleted": "スクリプトを削除しました (.trash に保管)",
+    "deleteTitle": "スクリプトを削除",
+    "deleteBody": "{{name}} を .trash に移します。",
+    "deleteUsed": "{{name}} を .trash に移します。使っているフック {{count}} 件はそれぞれコピーを専用スクリプトとして持ちます。",
+    "empty": "スクリプトはまだありません",
+    "emptyHint": "ここのスクリプトは複数のフックで共有できます。一度書いて「自分で書く」フックから選んでください。",
+    "users": "使っているフック",
+    "noUsers": "このスクリプトを使うフックはまだありません。",
+    "usedBy": "フック {{count}} 件",
+    "argHint": "最初の引数にツール名、stdin にイベントの JSON が入ります。",
+    "nameHint": "scripts/<名前>.sh として保存されます",
+    "nameTaken": "同じ名前のスクリプトがあります",
+    "description": "説明"
   }
 }

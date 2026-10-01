@@ -77,6 +77,10 @@ import {
   type HookDoc,
   type NewHookInput,
   savePermissionRules,
+  createScript,
+  saveScript,
+  deleteScript,
+  convertHookToLibraryScript,
   type PermissionRules
 } from '../engine'
 import { previewSwitch } from '../engine'
@@ -672,13 +676,23 @@ export const lib = {
     return { name }
   },
   /** Make a built-in action hook a script hook, starting from what it runs in this tool */
-  hookConvert: (home: string, name: string, tool: string) => {
+  hookConvert: (home: string, name: string, tool: string, script?: string) => {
     if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
     const h = readHook(home, name)
-    const runs = toolScript(tool, h)
-    convertHookToScript(home, name, runs?.content ?? HOOK_SCRIPT_TEMPLATE)
+    const content = toolScript(tool, h)?.content ?? HOOK_SCRIPT_TEMPLATE
+    if (script) convertHookToLibraryScript(home, name, script, content)
+    else convertHookToScript(home, name, content)
     return { name }
   },
+  scriptCreate: (home: string, name: string, content?: string) => {
+    createScript(home, name, content)
+    return { name }
+  },
+  scriptSave: (home: string, name: string, content: string) => {
+    saveScript(home, name, content)
+    return { name }
+  },
+  scriptDelete: (home: string, name: string) => deleteScript(home, name),
   hookDelete: (home: string, name: string) => deleteHook(home, name),
   hookScriptSave: (home: string, name: string, file: string, content: string) => {
     saveHookScript(home, name, file, String(content))

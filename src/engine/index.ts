@@ -516,6 +516,7 @@ export {
   hookTriggers,
   hookOptions,
   hookScriptFiles,
+  usedScript,
   scriptForTool,
   HOOKS_DIR,
   HOOK_FILE,
@@ -563,3 +564,20 @@ export {
   withPermissionRules
 } from './permissions'
 export type { CommandRule, McpRule, PermissionDecision, PermissionRules } from './permissions'
+export {
+  createScript,
+  saveScript,
+  deleteScript,
+  scriptUsers,
+  convertHookToLibraryScript
+} from './library'
+export {
+  LIBRARY_SCRIPT_RE,
+  SCRIPT_TEMPLATE,
+  readScript,
+  readScripts,
+  scriptDescription,
+  scriptNames,
+  scriptsDir
+} from './scripts'
+export type { LibraryScript } from './scripts'

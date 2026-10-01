@@ -12,7 +12,8 @@
     "memory": "记忆",
     "stats": "统计",
     "hooks": "钩子",
-    "permissions": "权限"
+    "permissions": "权限",
+    "scripts": "脚本"
   },
   "settings": {
     "language": "语言",
@@ -921,7 +922,15 @@
     "convert": "改为自己编写",
     "convertTitle": "改为自己编写的脚本",
     "convertBody": "{{tool}} 的脚本会成为此钩子的 run.sh，所有工具都运行它。选项将不再生效。",
-    "converted": "现在运行自己的脚本"
+    "converted": "现在运行自己的脚本",
+    "useLabel": "脚本",
+    "useOwn": "为此钩子单独编写",
+    "libScript": "库脚本",
+    "libScriptHint": "运行脚本菜单中的脚本。在那里修改后，所有使用它的钩子都会跟着更新。",
+    "openScript": "在脚本菜单中打开",
+    "convertOwn": "此钩子专用脚本",
+    "convertLibrary": "保存到脚本库",
+    "scriptName": "脚本名称"
   },
   "permissions": {
     "new": "新建规则",
@@ -973,5 +982,24 @@
     "codexMcpUnmanaged": "Codex: 仅适用于 Illithid 管理的服务器",
     "geminiUnderscore": "Gemini CLI 不接受名称中带 \"_\" 的服务器",
     "copilotMcpNo": "Copilot 无法保存 MCP 规则"
+  },
+  "scripts": {
+    "search": "搜索脚本",
+    "new": "新建脚本",
+    "created": "已创建脚本",
+    "saved": "已保存脚本",
+    "deleted": "已删除脚本 (保留在 .trash)",
+    "deleteTitle": "删除脚本",
+    "deleteBody": "将 {{name}} 移到 .trash。",
+    "deleteUsed": "将 {{name}} 移到 .trash。使用它的 {{count}} 个钩子会各自保留一份副本作为专用脚本。",
+    "empty": "还没有脚本",
+    "emptyHint": "这里的脚本可以被多个钩子共用：写一次，在“自己编写”钩子中选用。",
+    "users": "使用它的钩子",
+    "noUsers": "还没有钩子使用此脚本。",
+    "usedBy": "{{count}} 个钩子",
+    "argHint": "第一个参数是工具名称，stdin 是事件 JSON。",
+    "nameHint": "保存为 scripts/<名称>.sh",
+    "nameTaken": "已有同名脚本",
+    "description": "描述"
   }
 }

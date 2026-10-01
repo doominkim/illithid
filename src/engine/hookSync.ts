@@ -16,10 +16,11 @@ import { appConfigDir, syncTools } from './config'
 import { deliverFile } from './deliver'
 import { HOOK_TOOLS, isHookTool, type HookTool } from './hookEvents'
 import { hookCopyPath, hookCopyRoot, hooksForTool, PERMISSION_HOOK } from './hookRender'
-import { HOOK_FILE, hooksDir, readHooks } from './hooks'
+import { HOOK_FILE, hooksDir, readHooks, SHARED_SCRIPT, usedScript } from './hooks'
 import { toolScript } from './hookScripts'
 import { LibraryError } from './libpath'
-import { convertHookToScript, saveHookScript } from './library'
+import { convertHookToScript, saveHookScript, saveScript } from './library'
+import { scriptPath } from './scripts'
 import { MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
@@ -103,14 +104,17 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
       wanted.add(name)
       const path = hookCopyPath(home, tool, th.hook.name, th.file)
       // Built-in actions are rendered per tool; the script action copies its own file
+      const use = usedScript(th.hook.doc)
       const source =
         th.hook.name === PERMISSION_HOOK
           ? libraryPaths(home).permissions
-          : join(
-              hooksDir(home),
-              th.hook.name,
-              th.hook.doc.action === 'script' ? th.file : HOOK_FILE
-            )
+          : use && th.file === SHARED_SCRIPT
+            ? scriptPath(home, use)
+            : join(
+                hooksDir(home),
+                th.hook.name,
+                th.hook.doc.action === 'script' ? th.file : HOOK_FILE
+              )
       const sourceHash = sha256(th.content)
       const base = { tool, name, hook: th.hook.name, file: th.file, path, source, sourceHash }
       const st = lstatOrNull(path)
@@ -278,6 +282,9 @@ export function keepHookCopy(home: string, tool: HookTool, hook: string, file: s
   if (!st?.isFile() || st.isSymbolicLink())
     throw new LibraryError('notFound', 'no copy in the tool')
   const content = readFileSync(path, 'utf8')
+  // A library script goes back into the library: every hook using it gets the kept version
+  const use = usedScript(h.doc)
+  if (use && file === SHARED_SCRIPT) return saveScript(home, use, content)
   return h.doc.action === 'script'
     ? saveHookScript(home, hook, file, content)
     : convertHookToScript(home, hook, content)

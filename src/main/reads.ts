@@ -68,10 +68,17 @@ import {
   readPermissions,
   permissionRules,
   listMcpServers,
+  readScripts,
+  scriptsDir,
+  hookNames,
+  readHook,
+  type HookDoc,
+  usedScript,
   PERMISSION_HOOK,
   type Allowlist
 } from '../engine'
 import type {
+  ScriptsData,
   PermissionsData,
   AgentsData,
   HooksData,
@@ -450,6 +457,7 @@ export type Op =
   | 'agents'
   | 'mcp'
   | 'permissions'
+  | 'scripts'
   | 'artifacts'
   | 'sessions'
   | 'toolMemory'
@@ -585,6 +593,8 @@ export function runOp(
       return hooks(home, env)
     case 'permissions':
       return permissions(home, env)
+    case 'scripts':
+      return scripts(home)
     case 'artifacts':
       return withSessionTitles(home, scanArtifacts(home))
     case 'sessions':
@@ -798,4 +808,36 @@ export function permissions(home: string, env: Env): PermissionsData {
     guards,
     servers: listMcpServers(home)
   }
+}
+
+// ---------------------------------------------------------------- scripts
+
+export function scripts(home: string): ScriptsData {
+  const dir = tilde(home, scriptsDir(home))
+  try {
+    const users = new Map<string, string[]>()
+    for (const h of readHooksLenient(home)) {
+      const use = usedScript(h)
+      if (use) users.set(use, [...(users.get(use) ?? []), h.name])
+    }
+    return {
+      dir,
+      scripts: readScripts(home).map((s) => ({ ...s, users: users.get(s.name) ?? [] }))
+    }
+  } catch (e) {
+    return { dir, scripts: [], error: `${dir} read failed: ${(e as Error).message}` }
+  }
+}
+
+/** Hook docs that can be read (a broken hook shows in the hooks menu, not here) */
+function readHooksLenient(home: string): (HookDoc & { name: string })[] {
+  const out: (HookDoc & { name: string })[] = []
+  for (const name of hookNames(home)) {
+    try {
+      out.push({ ...readHook(home, name).doc, name })
+    } catch {
+      // skipped
+    }
+  }
+  return out
 }

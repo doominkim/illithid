@@ -7,6 +7,7 @@ export const PRIMARY = [
   'mcp',
   'hooks',
   'permissions',
+  'scripts',
   'agents',
   'market',
   'artifacts',

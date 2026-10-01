@@ -76,6 +76,7 @@ import {
   TOOLS
 } from '../lib/tools'
 import { useApi } from '../lib/useApi'
+import { LIBRARY_SCRIPT_RE } from '../../../engine/scriptNames'
 import { useViewMode } from '../lib/viewMode'
 
 const NEW = '__new__'
@@ -110,7 +111,7 @@ function useSummary(): (h: {
               ? String(o.path)
               : h.action === 'ask'
                 ? (h.body ?? '').trim().split('\n')[0]
-                : ''
+                : String(o.use || '')
     const head = `${t(`hooks.timing.${h.when}`)} → ${t(`hooks.actions.${h.action}.title`)}`
     return detail ? `${head}: ${detail}` : head
   }
@@ -710,7 +711,13 @@ function HookDetail({
           <HookOverview edit={edit} />
         </Tabs.Panel>
         <Tabs.Panel value="edit">
-          <HookEditForm name={hook.name} edit={edit} onSave={saveDoc} onChanged={onChanged} />
+          <HookEditForm
+            key={JSON.stringify(edit.doc)}
+            name={hook.name}
+            edit={edit}
+            onSave={saveDoc}
+            onChanged={onChanged}
+          />
         </Tabs.Panel>
         <Tabs.Panel value="advanced">
           <HookAdvanced
@@ -753,7 +760,11 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
   if (doc.action === 'format')
     rows.push([t('hooks.opt.command'), <Code key="c">{String(o.command)}</Code>])
   if (doc.action === 'log') rows.push([t('hooks.opt.path'), <Code key="l">{String(o.path)}</Code>])
-  if (doc.action === 'script') rows.push([t('hooks.scripts'), Object.keys(edit.scripts).join(', ')])
+  if (doc.action === 'script')
+    rows.push([
+      t('hooks.scripts'),
+      o.use ? `${t('hooks.libScript')}: ${String(o.use)}` : Object.keys(edit.scripts).join(', ')
+    ])
   return (
     <Stack gap="md">
       <Box className="ac-card" p="md">
@@ -873,7 +884,9 @@ function HookEditForm({
           </Group>
         </Stack>
       </Box>
-      {doc.action === 'script' && <ScriptEditors name={name} edit={edit} onChanged={onChanged} />}
+      {doc.action === 'script' && (
+        <ScriptEditors name={name} edit={edit} onSave={onSave} onChanged={onChanged} />
+      )}
     </Stack>
   )
 }
@@ -882,17 +895,26 @@ function HookEditForm({
 function ScriptEditors({
   name,
   edit,
+  onSave,
   onChanged
 }: {
   name: string
   edit: HookEditView
+  onSave: (doc: HookDoc) => Promise<boolean>
   onChanged: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const { navigate } = useNav()
   const doc = edit.doc
+  const use = typeof doc.options.use === 'string' ? doc.options.use : ''
+  const libScripts = useApi('scripts', () => window.api.scripts()).data?.scripts ?? []
   const [tab, setTab] = useState<string | null>(null)
   const files: { value: string; file: string; label: string; tool?: HookTool }[] = [
-    { value: 'shared', file: 'run.sh', label: t('hooks.shared') },
+    {
+      value: 'shared',
+      file: use ? `${use}.sh` : 'run.sh',
+      label: use ? t('hooks.libScript') : t('hooks.shared')
+    },
     ...HOOK_TOOLS.filter((tool) => doc.toolScripts?.[tool]).map((tool) => ({
       value: `own:${tool}`,
       file: doc.toolScripts![tool]!,
@@ -923,6 +945,18 @@ function ScriptEditors({
       <Text size="xs" c="dimmed">
         {t('hooks.argHint')}
       </Text>
+      <Select
+        aria-label={t('hooks.useLabel')}
+        data={[
+          { value: '', label: t('hooks.useOwn') },
+          ...libScripts.map((x) => ({ value: x.name, label: x.name }))
+        ]}
+        value={use}
+        onChange={(v) => void onSave({ ...doc, options: { ...doc.options, use: v ?? '' } })}
+        allowDeselect={false}
+        maw={360}
+        data-testid="hook-script-use"
+      />
       <Tabs value={active} onChange={setTab} keepMounted={false}>
         <Tabs.List>
           {files.map((x) => (
@@ -953,11 +987,32 @@ function ScriptEditors({
                   </Button>
                 </Group>
               )}
-              <MarkdownEditor
-                value={edit.scripts[x.file] ?? ''}
-                minRows={12}
-                onSave={(text) => save(x.file, text)}
-              />
+              {x.value === 'shared' && use ? (
+                <Stack gap="xs" data-testid="hook-lib-script">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="xs" c="dimmed">
+                      {t('hooks.libScriptHint')}
+                    </Text>
+                    <Button
+                      size="compact-xs"
+                      variant="default"
+                      onClick={() => navigate('scripts', { select: use })}
+                      data-testid="hook-open-script"
+                    >
+                      {t('hooks.openScript')}
+                    </Button>
+                  </Group>
+                  <Code block style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {edit.scripts['run.sh'] ?? ''}
+                  </Code>
+                </Stack>
+              ) : (
+                <MarkdownEditor
+                  value={edit.scripts[x.file] ?? ''}
+                  minRows={12}
+                  onSave={(text) => save(x.file, text)}
+                />
+              )}
             </Stack>
           </Tabs.Panel>
         ))}
@@ -1003,11 +1058,15 @@ function HookAdvanced({
         })
     if (r) onChanged()
   }
+  const [convertTo, setConvertTo] = useState<'own' | 'library'>('own')
+  const [scriptName, setScriptName] = useState(name)
+  const libraryNameOk = LIBRARY_SCRIPT_RE.test(scriptName)
   const convert = async (): Promise<void> => {
-    if (!converting) return
-    const r = await runWrite(window.api.hookConvert(name, converting), {
-      success: t('hooks.converted')
-    })
+    if (!converting || (convertTo === 'library' && !libraryNameOk)) return
+    const r = await runWrite(
+      window.api.hookConvert(name, converting, convertTo === 'library' ? scriptName : undefined),
+      { success: t('hooks.converted') }
+    )
     setConverting(null)
     if (r) onChanged()
   }
@@ -1139,7 +1198,31 @@ function HookAdvanced({
         onConfirm={convert}
         title={t('hooks.convertTitle')}
         confirmLabel={t('hooks.convert')}
-        message={t('hooks.convertBody', { tool: converting ? TOOL_NAME[converting] : '' })}
+        message={
+          <Stack gap="sm">
+            <Text size="sm">
+              {t('hooks.convertBody', { tool: converting ? TOOL_NAME[converting] : '' })}
+            </Text>
+            <SegmentedControl
+              value={convertTo}
+              onChange={(v) => setConvertTo(v as 'own' | 'library')}
+              data={[
+                { value: 'own', label: t('hooks.convertOwn') },
+                { value: 'library', label: t('hooks.convertLibrary') }
+              ]}
+              data-testid="hook-convert-to"
+            />
+            {convertTo === 'library' && (
+              <TextInput
+                label={t('hooks.scriptName')}
+                value={scriptName}
+                onChange={(e) => setScriptName(e.currentTarget.value)}
+                error={scriptName && !libraryNameOk ? t('mcp.nameInvalid') : undefined}
+                data-testid="hook-convert-name"
+              />
+            )}
+          </Stack>
+        }
       />
     </Stack>
   )
@@ -1283,6 +1366,9 @@ function NewHookForm({
   // null = the name follows the action and timing until the user types one
   const [typedName, setTypedName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // script: a library script to run instead of the hook's own run.sh ('' = its own)
+  const [use, setUse] = useState('')
+  const libScripts = useApi('scripts', () => window.api.scripts()).data?.scripts ?? []
 
   const pick = (a: HookAction): void => {
     setAction(a)
@@ -1341,7 +1427,7 @@ function NewHookForm({
         description: description.trim(),
         when,
         action,
-        options: clean,
+        options: action === 'script' ? { ...clean, use } : clean,
         body
       }),
       { success: t('hooks.created') }
@@ -1385,9 +1471,18 @@ function NewHookForm({
       />
       {action === 'ask' && <InstructionField value={body} onChange={setBody} />}
       {action === 'script' && (
-        <Text size="xs" c="dimmed">
-          {t('hooks.scriptStarter')}
-        </Text>
+        <Select
+          label={t('hooks.useLabel')}
+          description={use ? t('hooks.libScriptHint') : t('hooks.scriptStarter')}
+          data={[
+            { value: '', label: t('hooks.useOwn') },
+            ...libScripts.map((x) => ({ value: x.name, label: x.name }))
+          ]}
+          value={use}
+          onChange={(v) => setUse(v ?? '')}
+          allowDeselect={false}
+          data-testid="hook-new-use"
+        />
       )}
       <TextInput
         label={t('hooks.description')}

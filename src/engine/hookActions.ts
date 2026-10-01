@@ -83,7 +83,8 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
     // verbatim: the body is a complete Claude Code prompt (imported) — written as is, without the reply-format wrapper
     defaults: { verbatim: false }
   },
-  script: { timings: ALL_TIMINGS, defaults: {} }
+  // use: a library script (scripts/<name>.sh) instead of the hook's own run.sh
+  script: { timings: ALL_TIMINGS, defaults: { use: '' } }
 }
 
 export function isHookAction(v: unknown): v is HookAction {

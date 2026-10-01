@@ -35,6 +35,7 @@ import {
   type HookTiming,
   type HookTool
 } from './hookEvents'
+import { LIBRARY_SCRIPT_RE, readScript } from './scripts'
 import { libraryPaths } from './sources'
 
 export const HOOKS_DIR = 'hooks'
@@ -130,6 +131,14 @@ export function validateHookDoc(v: unknown): string[] {
       else if (!sameType(val, d))
         errors.push(`options.${k} must be ${Array.isArray(d) ? 'a list of texts' : typeof d}`)
     }
+  if (
+    v.action === 'script' &&
+    isObj(v.options) &&
+    typeof v.options.use === 'string' &&
+    v.options.use &&
+    !LIBRARY_SCRIPT_RE.test(v.options.use)
+  )
+    errors.push('options.use must be a script name')
   if (v.action === 'ask' && typeof v.body === 'string' && !v.body.trim())
     errors.push('ask needs an instruction')
   if (v.tools !== undefined) {
@@ -197,10 +206,18 @@ export function scriptForTool(doc: HookDoc, tool: HookTool): string {
   return doc.toolScripts?.[tool] ?? SHARED_SCRIPT
 }
 
-/** Script files a script-action hook keeps */
+/** Library script a script-action hook runs instead of its own run.sh (null when none) */
+export function usedScript(doc: HookDoc): string | null {
+  return doc.action === 'script' && typeof doc.options.use === 'string' && doc.options.use
+    ? doc.options.use
+    : null
+}
+
+/** Script files a script-action hook keeps in its folder (run.sh unless it uses a library script, and tool-only ones) */
 export function hookScriptFiles(doc: HookDoc): string[] {
   if (doc.action !== 'script') return []
-  return [...new Set([SHARED_SCRIPT, ...Object.values(doc.toolScripts ?? {})])].filter(
+  const own = usedScript(doc) ? [] : [SHARED_SCRIPT]
+  return [...new Set([...own, ...Object.values(doc.toolScripts ?? {})])].filter(
     (f): f is string => typeof f === 'string'
   )
 }
@@ -279,6 +296,13 @@ export function readHook(home: string, name: string): LibraryHook {
     const p = join(dir, file)
     if (!existsSync(p)) throw new Error(`hooks/${name}/${file}: script not found`)
     scripts[file] = readFileSync(p, 'utf8')
+  }
+  // A library script stands in for run.sh, so the tools copy it like the hook's own
+  const use = usedScript(doc)
+  if (use) {
+    const lib = readScript(home, use)
+    if (!lib) throw new Error(`hooks/${name}: library script ${use} not found`)
+    scripts[SHARED_SCRIPT] = lib.content
   }
   return { name, doc, scripts }
 }
