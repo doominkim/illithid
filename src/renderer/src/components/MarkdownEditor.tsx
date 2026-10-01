@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Badge, Box, Button, Group, Textarea, Text } from '@mantine/core'
 import { Save, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -24,7 +24,12 @@ export function MarkdownEditor({ value, onSave, disabledHint, minRows = 16, plac
   const { t } = useTranslation()
   const [text, setText] = useState(value)
   const [saving, setSaving] = useState(false)
-  useEffect(() => setText(value), [value])
+  // Take a new outside value (state from the previous render)
+  const [shown, setShown] = useState(value)
+  if (value !== shown) {
+    setShown(value)
+    setText(value)
+  }
   const dirty = text !== value || extraDirty
   const save = async (): Promise<void> => {
     setSaving(true)

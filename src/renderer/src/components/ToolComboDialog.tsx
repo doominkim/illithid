@@ -4,15 +4,6 @@ import { useTranslation } from 'react-i18next'
 import type { ToolId } from '../../../shared/api'
 import { TOOL_NAME } from '../lib/tools'
 
-/** Tools that also read Claude Code's files when both are used */
-export const CLAUDE_READERS: readonly ToolId[] = ['grok', 'copilot']
-
-/** Readers of Claude's files that `next` turns on together with Claude while `prev` did not have that pair */
-export function claudeCombos(prev: readonly ToolId[], next: readonly ToolId[]): ToolId[] {
-  if (!next.includes('claude')) return []
-  return CLAUDE_READERS.filter((t) => next.includes(t) && !(prev.includes(t) && prev.includes('claude')))
-}
-
 /**
  * Asked when Claude Code and a tool that reads Claude's files (Grok CLI, GitHub Copilot) would both be in use.
  * For Grok, "both" can also switch off Grok's reading of Claude's skills and MCP servers (config.grokReadsClaude = false)

@@ -18,6 +18,7 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
 
   useEffect(() => {
     let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show loading while another item loads
     setStats(undefined)
     window.api.sessionIndexStatus().then((v) => alive && setIndexing(v.running), () => {})
     const load = (): void => {

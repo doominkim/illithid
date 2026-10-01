@@ -27,6 +27,7 @@ export function TrayPopover(): React.JSX.Element {
     setNow(Date.now())
   }, [])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; load also refreshes the relative times
     load()
     window.addEventListener('focus', load)
     const offSessions = window.api.onTraySessions(setSessions)

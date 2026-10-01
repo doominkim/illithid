@@ -34,6 +34,7 @@ import {
   type RepoTrees
 } from '../engine'
 import type {
+  Api,
   MarketBulkResult,
   MarketDetailView,
   MarketInstallOptions,
@@ -118,7 +119,18 @@ function assertRef(kind: MarketKind, p: PreparedSkill | RegistryServer | Prepare
     throw new MarketError('changed', 'the source changed since you opened it — reopen to review the new version')
 }
 
-export function marketHandlers(home: string, libWrite: LibWrite) {
+type MarketChannel =
+  | 'marketSearch'
+  | 'marketDetail'
+  | 'marketInstall'
+  | 'marketInstallMany'
+  | 'marketUpdates'
+  | 'marketUpdate'
+
+/** IPC handlers take unchecked arguments and resolve to what the renderer API declares */
+type MarketHandlers = { [K in MarketChannel]: (...args: unknown[]) => ReturnType<Api[K]> }
+
+export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers {
   return {
     marketSearch: async (kind: unknown, q: unknown, cursor?: unknown): Promise<WriteResult<MarketSearchView>> =>
       run(home, async () => {

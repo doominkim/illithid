@@ -93,6 +93,7 @@ function Market(): React.JSX.Element {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- search again when the tab or query changes
     void search()
     // Rules load once per tab switch; skills and MCP follow the query
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
 import { clearApiCache, RefreshContext, useApi } from './lib/useApi'
-import { ReloadContext } from './components/ReloadButton'
+import { ReloadContext } from './lib/reload'
 import { ConfigContext } from './lib/config'
 import { type Menu, NavContext, type NavRequest, PRIMARY, SECONDARY } from './lib/nav'
 import { Sidebar } from './components/Sidebar'

@@ -96,7 +96,7 @@ function skillRoutes(sha: string, dirSha: string, extra: Record<string, Route> =
 }
 
 const REG = 'https://registry.modelcontextprotocol.io/v0.1'
-const meta = (status = 'active') => ({ 'io.modelcontextprotocol.registry/official': { status, isLatest: true } })
+const meta = (status = 'active'): object => ({ 'io.modelcontextprotocol.registry/official': { status, isLatest: true } })
 const FS_SERVER = {
   server: {
     name: 'io.github.acme/fs-mcp',
@@ -167,7 +167,7 @@ async function run(): Promise<void> {
   // a2. findSkills: shorter-query hits and leaderboard substring hits merged, unrelated fuzzy hits dropped
   {
     const H = makeFixture('illithid-market-a2-')
-    const sk = (id: string, installs: number) => ({ id, source: id.split('/').slice(0, 2).join('/'), skillId: id.split('/')[2], name: id.split('/')[2], installs })
+    const sk = (id: string, installs: number): object => ({ id, source: id.split('/').slice(0, 2).join('/'), skillId: id.split('/')[2], name: id.split('/')[2], installs })
     const f = fakeFetch({
       'https://skills.sh/api/search?q=nest&limit=100': { skills: [sk('a/b/nestjs-one', 10), sk('big/x/popular', 9000)] },
       'https://skills.sh/api/search?q=nes&limit=100': { skills: [sk('c/d/nestjs-two', 50), sk('e/f/nesting-other', 5), sk('g/h/ones', 7)] },
@@ -313,7 +313,7 @@ async function run(): Promise<void> {
 
   // d. unsafe paths and limits
   {
-    const tree = (entries: object[]) => ({
+    const tree = (entries: object[]): Record<string, Route> => ({
       [`${API}/commits/HEAD`]: SHA1,
       [`${API}/git/trees/${SHA1}?recursive=1`]: { sha: 'r', tree: [{ path: 'pdf/SKILL.md', mode: '100644', type: 'blob', size: 3 }, ...entries] },
       [`${RAW}/${SHA1}/pdf/SKILL.md`]: 'x'

@@ -14,7 +14,8 @@ import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
-import { ReloadButton, useReload } from '../components/ReloadButton'
+import { ReloadButton } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
@@ -448,6 +449,7 @@ function SkillFileEditor({ name, files, onSaved }: { name: string; files: string
 
   useEffect(() => {
     let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the previous file before loading another
     setText(null)
     setErr(null)
     window.api.skillFileRead(name, rel).then((r) => {

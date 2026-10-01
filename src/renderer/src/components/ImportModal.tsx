@@ -37,6 +37,7 @@ export function ImportModal({ opened, onClose, onImported, initialSource, kind, 
 
   useEffect(() => {
     if (!opened) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- start from a clean state each time the modal opens
     setSources(null)
     setPlan(null)
     setErr(null)
@@ -62,6 +63,7 @@ export function ImportModal({ opened, onClose, onImported, initialSource, kind, 
 
   useEffect(() => {
     if (!opened || !sourceId) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the previous plan before loading another source
     setPlan(null)
     setErr(null)
     let alive = true

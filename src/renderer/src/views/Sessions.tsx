@@ -301,6 +301,7 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
   }
   useEffect(() => {
     if (pendingJump === null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the jump once its message is rendered
     if (scrollTo(pendingJump)) setPendingJump(null)
   })
   // Search result click: load the transcript, then jump to that message
@@ -518,6 +519,7 @@ function Sessions(): React.JSX.Element {
   const contentQ = mode === 'content' ? query.trim() : ''
   // Clear previous results immediately when the query or tool changes (kept on re-search after indexing finishes)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- drop results of the previous query at once
     setFound(null)
   }, [contentQ, tool])
   // Content search: 300ms after input, and again when indexing finishes
@@ -558,6 +560,7 @@ function Sessions(): React.JSX.Element {
     return { rows, sessions: n }
   }, [found, data, tool, hideSub])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- select the first row while nothing is selected
     if (!selected && filtered[0]) setSelected(`${filtered[0].tool}:${filtered[0].id}`)
   }, [filtered, selected])
 

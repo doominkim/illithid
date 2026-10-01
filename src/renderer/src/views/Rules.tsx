@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Badge, Box, Button, Group, Modal, Stack, Tabs, TextInput } from '@mantine/core'
 import { Download, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,8 @@ import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
-import { ReloadButton, useReload } from '../components/ReloadButton'
+import { ReloadButton } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
@@ -67,10 +68,13 @@ function Rules(): React.JSX.Element {
   /** Keep the detail open right after a rename until the list is reloaded */
   const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null)
   useNavSelect(setSelected)
-  useEffect(() => {
+  // Reset the rename field when another rule is opened (state from the previous render)
+  const [draftFor, setDraftFor] = useState<string | null | undefined>(undefined)
+  if (selected !== draftFor) {
+    setDraftFor(selected)
     setNameDraft(selected ?? '')
     setRenameErr(null)
-  }, [selected])
+  }
 
   /** Per-tool sync state (status cells) */
   const injection = useMemo<PillMap>(() => {
