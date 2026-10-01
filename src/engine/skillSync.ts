@@ -50,7 +50,14 @@ import { isAppTmpName } from './write'
  * Tools not in use (config.toolsInUse) are left out entirely.
  */
 export type SkillSyncAction =
-  'copy' | 'replaceLink' | 'update' | 'skip' | 'inSync' | 'deleteCandidate' | 'replaceImported' | 'retireImported'
+  | 'copy'
+  | 'replaceLink'
+  | 'update'
+  | 'skip'
+  | 'inSync'
+  | 'deleteCandidate'
+  | 'replaceImported'
+  | 'retireImported'
 
 export interface SkillSyncItem {
   tool: ToolId
@@ -106,7 +113,8 @@ export interface SkillSyncOptions {
 function symlinkDirs(home: string, env?: Env): Map<ToolId, string> {
   const m = new Map<ToolId, string>()
   const inUse = syncTools(home)
-  for (const t of tools(home)) if (t.skills.kind === 'symlinkDir' && inUse.includes(t.id)) m.set(t.id, t.skills.dir)
+  for (const t of tools(home))
+    if (t.skills.kind === 'symlinkDir' && inUse.includes(t.id)) m.set(t.id, t.skills.dir)
   // With env given: no Copilot / Grok copies while COPILOT_HOME / GROK_HOME points elsewhere
   if (env) for (const t of [...m.keys()]) if (toolHomeOverride(home, t, env)) m.delete(t)
   return m
@@ -204,7 +212,9 @@ export function planSkillSync(home: string, _env: Env = process.env): SkillSyncI
       } else {
         const currentHash = dirContentHash(path)
         const rec = managed[name]
-        const imported = rec ? undefined : pendingOf(home, appState, 'skill', tool, name).find((p) => p.path === path)
+        const imported = rec
+          ? undefined
+          : pendingOf(home, appState, 'skill', tool, name).find((p) => p.path === path)
         if (imported) {
           items.push({
             ...base,
@@ -413,7 +423,13 @@ export function applySkillSync(
         // Imported original: back up to backups/imported and replace in one step (put back if the swap fails)
         const p = pendingOf(home, state, 'skill', f.tool, f.name).find((x) => x.path === f.path)
         const cur = lstatOrNull(f.path)
-        if (!p || p.hash !== f.currentHash || !cur?.isDirectory() || cur.isSymbolicLink() || dirContentHash(f.path) !== f.currentHash) {
+        if (
+          !p ||
+          p.hash !== f.currentHash ||
+          !cur?.isDirectory() ||
+          cur.isSymbolicLink() ||
+          dirContentHash(f.path) !== f.currentHash
+        ) {
           out(it, 'refused', { reason: 'changedSinceCheck' })
           continue
         }
@@ -477,7 +493,10 @@ export function applySkillSync(
       const p = pendingOf(home, state, 'skill', it.tool, it.name).find((x) => x.path === it.path)
       const toolDir = dirs.get(it.tool)
       const allowed = it.tool === 'opencode' ? opencodeSkillDirs(home) : toolDir ? [toolDir] : []
-      if (!allowed.includes(dirname(resolve(it.path))) || (toolDir && resolve(it.path) === join(toolDir, it.name))) {
+      if (
+        !allowed.includes(dirname(resolve(it.path))) ||
+        (toolDir && resolve(it.path) === join(toolDir, it.name))
+      ) {
         out(it, 'refused', { reason: 'outOfScope' })
         continue
       }
@@ -491,7 +510,11 @@ export function applySkillSync(
         const rec = state.skills![it.tool]?.[it.name]
         const slot = lstatOrNull(join(toolDir, it.name))
         try {
-          copyReady = !!rec && !!slot?.isDirectory() && !slot.isSymbolicLink() && dirContentHash(join(toolDir, it.name)) === rec.contentHash
+          copyReady =
+            !!rec &&
+            !!slot?.isDirectory() &&
+            !slot.isSymbolicLink() &&
+            dirContentHash(join(toolDir, it.name)) === rec.contentHash
         } catch {
           copyReady = false
         }
@@ -508,7 +531,11 @@ export function applySkillSync(
         }
         dropPending(state, [p])
         writeState(home, state)
-        out(it, r.status === 'moved' ? 'done' : 'unchanged', r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' })
+        out(
+          it,
+          r.status === 'moved' ? 'done' : 'unchanged',
+          r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' }
+        )
       } catch (e) {
         out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
       }
@@ -522,8 +549,7 @@ export function leftoverSkillTmps(home: string): string[] {
   const out: string[] = []
   for (const dir of symlinkDirs(home).values()) {
     if (!existsSync(dir)) continue
-    for (const n of readdirSync(dir))
-      if (isAppTmpName(n)) out.push(n)
+    for (const n of readdirSync(dir)) if (isAppTmpName(n)) out.push(n)
   }
   return out
 }
@@ -532,7 +558,10 @@ export function leftoverSkillTmps(home: string): string[] {
  * Right after import: a same-named real directory in a tool skills folder (Claude, Codex) whose content matches the library copy is adopted as app-owned
  * (recorded in state — the next sync sees inSync). If different, it stays user-owned (sync skips it). Enabled tools only; skipped if already recorded.
  */
-export function adoptSkillCopies(home: string, name: string): { adopted: ToolId[]; userOwned: ToolId[] } {
+export function adoptSkillCopies(
+  home: string,
+  name: string
+): { adopted: ToolId[]; userOwned: ToolId[] } {
   const out = { adopted: [] as ToolId[], userOwned: [] as ToolId[] }
   const st = readState(home)
   if (st.error) return out

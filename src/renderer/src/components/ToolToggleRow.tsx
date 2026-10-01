@@ -22,7 +22,9 @@ interface Props {
 export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const inUse = useToolsInUse()
-  const shown = inUse.filter((tool) => (!tools || tools.includes(tool)) && pills[tool] && !pills[tool]!.na)
+  const shown = inUse.filter(
+    (tool) => (!tools || tools.includes(tool)) && pills[tool] && !pills[tool]!.na
+  )
   return (
     <Stack gap={8} data-testid={testId} data-busy={busy.length ? true : undefined}>
       <Text size="sm" fw={600} c="dimmed">
@@ -44,7 +46,11 @@ export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): 
               disabled={busy.length > 0}
               onClick={() => onToggle(tool)}
             >
-              {busy.includes(tool) ? <Loader size={14} color="accent" /> : <ToolIcon tool={tool} size={16} />}
+              {busy.includes(tool) ? (
+                <Loader size={14} color="accent" />
+              ) : (
+                <ToolIcon tool={tool} size={16} />
+              )}
               <span className="ac-tool-btn-name">{name}</span>
               <span className="ac-tool-btn-state">{t(p.on ? 'detail.on' : 'detail.off')}</span>
             </UnstyledButton>

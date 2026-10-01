@@ -39,7 +39,17 @@ export function Initial({ text, size = 28 }: { text: string; size?: number }): R
 }
 
 /** List row: avatar + title/tags + subtext + right slot */
-export function ListRow({ avatar, title, tags, subtitle, right, active, onClick, style, leading }: Props): React.JSX.Element {
+export function ListRow({
+  avatar,
+  title,
+  tags,
+  subtitle,
+  right,
+  active,
+  onClick,
+  style,
+  leading
+}: Props): React.JSX.Element {
   const body = (
     <>
       {avatar}
@@ -63,14 +73,22 @@ export function ListRow({ avatar, title, tags, subtitle, right, active, onClick,
     return (
       <Box className="ac-row" data-active={active || undefined} style={style}>
         <Box style={{ flexShrink: 0, display: 'flex' }}>{leading}</Box>
-        <UnstyledButton onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <UnstyledButton
+          onClick={onClick}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}
+        >
           {body}
         </UnstyledButton>
       </Box>
     )
   if (onClick)
     return (
-      <UnstyledButton className="ac-row" data-active={active || undefined} onClick={onClick} style={style}>
+      <UnstyledButton
+        className="ac-row"
+        data-active={active || undefined}
+        onClick={onClick}
+        style={style}
+      >
         {body}
       </UnstyledButton>
     )
@@ -82,7 +100,13 @@ export function ListRow({ avatar, title, tags, subtitle, right, active, onClick,
 }
 
 /** Card grouping rows */
-export function ListCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }): React.JSX.Element {
+export function ListCard({
+  children,
+  style
+}: {
+  children: React.ReactNode
+  style?: React.CSSProperties
+}): React.JSX.Element {
   return (
     <Box className="ac-card" style={{ overflow: 'hidden', ...style }}>
       {children}

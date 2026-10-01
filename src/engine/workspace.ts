@@ -86,7 +86,11 @@ export function workspaceName(home: string, id: string): string {
 
 export function listWorkspaces(home: string): WorkspaceInfo[] {
   const active = activeWorkspaceId(home)
-  return workspaceIds(home).map((id) => ({ id, name: workspaceName(home, id), active: id === active }))
+  return workspaceIds(home).map((id) => ({
+    id,
+    name: workspaceName(home, id),
+    active: id === active
+  }))
 }
 
 /** name → id slug (lowercase·digits·-). 'workspace' if no ASCII letters or digits */
@@ -119,7 +123,10 @@ function checkName(name: unknown): string {
   const n = typeof name === 'string' ? name.trim() : ''
   // eslint-disable-next-line no-control-regex
   if (!n || n.length > 64 || /[\u0000-\u001f\u007f]/.test(n))
-    throw new WorkspaceError('invalidName', 'workspace name must be 1–64 chars with no control characters')
+    throw new WorkspaceError(
+      'invalidName',
+      'workspace name must be 1–64 chars with no control characters'
+    )
   return n
 }
 
@@ -208,10 +215,12 @@ export function deleteWorkspace(home: string, id: string): { id: string; backupP
   const ids = workspaceIds(home)
   if (typeof id !== 'string' || !WORKSPACE_ID_RE.test(id) || !ids.includes(id))
     throw new WorkspaceError('notFound', 'workspace not found')
-  if (id === DEFAULT_WORKSPACE) throw new WorkspaceError('defaultWorkspace', 'the default workspace cannot be deleted')
+  if (id === DEFAULT_WORKSPACE)
+    throw new WorkspaceError('defaultWorkspace', 'the default workspace cannot be deleted')
   if (id === activeWorkspaceId(home))
     throw new WorkspaceError('activeWorkspace', 'the active workspace cannot be deleted')
-  if (ids.length <= 1) throw new WorkspaceError('lastWorkspace', 'the last workspace cannot be deleted')
+  if (ids.length <= 1)
+    throw new WorkspaceError('lastWorkspace', 'the last workspace cannot be deleted')
   const from = workspaceRoot(home, id)
   const to = join(deletedWorkspacesRoot(home), new Date().toISOString().replace(/[:.]/g, '-'), id)
   mkdirSync(dirname(to), { recursive: true, mode: 0o700 })
@@ -294,7 +303,15 @@ export function planMigrateToWorkspaces(home: string): WorkspaceMigrationPlan {
   const stateRewrites = st ? rewriteStatePaths(st, (x) => toDefaultWorkspacePath(home, x)) : 0
   const cfg = readJsonObj(join(appConfigDir(home), 'config.json'))
   const dropLibraryPath = !!entries.length && !!cfg && cfg.libraryPath !== undefined
-  return { needed: entries.length > 0, from, to, entries, conflicts, stateRewrites, dropLibraryPath }
+  return {
+    needed: entries.length > 0,
+    from,
+    to,
+    entries,
+    conflicts,
+    stateRewrites,
+    dropLibraryPath
+  }
 }
 
 function stamp(): string {
@@ -353,7 +370,8 @@ export function migrateToWorkspaces(home: string): WorkspaceMigrationResult {
       }
     }
   }
-  if (!existsSync(join(plan.to, WORKSPACE_FILE))) writeWorkspaceFile(plan.to, { name: DEFAULT_WORKSPACE })
+  if (!existsSync(join(plan.to, WORKSPACE_FILE)))
+    writeWorkspaceFile(plan.to, { name: DEFAULT_WORKSPACE })
   if (plan.dropLibraryPath) {
     const cfg = readJsonObj(join(appConfigDir(home), 'config.json'))
     if (cfg) {
@@ -382,11 +400,14 @@ export function secretAccountsInWorkspaces(home: string, except?: string): Set<s
     const dir = join(workspaceRoot(home, id), 'mcps')
     let files: string[] = []
     try {
-      files = readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('_') && !f.startsWith('.'))
+      files = readdirSync(dir).filter(
+        (f) => f.endsWith('.json') && !f.startsWith('_') && !f.startsWith('.')
+      )
     } catch {
       continue
     }
-    for (const f of files) for (const r of secretRefsOf(readJsonObj(join(dir, f)))) out.add(r.account)
+    for (const f of files)
+      for (const r of secretRefsOf(readJsonObj(join(dir, f)))) out.add(r.account)
   }
   return out
 }
@@ -555,7 +576,14 @@ export function planImportWorkspace(data: Uint8Array): WorkspaceImportPlan {
   try {
     entries = readZipEntries(data)
   } catch (e) {
-    return { ok: false, reason: 'invalidZip', errors: [(e as Error).message], name: null, files: 0, bytes: 0 }
+    return {
+      ok: false,
+      reason: 'invalidZip',
+      errors: [(e as Error).message],
+      name: null,
+      files: 0,
+      bytes: 0
+    }
   }
   const seen = new Set<string>()
   let files = 0
@@ -577,7 +605,11 @@ export function planImportWorkspace(data: Uint8Array): WorkspaceImportPlan {
     errors.push(`${files} files — limit ${WORKSPACE_ZIP_MAX_FILES}`)
   if (bytes > WORKSPACE_ZIP_MAX_BYTES)
     errors.push(`uncompressed size ${bytes} bytes — limit ${WORKSPACE_ZIP_MAX_BYTES} bytes`)
-  const reason = unsafe ? ('unsafeEntry' as const) : errors.length ? ('tooLarge' as const) : undefined
+  const reason = unsafe
+    ? ('unsafeEntry' as const)
+    : errors.length
+      ? ('tooLarge' as const)
+      : undefined
   let name: string | null = null
   if (!errors.length && seen.has(WORKSPACE_FILE)) {
     try {
@@ -621,10 +653,12 @@ export function importWorkspace(
   // re-check limits against actual sizes, which may differ from declared ones
   let actual = 0
   for (const [n, buf] of Object.entries(unz)) {
-    if (entryProblem(n, n.endsWith('/'))) throw new WorkspaceError('unsafeEntry', `${JSON.stringify(n)}: disallowed entry`)
+    if (entryProblem(n, n.endsWith('/')))
+      throw new WorkspaceError('unsafeEntry', `${JSON.stringify(n)}: disallowed entry`)
     actual += buf.byteLength
   }
-  if (actual > WORKSPACE_ZIP_MAX_BYTES) throw new WorkspaceError('tooLarge', 'uncompressed size limit exceeded')
+  if (actual > WORKSPACE_ZIP_MAX_BYTES)
+    throw new WorkspaceError('tooLarge', 'uncompressed size limit exceeded')
   const name = uniqueName(home, checkName(opts.name ?? plan.name ?? 'imported'))
   const id = uniqueId(home, workspaceSlug(name))
   mkdirSync(workspacesRoot(home), { recursive: true, mode: 0o755 })
@@ -634,7 +668,8 @@ export function importWorkspace(
     mkdirSync(tmp, { mode: 0o755 })
     for (const [n, buf] of Object.entries(unz)) {
       const dst = join(tmp, ...n.split('/').filter(Boolean))
-      if (!dst.startsWith(tmp + sep)) throw new WorkspaceError('unsafeEntry', `${JSON.stringify(n)}: outside path`)
+      if (!dst.startsWith(tmp + sep))
+        throw new WorkspaceError('unsafeEntry', `${JSON.stringify(n)}: outside path`)
       if (n.endsWith('/')) {
         mkdirSync(dst, { recursive: true, mode: 0o755 })
         continue

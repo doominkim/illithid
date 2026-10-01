@@ -193,11 +193,15 @@ export function tableExists(db: DatabaseSync, name: string): boolean {
 }
 
 export function metaGet(db: DatabaseSync, key: string): string | undefined {
-  return (db.prepare('select value from meta where key = ?').get(key) as { value?: string } | undefined)?.value
+  return (
+    db.prepare('select value from meta where key = ?').get(key) as { value?: string } | undefined
+  )?.value
 }
 
 export function metaSet(db: DatabaseSync, key: string, value: string): void {
-  db.prepare('insert into meta(key, value) values (?, ?) on conflict(key) do update set value = excluded.value').run(key, value)
+  db.prepare(
+    'insert into meta(key, value) values (?, ?) on conflict(key) do update set value = excluded.value'
+  ).run(key, value)
 }
 
 export function totalChanges(db: DatabaseSync): number {
@@ -267,12 +271,18 @@ export async function indexSessions(
     }
     const prevTools = metaGet(db, 'includeTools')
     if (prevTools !== undefined && prevTools !== String(includeTools)) {
-      db.exec(`delete from messages; delete from msg; delete from sessions; delete from usage; ${MODEL_TABLES.map((t) => `delete from ${t};`).join(' ')}`)
+      db.exec(
+        `delete from messages; delete from msg; delete from sessions; delete from usage; ${MODEL_TABLES.map((t) => `delete from ${t};`).join(' ')}`
+      )
     }
     if (prevTools !== String(includeTools)) metaSet(db, 'includeTools', String(includeTools))
 
     const existing = new Map<string, Row>()
-    for (const r of db.prepare('select sid, tool, id, path, mtime, size, title, project, updatedAt, parentId from sessions').all() as unknown as Row[])
+    for (const r of db
+      .prepare(
+        'select sid, tool, id, path, mtime, size, title, project, updatedAt, parentId from sessions'
+      )
+      .all() as unknown as Row[])
       existing.set(keyOf(r.tool, r.id), r)
 
     // Dedupe the list (earlier = more recent wins)
@@ -285,16 +295,22 @@ export async function indexSessions(
       list.push(s)
     }
 
-    const delMessages = db.prepare('delete from messages where rowid in (select mid from msg where sid = ?)')
+    const delMessages = db.prepare(
+      'delete from messages where rowid in (select mid from msg where sid = ?)'
+    )
     const delMsg = db.prepare('delete from msg where sid = ?')
     const delSession = db.prepare('delete from sessions where sid = ?')
     const delUsage = db.prepare('delete from usage where sid = ?')
     const delModel = MODEL_TABLES.map((t) => db.prepare(`delete from ${t} where sid = ?`))
-    const insUsage = db.prepare('insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)')
+    const insUsage = db.prepare(
+      'insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)'
+    )
 
     // Sessions that disappeared
     const complete = new Set<string>(opts.completeTools ?? TOOL_IDS)
-    const gone = [...existing.values()].filter((r) => complete.has(r.tool) && !seen.has(keyOf(r.tool, r.id)))
+    const gone = [...existing.values()].filter(
+      (r) => complete.has(r.tool) && !seen.has(keyOf(r.tool, r.id))
+    )
     if (gone.length) {
       db.exec('begin')
       try {
@@ -319,7 +335,8 @@ export async function indexSessions(
       const sig = signature(s)
       if (!sig) continue
       const row = existing.get(keyOf(s.tool, s.id))
-      if (!row || row.mtime !== sig.mtime || row.size !== sig.size || row.path !== s.path) todo.push({ s, sig, row })
+      if (!row || row.mtime !== sig.mtime || row.size !== sig.size || row.path !== s.path)
+        todo.push({ s, sig, row })
       else if (
         (row.title ?? '') !== (s.title ?? '') ||
         (row.project ?? '') !== (s.project ?? '') ||
@@ -329,10 +346,19 @@ export async function indexSessions(
         metaOnly.push({ s, row })
     }
 
-    const updMeta = db.prepare('update sessions set title = ?, project = ?, updatedAt = ?, parentId = ? where sid = ?')
+    const updMeta = db.prepare(
+      'update sessions set title = ?, project = ?, updatedAt = ?, parentId = ? where sid = ?'
+    )
     if (metaOnly.length) {
       db.exec('begin')
-      for (const { s, row } of metaOnly) updMeta.run(s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null, row.sid)
+      for (const { s, row } of metaOnly)
+        updMeta.run(
+          s.title ?? '',
+          s.project ?? null,
+          s.updatedAt ?? null,
+          s.parentId ?? null,
+          row.sid
+        )
       db.exec('commit')
     }
 
@@ -359,7 +385,17 @@ export async function indexSessions(
           delMessages.run(sid)
           delMsg.run(sid)
         } else {
-          sid = Number(insSession.run(s.tool, s.id, s.path, s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null).lastInsertRowid)
+          sid = Number(
+            insSession.run(
+              s.tool,
+              s.id,
+              s.path,
+              s.title ?? '',
+              s.project ?? null,
+              s.updatedAt ?? null,
+              s.parentId ?? null
+            ).lastInsertRowid
+          )
         }
         let n = 0
         const sink = (m: TranscriptMessage): void => {
@@ -384,10 +420,14 @@ export async function indexSessions(
             for (const f of claudeSubagentFiles(s.path)) {
               models.beginSubagent()
               try {
-                await readClaudeSubagentStats(f, (call) => {
-                  usage.add(call)
-                  models.call(call)
-                }, models)
+                await readClaudeSubagentStats(
+                  f,
+                  (call) => {
+                    usage.add(call)
+                    models.call(call)
+                  },
+                  models
+                )
               } catch {
                 // an unreadable or vanished subagent file must not fail the whole session
               }
@@ -415,9 +455,20 @@ export async function indexSessions(
           }
         }
         delUsage.run(sid)
-        for (const u of usage.rows.values()) insUsage.run(sid, s.tool, u.kind, u.name, u.model, u.day, u.n)
+        for (const u of usage.rows.values())
+          insUsage.run(sid, s.tool, u.kind, u.name, u.model, u.day, u.n)
         models.write(db, sid)
-        finish.run(s.path, sig.mtime, sig.size, s.title ?? '', s.project ?? null, s.updatedAt ?? null, s.parentId ?? null, n, sid)
+        finish.run(
+          s.path,
+          sig.mtime,
+          sig.size,
+          s.title ?? '',
+          s.project ?? null,
+          s.updatedAt ?? null,
+          s.parentId ?? null,
+          n,
+          sid
+        )
         db.exec('commit')
         indexed++
         inserted += n
@@ -433,7 +484,15 @@ export async function indexSessions(
 
     const changes = totalChanges(db) - base
     if (changes > 0) metaSet(db, 'lastIndexedAt', new Date().toISOString())
-    return { sessions: list.length, indexed, removed: gone.length, failed, inserted, changes, ms: Date.now() - t0 }
+    return {
+      sessions: list.length,
+      indexed,
+      removed: gone.length,
+      failed,
+      inserted,
+      changes,
+      ms: Date.now() - t0
+    }
   } finally {
     opencode?.close()
     db.close()
@@ -445,9 +504,13 @@ export function indexStatus(home: string, opts: IndexOptions = {}): IndexStatus 
   if (!existsSync(path)) return { exists: false, sessions: 0, messages: 0 }
   const db = openDb(path)
   try {
-    const sessions = Number((db.prepare('select count(*) as n from sessions').get() as { n: number }).n)
+    const sessions = Number(
+      (db.prepare('select count(*) as n from sessions').get() as { n: number }).n
+    )
     const messages = Number((db.prepare('select count(*) as n from msg').get() as { n: number }).n)
-    const docs = tableExists(db, 'docs') ? Number((db.prepare('select count(*) as n from docs').get() as { n: number }).n) : 0
+    const docs = tableExists(db, 'docs')
+      ? Number((db.prepare('select count(*) as n from docs').get() as { n: number }).n)
+      : 0
     return { exists: true, sessions, messages, docs, lastIndexedAt: metaGet(db, 'lastIndexedAt') }
   } finally {
     db.close()
@@ -459,7 +522,10 @@ export function indexStatus(home: string, opts: IndexOptions = {}): IndexStatus 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** About 60 chars around the first match + highlight range */
-export function makeSnippet(text: string, q: string): { snippet: string; marks: [number, number][] } {
+export function makeSnippet(
+  text: string,
+  q: string
+): { snippet: string; marks: [number, number][] } {
   const flat = text.replace(/\s+/g, ' ').trim()
   const re = new RegExp(escapeRe(q.replace(/\s+/g, ' ')), 'giu')
   const found: [number, number][] = []
@@ -502,7 +568,11 @@ interface SessionRow {
   parentId: string | null
 }
 
-export function searchSessions(home: string, query: string, opts: SearchOptions = {}): SessionSearchResponse {
+export function searchSessions(
+  home: string,
+  query: string,
+  opts: SearchOptions = {}
+): SessionSearchResponse {
   const t0 = Date.now()
   const q = query.trim()
   const path = opts.dbPath ?? searchIndexPath(home)
@@ -555,7 +625,9 @@ export function searchSessions(home: string, query: string, opts: SearchOptions 
       list.push(r)
       bySid.set(r.sid, list)
     }
-    const sessStmt = db.prepare('select sid, tool, id, title, project, updatedAt, parentId from sessions where sid = ?')
+    const sessStmt = db.prepare(
+      'select sid, tool, id, title, project, updatedAt, parentId from sessions where sid = ?'
+    )
     const sess = [...bySid.keys()].map((sid) => sessStmt.get(sid) as unknown as SessionRow)
     sess.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
     const top = sess.slice(0, limit)
@@ -594,8 +666,11 @@ export function sessionTitles(home: string, tool: string, ids: string[]): Map<st
   const db = openDbForRead(searchIndexPath(home))
   if (!db) return out
   try {
-    const q = db.prepare(`select id, title from sessions where tool = ? and id in (${ids.map(() => '?').join(',')})`)
-    for (const r of q.all(tool, ...ids) as { id: string; title: string | null }[]) if (r.title?.trim()) out.set(r.id, r.title)
+    const q = db.prepare(
+      `select id, title from sessions where tool = ? and id in (${ids.map(() => '?').join(',')})`
+    )
+    for (const r of q.all(tool, ...ids) as { id: string; title: string | null }[])
+      if (r.title?.trim()) out.set(r.id, r.title)
   } finally {
     db.close()
   }

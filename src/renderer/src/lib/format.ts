@@ -29,7 +29,10 @@ export function includesCI(hay: string | undefined, needle: string): boolean {
 }
 
 /** Relative time ("5 min ago"). Localized wording comes from i18n keys rel.* */
-export function relTime(iso: string | undefined, t: (k: string, o?: Record<string, unknown>) => string): string {
+export function relTime(
+  iso: string | undefined,
+  t: (k: string, o?: Record<string, unknown>) => string
+): string {
   if (!iso) return '-'
   const d = new Date(iso).getTime()
   if (Number.isNaN(d)) return '-'

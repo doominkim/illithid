@@ -3,9 +3,20 @@
  * and nothing in the engine reaches the network on its own. GET only, no credentials.
  */
 
-export type FetchFn = (url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal }) => Promise<Response>
+export type FetchFn = (
+  url: string,
+  init?: { headers?: Record<string, string>; signal?: AbortSignal }
+) => Promise<Response>
 
-export type MarketErrorCode = 'network' | 'rateLimited' | 'notFound' | 'tooLarge' | 'invalid' | 'unsupported' | 'disabled' | 'changed'
+export type MarketErrorCode =
+  | 'network'
+  | 'rateLimited'
+  | 'notFound'
+  | 'tooLarge'
+  | 'invalid'
+  | 'unsupported'
+  | 'disabled'
+  | 'changed'
 
 export class MarketError extends Error {
   constructor(
@@ -24,25 +35,41 @@ export const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 const USER_AGENT = 'Illithid'
 
-async function request(fetchFn: FetchFn, url: string, headers: Record<string, string>, maxBytes: number): Promise<Uint8Array> {
+async function request(
+  fetchFn: FetchFn,
+  url: string,
+  headers: Record<string, string>,
+  maxBytes: number
+): Promise<Uint8Array> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS)
   let res: Response
   try {
-    res = await fetchFn(url, { headers: { 'User-Agent': USER_AGENT, ...headers }, signal: ctl.signal })
+    res = await fetchFn(url, {
+      headers: { 'User-Agent': USER_AGENT, ...headers },
+      signal: ctl.signal
+    })
   } catch (e) {
     clearTimeout(timer)
-    throw new MarketError('network', `request failed: ${host(url)} (${(e as Error).name === 'AbortError' ? 'timeout' : 'unreachable'})`)
+    throw new MarketError(
+      'network',
+      `request failed: ${host(url)} (${(e as Error).name === 'AbortError' ? 'timeout' : 'unreachable'})`
+    )
   }
   try {
-    if (res.status === 429 || (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0'))
+    if (
+      res.status === 429 ||
+      (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0')
+    )
       throw new MarketError('rateLimited', `rate limited: ${host(url)}`)
     if (res.status === 404) throw new MarketError('notFound', `not found: ${host(url)}`)
     if (!res.ok) throw new MarketError('network', `${host(url)} returned ${res.status}`)
     const declared = Number(res.headers.get('content-length') ?? '')
-    if (Number.isFinite(declared) && declared > maxBytes) throw new MarketError('tooLarge', `response too large: ${host(url)}`)
+    if (Number.isFinite(declared) && declared > maxBytes)
+      throw new MarketError('tooLarge', `response too large: ${host(url)}`)
     const buf = new Uint8Array(await res.arrayBuffer())
-    if (buf.byteLength > maxBytes) throw new MarketError('tooLarge', `response too large: ${host(url)}`)
+    if (buf.byteLength > maxBytes)
+      throw new MarketError('tooLarge', `response too large: ${host(url)}`)
     return buf
   } catch (e) {
     if (e instanceof MarketError) throw e
@@ -60,15 +87,30 @@ function host(url: string): string {
   }
 }
 
-export async function getBytes(fetchFn: FetchFn, url: string, maxBytes = MAX_RESPONSE_BYTES, headers: Record<string, string> = {}): Promise<Uint8Array> {
+export async function getBytes(
+  fetchFn: FetchFn,
+  url: string,
+  maxBytes = MAX_RESPONSE_BYTES,
+  headers: Record<string, string> = {}
+): Promise<Uint8Array> {
   return request(fetchFn, url, headers, maxBytes)
 }
 
-export async function getText(fetchFn: FetchFn, url: string, maxBytes = MAX_RESPONSE_BYTES, headers: Record<string, string> = {}): Promise<string> {
+export async function getText(
+  fetchFn: FetchFn,
+  url: string,
+  maxBytes = MAX_RESPONSE_BYTES,
+  headers: Record<string, string> = {}
+): Promise<string> {
   return new TextDecoder().decode(await request(fetchFn, url, headers, maxBytes))
 }
 
-export async function getJson<T = unknown>(fetchFn: FetchFn, url: string, maxBytes = MAX_RESPONSE_BYTES, headers: Record<string, string> = {}): Promise<T> {
+export async function getJson<T = unknown>(
+  fetchFn: FetchFn,
+  url: string,
+  maxBytes = MAX_RESPONSE_BYTES,
+  headers: Record<string, string> = {}
+): Promise<T> {
   const text = await getText(fetchFn, url, maxBytes, { Accept: 'application/json', ...headers })
   try {
     return JSON.parse(text) as T
@@ -89,6 +131,10 @@ export function str(v: unknown): string | undefined {
 export const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 
 export function assertRepo(repo: string): void {
-  if (typeof repo !== 'string' || !REPO_RE.test(repo) || repo.split('/').some((s) => s === '.' || s === '..'))
+  if (
+    typeof repo !== 'string' ||
+    !REPO_RE.test(repo) ||
+    repo.split('/').some((s) => s === '.' || s === '..')
+  )
     throw new MarketError('invalid', 'invalid repository')
 }

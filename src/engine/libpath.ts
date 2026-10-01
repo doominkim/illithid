@@ -70,7 +70,8 @@ export function assertInsideLibrary(home: string, path: string): string {
     // Broken symlink
     throw new LibraryError('outsideLibrary', 'unresolvable symlink')
   }
-  if (!within(root, real)) throw new LibraryError('outsideLibrary', 'path outside library (symlink)')
+  if (!within(root, real))
+    throw new LibraryError('outsideLibrary', 'path outside library (symlink)')
   // Resolved real path + remaining relative path
   return resolve(real, relative(probe, abs))
 }

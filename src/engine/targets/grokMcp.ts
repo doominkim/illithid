@@ -4,13 +4,32 @@
  * those stay as written; `secret:` references are resolved to their values (like every other tool that has no Keychain access).
  */
 import { parse as parseToml } from 'smol-toml'
-import { blockBodyMulti, mcpEntries, outsideBlockMulti, presentMarkers, removeBlockMulti, spliceBlockMulti, toggleNotes } from '../text'
+import {
+  blockBodyMulti,
+  mcpEntries,
+  outsideBlockMulti,
+  presentMarkers,
+  removeBlockMulti,
+  spliceBlockMulti,
+  toggleNotes
+} from '../text'
 import type { SecretBackend } from '../secrets'
 import type { Env, McpSource, TargetDef } from '../types'
-import { extractCodexTables, LEGACY_TOML_MCP_MARKERS, stripCodexManagedTables, TOML_MCP_MARKERS } from './codexMcp'
+import {
+  extractCodexTables,
+  LEGACY_TOML_MCP_MARKERS,
+  stripCodexManagedTables,
+  TOML_MCP_MARKERS
+} from './codexMcp'
 import { GROK_COMPAT_MARKERS } from './grokCompat'
 import { isServerError, renderHttpHeaders, renderValue } from './mcpRender'
-import { disabledUnownedServers, enabledServerNames, mcpForTool, ownedServerNames, staleServerNames } from './toggles'
+import {
+  disabledUnownedServers,
+  enabledServerNames,
+  mcpForTool,
+  ownedServerNames,
+  staleServerNames
+} from './toggles'
 
 const ALL_MARKERS = [TOML_MCP_MARKERS, ...LEGACY_TOML_MCP_MARKERS]
 
@@ -63,7 +82,8 @@ export function buildGrokMcpBody(
         }
         if (s.env && Object.keys(s.env).length) {
           out.push('', `[mcp_servers.${key}.env]`)
-          for (const [k, v] of Object.entries(s.env)) out.push(`${tomlKey(k)} = ${tomlString(renderValue(v, 'claude', env, secrets))}`)
+          for (const [k, v] of Object.entries(s.env))
+            out.push(`${tomlKey(k)} = ${tomlString(renderValue(v, 'claude', env, secrets))}`)
         }
       } else {
         out.push(`url = ${tomlString(s.url)}`)
@@ -74,7 +94,8 @@ export function buildGrokMcpBody(
         const headers = renderHttpHeaders(s, 'claude', env, secrets)
         if (Object.keys(headers).length) {
           out.push('', `[mcp_servers.${key}.headers]`)
-          for (const [k, v] of Object.entries(headers)) out.push(`${tomlString(k)} = ${tomlString(v)}`)
+          for (const [k, v] of Object.entries(headers))
+            out.push(`${tomlString(k)} = ${tomlString(v)}`)
         }
       }
     } catch (e) {
@@ -100,7 +121,11 @@ function stripOwnedTables(text: string, names: string[]): string {
   if (!p) return stripCodexManagedTables(text, names)
   const i = text.indexOf(p[0])
   const j = text.indexOf(p[1]) + p[1].length
-  return stripCodexManagedTables(text.slice(0, i), names) + text.slice(i, j) + stripCodexManagedTables(text.slice(j), names)
+  return (
+    stripCodexManagedTables(text.slice(0, i), names) +
+    text.slice(i, j) +
+    stripCodexManagedTables(text.slice(j), names)
+  )
 }
 
 export const grokMcp: TargetDef = {
@@ -112,7 +137,10 @@ export const grokMcp: TargetDef = {
   region: (text) => blockBodyMulti(text, ALL_MARKERS),
   build(before, ctx) {
     const { sources, env } = ctx
-    const stripped = stripOwnedTables(outsideBlockMulti(before, ALL_MARKERS), ownedServerNames(sources, 'grok', ctx, 'grokMcp'))
+    const stripped = stripOwnedTables(
+      outsideBlockMulti(before, ALL_MARKERS),
+      ownedServerNames(sources, 'grok', ctx, 'grokMcp')
+    )
     // Grok-only keys on the user's (or the app's previous) tables of the same name are carried over
     const kept: Record<string, Json> = {}
     try {
@@ -120,32 +148,55 @@ export const grokMcp: TargetDef = {
       if (isObj(prev.mcp_servers))
         for (const [n, d] of Object.entries(prev.mcp_servers))
           if (isObj(d)) {
-            const k = Object.fromEntries(GROK_KEPT_SERVER_KEYS.filter((x) => d[x] !== undefined).map((x) => [x, d[x]]))
+            const k = Object.fromEntries(
+              GROK_KEPT_SERVER_KEYS.filter((x) => d[x] !== undefined).map((x) => [x, d[x]])
+            )
             if (Object.keys(k).length) kept[n] = k
           }
     } catch {
       // unparsable before: the result check below refuses anyway
     }
-    const { body, serverErrors } = buildGrokMcpBody(mcpForTool(sources, 'grok'), env, ctx.secrets, blockBodyMulti(before, ALL_MARKERS) ?? '', kept)
+    const { body, serverErrors } = buildGrokMcpBody(
+      mcpForTool(sources, 'grok'),
+      env,
+      ctx.secrets,
+      blockBodyMulti(before, ALL_MARKERS) ?? '',
+      kept
+    )
     const enabled = enabledServerNames(sources, 'grok')
-    const after = enabled.length ? spliceBlockMulti(stripped, TOML_MCP_MARKERS, LEGACY_TOML_MCP_MARKERS, body) : removeBlockMulti(stripped, ALL_MARKERS)
+    const after = enabled.length
+      ? spliceBlockMulti(stripped, TOML_MCP_MARKERS, LEGACY_TOML_MCP_MARKERS, body)
+      : removeBlockMulti(stripped, ALL_MARKERS)
     const outsideBefore = outsideBlockMulti(before, ALL_MARKERS)
-    const movedIn = enabled.filter((n) => new RegExp(`^\\[mcp_servers\\.(?:${escapeRe(n)}|"${escapeRe(n)}")\\]`, 'm').test(outsideBefore))
+    const movedIn = enabled.filter((n) =>
+      new RegExp(`^\\[mcp_servers\\.(?:${escapeRe(n)}|"${escapeRe(n)}")\\]`, 'm').test(
+        outsideBefore
+      )
+    )
     // Servers defined inline or as dotted keys outside the block can't be moved by line and would clash: refuse instead of writing broken TOML
     try {
       parseToml(after)
     } catch {
       return {
         after: before,
-        notes: ['config.toml would not be valid TOML after the change — an mcp_servers entry outside the app block is written inline or as dotted keys; move it to a [mcp_servers.<name>] table'],
+        notes: [
+          'config.toml would not be valid TOML after the change — an mcp_servers entry outside the app block is written inline or as dotted keys; move it to a [mcp_servers.<name>] table'
+        ],
         error: 'invalid TOML result'
       }
     }
     return {
       after,
       notes: [
-        ...(movedIn.length ? [`moved server tables from outside the markers into the block (app-owned from now on): ${movedIn.join(', ')}`] : []),
-        ...toggleNotes(staleServerNames(sources, 'grok', ctx, 'grokMcp'), disabledUnownedServers(sources, 'grok', ctx, 'grokMcp'))
+        ...(movedIn.length
+          ? [
+              `moved server tables from outside the markers into the block (app-owned from now on): ${movedIn.join(', ')}`
+            ]
+          : []),
+        ...toggleNotes(
+          staleServerNames(sources, 'grok', ctx, 'grokMcp'),
+          disabledUnownedServers(sources, 'grok', ctx, 'grokMcp')
+        )
       ],
       owned: enabled,
       ...(Object.keys(serverErrors).length ? { serverErrors } : {})

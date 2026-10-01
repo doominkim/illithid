@@ -6,7 +6,11 @@ const NAME = 'ac-search'
  * Highlight every case-insensitive occurrence of q in the rendered text under ref (CSS Custom Highlight API; the DOM is not changed)
  * and scroll the first one into view. Matches split across elements (e.g. partly bold) are not found. Re-runs when deps change
  */
-export function useTextHighlight(ref: RefObject<HTMLElement | null>, q: string, deps: unknown[]): void {
+export function useTextHighlight(
+  ref: RefObject<HTMLElement | null>,
+  q: string,
+  deps: unknown[]
+): void {
   const needle = q.trim().toLowerCase()
   useEffect(() => {
     const root = ref.current

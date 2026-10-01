@@ -10,7 +10,10 @@ function homeUsing(tools: string[]): string {
   const home = mkdtempSync(join(tmpdir(), 'illithid-skill-status-'))
   buildDemoHome(home, { tools: 'all' })
   const path = join(home, '.config/illithid/config.json')
-  writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), toolsInUse: tools }))
+  writeFileSync(
+    path,
+    JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), toolsInUse: tools })
+  )
   return home
 }
 
@@ -24,7 +27,11 @@ test('REQ-SKILL-STATUS-1 a skill has no OpenCode state while OpenCode is not in 
 test('REQ-SKILL-STATUS-2 with OpenCode in use the state comes from its sync plan', () => {
   const home = homeUsing(['claude', 'codex', 'opencode'])
   const data = skills(home, baseEnv(home))
-  for (const name of data.names) assert.ok(['synced', 'needsSync'].includes(data.state[name]?.opencode ?? ''), `${name}: ${data.state[name]?.opencode}`)
+  for (const name of data.names)
+    assert.ok(
+      ['synced', 'needsSync'].includes(data.state[name]?.opencode ?? ''),
+      `${name}: ${data.state[name]?.opencode}`
+    )
 })
 
 test('REQ-TOOL-PROBLEM-REASONS-2 error cells carry their reason (OpenCode skill config, Claude MCP config)', () => {

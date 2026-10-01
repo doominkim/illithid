@@ -17,7 +17,9 @@ function homeWithUsage(): string {
   const home = mkdtempSync(join(tmpdir(), 'illithid-list-usage-'))
   const db = openDb(searchIndexPath(home))
   ensureUsage(db)
-  const ins = db.prepare('insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)')
+  const ins = db.prepare(
+    'insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)'
+  )
   const rows: [string, string, string, string, number, number][] = [
     // tool, kind, name, model, days ago, n
     ['claude', 'skill', 'pdf', 'claude-opus-5-5', 0, 3],
@@ -33,7 +35,9 @@ function homeWithUsage(): string {
     // A different server whose name only shares a prefix must not count
     ['opencode', 'mcpRaw', 'brave-searchx_tool', 'gpt-6.1-sol', 1, 5]
   ]
-  rows.forEach(([tool, kind, name, model, ago, n], i) => ins.run(i, tool, kind, name, model, day(ago), n))
+  rows.forEach(([tool, kind, name, model, ago, n], i) =>
+    ins.run(i, tool, kind, name, model, day(ago), n)
+  )
   db.close()
   return home
 }
@@ -48,7 +52,11 @@ test('REQ-LIST-USAGE-3 list values equal the detail usage, including MCP name ru
     for (const name of names) {
       const detail = usageOf(home, kind, name, { now: NOW })!
       assert.equal(summaries[name].recent, detail.recent, `${kind} ${name} recent`)
-      assert.deepEqual(summaries[name].daily, detail.daily.map((d) => d.n), `${kind} ${name} daily`)
+      assert.deepEqual(
+        summaries[name].daily,
+        detail.daily.map((d) => d.n),
+        `${kind} ${name} daily`
+      )
     }
   }
   const mcp = usageSummaries(home, 'mcp', ['brave-search'], { now: NOW })!
@@ -63,5 +71,10 @@ test('REQ-LIST-USAGE-4 one call returns every requested name; no index reads as 
   assert.equal(all.pdf.recent, 4)
   assert.equal(all.unused.recent, 0)
   assert.ok(all.unused.daily.every((n) => n === 0))
-  assert.equal(usageSummaries(mkdtempSync(join(tmpdir(), 'illithid-no-index-')), 'skill', ['pdf'], { now: NOW }), null)
+  assert.equal(
+    usageSummaries(mkdtempSync(join(tmpdir(), 'illithid-no-index-')), 'skill', ['pdf'], {
+      now: NOW
+    }),
+    null
+  )
 })

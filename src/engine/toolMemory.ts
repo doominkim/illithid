@@ -595,7 +595,8 @@ export function readCodexMemoryFile(
 
 /** Claude memory writes are refused when Claude is not in use on this device (config.toolsInUse) */
 function assertClaudeInUse(home: string): void {
-  if (!toolInUse(home, 'claude')) throw new LibraryError('toolNotInUse', 'Claude Code is not in use on this device')
+  if (!toolInUse(home, 'claude'))
+    throw new LibraryError('toolNotInUse', 'Claude Code is not in use on this device')
 }
 
 function checkType(type: unknown): MemoryType {

@@ -41,7 +41,14 @@ import type {
 } from '../engine'
 
 import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
-import type { ModelDetail, ModelKey, ModelSummary, UsageKind, UsageStats, UsageSummary } from '../engine'
+import type {
+  ModelDetail,
+  ModelKey,
+  ModelSummary,
+  UsageKind,
+  UsageStats,
+  UsageSummary
+} from '../engine'
 import type {
   AuditPartner,
   MarketInstallChoice,
@@ -295,7 +302,8 @@ export interface TrayState {
 }
 
 /** Menu bar item clicks the renderer handles (main shows the window first) */
-export type TrayAction = { kind: 'settings' } | { kind: 'update' } | { kind: 'workspace'; id: string }
+export type TrayAction =
+  { kind: 'settings' } | { kind: 'update' } | { kind: 'workspace'; id: string }
 
 /** Recent session in the menu bar popover */
 export interface TraySession {
@@ -306,7 +314,8 @@ export interface TraySession {
 }
 
 /** Menu bar popover buttons */
-export type TrayCommand = { kind: 'open' | 'settings' | 'update' | 'quit' } | { kind: 'workspace'; id: string }
+export type TrayCommand =
+  { kind: 'open' | 'settings' | 'update' | 'quit' } | { kind: 'workspace'; id: string }
 
 /** A newer release than the running app */
 export interface UpdateView {
@@ -338,7 +347,8 @@ export interface WorkspaceImportView {
 }
 
 /** Write refusal reason */
-export type RefusedReason = 'allowRealApplyOff' | 'configError' | 'invalid' | 'libraryNotReady' | 'notAvailable'
+export type RefusedReason =
+  'allowRealApplyOff' | 'configError' | 'invalid' | 'libraryNotReady' | 'notAvailable'
 
 export interface Refused {
   refused: RefusedReason
@@ -475,7 +485,13 @@ export interface ToolMemoryView {
 }
 
 // ---- session content search (engine sessionIndex)
-import type { DocKind, DocSearchResponse, IndexStatus, SearchAllResponse, SessionSearchResponse } from '../engine'
+import type {
+  DocKind,
+  DocSearchResponse,
+  IndexStatus,
+  SearchAllResponse,
+  SessionSearchResponse
+} from '../engine'
 export type { SessionSearchHit, SessionSearchResponse, SessionSearchResult } from '../engine'
 export type { DocKind, DocSearchResponse, DocSearchResult, SearchAllResponse } from '../engine'
 
@@ -635,7 +651,11 @@ export interface Api {
   // ---- marketplace (network in main only; refused with code 'disabled' when marketEnabled is false)
   marketSearch(kind: MarketKind, q: string, cursor?: string): Promise<WriteResult<MarketSearchView>>
   marketDetail(kind: MarketKind, id: string): Promise<WriteResult<MarketDetailView>>
-  marketInstall(kind: MarketKind, id: string, opts: MarketInstallOptions): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
+  marketInstall(
+    kind: MarketKind,
+    id: string,
+    opts: MarketInstallOptions
+  ): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused>
   /** Skill or MCP call counts from local session logs, by model, tool and day. null = not indexed yet (an index run starts) */
   usage(kind: UsageKind, name: string): Promise<UsageStats | null>
   /** Last 30 days for many skills or MCP servers at once (lists). null until the usage index exists */
@@ -647,7 +667,10 @@ export interface Api {
   /** Models used in one session (subagents included) by share of turns. null = not indexed yet */
   sessionModels(tool: ToolId, id: string): Promise<SessionModelShare[] | null>
   /** Install several items with default names/options; one sync at the end */
-  marketInstallMany(kind: MarketKind, ids: string[]): Promise<WriteResult<MarketBulkResult> | Refused>
+  marketInstallMany(
+    kind: MarketKind,
+    ids: string[]
+  ): Promise<WriteResult<MarketBulkResult> | Refused>
   marketUpdates(): Promise<WriteResult<{ updates: MarketUpdate[]; failed: string[] }>>
   marketUpdate(kind: MarketKind, name: string): Promise<WriteResult<{ name: string }> | Refused>
   // ---- config·library setup
@@ -706,7 +729,12 @@ export interface Api {
   /** A check found (or dropped) a newer release. Returns an unsubscribe function */
   onUpdateEvent(cb: (v: UpdateView | null) => void): () => void
   // ---- library writes (library required. Auto sync after save when allowRealApply)
-  toggle(kind: ManifestKind, name: string, tool: ToolId, on: boolean): Promise<WriteResult<Manifest> | Refused>
+  toggle(
+    kind: ManifestKind,
+    name: string,
+    tool: ToolId,
+    on: boolean
+  ): Promise<WriteResult<Manifest> | Refused>
   ruleRead(name: string): Promise<WriteResult<string>>
   ruleSave(name: string, content: string): Promise<WriteResult | Refused>
   ruleCreate(name: string, content: string): Promise<WriteResult | Refused>
@@ -743,12 +771,23 @@ export interface Api {
   codexRollouts(): Promise<WriteResult<CodexRolloutSummary[]>>
   /** Path → Claude project slug */
   toolMemorySlug(path: string): Promise<string>
-  toolMemoryPromote(slug: string, file: string, type: MemoryType): Promise<WriteResult<ToolMemoryMoveResult> | Refused>
-  toolMemoryMove(slug: string, file: string, toSlug: string): Promise<WriteResult<ToolMemoryMoveResult> | Refused>
+  toolMemoryPromote(
+    slug: string,
+    file: string,
+    type: MemoryType
+  ): Promise<WriteResult<ToolMemoryMoveResult> | Refused>
+  toolMemoryMove(
+    slug: string,
+    file: string,
+    toSlug: string
+  ): Promise<WriteResult<ToolMemoryMoveResult> | Refused>
   toolMemoryTrash(slug: string, file: string): Promise<WriteResult<ToolMemoryMoveResult> | Refused>
   importSources(): Promise<ImportSource[]>
   importPlan(sourceId: string): Promise<WriteResult<ImportPlanView>>
-  importApply(sourceId: string, selections: ImportSelection[]): Promise<WriteResult<ImportResult[]> | Refused>
+  importApply(
+    sourceId: string,
+    selections: ImportSelection[]
+  ): Promise<WriteResult<ImportResult[]> | Refused>
   // ---- sync (source → tools. Plan only when allowRealApply is off)
   syncStatus(): Promise<SyncStatusView>
   syncNow(): Promise<SyncStatusView>
@@ -763,7 +802,9 @@ export interface Api {
   importedKeep(item: ImportedKeepRequest): Promise<WriteResult | Refused>
   /** Save a rule's tool-side version into the library (it then reaches every tool) */
   editedRuleKeep(tool: ToolId, name: string): Promise<WriteResult | Refused>
-  deleteCandidates(items: DeleteCandidateRequest[]): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
+  deleteCandidates(
+    items: DeleteCandidateRequest[]
+  ): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
   modelSet(tool: ToolId, key: string, value: string): Promise<WriteResult<SetModelResult> | Refused>
   // ---- backup (available=false / notAvailable until the engine is ready)
   backupStatus(): Promise<BackupStatusView>
@@ -771,7 +812,10 @@ export interface Api {
   /** snapshotFirst: snapshot first when dirty */
   backupSnapshot(message?: string): Promise<WriteResult<Snapshot | null> | Refused>
   backupHistory(): Promise<WriteResult<Snapshot[]> | Refused>
-  backupRestore(hash: string, snapshotFirst?: boolean): Promise<WriteResult<SyncStatusView> | Refused>
+  backupRestore(
+    hash: string,
+    snapshotFirst?: boolean
+  ): Promise<WriteResult<SyncStatusView> | Refused>
   backupDisconnect(): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetDevice(name: string): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetAuto(on: boolean): Promise<WriteResult<BackupStatusView> | Refused>
@@ -954,6 +998,16 @@ export const CHANNELS = [
   'updateCheckNow',
   'updateSkip',
   'updateOpenTerminal'
-] as const satisfies readonly Exclude<keyof Api, 'onSyncEvent' | 'onSearchIndexEvent' | 'onBackupCleanupEvent' | 'onTrayAction' | 'onUpdateEvent' | 'onTraySessions' | 'onUiPrefsEvent' | 'uiPrefsInitial'>[]
+] as const satisfies readonly Exclude<
+  keyof Api,
+  | 'onSyncEvent'
+  | 'onSearchIndexEvent'
+  | 'onBackupCleanupEvent'
+  | 'onTrayAction'
+  | 'onUpdateEvent'
+  | 'onTraySessions'
+  | 'onUiPrefsEvent'
+  | 'uiPrefsInitial'
+>[]
 
 export type Channel = (typeof CHANNELS)[number]

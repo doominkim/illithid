@@ -16,7 +16,15 @@ export function UpdateDialog({
 }): React.JSX.Element {
   const u = update
   return (
-    <Modal opened={opened && !!u} onClose={onLater} title={u ? `Illithid ${u.version} is available` : ''} centered radius="lg" size="lg" data-testid="update-dialog">
+    <Modal
+      opened={opened && !!u}
+      onClose={onLater}
+      title={u ? `Illithid ${u.version} is available` : ''}
+      centered
+      radius="lg"
+      size="lg"
+      data-testid="update-dialog"
+    >
       {u && (
         <Stack gap="md">
           <Text size="sm" c="dimmed">
@@ -47,7 +55,12 @@ export function UpdateDialog({
             <Text size="sm">Download the new version and replace the app in Applications.</Text>
           )}
           <Group justify="space-between">
-            <Button variant="subtle" color="gray" onClick={() => onSkip(u.version)} data-testid="update-skip">
+            <Button
+              variant="subtle"
+              color="gray"
+              onClick={() => onSkip(u.version)}
+              data-testid="update-skip"
+            >
               Skip this version
             </Button>
             <Group gap="xs">
@@ -66,7 +79,14 @@ export function UpdateDialog({
                 </Button>
               )}
               {!u.command && (
-                <Button component="a" href={u.url} target="_blank" rel="noreferrer" onClick={onLater} data-testid="update-download">
+                <Button
+                  component="a"
+                  href={u.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={onLater}
+                  data-testid="update-download"
+                >
                   Download
                 </Button>
               )}

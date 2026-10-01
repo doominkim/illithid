@@ -46,9 +46,11 @@ function migrateFromLocalStorage(): void {
     migrateStorageKey(COLOR_SCHEME_KEY, ['harnesssync-color-scheme'])
     const patch: UiPrefsPatch = {}
     const language = localStorage.getItem(LANGUAGE_KEY)
-    if (!prefs.language && language && (UI_LANGUAGES as readonly string[]).includes(language)) patch.language = language as UiPrefs['language']
+    if (!prefs.language && language && (UI_LANGUAGES as readonly string[]).includes(language))
+      patch.language = language as UiPrefs['language']
     const scheme = localStorage.getItem(COLOR_SCHEME_KEY)
-    if (!prefs.colorScheme && scheme && (UI_COLOR_SCHEMES as readonly string[]).includes(scheme)) patch.colorScheme = scheme as UiPrefs['colorScheme']
+    if (!prefs.colorScheme && scheme && (UI_COLOR_SCHEMES as readonly string[]).includes(scheme))
+      patch.colorScheme = scheme as UiPrefs['colorScheme']
     const views: Record<string, 'grid' | 'list'> = {}
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)

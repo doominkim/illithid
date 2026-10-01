@@ -71,7 +71,12 @@ export const codexRules: TargetDef = {
     // Codex turned off: the app's block goes, hand-written rules outside it stay
     if (retiring) {
       const after = removeBlockMulti(before, ALL_RULES_MARKERS)
-      return { after, notes: [after === before ? 'Codex is off — no app block' : 'Codex is off — app block removed'] }
+      return {
+        after,
+        notes: [
+          after === before ? 'Codex is off — no app block' : 'Codex is off — app block removed'
+        ]
+      }
     }
     if (!sources.hasPermissions) {
       return {
@@ -84,8 +89,11 @@ export const codexRules: TargetDef = {
     const outsideLines = outsideBlockMulti(after, ALL_RULES_MARKERS)
       .split('\n')
       .filter((l) => l.trim()).length
-    const notes = [`kept outside markers: ${outsideLines} lines (hand-written rules appended by the runtime)`]
-    if (skipped.length) notes.push(`skipped duplicates: ${skipped.length} (already outside the markers)`)
+    const notes = [
+      `kept outside markers: ${outsideLines} lines (hand-written rules appended by the runtime)`
+    ]
+    if (skipped.length)
+      notes.push(`skipped duplicates: ${skipped.length} (already outside the markers)`)
     if (blockBodyMulti(before, LEGACY_RULES_MARKERS) !== null)
       notes.push('legacy marker block → replaced with app marker')
     return { after, notes }

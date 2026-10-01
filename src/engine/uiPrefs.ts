@@ -26,18 +26,28 @@ export interface UiPrefsPatch {
   sorts?: Record<string, UiListSort>
 }
 
-const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const isObj = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v)
 
 export function uiPrefsErrors(v: unknown): string[] {
   if (!isObj(v)) return ['ui must be an object']
   const errs: string[] = []
   if (v.language !== undefined && !(UI_LANGUAGES as readonly unknown[]).includes(v.language))
     errs.push(`ui.language must be ${UI_LANGUAGES.join(' | ')}`)
-  if (v.colorScheme !== undefined && !(UI_COLOR_SCHEMES as readonly unknown[]).includes(v.colorScheme))
+  if (
+    v.colorScheme !== undefined &&
+    !(UI_COLOR_SCHEMES as readonly unknown[]).includes(v.colorScheme)
+  )
     errs.push(`ui.colorScheme must be ${UI_COLOR_SCHEMES.join(' | ')}`)
-  if (v.views !== undefined && (!isObj(v.views) || !Object.values(v.views).every((x) => x === 'grid' || x === 'list')))
+  if (
+    v.views !== undefined &&
+    (!isObj(v.views) || !Object.values(v.views).every((x) => x === 'grid' || x === 'list'))
+  )
     errs.push('ui.views must map screens to grid | list')
-  if (v.sorts !== undefined && (!isObj(v.sorts) || !Object.values(v.sorts).every((x) => x === 'name' || x === 'usage')))
+  if (
+    v.sorts !== undefined &&
+    (!isObj(v.sorts) || !Object.values(v.sorts).every((x) => x === 'name' || x === 'usage'))
+  )
     errs.push('ui.sorts must map screens to name | usage')
   return errs
 }

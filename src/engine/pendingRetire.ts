@@ -14,7 +14,15 @@
  * Records belong to the workspace that was active at import: sync only acts on (and plans) the active workspace's records, so
  * switching to a workspace with a same-name item never swaps an original for the wrong copy. Other workspaces' records are kept.
  */
-import { cpSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync } from 'node:fs'
+import {
+  cpSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync
+} from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { agentToolPath } from './agentRender'
 import type { ToolId } from './agents'
@@ -43,10 +51,14 @@ export interface PendingRetire {
 }
 
 /** Workspace a record belongs to */
-export const pendingWorkspace = (p: Pick<PendingRetire, 'workspace'>): string => p.workspace ?? DEFAULT_WORKSPACE
+export const pendingWorkspace = (p: Pick<PendingRetire, 'workspace'>): string =>
+  p.workspace ?? DEFAULT_WORKSPACE
 
 /** Records of the active workspace only */
-export function activePending(home: string, list: readonly PendingRetire[] | undefined): PendingRetire[] {
+export function activePending(
+  home: string,
+  list: readonly PendingRetire[] | undefined
+): PendingRetire[] {
   if (!list?.length) return []
   const ws = activeWorkspaceId(home)
   return list.filter((p) => pendingWorkspace(p) === ws)
@@ -80,8 +92,9 @@ export function retireHash(path: string): string | null {
 }
 
 /** Skip reason for an original that no longer matches its record */
-export const retireSkipReason = (hash: string | null | undefined): 'importedChanged' | 'unreadable' =>
-  hash === UNREADABLE_HASH ? 'unreadable' : 'importedChanged'
+export const retireSkipReason = (
+  hash: string | null | undefined
+): 'importedChanged' | 'unreadable' => (hash === UNREADABLE_HASH ? 'unreadable' : 'importedChanged')
 
 /** Move src (file, directory, link) to dest (never permanently deleted; copy then remove across devices) */
 export function moveToImportedBackup(src: string, dest: string): void {
@@ -96,7 +109,11 @@ export function moveToImportedBackup(src: string, dest: string): void {
 }
 
 /** backups/imported/<ts>/<tool>/<parent folder>/<entry> */
-export function importedBackupDest(home: string, ts: string, p: Pick<PendingRetire, 'tool' | 'path'>): string {
+export function importedBackupDest(
+  home: string,
+  ts: string,
+  p: Pick<PendingRetire, 'tool' | 'path'>
+): string {
   return join(importedBackupRoot(home), ts, p.tool, basename(dirname(p.path)), basename(p.path))
 }
 
@@ -110,7 +127,11 @@ export type RetireOutcome =
   | { status: 'unreadable' }
 
 /** Move one original to backups/imported if it still matches the recorded hash */
-export function retireOriginal(home: string, p: PendingRetire, ts: string = importStamp()): RetireOutcome {
+export function retireOriginal(
+  home: string,
+  p: PendingRetire,
+  ts: string = importStamp()
+): RetireOutcome {
   const cur = retireHash(p.path)
   if (cur === null) return { status: 'gone' }
   if (cur === UNREADABLE_HASH) return { status: 'unreadable' }
@@ -123,11 +144,22 @@ export function retireOriginal(home: string, p: PendingRetire, ts: string = impo
 type PendingKey = Pick<PendingRetire, 'kind' | 'tool' | 'path' | 'workspace'>
 
 export const samePending = (a: PendingKey, b: PendingKey): boolean =>
-  a.kind === b.kind && a.tool === b.tool && a.path === b.path && pendingWorkspace(a) === pendingWorkspace(b)
+  a.kind === b.kind &&
+  a.tool === b.tool &&
+  a.path === b.path &&
+  pendingWorkspace(a) === pendingWorkspace(b)
 
 /** Active-workspace pending entries of one kind/tool/name */
-export function pendingOf(home: string, state: AppState, kind: RetireKind, tool: ToolId, name: string): PendingRetire[] {
-  return activePending(home, state.pendingRetire).filter((p) => p.kind === kind && p.tool === tool && p.name === name)
+export function pendingOf(
+  home: string,
+  state: AppState,
+  kind: RetireKind,
+  tool: ToolId,
+  name: string
+): PendingRetire[] {
+  return activePending(home, state.pendingRetire).filter(
+    (p) => p.kind === kind && p.tool === tool && p.name === name
+  )
 }
 
 /** Remove entries from state (in place). Returns true if something was removed */
@@ -170,7 +202,8 @@ export function keepImportedOriginal(
   const records = activePending(home, st.state.pendingRetire).filter(
     (p) => p.kind === req.kind && p.tool === req.tool && p.path === req.path
   )
-  if (!records.length) throw new LibraryError('notFound', 'not an imported original awaiting replacement')
+  if (!records.length)
+    throw new LibraryError('notFound', 'not an imported original awaiting replacement')
   const { name, tool, kind } = records[0]
   const state = { ...st.state }
   dropPending(state, records)
@@ -189,7 +222,12 @@ export function keepImportedOriginal(
  * A library item was renamed: the active workspace's records follow it (rule → also its OpenCode instructions entry).
  * Best effort — on failure the record keeps the old name and its original is simply left in place
  */
-export function renamePendingRetire(home: string, kind: 'rule' | 'skill' | 'agent', from: string, to: string): void {
+export function renamePendingRetire(
+  home: string,
+  kind: 'rule' | 'skill' | 'agent',
+  from: string,
+  to: string
+): void {
   try {
     const st = readState(home)
     if (st.error || !st.state.pendingRetire?.length) return

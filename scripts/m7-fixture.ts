@@ -138,7 +138,15 @@ import {
   type McpServer,
   type ToolId
 } from '../src/engine'
-import { configView, deleteCandidates, mcpRead, mcpSave, notInitializedOf, toolsInUseSet, toolsInUseView } from '../src/main/writes'
+import {
+  configView,
+  deleteCandidates,
+  mcpRead,
+  mcpSave,
+  notInitializedOf,
+  toolsInUseSet,
+  toolsInUseView
+} from '../src/main/writes'
 import {
   indexSessions,
   usageOf,
@@ -185,7 +193,12 @@ import {
   LEGACY_APP_LIBRARY_DIRS,
   workspacesRoot
 } from '../src/engine/config'
-import { CLAUDE_RULES_DIR, LEGACY_CLAUDE_RULES_DIRS, SOURCE_NOTE_PREFIX, stripSourceNote } from '../src/engine/ruleSync'
+import {
+  CLAUDE_RULES_DIR,
+  LEGACY_CLAUDE_RULES_DIRS,
+  SOURCE_NOTE_PREFIX,
+  stripSourceNote
+} from '../src/engine/ruleSync'
 import { adoptEditedRule, editedRules } from '../src/engine/editedRules'
 import { LEGACY_MANIFEST_FILES } from '../src/engine/manifest'
 import { BACKUP_SUFFIX, LEGACY_BACKUP_SUFFIXES } from '../src/engine/write'
@@ -346,12 +359,20 @@ function realHomeProbe(): Map<string, string> {
   ]
   // The app auto-creates the session content index (search.sqlite, -wal, -shm) in this folder — instead of the dir mtime,
   // compare entry names excluding the index files
-  const appCfgs = new Set([APP_CONFIG_DIR, ...LEGACY_APP_CONFIG_DIRS].map((d) => join(REAL_HOME, d)))
+  const appCfgs = new Set(
+    [APP_CONFIG_DIR, ...LEGACY_APP_CONFIG_DIRS].map((d) => join(REAL_HOME, d))
+  )
   for (const p of paths) {
     try {
       const st = lstatSync(p)
       if (appCfgs.has(p) && st.isDirectory()) {
-        m.set(p, readdirSync(p).filter((n) => !/^search\.sqlite/.test(n)).sort().join('|'))
+        m.set(
+          p,
+          readdirSync(p)
+            .filter((n) => !/^search\.sqlite/.test(n))
+            .sort()
+            .join('|')
+        )
         continue
       }
       m.set(p, `${st.mtimeMs}:${st.size}`)
@@ -436,7 +457,11 @@ async function toolSteps(): Promise<void> {
   {
     const envG: Env = { PATH: '' }
     const memG = memorySecretBackend()
-    const gHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+    const gHome = (
+      prefix: string,
+      files: Record<string, string>,
+      toolsInUse?: ToolId[]
+    ): string => {
       const H = makeFixture(prefix)
       unlinkSync(join(H, '.agents'))
       for (const [rel, body] of Object.entries(files)) {
@@ -454,21 +479,48 @@ async function toolSteps(): Promise<void> {
       return readdirSync(p, { recursive: true })
         .map(String)
         .sort()
-        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .map((n) =>
+          lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`
+        )
         .join(',')
     }
     const G_OUTSIDE = '# My Gemini notes\n\n## Gemini Added Memories\n- Prefers short answers.\n'
-    const G_SETTINGS = JSON.stringify({ theme: 'Default', mcpServers: { mine: { command: 'my-server', trust: true } }, model: { name: 'pro' }, security: { auth: { selectedType: 'oauth-personal' } } }, null, 2) + '\n'
+    const G_SETTINGS =
+      JSON.stringify(
+        {
+          theme: 'Default',
+          mcpServers: { mine: { command: 'my-server', trust: true } },
+          model: { name: 'pro' },
+          security: { auth: { selectedType: 'oauth-personal' } }
+        },
+        null,
+        2
+      ) + '\n'
     const G_COMMENTED = '{\n  // user comment\n  "theme": "Default",\n  "mcpServers": {}\n}\n'
     const seedLibrary = (H: string): void => {
       createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
       createSkill(H, 'gsk', 'Gemini skill')
       createAgent(H, 'helper', 'Helps')
-      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { gemini: { model: 'flash' }, claude: { model: 'haiku' } } })
+      writeAgentDoc(H, 'helper', {
+        description: 'Helps',
+        body: 'Help out.\n',
+        tools: { gemini: { model: 'flash' }, claude: { model: 'haiku' } }
+      })
       createAgent(H, 'plain', 'No model')
       createAgent(H, 'dot.agent', 'Dotted name')
-      upsertMcpServer(H, 'g-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, timeoutMs: 30000 })
-      upsertMcpServer(H, 'g-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
+      upsertMcpServer(H, 'g-stdio', {
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', 'srv'],
+        env: { API_KEY: '${API_KEY}' },
+        timeoutMs: 30000
+      })
+      upsertMcpServer(H, 'g-http', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        bearerEnv: 'G_TOKEN',
+        headers: { 'X-Team': '${TEAM}' }
+      })
     }
 
     // ag1. Gemini not chosen — existing user (toolsInUse unset) and new user (explicit list without Gemini): ~/.gemini byte-identical
@@ -485,16 +537,29 @@ async function toolSteps(): Promise<void> {
         ['explicit', ['claude', 'codex', 'opencode']]
       ]
       for (const [label, inUse] of cases) {
-        const H = gHome(`illithid-m7-G1${label}-`, { ...gemFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
+        const H = gHome(
+          `illithid-m7-G1${label}-`,
+          { ...gemFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' },
+          inUse
+        )
         seedLibrary(H)
         const g0 = tree(H, '.gemini')
         const p = planSyncAll(H, envG, memG)
-        if (p.targets.some((c) => c.id.startsWith('gemini')) || p.skills.some((x) => x.tool === 'gemini') || p.agents.some((x) => x.tool === 'gemini'))
+        if (
+          p.targets.some((c) => c.id.startsWith('gemini')) ||
+          p.skills.some((x) => x.tool === 'gemini') ||
+          p.agents.some((x) => x.tool === 'gemini')
+        )
           bad.push(`${label}: plan has Gemini items`)
         const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
         if (!r.results) bad.push(`${label}: sync refused`)
         if (tree(H, '.gemini') !== g0) bad.push(`${label}: ~/.gemini changed`)
-        if (statusReport(H, envG, memG).cells.some((c) => c.tool === 'gemini' && c.state !== 'notApplicable')) bad.push(`${label}: Gemini status cells`)
+        if (
+          statusReport(H, envG, memG).cells.some(
+            (c) => c.tool === 'gemini' && c.state !== 'notApplicable'
+          )
+        )
+          bad.push(`${label}: Gemini status cells`)
         if (toolsInUse(H).includes('gemini')) bad.push(`${label}: Gemini in use`)
         let refused = false
         try {
@@ -503,12 +568,15 @@ async function toolSteps(): Promise<void> {
           refused = e instanceof SetModelError
         }
         if (!refused || tree(H, '.gemini') !== g0) bad.push(`${label}: setModel not refused`)
-        if (!existsSync(join(H, '.claude/agents/helper.md'))) bad.push(`${label}: other tools not synced`)
+        if (!existsSync(join(H, '.claude/agents/helper.md')))
+          bad.push(`${label}: other tools not synced`)
       }
       check(
         'ag1. HAR-17 Gemini not chosen — toolsInUse unset and an explicit list without Gemini: no Gemini plan items, ~/.gemini byte-identical after approved Sync, status notApplicable, setModel refused',
         !bad.length,
-        bad.length ? bad.join('; ') : '2 cases, ~/.gemini tree unchanged (GEMINI.md, settings.json, skills, agents), other tools synced'
+        bad.length
+          ? bad.join('; ')
+          : '2 cases, ~/.gemini tree unchanged (GEMINI.md, settings.json, skills, agents), other tools synced'
       )
     }
 
@@ -520,59 +588,141 @@ async function toolSteps(): Promise<void> {
       S2.mcpServers = {
         ...(S2.mcpServers as Json),
         'g-stdio': { command: 'old', excludeTools: ['delete_all'], trust: false },
-        'g-http': { httpUrl: 'https://old.example.com', oauth: { enabled: true, clientId: 'fixture' }, includeTools: ['read'] }
+        'g-http': {
+          httpUrl: 'https://old.example.com',
+          oauth: { enabled: true, clientId: 'fixture' },
+          includeTools: ['read']
+        }
       }
       S2.skills = { disabled: ['gsk'] }
       const S2_TEXT = JSON.stringify(S2, null, 2) + '\n'
-      const H = gHome('illithid-m7-G2-', { '.gemini/GEMINI.md': G_OUTSIDE, '.gemini/settings.json': S2_TEXT }, ['gemini'])
+      const H = gHome(
+        'illithid-m7-G2-',
+        { '.gemini/GEMINI.md': G_OUTSIDE, '.gemini/settings.json': S2_TEXT },
+        ['gemini']
+      )
       seedLibrary(H)
       upsertMcpServer(H, 'g_under', { transport: 'stdio', command: 'u' })
       const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
       if (!r.results) bad.push('sync refused')
       const mcpNotes = r.plan.targets.find((c) => c.id === 'geminiMcp')?.notes.join(' | ') ?? ''
-      for (const want of ['kept Gemini-only settings of g-stdio: trust, excludeTools', 'kept Gemini-only settings of g-http: includeTools, oauth', 'may be misread', 'g_under', 'skills.disabled', 'gsk'])
+      for (const want of [
+        'kept Gemini-only settings of g-stdio: trust, excludeTools',
+        'kept Gemini-only settings of g-http: includeTools, oauth',
+        'may be misread',
+        'g_under',
+        'skills.disabled',
+        'gsk'
+      ])
         if (!mcpNotes.includes(want)) bad.push(`geminiMcp note lacks "${want}"`)
       const gmd = read(join(H, '.gemini/GEMINI.md'))
       const body = blockBody(gmd, MD_BEGIN, MD_END) ?? ''
-      if (!body.includes('<!-- rules/style.md -->') || !body.includes('Be brief.')) bad.push('rule not in GEMINI.md block')
-      if (!body.includes('add your own notes outside this block')) bad.push('block header lacks the outside-notes line')
-      if (!gmd.startsWith(G_OUTSIDE.trimEnd()) || outsideBlockMulti(gmd, [MD_MARKERS]).trim() !== G_OUTSIDE.trim()) bad.push('GEMINI.md outside text changed')
+      if (!body.includes('<!-- rules/style.md -->') || !body.includes('Be brief.'))
+        bad.push('rule not in GEMINI.md block')
+      if (!body.includes('add your own notes outside this block'))
+        bad.push('block header lacks the outside-notes line')
+      if (
+        !gmd.startsWith(G_OUTSIDE.trimEnd()) ||
+        outsideBlockMulti(gmd, [MD_MARKERS]).trim() !== G_OUTSIDE.trim()
+      )
+        bad.push('GEMINI.md outside text changed')
       const before = S2
       const after = readJson(join(H, '.gemini/settings.json'))
-      if (Object.keys(after).join() !== Object.keys(before).join()) bad.push(`settings key order ${Object.keys(after).join()}`)
-      for (const k of Object.keys(before)) if (k !== 'mcpServers' && JSON.stringify(after[k]) !== JSON.stringify(before[k])) bad.push(`settings ${k} changed`)
+      if (Object.keys(after).join() !== Object.keys(before).join())
+        bad.push(`settings key order ${Object.keys(after).join()}`)
+      for (const k of Object.keys(before))
+        if (k !== 'mcpServers' && JSON.stringify(after[k]) !== JSON.stringify(before[k]))
+          bad.push(`settings ${k} changed`)
       const ms = after.mcpServers as Json
-      if (JSON.stringify(ms.mine) !== JSON.stringify((before.mcpServers as Json).mine)) bad.push('user server changed')
-      const wantStdio = { command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, timeout: 30000, trust: false, excludeTools: ['delete_all'] }
+      if (JSON.stringify(ms.mine) !== JSON.stringify((before.mcpServers as Json).mine))
+        bad.push('user server changed')
+      const wantStdio = {
+        command: 'npx',
+        args: ['-y', 'srv'],
+        env: { API_KEY: '${API_KEY}' },
+        timeout: 30000,
+        trust: false,
+        excludeTools: ['delete_all']
+      }
       const wantHttp = {
         httpUrl: 'https://mcp.example.com/mcp',
         headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' },
         includeTools: ['read'],
         oauth: { enabled: true, clientId: 'fixture' }
       }
-      if (JSON.stringify(ms['g-stdio']) !== JSON.stringify(wantStdio)) bad.push(`stdio ${JSON.stringify(ms['g-stdio'])}`)
-      if (JSON.stringify(ms['g-http']) !== JSON.stringify(wantHttp)) bad.push(`http ${JSON.stringify(ms['g-http'])}`)
-      if ('trust' in (ms['g_under'] as Json) || ['g-stdio', 'g-http', 'g_under'].some((n) => 'url' in (ms[n] as Json))) bad.push('trust or url written')
-      if (dirContentHash(join(H, '.gemini/skills/gsk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'gsk')) || !readState(H).state.skills?.gemini?.gsk) bad.push('skill copy')
+      if (JSON.stringify(ms['g-stdio']) !== JSON.stringify(wantStdio))
+        bad.push(`stdio ${JSON.stringify(ms['g-stdio'])}`)
+      if (JSON.stringify(ms['g-http']) !== JSON.stringify(wantHttp))
+        bad.push(`http ${JSON.stringify(ms['g-http'])}`)
+      if (
+        'trust' in (ms['g_under'] as Json) ||
+        ['g-stdio', 'g-http', 'g_under'].some((n) => 'url' in (ms[n] as Json))
+      )
+        bad.push('trust or url written')
+      if (
+        dirContentHash(join(H, '.gemini/skills/gsk')) !==
+          dirContentHash(join(libraryPaths(H).skillsDir, 'gsk')) ||
+        !readState(H).state.skills?.gemini?.gsk
+      )
+        bad.push('skill copy')
       const helper = read(join(H, '.gemini/agents/helper.md'))
-      if (helper !== '---\nname: helper\ndescription: Helps\nmodel: flash\n---\n\nHelp out.\n' || helper !== renderAgent('gemini', readAgentDoc(H, 'helper'))) bad.push('helper render')
-      if (/^model:/m.test(read(join(H, '.gemini/agents/plain.md')))) bad.push('plain agent has a model line')
-      const dot = planSyncAll(H, envG, memG).agents.find((x) => x.tool === 'gemini' && x.name === 'dot.agent')
-      if (existsSync(join(H, '.gemini/agents/dot.agent.md')) || dot?.action !== 'skip' || dot.reason !== 'invalidName') bad.push(`dotted agent ${dot?.action}:${dot?.reason}`)
-      if (!existsSync(join(H, '.gemini/agents/dot.agent.md')) && !(r.results?.agents ?? []).some((x) => x.name === 'dot.agent' && x.status === 'skipped')) bad.push('dotted agent result')
-      if (existsSync(join(H, '.claude')) || existsSync(join(H, '.codex')) || existsSync(join(H, '.config/opencode'))) bad.push('other tools written')
+      if (
+        helper !== '---\nname: helper\ndescription: Helps\nmodel: flash\n---\n\nHelp out.\n' ||
+        helper !== renderAgent('gemini', readAgentDoc(H, 'helper'))
+      )
+        bad.push('helper render')
+      if (/^model:/m.test(read(join(H, '.gemini/agents/plain.md'))))
+        bad.push('plain agent has a model line')
+      const dot = planSyncAll(H, envG, memG).agents.find(
+        (x) => x.tool === 'gemini' && x.name === 'dot.agent'
+      )
+      if (
+        existsSync(join(H, '.gemini/agents/dot.agent.md')) ||
+        dot?.action !== 'skip' ||
+        dot.reason !== 'invalidName'
+      )
+        bad.push(`dotted agent ${dot?.action}:${dot?.reason}`)
+      if (
+        !existsSync(join(H, '.gemini/agents/dot.agent.md')) &&
+        !(r.results?.agents ?? []).some((x) => x.name === 'dot.agent' && x.status === 'skipped')
+      )
+        bad.push('dotted agent result')
+      if (
+        existsSync(join(H, '.claude')) ||
+        existsSync(join(H, '.codex')) ||
+        existsSync(join(H, '.config/opencode'))
+      )
+        bad.push('other tools written')
       const p2 = planSyncAll(H, envG, memG)
-      if (p2.targets.some((c) => c.changed || c.error) || p2.skills.some((x) => x.action !== 'inSync') || p2.agents.some((x) => x.action !== 'inSync' && x.name !== 'dot.agent'))
+      if (
+        p2.targets.some((c) => c.changed || c.error) ||
+        p2.skills.some((x) => x.action !== 'inSync') ||
+        p2.agents.some((x) => x.action !== 'inSync' && x.name !== 'dot.agent')
+      )
         bad.push('re-plan not clean')
       // Gemini edits inside the block (its memory tool / file edits) → previous block backed up, then restored from the library
       const gp = join(H, '.gemini/GEMINI.md')
-      writeFileSync(gp, read(gp).replace('- Be brief.\n', '- Be brief.\n- GEMINI MEMORY: prefers tabs\n'))
+      writeFileSync(
+        gp,
+        read(gp).replace('- Be brief.\n', '- Be brief.\n- GEMINI MEMORY: prefers tabs\n')
+      )
       const pd = planSyncAll(H, envG, memG).targets.find((c) => c.id === 'geminiRules')
       if (!pd?.notes.some((n) => n.includes('edited outside Illithid'))) bad.push('no drift note')
       const rd = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
       const bk = rd.results?.targets.find((x) => x.id === 'geminiRules')?.blockBackup
-      if (!bk || !bk.endsWith('gemini/GEMINI.block.md') || !read(bk).includes('GEMINI MEMORY') || read(gp).includes('GEMINI MEMORY')) bad.push('edited block not backed up / restored')
-      if (planSyncAll(H, envG, memG).targets.find((c) => c.id === 'geminiRules')?.notes.some((n) => n.includes('edited outside'))) bad.push('drift note after restore')
+      if (
+        !bk ||
+        !bk.endsWith('gemini/GEMINI.block.md') ||
+        !read(bk).includes('GEMINI MEMORY') ||
+        read(gp).includes('GEMINI MEMORY')
+      )
+        bad.push('edited block not backed up / restored')
+      if (
+        planSyncAll(H, envG, memG)
+          .targets.find((c) => c.id === 'geminiRules')
+          ?.notes.some((n) => n.includes('edited outside'))
+      )
+        bad.push('drift note after restore')
       // MCP toggle off for Gemini → the owned entry is removed, the user's stays
       setToggle(H, 'mcp', 'g-http', 'gemini', false)
       syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
@@ -581,7 +731,12 @@ async function toolSteps(): Promise<void> {
       // setModel: nested model.name, other keys and siblings kept
       const sm = setModel(H, 'gemini', 'model.name', 'flash')
       const af = readJson(join(H, '.gemini/settings.json'))
-      if (sm.previous !== 'pro' || (af.model as Json).name !== 'flash' || JSON.stringify(af.security) !== JSON.stringify(before.security)) bad.push('setModel nested')
+      if (
+        sm.previous !== 'pro' ||
+        (af.model as Json).name !== 'flash' ||
+        JSON.stringify(af.security) !== JSON.stringify(before.security)
+      )
+        bad.push('setModel nested')
       // settings.json with comments → refused, byte-identical; broken marker → refused
       writeFileSync(join(H, '.gemini/settings.json'), G_COMMENTED)
       const brokenMd = G_OUTSIDE + '\n' + MD_BEGIN + '\nhalf a block\n'
@@ -590,34 +745,47 @@ async function toolSteps(): Promise<void> {
       const p3 = planSyncAll(H, envG, memG)
       const cm = p3.targets.find((c) => c.id === 'geminiMcp')
       const cr = p3.targets.find((c) => c.id === 'geminiRules')
-      if (!cm?.error?.includes('comments') || cm.changed) bad.push(`commented settings plan ${cm?.error}`)
+      if (!cm?.error?.includes('comments') || cm.changed)
+        bad.push(`commented settings plan ${cm?.error}`)
       if (!cr?.error?.includes('marker') || cr.changed) bad.push(`broken marker plan ${cr?.error}`)
       syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
-      if (read(join(H, '.gemini/settings.json')) !== G_COMMENTED || read(join(H, '.gemini/GEMINI.md')) !== brokenMd) bad.push('refused file written')
+      if (
+        read(join(H, '.gemini/settings.json')) !== G_COMMENTED ||
+        read(join(H, '.gemini/GEMINI.md')) !== brokenMd
+      )
+        bad.push('refused file written')
       let modelRefused = false
       try {
         setModel(H, 'gemini', 'model.name', 'pro')
       } catch (e) {
         modelRefused = e instanceof SetModelError
       }
-      if (!modelRefused || read(join(H, '.gemini/settings.json')) !== G_COMMENTED) bad.push('setModel on commented settings not refused')
+      if (!modelRefused || read(join(H, '.gemini/settings.json')) !== G_COMMENTED)
+        bad.push('setModel on commented settings not refused')
       // new user who chose Gemini and has no ~/.gemini: both files created with our content only
       const N = gHome('illithid-m7-G2n-', {}, ['gemini'])
       seedLibrary(N)
       syncAll(N, envG, { allowReal: true, approvedOnce: true, secrets: memG })
       const ns = readJson(join(N, '.gemini/settings.json'))
-      if (Object.keys(ns).join() !== 'mcpServers' || !read(join(N, '.gemini/GEMINI.md')).startsWith(MD_BEGIN)) bad.push('fresh ~/.gemini files')
+      if (
+        Object.keys(ns).join() !== 'mcpServers' ||
+        !read(join(N, '.gemini/GEMINI.md')).startsWith(MD_BEGIN)
+      )
+        bad.push('fresh ~/.gemini files')
       check(
         'ag2. HAR-17 Gemini chosen — GEMINI.md block (outside text kept), settings.json mcpServers only (httpUrl, ${VAR} kept, no trust, key order kept), skills copied, agents rendered (model mapping, invalid name skipped), re-sync 0, toggle off, model.name, comments and broken markers refused, fresh files',
         !bad.length,
-        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}; settings keys ${Object.keys(after).join(',')}; refused: geminiMcp (comments), geminiRules (broken marker)`
+        bad.length
+          ? bad.join('; ')
+          : `targets ${r.plan.targets.map((c) => c.id).join(',')}; settings keys ${Object.keys(after).join(',')}; refused: geminiMcp (comments), geminiRules (broken marker)`
       )
     }
 
     // ag3. import from ~/.gemini — candidates, conversion, source-only toggles, GEMINI.md text copied (off for Gemini), agent original retired by the approved Sync
     {
       const bad: string[] = []
-      const GAG = '---\nname: gag\ndescription: Gemini agent\nmodel: flash\ntemperature: 0.2\n---\n\nDo things.\n'
+      const GAG =
+        '---\nname: gag\ndescription: Gemini agent\nmodel: flash\ntemperature: 0.2\n---\n\nDo things.\n'
       const H = gHome(
         'illithid-m7-G3-',
         {
@@ -626,9 +794,11 @@ async function toolSteps(): Promise<void> {
             '{\n  // comments are fine for import\n  "mcpServers": {\n    "gs": { "command": "gsrv", "env": { "TOKEN": "$GS_TOKEN" }, "timeout": 5000, "trust": true },\n    "gh": { "httpUrl": "https://h.example.com/mcp", "headers": { "Authorization": "Bearer ${GH_TOKEN}" } },\n    "gsse": { "url": "https://s.example.com/sse" }\n  }\n}\n',
           '.gemini/skills/gsk2/SKILL.md': '---\nname: gsk2\ndescription: From Gemini\n---\n\nG.\n',
           '.gemini/agents/gag.md': GAG,
-          '.gemini/agents/remote.md': '---\nname: remote\nkind: remote\nagent_card_url: https://a.example.com/card\n---\n',
+          '.gemini/agents/remote.md':
+            '---\nname: remote\nkind: remote\nagent_card_url: https://a.example.com/card\n---\n',
           // Tool-limited agent and one whose own name differs from its file: importing would lose the limit / the name
-          '.gemini/agents/limited.md': '---\nname: limited\ndescription: Read only\ntools:\n  - read_file\n---\n\nOnly read.\n',
+          '.gemini/agents/limited.md':
+            '---\nname: limited\ndescription: Read only\ntools:\n  - read_file\n---\n\nOnly read.\n',
           '.gemini/agents/foo.md': '---\nname: bar\ndescription: Renamed\n---\n\nBar.\n'
         },
         ['claude', 'gemini']
@@ -637,50 +807,113 @@ async function toolSteps(): Promise<void> {
       const src = listImportSources(H).find((s) => s.id === 'tool:gemini')
       if (!src?.available) bad.push('tool:gemini source')
       const pl = planImport(H, 'tool:gemini')
-      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
-      if (names(pl.rules) !== 'gemini-md.md' || names(pl.mcp) !== 'gh,gs,gsse' || names(pl.skills) !== 'gsk2' || names(pl.agents) !== 'foo,gag,limited,remote') bad.push(`candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`)
+      const names = (xs: { name: string }[]): string =>
+        xs
+          .map((x) => x.name)
+          .sort()
+          .join(',')
+      if (
+        names(pl.rules) !== 'gemini-md.md' ||
+        names(pl.mcp) !== 'gh,gs,gsse' ||
+        names(pl.skills) !== 'gsk2' ||
+        names(pl.agents) !== 'foo,gag,limited,remote'
+      )
+        bad.push(
+          `candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`
+        )
       const port = (n: string): string => pl.agents.find((a) => a.name === n)?.portability ?? '-'
-      if (['remote', 'limited', 'foo'].some((n) => port(n) !== 'toolOnly') || port('gag') !== 'warn') bad.push(`agent portability ${['remote', 'limited', 'foo', 'gag'].map(port).join(',')}`)
-      if (!pl.agents.find((a) => a.name === 'limited')?.reasons.includes('restrictedAgent') || !pl.agents.find((a) => a.name === 'foo')?.reasons.includes('nameMismatch')) bad.push('agent reasons')
-      if (pl.rules[0]?.portability !== 'warn' || pl.rules[0].reasons.join() !== 'toolNotes') bad.push(`gemini-md portability ${pl.rules[0]?.portability}:${pl.rules[0]?.reasons.join()}`)
+      if (
+        ['remote', 'limited', 'foo'].some((n) => port(n) !== 'toolOnly') ||
+        port('gag') !== 'warn'
+      )
+        bad.push(`agent portability ${['remote', 'limited', 'foo', 'gag'].map(port).join(',')}`)
+      if (
+        !pl.agents.find((a) => a.name === 'limited')?.reasons.includes('restrictedAgent') ||
+        !pl.agents.find((a) => a.name === 'foo')?.reasons.includes('nameMismatch')
+      )
+        bad.push('agent reasons')
+      if (pl.rules[0]?.portability !== 'warn' || pl.rules[0].reasons.join() !== 'toolNotes')
+        bad.push(`gemini-md portability ${pl.rules[0]?.portability}:${pl.rules[0]?.reasons.join()}`)
       const gs = pl.mcp.find((c) => c.name === 'gs')?.variants[0]
-      if (gs?.server.env?.TOKEN !== '${GS_TOKEN}' || gs.server.timeoutMs !== 5000 || !gs.warnings.some((w) => w.includes('trust'))) bad.push(`gs ${JSON.stringify(gs?.server)}`)
+      if (
+        gs?.server.env?.TOKEN !== '${GS_TOKEN}' ||
+        gs.server.timeoutMs !== 5000 ||
+        !gs.warnings.some((w) => w.includes('trust'))
+      )
+        bad.push(`gs ${JSON.stringify(gs?.server)}`)
       const gh = pl.mcp.find((c) => c.name === 'gh')?.variants[0]
-      if (gh?.server.transport !== 'http' || gh.server.url !== 'https://h.example.com/mcp' || gh.server.bearerEnv !== 'GH_TOKEN') bad.push(`gh ${JSON.stringify(gh?.server)}`)
-      if (!pl.mcp.find((c) => c.name === 'gsse')?.variants[0].warnings.some((w) => w.includes('sse'))) bad.push('sse warning')
-      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+      if (
+        gh?.server.transport !== 'http' ||
+        gh.server.url !== 'https://h.example.com/mcp' ||
+        gh.server.bearerEnv !== 'GH_TOKEN'
+      )
+        bad.push(`gh ${JSON.stringify(gh?.server)}`)
+      if (
+        !pl.mcp.find((c) => c.name === 'gsse')?.variants[0].warnings.some((w) => w.includes('sse'))
+      )
+        bad.push('sse warning')
+      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents]
+        .filter((c) => c.portability !== 'toolOnly')
+        .map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
       const ir = applyImport(H, sels, 'tool:gemini', { secrets: memG })
-      if (ir.some((x) => x.status !== 'imported')) bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
+      if (ir.some((x) => x.status !== 'imported'))
+        bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
       if (tree(H, '.gemini') !== g0) bad.push('import changed ~/.gemini')
       if (readRule(H, 'gemini-md.md') !== G_OUTSIDE.trim() + '\n') bad.push('gemini-md.md content')
       const mf = readManifest(H).manifest
-      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string =>
+        JSON.stringify(mf[k][n] ?? {})
       const want: [string, string][] = [
-        [tg('rules', 'gemini-md.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [
+          tg('rules', 'gemini-md.md'),
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
         [tg('skills', 'gsk2'), '{"claude":false,"codex":false,"copilot":false,"grok":false}'],
-        [tg('agents', 'gag'), '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}'],
-        [tg('mcp', 'gs'), '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}']
+        [
+          tg('agents', 'gag'),
+          '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}'
+        ],
+        [
+          tg('mcp', 'gs'),
+          '{"claude":false,"codex":false,"opencode":false,"copilot":false,"grok":false}'
+        ]
       ]
       for (const [got, w] of want) if (got !== w) bad.push(`toggles ${got} ≠ ${w}`)
       const skillRes = ir.find((x) => x.kind === 'skill')
-      if (JSON.stringify(skillRes?.adopted) !== '["gemini"]') bad.push(`skill adopted ${JSON.stringify(skillRes?.adopted)}`)
-      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
+      if (JSON.stringify(skillRes?.adopted) !== '["gemini"]')
+        bad.push(`skill adopted ${JSON.stringify(skillRes?.adopted)}`)
+      const pend = (readState(H).state.pendingRetire ?? [])
+        .map((p) => `${p.kind}:${p.tool}:${p.name}`)
+        .sort()
+        .join(',')
       if (pend !== 'agent:gemini:gag') bad.push(`pendingRetire ${pend}`)
-      if (readAgentDoc(H, 'gag').tools.gemini?.model !== 'flash') bad.push('agent model not under gemini')
+      if (readAgentDoc(H, 'gag').tools.gemini?.model !== 'flash')
+        bad.push('agent model not under gemini')
       const r = syncAll(H, envG, { allowReal: true, approvedOnce: true, secrets: memG })
       if (!r.results) bad.push('sync refused')
-      if (read(join(H, '.gemini/agents/gag.md')) !== renderAgent('gemini', readAgentDoc(H, 'gag'))) bad.push('agent not replaced by render')
-      const ib = readdirSync(importedBackupRoot(H)).map((ts) => join(importedBackupRoot(H), ts, 'gemini/agents/gag.md')).find((p) => existsSync(p))
+      if (read(join(H, '.gemini/agents/gag.md')) !== renderAgent('gemini', readAgentDoc(H, 'gag')))
+        bad.push('agent not replaced by render')
+      const ib = readdirSync(importedBackupRoot(H))
+        .map((ts) => join(importedBackupRoot(H), ts, 'gemini/agents/gag.md'))
+        .find((p) => existsSync(p))
       if (!ib || read(ib) !== GAG) bad.push('agent original not in backups/imported')
       if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
       const gmd = read(join(H, '.gemini/GEMINI.md'))
-      if ((blockBody(gmd, MD_BEGIN, MD_END) ?? '').includes('rules/gemini-md.md') || !gmd.startsWith(G_OUTSIDE.trimEnd())) bad.push('GEMINI.md text duplicated into the block or moved')
-      if (existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'gemini-md.md'))) bad.push('gemini-md.md reached Claude while all its toggles are off')
-      if (read(join(H, '.gemini/settings.json')).indexOf('// comments are fine') < 0) bad.push('commented settings.json rewritten')
+      if (
+        (blockBody(gmd, MD_BEGIN, MD_END) ?? '').includes('rules/gemini-md.md') ||
+        !gmd.startsWith(G_OUTSIDE.trimEnd())
+      )
+        bad.push('GEMINI.md text duplicated into the block or moved')
+      if (existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'gemini-md.md')))
+        bad.push('gemini-md.md reached Claude while all its toggles are off')
+      if (read(join(H, '.gemini/settings.json')).indexOf('// comments are fine') < 0)
+        bad.push('commented settings.json rewritten')
       check(
         'ag3. HAR-17 import from ~/.gemini — rule (GEMINI.md outside text, copied, warn toolNotes, all tools off), MCP (commented settings read, $VAR → ${VAR}, httpUrl → http, sse/trust warned), skill adopted, agent (model under gemini; remote, tool-limited and renamed agents toolOnly), source-only toggles, agent original retired by the approved Sync',
         !bad.length,
-        bad.length ? bad.join('; ') : `imported ${ir.map((x) => x.name).join(',')}; pendingRetire agent:gemini:gag → backups/imported; settings.json with comments left as-is (geminiMcp refused)`
+        bad.length
+          ? bad.join('; ')
+          : `imported ${ir.map((x) => x.name).join(',')}; pendingRetire agent:gemini:gag → backups/imported; settings.json with comments left as-is (geminiMcp refused)`
       )
     }
 
@@ -700,37 +933,134 @@ async function toolSteps(): Promise<void> {
       put('.gemini/tmp/proj/.project_root', '/work/proj\n')
       put(
         '.gemini/tmp/proj/chats/session-2026-09-20T10-00-abcd1234.jsonl',
-        ln({ sessionId: A, projectHash: 'h1', startTime: '2026-09-20T10:00:00.000Z', lastUpdated: '2026-09-20T10:00:00.000Z', kind: 'main' }) +
-          ln({ id: 'u0', timestamp: '2026-09-20T10:00:00.500Z', type: 'user', content: [{ text: '<session_context>\nworkspace info\n</session_context>' }] }) +
-          ln({ id: 'u1', timestamp: '2026-09-20T10:00:01.000Z', type: 'user', content: [{ text: 'first question zebra' }] }) +
-          ln({ id: 'g1', timestamp: '2026-09-20T10:00:02.000Z', type: 'gemini', content: [{ text: 'thinking', thought: true }, { text: 'answer one' }], toolCalls: [{ name: 'run_shell_command', args: { command: 'ls -la' } }] }) +
+        ln({
+          sessionId: A,
+          projectHash: 'h1',
+          startTime: '2026-09-20T10:00:00.000Z',
+          lastUpdated: '2026-09-20T10:00:00.000Z',
+          kind: 'main'
+        }) +
+          ln({
+            id: 'u0',
+            timestamp: '2026-09-20T10:00:00.500Z',
+            type: 'user',
+            content: [{ text: '<session_context>\nworkspace info\n</session_context>' }]
+          }) +
+          ln({
+            id: 'u1',
+            timestamp: '2026-09-20T10:00:01.000Z',
+            type: 'user',
+            content: [{ text: 'first question zebra' }]
+          }) +
+          ln({
+            id: 'g1',
+            timestamp: '2026-09-20T10:00:02.000Z',
+            type: 'gemini',
+            content: [{ text: 'thinking', thought: true }, { text: 'answer one' }],
+            toolCalls: [{ name: 'run_shell_command', args: { command: 'ls -la' } }]
+          }) +
           ln({ $set: { lastUpdated: '2026-09-20T10:00:02.000Z' } }) +
-          ln({ id: 'u2', timestamp: '2026-09-20T10:01:00.000Z', type: 'user', content: [{ text: 'second question' }] }) +
-          ln({ id: 'g2', timestamp: '2026-09-20T10:01:01.000Z', type: 'gemini', content: [{ text: 'rewound answer walrus' }] }) +
+          ln({
+            id: 'u2',
+            timestamp: '2026-09-20T10:01:00.000Z',
+            type: 'user',
+            content: [{ text: 'second question' }]
+          }) +
+          ln({
+            id: 'g2',
+            timestamp: '2026-09-20T10:01:01.000Z',
+            type: 'gemini',
+            content: [{ text: 'rewound answer walrus' }]
+          }) +
           ln({ $rewindTo: 'u2' }) +
-          ln({ id: 'u3', timestamp: '2026-09-20T10:02:00.000Z', type: 'user', content: [{ text: 'third question' }] }) +
-          ln({ id: 'g3', timestamp: '2026-09-20T10:02:01.000Z', type: 'gemini', content: [{ text: 'answer three giraffe' }] }) +
-          ln({ id: 'i1', timestamp: '2026-09-20T10:02:02.000Z', type: 'info', content: [{ text: 'info line' }] }) +
+          ln({
+            id: 'u3',
+            timestamp: '2026-09-20T10:02:00.000Z',
+            type: 'user',
+            content: [{ text: 'third question' }]
+          }) +
+          ln({
+            id: 'g3',
+            timestamp: '2026-09-20T10:02:01.000Z',
+            type: 'gemini',
+            content: [{ text: 'answer three giraffe' }]
+          }) +
+          ln({
+            id: 'i1',
+            timestamp: '2026-09-20T10:02:02.000Z',
+            type: 'info',
+            content: [{ text: 'info line' }]
+          }) +
           ln({ $set: { lastUpdated: '2026-09-20T10:02:02.000Z' } })
       )
       put('.gemini/projects.json', JSON.stringify({ projects: { '/work/other dir': 'other' } }))
       put(
         '.gemini/tmp/other/chats/session-2026-09-21T09-00-bcde2345.jsonl',
-        ln({ sessionId: B, projectHash: 'h2', startTime: '2026-09-21T09:00:00.000Z', lastUpdated: '2026-09-21T09:00:00.000Z' }) +
-          ln({ id: 'x1', timestamp: '2026-09-21T09:00:01.000Z', type: 'user', content: [{ text: 'dropped by $set' }] }) +
-          ln({ $set: { messages: [{ id: 'y1', timestamp: '2026-09-21T09:00:02.000Z', type: 'user', content: 'kept question' }, { id: 'y2', timestamp: '2026-09-21T09:00:03.000Z', type: 'gemini', content: [{ text: 'kept answer' }] }], lastUpdated: '2026-09-21T09:00:03.000Z' } })
+        ln({
+          sessionId: B,
+          projectHash: 'h2',
+          startTime: '2026-09-21T09:00:00.000Z',
+          lastUpdated: '2026-09-21T09:00:00.000Z'
+        }) +
+          ln({
+            id: 'x1',
+            timestamp: '2026-09-21T09:00:01.000Z',
+            type: 'user',
+            content: [{ text: 'dropped by $set' }]
+          }) +
+          ln({
+            $set: {
+              messages: [
+                {
+                  id: 'y1',
+                  timestamp: '2026-09-21T09:00:02.000Z',
+                  type: 'user',
+                  content: 'kept question'
+                },
+                {
+                  id: 'y2',
+                  timestamp: '2026-09-21T09:00:03.000Z',
+                  type: 'gemini',
+                  content: [{ text: 'kept answer' }]
+                }
+              ],
+              lastUpdated: '2026-09-21T09:00:03.000Z'
+            }
+          })
       )
       put(
         '.gemini/tmp/other/chats/session-2026-09-21T09-05-cdef3456.jsonl',
-        ln({ sessionId: C, projectHash: 'h2', startTime: '2026-09-21T09:05:00.000Z', lastUpdated: '2026-09-21T09:05:00.000Z', kind: 'subagent' }) +
-          ln({ id: 's1', timestamp: '2026-09-21T09:05:01.000Z', type: 'user', content: [{ text: 'sub task' }] })
+        ln({
+          sessionId: C,
+          projectHash: 'h2',
+          startTime: '2026-09-21T09:05:00.000Z',
+          lastUpdated: '2026-09-21T09:05:00.000Z',
+          kind: 'subagent'
+        }) +
+          ln({
+            id: 's1',
+            timestamp: '2026-09-21T09:05:01.000Z',
+            type: 'user',
+            content: [{ text: 'sub task' }]
+          })
       )
       // Project root that isn't absolute → no resume command
       put('.gemini/tmp/rel/.project_root', 'relative/dir\n')
       put(
         '.gemini/tmp/rel/chats/session-2026-09-19T08-00-defa4567.jsonl',
-        ln({ sessionId: D, projectHash: 'h3', startTime: '2026-09-19T08:00:00.000Z', lastUpdated: '2026-09-19T08:00:00.000Z', kind: 'main' }) +
-          ln({ id: 'd1', timestamp: '2026-09-19T08:00:01.000Z', type: 'user', content: [{ text: 'relative root' }] })
+        ln({
+          sessionId: D,
+          projectHash: 'h3',
+          startTime: '2026-09-19T08:00:00.000Z',
+          lastUpdated: '2026-09-19T08:00:00.000Z',
+          kind: 'main'
+        }) +
+          ln({
+            id: 'd1',
+            timestamp: '2026-09-19T08:00:01.000Z',
+            type: 'user',
+            content: [{ text: 'relative root' }]
+          })
       )
       const g0 = tree(H, '.gemini')
       const sc = scanSessions(H, ['gemini'])
@@ -738,32 +1068,64 @@ async function toolSteps(): Promise<void> {
       const a = by.get(A)
       const b = by.get(B)
       const c = by.get(C)
-      if (sc.errors.length || sc.sessions.length !== 4) bad.push(`scan ${sc.sessions.length} errors ${sc.errors.length}`)
-      if (a?.title !== 'first question zebra' || a.cwd !== '/work/proj' || a.project !== 'proj' || a.updatedAt !== '2026-09-20T10:02:02.000Z' || a.resumeCommand !== `cd -- /work/proj && gemini --resume ${A}`)
+      if (sc.errors.length || sc.sessions.length !== 4)
+        bad.push(`scan ${sc.sessions.length} errors ${sc.errors.length}`)
+      if (
+        a?.title !== 'first question zebra' ||
+        a.cwd !== '/work/proj' ||
+        a.project !== 'proj' ||
+        a.updatedAt !== '2026-09-20T10:02:02.000Z' ||
+        a.resumeCommand !== `cd -- /work/proj && gemini --resume ${A}`
+      )
         bad.push(`A ${JSON.stringify(a)}`)
-      if (b?.title !== 'kept question' || b.cwd !== '/work/other dir' || b.resumeCommand !== `cd -- '/work/other dir' && gemini --resume ${B}`) bad.push(`B ${b?.title}|${b?.cwd}|${b?.resumeCommand}`)
+      if (
+        b?.title !== 'kept question' ||
+        b.cwd !== '/work/other dir' ||
+        b.resumeCommand !== `cd -- '/work/other dir' && gemini --resume ${B}`
+      )
+        bad.push(`B ${b?.title}|${b?.cwd}|${b?.resumeCommand}`)
       if (!c || c.resumeCommand !== undefined) bad.push('subagent session resumable')
-      if (by.get(D)?.resumeCommand !== undefined || by.get(D)?.cwd !== 'relative/dir') bad.push('relative project root resumable')
+      if (by.get(D)?.resumeCommand !== undefined || by.get(D)?.cwd !== 'relative/dir')
+        bad.push('relative project root resumable')
       // Gemini context blocks are filtered for Gemini only — other tools keep the shared cleanup rule
-      if (cleanUserText('<session_context>x</session_context>') === undefined) bad.push('session_context filtered for all tools')
-      if (sc.sessions.map((s) => s.id).join() !== [C, B, A, D].join()) bad.push('order (updatedAt desc)')
+      if (cleanUserText('<session_context>x</session_context>') === undefined)
+        bad.push('session_context filtered for all tools')
+      if (sc.sessions.map((s) => s.id).join() !== [C, B, A, D].join())
+        bad.push('order (updatedAt desc)')
       const tr = await readSessionTranscript(H, 'gemini', A)
-      const seq = tr.messages.map((m) => `${m.role}${m.kind === 'tool' ? ':tool' : ''}:${m.text}`).join('|')
-      if (seq !== 'user:first question zebra|assistant:answer one|assistant:tool:run_shell_command: ls -la|user:third question|assistant:answer three giraffe') bad.push(`transcript ${seq}`)
+      const seq = tr.messages
+        .map((m) => `${m.role}${m.kind === 'tool' ? ':tool' : ''}:${m.text}`)
+        .join('|')
+      if (
+        seq !==
+        'user:first question zebra|assistant:answer one|assistant:tool:run_shell_command: ls -la|user:third question|assistant:answer three giraffe'
+      )
+        bad.push(`transcript ${seq}`)
       const trB = await readSessionTranscript(H, 'gemini', B)
-      if (trB.messages.map((m) => m.text).join('|') !== 'kept question|kept answer') bad.push('transcript $set.messages')
+      if (trB.messages.map((m) => m.text).join('|') !== 'kept question|kept answer')
+        bad.push('transcript $set.messages')
       const dbPath = join(H, 'search-g.sqlite')
       const ix = await indexSessions(H, scanSessions(H).sessions, { dbPath })
       if (ix.failed || ix.indexed !== 4) bad.push(`index ${JSON.stringify(ix)}`)
       const hit = searchSessions(H, 'giraffe', { dbPath }).results
-      if (hit.length !== 1 || hit[0].tool !== 'gemini' || hit[0].id !== A || hit[0].hits[0]?.idx !== 4) bad.push(`search ${JSON.stringify(hit.map((x) => [x.tool, x.id, x.hits[0]?.idx]))}`)
-      if (searchSessions(H, 'walrus', { dbPath }).results.length) bad.push('rewound message indexed')
-      if (searchSessions(H, 'zebra', { dbPath, tool: 'gemini' }).results.length !== 1) bad.push('tool filter')
+      if (
+        hit.length !== 1 ||
+        hit[0].tool !== 'gemini' ||
+        hit[0].id !== A ||
+        hit[0].hits[0]?.idx !== 4
+      )
+        bad.push(`search ${JSON.stringify(hit.map((x) => [x.tool, x.id, x.hits[0]?.idx]))}`)
+      if (searchSessions(H, 'walrus', { dbPath }).results.length)
+        bad.push('rewound message indexed')
+      if (searchSessions(H, 'zebra', { dbPath, tool: 'gemini' }).results.length !== 1)
+        bad.push('tool filter')
       if (tree(H, '.gemini') !== g0) bad.push('~/.gemini changed by reading')
       check(
         'ag4. HAR-17 Gemini sessions — $set/$rewindTo replay, thought parts skipped, cwd from .project_root then projects.json, quoted resume command (none for subagents), transcript and search index',
         !bad.length,
-        bad.length ? bad.join('; ') : `4 sessions, transcript ${tr.total} messages, index ${ix.indexed} sessions, search hit idx 4, rewound text not indexed`
+        bad.length
+          ? bad.join('; ')
+          : `4 sessions, transcript ${tr.total} messages, index ${ix.indexed} sessions, search hit idx 4, rewound text not indexed`
       )
     }
   }
@@ -773,7 +1135,11 @@ async function toolSteps(): Promise<void> {
   {
     const envC: Env = { PATH: '' }
     const memC = memorySecretBackend()
-    const cHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+    const cHome = (
+      prefix: string,
+      files: Record<string, string>,
+      toolsInUse?: ToolId[]
+    ): string => {
       const H = makeFixture(prefix)
       unlinkSync(join(H, '.agents'))
       for (const [rel, body] of Object.entries(files)) {
@@ -790,13 +1156,23 @@ async function toolSteps(): Promise<void> {
       return readdirSync(p, { recursive: true })
         .map(String)
         .sort()
-        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .map((n) =>
+          lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`
+        )
         .join(',')
     }
     const C_CONFIG = '{\n  "firstLaunchAt": "2026-09-01T00:00:00.000Z"\n}\n'
     const C_SETTINGS = '{\n  "theme": "dark"\n}\n'
     const C_USER_INS = '# Mine\n\n- Personal rule.\n'
-    const C_MCP = JSON.stringify({ mcpServers: { mine: { type: 'stdio', command: 'my-server', tools: ['*'] } }, extra: { keep: true } }, null, 2) + '\n'
+    const C_MCP =
+      JSON.stringify(
+        {
+          mcpServers: { mine: { type: 'stdio', command: 'my-server', tools: ['*'] } },
+          extra: { keep: true }
+        },
+        null,
+        2
+      ) + '\n'
     const copilotFiles = {
       '.copilot/config.json': C_CONFIG,
       '.copilot/settings.json': C_SETTINGS,
@@ -812,32 +1188,74 @@ async function toolSteps(): Promise<void> {
       writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n\n- [Note](notes/a.md) — a note\n')
       createSkill(H, 'csk', 'Copilot skill')
       createAgent(H, 'helper', 'Helps')
-      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { copilot: { model: 'gpt-5.5', effort: 'high' } } })
+      writeAgentDoc(H, 'helper', {
+        description: 'Helps',
+        body: 'Help out.\n',
+        tools: { copilot: { model: 'gpt-5.5', effort: 'high' } }
+      })
       createAgent(H, 'plain', 'No model')
-      upsertMcpServer(H, 'c-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } })
-      upsertMcpServer(H, 'c-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
-      upsertMcpServer(H, 'c-sec', { transport: 'stdio', command: 'sec', env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' } }, { secrets: memC })
+      upsertMcpServer(H, 'c-stdio', {
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', 'srv'],
+        env: { API_KEY: '${API_KEY}' }
+      })
+      upsertMcpServer(H, 'c-http', {
+        transport: 'http',
+        url: 'https://mcp.example.com/mcp',
+        bearerEnv: 'G_TOKEN',
+        headers: { 'X-Team': '${TEAM}' }
+      })
+      upsertMcpServer(
+        H,
+        'c-sec',
+        {
+          transport: 'stdio',
+          command: 'sec',
+          env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' }
+        },
+        { secrets: memC }
+      )
     }
 
     // ah1. not chosen — toolsInUse unset and an explicit list without Copilot: ~/.copilot byte-identical
     {
       const bad: string[] = []
-      for (const [label, inUse] of [['unset', undefined], ['explicit', ['claude', 'codex', 'opencode', 'gemini']]] as [string, ToolId[] | undefined][]) {
-        const H = cHome(`illithid-m7-C1${label}-`, { ...copilotFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
+      for (const [label, inUse] of [
+        ['unset', undefined],
+        ['explicit', ['claude', 'codex', 'opencode', 'gemini']]
+      ] as [string, ToolId[] | undefined][]) {
+        const H = cHome(
+          `illithid-m7-C1${label}-`,
+          { ...copilotFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' },
+          inUse
+        )
         seedC(H)
         const c0 = ctree(H, '.copilot')
         const p = planSyncAll(H, envC, memC)
-        if (p.targets.some((c) => c.id === 'copilotMcp') || [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'copilot')) bad.push(`${label}: plan has Copilot items`)
+        if (
+          p.targets.some((c) => c.id === 'copilotMcp') ||
+          [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'copilot')
+        )
+          bad.push(`${label}: plan has Copilot items`)
         const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
         if (!r.results) bad.push(`${label}: sync refused`)
         if (ctree(H, '.copilot') !== c0) bad.push(`${label}: ~/.copilot changed`)
-        if (statusReport(H, envC, memC).cells.some((c) => c.tool === 'copilot' && c.state !== 'notApplicable')) bad.push(`${label}: Copilot status cells`)
-        if (!existsSync(join(H, '.claude/agents/helper.md'))) bad.push(`${label}: other tools not synced`)
+        if (
+          statusReport(H, envC, memC).cells.some(
+            (c) => c.tool === 'copilot' && c.state !== 'notApplicable'
+          )
+        )
+          bad.push(`${label}: Copilot status cells`)
+        if (!existsSync(join(H, '.claude/agents/helper.md')))
+          bad.push(`${label}: other tools not synced`)
       }
       check(
         'ah1. HAR-20 Copilot not chosen — toolsInUse unset and an explicit list without Copilot: no Copilot plan items, ~/.copilot byte-identical after approved Sync, status notApplicable',
         !bad.length,
-        bad.length ? bad.join('; ') : '2 cases, ~/.copilot tree unchanged (config.json, settings.json, mcp-config.json, instructions, skills, agents)'
+        bad.length
+          ? bad.join('; ')
+          : '2 cases, ~/.copilot tree unchanged (config.json, settings.json, mcp-config.json, instructions, skills, agents)'
       )
     }
 
@@ -845,10 +1263,23 @@ async function toolSteps(): Promise<void> {
     {
       const bad: string[] = []
       const M2 = JSON.parse(C_MCP) as Json
-      M2.mcpServers = { ...(M2.mcpServers as Json), 'c-stdio': { type: 'stdio', command: 'old', tools: ['read'], timeout: 5000, oauthClientId: 'fixture' } }
+      M2.mcpServers = {
+        ...(M2.mcpServers as Json),
+        'c-stdio': {
+          type: 'stdio',
+          command: 'old',
+          tools: ['read'],
+          timeout: 5000,
+          oauthClientId: 'fixture'
+        }
+      }
       const H = cHome(
         'illithid-m7-C2-',
-        { ...copilotFiles, '.copilot/mcp-config.json': JSON.stringify(M2, null, 2) + '\n', '.copilot/instructions/illithid/stray.instructions.md': '# stray\n' },
+        {
+          ...copilotFiles,
+          '.copilot/mcp-config.json': JSON.stringify(M2, null, 2) + '\n',
+          '.copilot/instructions/illithid/stray.instructions.md': '# stray\n'
+        },
         ['copilot']
       )
       seedC(H)
@@ -857,41 +1288,120 @@ async function toolSteps(): Promise<void> {
       const ins = join(H, '.copilot/instructions')
       const mem = read(join(ins, 'illithid/MEMORY.instructions.md'))
       // Copilot applies *.instructions.md automatically only with applyTo (or description) — the copy gets applyTo: "**"
-      if (stripSourceNote(read(join(ins, 'illithid/style.instructions.md'))) !== '---\napplyTo: "**"\n---\n\n' + readRule(H, 'style.md')) bad.push('rule copy')
+      if (
+        stripSourceNote(read(join(ins, 'illithid/style.instructions.md'))) !==
+        '---\napplyTo: "**"\n---\n\n' + readRule(H, 'style.md')
+      )
+        bad.push('rule copy')
       if (!mem.startsWith('---\napplyTo: "**"\n---\n\n')) bad.push('memory copy applyTo')
-      if (!mem.includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory index copy (absolute links)')
-      if (read(join(ins, 'user.instructions.md')) !== C_USER_INS || read(join(ins, 'illithid/stray.instructions.md')) !== '# stray\n') bad.push('user instructions touched')
-      if (!readState(H).state.toolRules?.copilot?.['style.md'] || readState(H).state.rules) bad.push('state: Copilot copies must be in toolRules, Claude rules untouched')
+      if (!mem.includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`))
+        bad.push('memory index copy (absolute links)')
+      if (
+        read(join(ins, 'user.instructions.md')) !== C_USER_INS ||
+        read(join(ins, 'illithid/stray.instructions.md')) !== '# stray\n'
+      )
+        bad.push('user instructions touched')
+      if (!readState(H).state.toolRules?.copilot?.['style.md'] || readState(H).state.rules)
+        bad.push('state: Copilot copies must be in toolRules, Claude rules untouched')
       const after = readJson(join(H, '.copilot/mcp-config.json'))
-      if (Object.keys(after).join() !== 'mcpServers,extra' || JSON.stringify(after.extra) !== JSON.stringify(M2.extra)) bad.push('mcp-config other keys')
+      if (
+        Object.keys(after).join() !== 'mcpServers,extra' ||
+        JSON.stringify(after.extra) !== JSON.stringify(M2.extra)
+      )
+        bad.push('mcp-config other keys')
       const ms = after.mcpServers as Json
       const want: Record<string, unknown> = {
         mine: (M2.mcpServers as Json).mine,
-        'c-stdio': { type: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' }, tools: ['read'], oauthClientId: 'fixture', timeout: 5000 },
-        'c-http': { type: 'http', url: 'https://mcp.example.com/mcp', headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' } }
+        'c-stdio': {
+          type: 'stdio',
+          command: 'npx',
+          args: ['-y', 'srv'],
+          env: { API_KEY: '${API_KEY}' },
+          tools: ['read'],
+          oauthClientId: 'fixture',
+          timeout: 5000
+        },
+        'c-http': {
+          type: 'http',
+          url: 'https://mcp.example.com/mcp',
+          headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' }
+        }
       }
-      for (const [n, w] of Object.entries(want)) if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
-      if ((ms['c-sec'] as Json | undefined)?.env === undefined || ((ms['c-sec'] as Json).env as Json).API_TOKEN !== 'sk-fixture-literal-1234567890abcdef') bad.push('secret not resolved')
-      if (!r.plan.targets.find((c) => c.id === 'copilotMcp')?.notes.some((n) => n.includes('kept Copilot-only settings of c-stdio: tools, oauthClientId, timeout'))) bad.push('kept-keys note')
-      if (dirContentHash(join(H, '.copilot/skills/csk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'csk'))) bad.push('skill copy')
-      if (read(join(H, '.copilot/skills/own/SKILL.md')) !== copilotFiles['.copilot/skills/own/SKILL.md'] || read(join(H, '.copilot/agents/mine.agent.md')) !== copilotFiles['.copilot/agents/mine.agent.md']) bad.push('user skill/agent touched')
+      for (const [n, w] of Object.entries(want))
+        if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
+      if (
+        (ms['c-sec'] as Json | undefined)?.env === undefined ||
+        ((ms['c-sec'] as Json).env as Json).API_TOKEN !== 'sk-fixture-literal-1234567890abcdef'
+      )
+        bad.push('secret not resolved')
+      if (
+        !r.plan.targets
+          .find((c) => c.id === 'copilotMcp')
+          ?.notes.some((n) =>
+            n.includes('kept Copilot-only settings of c-stdio: tools, oauthClientId, timeout')
+          )
+      )
+        bad.push('kept-keys note')
+      if (
+        dirContentHash(join(H, '.copilot/skills/csk')) !==
+        dirContentHash(join(libraryPaths(H).skillsDir, 'csk'))
+      )
+        bad.push('skill copy')
+      if (
+        read(join(H, '.copilot/skills/own/SKILL.md')) !==
+          copilotFiles['.copilot/skills/own/SKILL.md'] ||
+        read(join(H, '.copilot/agents/mine.agent.md')) !==
+          copilotFiles['.copilot/agents/mine.agent.md']
+      )
+        bad.push('user skill/agent touched')
       const helper = read(join(H, '.copilot/agents/helper.agent.md'))
-      if (helper !== '---\nname: helper\ndescription: Helps\nmodel: gpt-5.5\nreasoning-effort: high\n---\n\nHelp out.\n' || helper !== renderAgent('copilot', readAgentDoc(H, 'helper'))) bad.push('helper render')
-      if (/^(model|reasoning-effort):/m.test(read(join(H, '.copilot/agents/plain.agent.md')))) bad.push('plain agent has model/effort')
-      if (read(join(H, '.copilot/config.json')) !== C_CONFIG || read(join(H, '.copilot/settings.json')) !== C_SETTINGS) bad.push('config.json/settings.json changed')
-      for (const rel of ['.claude', '.codex', '.gemini', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      if (
+        helper !==
+          '---\nname: helper\ndescription: Helps\nmodel: gpt-5.5\nreasoning-effort: high\n---\n\nHelp out.\n' ||
+        helper !== renderAgent('copilot', readAgentDoc(H, 'helper'))
+      )
+        bad.push('helper render')
+      if (/^(model|reasoning-effort):/m.test(read(join(H, '.copilot/agents/plain.agent.md'))))
+        bad.push('plain agent has model/effort')
+      if (
+        read(join(H, '.copilot/config.json')) !== C_CONFIG ||
+        read(join(H, '.copilot/settings.json')) !== C_SETTINGS
+      )
+        bad.push('config.json/settings.json changed')
+      for (const rel of ['.claude', '.codex', '.gemini', '.config/opencode'])
+        if (existsSync(join(H, rel))) bad.push(`${rel} created`)
       const p2 = planSyncAll(H, envC, memC)
-      const busy = [...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id), ...[...p2.rules, ...p2.skills, ...p2.agents].filter((x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')).map((x) => `${x.name}:${x.action}`)]
+      const busy = [
+        ...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id),
+        ...[...p2.rules, ...p2.skills, ...p2.agents]
+          .filter(
+            (x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')
+          )
+          .map((x) => `${x.name}:${x.action}`)
+      ]
       if (busy.length) bad.push(`re-plan ${busy.join(',')}`)
       const cells = statusReport(H, envC, memC).cells.filter((c) => c.tool === 'copilot')
-      if (cells.find((c) => c.resource === 'rules')?.state !== 'synced' || cells.find((c) => c.resource === 'models')?.state !== 'notApplicable') bad.push('status cells')
+      if (
+        cells.find((c) => c.resource === 'rules')?.state !== 'synced' ||
+        cells.find((c) => c.resource === 'models')?.state !== 'notApplicable'
+      )
+        bad.push('status cells')
       // rule turned off for Copilot only → the approved Sync deletes the Copilot copy (result done on the Copilot row)
       setToggle(H, 'rules', 'extra.md', 'copilot', false)
-      const dc = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'copilot' && x.action === 'deleteCandidate')
+      const dc = planSyncAll(H, envC, memC).rules.find(
+        (x) => x.tool === 'copilot' && x.action === 'deleteCandidate'
+      )
       if (dc?.name !== 'extra.md') bad.push('no delete candidate')
       const rx = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const dres = rx.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`).join(',')
-      if (dres !== 'copilot:extra.md:done' || existsSync(join(ins, 'illithid/extra.instructions.md')) || readState(H).state.toolRules?.copilot?.['extra.md'])
+      const dres = rx.results?.rules
+        .filter((x) => x.action === 'deleteCandidate')
+        .map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`)
+        .join(',')
+      if (
+        dres !== 'copilot:extra.md:done' ||
+        existsSync(join(ins, 'illithid/extra.instructions.md')) ||
+        readState(H).state.toolRules?.copilot?.['extra.md']
+      )
         bad.push(`copilot-only delete ${dres}`)
       // with Claude also in use, removing the library MEMORY.md deletes both copies, each result on its own row
       writeConfig(H, { ...readConfig(H).config, toolsInUse: ['claude', 'copilot'] })
@@ -899,109 +1409,219 @@ async function toolSteps(): Promise<void> {
       writeFileSync(join(H, '.claude/settings.json'), '{}\n')
       writeFileSync(join(H, '.claude.json'), '{}\n')
       syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md'))) bad.push('Claude MEMORY copy missing')
+      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md')))
+        bad.push('Claude MEMORY copy missing')
       unlinkSync(libraryPaths(H).memoryIndex)
       const rm = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const mres = rm.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`).sort().join(',')
-      if (mres !== 'claude:MEMORY.md:done,copilot:MEMORY.md:done' || existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md')) || existsSync(join(ins, 'illithid/MEMORY.instructions.md')))
+      const mres = rm.results?.rules
+        .filter((x) => x.action === 'deleteCandidate')
+        .map((x) => `${x.tool ?? 'claude'}:${x.name}:${x.status}`)
+        .sort()
+        .join(',')
+      if (
+        mres !== 'claude:MEMORY.md:done,copilot:MEMORY.md:done' ||
+        existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'MEMORY.md')) ||
+        existsSync(join(ins, 'illithid/MEMORY.instructions.md'))
+      )
         bad.push(`MEMORY delete ${mres}`)
       // a user <name>.md in ~/.copilot/agents is also loaded by Copilot → the app copy is not written (userOwned)
       createAgent(H, 'twin', 'Twin')
-      writeFileSync(join(H, '.copilot/agents/twin.md'), '---\nname: twin\ndescription: Mine\n---\n\nMine.\n')
+      writeFileSync(
+        join(H, '.copilot/agents/twin.md'),
+        '---\nname: twin\ndescription: Mine\n---\n\nMine.\n'
+      )
       syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const tw = planSyncAll(H, envC, memC).agents.find((x) => x.tool === 'copilot' && x.name === 'twin')
-      if (existsSync(join(H, '.copilot/agents/twin.agent.md')) || tw?.action !== 'skip' || tw.reason !== 'userOwned') bad.push(`twin agent ${tw?.action}:${tw?.reason}`)
+      const tw = planSyncAll(H, envC, memC).agents.find(
+        (x) => x.tool === 'copilot' && x.name === 'twin'
+      )
+      if (
+        existsSync(join(H, '.copilot/agents/twin.agent.md')) ||
+        tw?.action !== 'skip' ||
+        tw.reason !== 'userOwned'
+      )
+        bad.push(`twin agent ${tw?.action}:${tw?.reason}`)
       // COPILOT_HOME elsewhere → Copilot files are left alone (skip copilotHomeOverride, nothing written)
       const envO: Env = { ...envC, COPILOT_HOME: join(H, 'elsewhere') }
       createRule(H, 'later.md', '# Later\n')
       const po = planSyncAll(H, envO, memC)
-      if (po.targets.find((c) => c.id === 'copilotMcp')?.skip !== 'copilotHomeOverride' || [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'copilot'))
+      if (
+        po.targets.find((c) => c.id === 'copilotMcp')?.skip !== 'copilotHomeOverride' ||
+        [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'copilot')
+      )
         bad.push('COPILOT_HOME override plan')
       syncAll(H, envO, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (existsSync(join(ins, 'illithid/later.instructions.md')) || existsSync(join(H, 'elsewhere'))) bad.push('written despite COPILOT_HOME override')
-      if (planSyncAll(H, { ...envC, COPILOT_HOME: join(H, '.copilot') }, memC).targets.find((c) => c.id === 'copilotMcp')?.skip) bad.push('COPILOT_HOME = ~/.copilot treated as override')
+      if (
+        existsSync(join(ins, 'illithid/later.instructions.md')) ||
+        existsSync(join(H, 'elsewhere'))
+      )
+        bad.push('written despite COPILOT_HOME override')
+      if (
+        planSyncAll(H, { ...envC, COPILOT_HOME: join(H, '.copilot') }, memC).targets.find(
+          (c) => c.id === 'copilotMcp'
+        )?.skip
+      )
+        bad.push('COPILOT_HOME = ~/.copilot treated as override')
       // comments refused, byte-identical
       const commented = '{\n  // mine\n  "mcpServers": {}\n}\n'
       writeFileSync(join(H, '.copilot/mcp-config.json'), commented)
       const cm = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'copilotMcp')
       if (!cm?.error?.includes('comments')) bad.push(`commented plan ${cm?.error}`)
       syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (read(join(H, '.copilot/mcp-config.json')) !== commented) bad.push('commented mcp-config.json written')
+      if (read(join(H, '.copilot/mcp-config.json')) !== commented)
+        bad.push('commented mcp-config.json written')
       check(
         'ah2. HAR-20 Copilot chosen — instructions/illithid copies (memory index, user files kept, toolRules state), mcp-config.json mcpServers only (Copilot-only keys kept, ${VAR} kept, secret resolved), skills, .agent.md (model, reasoning-effort), config.json/settings.json untouched, re-sync 0, delete candidate, comments refused',
         !bad.length,
-        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}; rules ${r.plan.rules.map((x) => x.name).join(',')}`
+        bad.length
+          ? bad.join('; ')
+          : `targets ${r.plan.targets.map((c) => c.id).join(',')}; rules ${r.plan.rules.map((x) => x.name).join(',')}`
       )
     }
 
     // ah3. import from ~/.copilot — instructions (scoped → toolOnly), copilot-instructions.md copied (warn, all off), MCP, skill, agents, pendingRetire
     {
       const bad: string[] = []
-      const CAG = '---\nname: cag\ndescription: Copilot agent\nmodel: gpt-5.5\nreasoning-effort: medium\ntarget: vscode\n---\n\nDo it.\n'
+      const CAG =
+        '---\nname: cag\ndescription: Copilot agent\nmodel: gpt-5.5\nreasoning-effort: medium\ntarget: vscode\n---\n\nDo it.\n'
       const H = cHome(
         'illithid-m7-C3-',
         {
           '.copilot/config.json': C_CONFIG,
           '.copilot/instructions/team.instructions.md': '# Team\n\n- Tabs.\n',
-          '.copilot/instructions/scoped.instructions.md': '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n',
+          '.copilot/instructions/scoped.instructions.md':
+            '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n',
           '.copilot/copilot-instructions.md': '# My Copilot notes\n',
-          '.copilot/mcp-config.json': '{\n  // comments are fine for import\n  "mcpServers": {\n    "c1": { "type": "local", "command": "x", "env": { "T": "$TOK" }, "tools": ["*"] },\n    "c2": { "type": "http", "url": "https://c.example.com/mcp", "headers": { "Authorization": "Bearer ${C_TOKEN}" } }\n  }\n}\n',
-          '.copilot/skills/csk2/SKILL.md': '---\nname: csk2\ndescription: From Copilot\n---\n\nC.\n',
+          '.copilot/mcp-config.json':
+            '{\n  // comments are fine for import\n  "mcpServers": {\n    "c1": { "type": "local", "command": "x", "env": { "T": "$TOK" }, "tools": ["*"] },\n    "c2": { "type": "http", "url": "https://c.example.com/mcp", "headers": { "Authorization": "Bearer ${C_TOKEN}" } }\n  }\n}\n',
+          '.copilot/skills/csk2/SKILL.md':
+            '---\nname: csk2\ndescription: From Copilot\n---\n\nC.\n',
           '.copilot/agents/cag.agent.md': CAG,
-          '.copilot/agents/lim.agent.md': '---\nname: lim\ndescription: Limited\ntools: ["read"]\n---\n\nRead.\n'
+          '.copilot/agents/lim.agent.md':
+            '---\nname: lim\ndescription: Limited\ntools: ["read"]\n---\n\nRead.\n'
         },
         ['copilot']
       )
       const c0 = ctree(H, '.copilot')
-      if (!listImportSources(H).find((s) => s.id === 'tool:copilot')?.available) bad.push('tool:copilot source')
+      if (!listImportSources(H).find((s) => s.id === 'tool:copilot')?.available)
+        bad.push('tool:copilot source')
       const pl = planImport(H, 'tool:copilot')
-      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
-      if (names(pl.rules) !== 'copilot-instructions.md,scoped.md,team.md' || names(pl.mcp) !== 'c1,c2' || names(pl.skills) !== 'csk2' || names(pl.agents) !== 'cag,lim')
-        bad.push(`candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`)
-      const port = (xs: { name: string; portability: string; reasons: string[] }[], n: string): string => {
+      const names = (xs: { name: string }[]): string =>
+        xs
+          .map((x) => x.name)
+          .sort()
+          .join(',')
+      if (
+        names(pl.rules) !== 'copilot-instructions.md,scoped.md,team.md' ||
+        names(pl.mcp) !== 'c1,c2' ||
+        names(pl.skills) !== 'csk2' ||
+        names(pl.agents) !== 'cag,lim'
+      )
+        bad.push(
+          `candidates ${names(pl.rules)}|${names(pl.mcp)}|${names(pl.skills)}|${names(pl.agents)}`
+        )
+      const port = (
+        xs: { name: string; portability: string; reasons: string[] }[],
+        n: string
+      ): string => {
         const c = xs.find((x) => x.name === n)
         return c ? `${c.portability}:${c.reasons.join('+')}` : '-'
       }
-      const got = [port(pl.rules, 'team.md'), port(pl.rules, 'scoped.md'), port(pl.rules, 'copilot-instructions.md'), port(pl.agents, 'cag'), port(pl.agents, 'lim')].join(' ')
-      if (got !== 'ok: toolOnly:projectScoped warn:toolNotes warn:toolSpecificKeys toolOnly:restrictedAgent+toolSpecificKeys') bad.push(`portability ${got}`)
+      const got = [
+        port(pl.rules, 'team.md'),
+        port(pl.rules, 'scoped.md'),
+        port(pl.rules, 'copilot-instructions.md'),
+        port(pl.agents, 'cag'),
+        port(pl.agents, 'lim')
+      ].join(' ')
+      if (
+        got !==
+        'ok: toolOnly:projectScoped warn:toolNotes warn:toolSpecificKeys toolOnly:restrictedAgent+toolSpecificKeys'
+      )
+        bad.push(`portability ${got}`)
       const c1 = pl.mcp.find((c) => c.name === 'c1')?.variants[0]
-      if (c1?.server.env?.T !== '${TOK}' || !c1.warnings.some((w) => w.includes('tools'))) bad.push(`c1 ${JSON.stringify(c1?.server)}`)
-      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+      if (c1?.server.env?.T !== '${TOK}' || !c1.warnings.some((w) => w.includes('tools')))
+        bad.push(`c1 ${JSON.stringify(c1?.server)}`)
+      const sels: ImportSelection[] = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents]
+        .filter((c) => c.portability !== 'toolOnly')
+        .map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
       const ir = applyImport(H, sels, 'tool:copilot', { secrets: memC })
-      if (ir.some((x) => x.status !== 'imported')) bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
+      if (ir.some((x) => x.status !== 'imported'))
+        bad.push(`import ${ir.map((x) => `${x.name}:${x.status}:${x.reason ?? ''}`).join(',')}`)
       if (ctree(H, '.copilot') !== c0) bad.push('import changed ~/.copilot')
       const mf = readManifest(H).manifest
-      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string =>
+        JSON.stringify(mf[k][n] ?? {})
       for (const [g, w] of [
-        [tg('rules', 'team.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'],
-        [tg('rules', 'copilot-instructions.md'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [
+          tg('rules', 'team.md'),
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'
+        ],
+        [
+          tg('rules', 'copilot-instructions.md'),
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
         [tg('skills', 'csk2'), '{"claude":false,"codex":false,"gemini":false,"grok":false}'],
-        [tg('agents', 'cag'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'],
-        [tg('mcp', 'c1'), '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}']
+        [
+          tg('agents', 'cag'),
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'
+        ],
+        [
+          tg('mcp', 'c1'),
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"grok":false}'
+        ]
       ])
         if (g !== w) bad.push(`toggles ${g} ≠ ${w}`)
-      if (readAgentDoc(H, 'cag').tools.copilot?.effort !== 'medium') bad.push('agent effort not under copilot')
-      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
+      if (readAgentDoc(H, 'cag').tools.copilot?.effort !== 'medium')
+        bad.push('agent effort not under copilot')
+      const pend = (readState(H).state.pendingRetire ?? [])
+        .map((p) => `${p.kind}:${p.tool}:${p.name}`)
+        .sort()
+        .join(',')
       if (pend !== 'agent:copilot:cag,rule:copilot:team.md') bad.push(`pendingRetire ${pend}`)
       const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
       if (!r.results) bad.push('sync refused')
       const imp = (rel: string): string | null => {
         const root = importedBackupRoot(H)
         if (!existsSync(root)) return null
-        const hit = readdirSync(root).map((ts) => join(root, ts, rel)).find((p) => existsSync(p))
+        const hit = readdirSync(root)
+          .map((ts) => join(root, ts, rel))
+          .find((p) => existsSync(p))
         return hit ? read(hit) : null
       }
-      if (existsSync(join(H, '.copilot/instructions/team.instructions.md')) || imp('copilot/instructions/team.instructions.md') !== '# Team\n\n- Tabs.\n') bad.push('instructions original not retired')
-      if (stripSourceNote(read(join(H, '.copilot/instructions/illithid/team.instructions.md'))) !== '---\napplyTo: "**"\n---\n\n# Team\n\n- Tabs.\n') bad.push('instructions copy')
-      if (read(join(H, '.copilot/agents/cag.agent.md')) !== renderAgent('copilot', readAgentDoc(H, 'cag')) || imp('copilot/agents/cag.agent.md') !== CAG) bad.push('agent not replaced')
-      if (read(join(H, '.copilot/copilot-instructions.md')) !== '# My Copilot notes\n' || existsSync(join(H, '.copilot/instructions/illithid/copilot-instructions.instructions.md'))) bad.push('copilot-instructions.md moved or copied back')
-      if (read(join(H, '.copilot/instructions/scoped.instructions.md')) !== '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n') bad.push('scoped instructions touched')
+      if (
+        existsSync(join(H, '.copilot/instructions/team.instructions.md')) ||
+        imp('copilot/instructions/team.instructions.md') !== '# Team\n\n- Tabs.\n'
+      )
+        bad.push('instructions original not retired')
+      if (
+        stripSourceNote(read(join(H, '.copilot/instructions/illithid/team.instructions.md'))) !==
+        '---\napplyTo: "**"\n---\n\n# Team\n\n- Tabs.\n'
+      )
+        bad.push('instructions copy')
+      if (
+        read(join(H, '.copilot/agents/cag.agent.md')) !==
+          renderAgent('copilot', readAgentDoc(H, 'cag')) ||
+        imp('copilot/agents/cag.agent.md') !== CAG
+      )
+        bad.push('agent not replaced')
+      if (
+        read(join(H, '.copilot/copilot-instructions.md')) !== '# My Copilot notes\n' ||
+        existsSync(join(H, '.copilot/instructions/illithid/copilot-instructions.instructions.md'))
+      )
+        bad.push('copilot-instructions.md moved or copied back')
+      if (
+        read(join(H, '.copilot/instructions/scoped.instructions.md')) !==
+        '---\napplyTo: "**/*.ts"\n---\n\n# TS only\n'
+      )
+        bad.push('scoped instructions touched')
       if (read(join(H, '.copilot/config.json')) !== C_CONFIG) bad.push('config.json changed')
       if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
       check(
         'ah3. HAR-20 import from ~/.copilot — instructions (applyTo-scoped toolOnly), copilot-instructions.md copied (warn, all tools off), MCP ($VAR → ${VAR}, tool filters warned), skill, agents (effort under copilot, tool-limited toolOnly), source-only toggles, originals retired by the approved Sync',
         !bad.length,
-        bad.length ? bad.join('; ') : `imported ${ir.map((x) => x.name).join(',')}; retired rule:copilot:team.md, agent:copilot:cag`
+        bad.length
+          ? bad.join('; ')
+          : `imported ${ir.map((x) => x.name).join(',')}; retired rule:copilot:team.md, agent:copilot:cag`
       )
     }
   }
@@ -1010,7 +1630,11 @@ async function toolSteps(): Promise<void> {
   {
     const envI: Env = { PATH: '' }
     const memI = memorySecretBackend()
-    const iHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
+    const iHome = (
+      prefix: string,
+      files: Record<string, string>,
+      toolsInUse?: ToolId[]
+    ): string => {
       const H = makeFixture(prefix)
       unlinkSync(join(H, '.agents'))
       for (const [rel, body] of Object.entries(files)) {
@@ -1027,281 +1651,514 @@ async function toolSteps(): Promise<void> {
       return readdirSync(p, { recursive: true })
         .map(String)
         .sort()
-        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
+        .map((n) =>
+          lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`
+        )
         .join(',')
     }
 
     // ---- aj. Grok CLI (~/.grok)
-  {
-    const envC: Env = { PATH: '' }
-    const memC = memorySecretBackend()
-    const cHome = (prefix: string, files: Record<string, string>, toolsInUse?: ToolId[]): string => {
-      const H = makeFixture(prefix)
-      unlinkSync(join(H, '.agents'))
-      for (const [rel, body] of Object.entries(files)) {
-        mkdirSync(join(H, rel, '..'), { recursive: true })
-        writeFileSync(join(H, rel), body)
-      }
-      if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
-      initLibrary(H)
-      return H
-    }
-    const ctree = (H: string, rel: string): string => {
-      const p = join(H, rel)
-      if (!existsSync(p)) return 'absent'
-      return readdirSync(p, { recursive: true })
-        .map(String)
-        .sort()
-        .map((n) => (lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`))
-        .join(',')
-    }
-    const G_CONFIG = '# mine\n[ui]\ncompact_mode = true\n\n[models]\ndefault = "grok-4.7"\n\n[mcp_servers.mine]\ncommand = "my-server"\n'
-    const grokFiles = {
-      '.grok/config.toml': G_CONFIG,
-      '.grok/rules/user.md': '# Mine\n\n- Personal rule.\n',
-      '.grok/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n\nOwn.\n',
-      '.grok/agents/mine.md': '---\nname: mine\ndescription: Mine\n---\n\nMine.\n'
-    }
-    const seedG = (H: string): void => {
-      createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
-      createRule(H, 'extra.md', '# Extra\n')
-      mkdirSync(libraryPaths(H).memoryDir, { recursive: true })
-      writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n\n- [Note](notes/a.md) — a note\n')
-      createSkill(H, 'gsk', 'Grok skill')
-      createAgent(H, 'helper', 'Helps')
-      writeAgentDoc(H, 'helper', { description: 'Helps', body: 'Help out.\n', tools: { grok: { model: 'grok-4.7' } } })
-      upsertMcpServer(H, 'g-stdio', { transport: 'stdio', command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } })
-      upsertMcpServer(H, 'g-http', { transport: 'http', url: 'https://mcp.example.com/mcp', bearerEnv: 'G_TOKEN', headers: { 'X-Team': '${TEAM}' } })
-      upsertMcpServer(H, 'g-sec', { transport: 'stdio', command: 'sec', env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' } }, { secrets: memC })
-    }
-
-    // aj1. not chosen — ~/.grok byte-identical
     {
-      const bad: string[] = []
-      for (const [label, inUse] of [['unset', undefined], ['explicit', ['claude', 'codex', 'copilot']]] as [string, ToolId[] | undefined][]) {
-        const H = cHome(`illithid-m7-G1${label}-`, { ...grokFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, inUse)
-        seedG(H)
-        const g0 = ctree(H, '.grok')
-        const p = planSyncAll(H, envC, memC)
-        if (p.targets.some((c) => c.id === 'grokMcp') || [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'grok')) bad.push(`${label}: plan has Grok items`)
-        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-        if (ctree(H, '.grok') !== g0) bad.push(`${label}: ~/.grok changed`)
-      }
-      check('aj1. Grok not chosen — toolsInUse unset and an explicit list without Grok: no Grok plan items, ~/.grok byte-identical', !bad.length, bad.length ? bad.join('; ') : '2 cases unchanged')
-    }
-
-    // aj2. chosen — rules flat in ~/.grok/rules (user files kept), config.toml marker block, skills, agents, model, re-sync 0, delete, GROK_HOME
-    {
-      const bad: string[] = []
-      const H = cHome('illithid-m7-G2-', grokFiles, ['grok'])
-      seedG(H)
-      const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (!r.results) bad.push('sync refused')
-      const rd = join(H, '.grok/rules')
-      if (stripSourceNote(read(join(rd, 'style.md'))) !== readRule(H, 'style.md')) bad.push('rule copy')
-      if (!read(join(rd, 'illithid-memory.md')).includes(`](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`)) bad.push('memory copy')
-      if (read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']) bad.push('user rule touched')
-      if (!readState(H).state.toolRules?.grok?.['style.md']) bad.push('toolRules.grok state')
-      const cfg = read(join(H, '.grok/config.toml'))
-      if (!cfg.startsWith(G_CONFIG.trimEnd())) bad.push('config.toml outside the block changed')
-      const t = parseToml(cfg) as Json
-      const ms = t.mcp_servers as Json
-      const want: Record<string, unknown> = {
-        mine: { command: 'my-server' },
-        'g-stdio': { command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } },
-        'g-http': { url: 'https://mcp.example.com/mcp', headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' } }
-      }
-      for (const [n, w] of Object.entries(want)) if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
-      if (((ms['g-sec'] as Json)?.env as Json)?.API_TOKEN !== 'sk-fixture-literal-1234567890abcdef') bad.push('secret not resolved')
-      if ((t.models as Json)?.default !== 'grok-4.7' || (t.ui as Json)?.compact_mode !== true) bad.push('other tables')
-      if (dirContentHash(join(H, '.grok/skills/gsk')) !== dirContentHash(join(libraryPaths(H).skillsDir, 'gsk'))) bad.push('skill copy')
-      if (read(join(H, '.grok/skills/own/SKILL.md')) !== grokFiles['.grok/skills/own/SKILL.md'] || read(join(H, '.grok/agents/mine.md')) !== grokFiles['.grok/agents/mine.md']) bad.push('user skill/agent touched')
-      if (read(join(H, '.grok/agents/helper.md')) !== '---\nname: helper\ndescription: Helps\nmodel: grok-4.7\n---\n\nHelp out.\n') bad.push('helper render')
-      for (const rel of ['.claude', '.codex', '.gemini', '.copilot', '.config/opencode']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
-      const p2 = planSyncAll(H, envC, memC)
-      const busy = [...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id), ...[...p2.rules, ...p2.skills, ...p2.agents].filter((x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')).map((x) => `${x.name}:${x.action}`)]
-      if (busy.length) bad.push(`re-plan ${busy.join(',')}`)
-      // default model: [models] default changed in place, the rest of the file intact
-      setModel(H, 'grok', 'models.default', 'grok-5')
-      const cfg2 = read(join(H, '.grok/config.toml'))
-      if ((parseToml(cfg2) as Json as { models: Json }).models.default !== 'grok-5' || cfg2.replace('"grok-5"', '"grok-4.7"') !== cfg) bad.push('setModel models.default')
-      // a user rule with the library name is left alone (userOwned); turning a rule off deletes only the app copy
-      createRule(H, 'user.md', '# Library user\n')
-      const uo = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'user.md')
-      if (uo?.action !== 'skip' || uo.reason !== 'userOwned') bad.push(`user.md ${uo?.action}`)
-      setToggle(H, 'rules', 'extra.md', 'grok', false)
-      const rx = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const dres = rx.results?.rules.filter((x) => x.action === 'deleteCandidate').map((x) => `${x.tool}:${x.name}:${x.status}`).join(',')
-      if (dres !== 'grok:extra.md:done' || existsSync(join(rd, 'extra.md')) || read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']) bad.push(`delete ${dres}`)
-      // a copy the user edited in the shared folder is not deleted when the rule goes away
-      createRule(H, 'mine2.md', '# M2\n')
-      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      writeFileSync(join(rd, 'mine2.md'), '# edited by me\n')
-      setToggle(H, 'rules', 'mine2.md', 'grok', false)
-      const ue = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'mine2.md')
-      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (ue?.action !== 'skip' || ue.reason !== 'userEdited' || read(join(rd, 'mine2.md')) !== '# edited by me\n') bad.push(`user-edited copy ${ue?.action}:${ue?.reason}`)
-      // a library rule named like the memory copy is skipped (reservedName)
-      createRule(H, 'illithid-memory.md', '# clash\n')
-      const rn = planSyncAll(H, envC, memC).rules.find((x) => x.tool === 'grok' && x.name === 'illithid-memory.md')
-      if (rn?.reason !== 'reservedName') bad.push(`reserved name ${rn?.action}:${rn?.reason}`)
-      // Grok-only keys of the same-name table are kept; an inline mcp_servers entry outside the block is refused (file untouched)
-      const cfgNow = read(join(H, '.grok/config.toml'))
-      writeFileSync(join(H, '.grok/config.toml'), cfgNow.replace('[mcp_servers.mine]', '[mcp_servers.g-stdio2]\nenabled = false\ntool_timeout_sec = 90\n\n[mcp_servers.mine]'))
-      upsertMcpServer(H, 'g-stdio2', { transport: 'stdio', command: 'x2' })
-      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const k2 = (parseToml(read(join(H, '.grok/config.toml'))) as { mcp_servers: Json }).mcp_servers['g-stdio2'] as Json
-      if (k2?.enabled !== false || k2?.tool_timeout_sec !== 90 || k2?.command !== 'x2') bad.push(`kept keys ${JSON.stringify(k2)}`)
-      const inlineCfg = read(join(H, '.grok/config.toml')) + '\n[mcp_servers]\ng-inline = { command = "y" }\n'
-      writeFileSync(join(H, '.grok/config.toml'), inlineCfg)
-      upsertMcpServer(H, 'g-inline', { transport: 'stdio', command: 'z' })
-      const pin = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokMcp')
-      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (!pin?.error || read(join(H, '.grok/config.toml')) !== inlineCfg) bad.push(`inline refused ${pin?.error}`)
-      writeFileSync(join(H, '.grok/config.toml'), cfgNow)
-      // GROK_HOME elsewhere → nothing written
-      const envO: Env = { ...envC, GROK_HOME: join(H, 'elsewhere') }
-      createRule(H, 'later.md', '# Later\n')
-      const po = planSyncAll(H, envO, memC)
-      if (po.targets.find((c) => c.id === 'grokMcp')?.skip !== 'grokHomeOverride' || [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'grok')) bad.push('GROK_HOME override plan')
-      syncAll(H, envO, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (existsSync(join(rd, 'later.md'))) bad.push('written despite GROK_HOME override')
-      check(
-        'aj2. Grok chosen — rules copied flat into ~/.grok/rules (memory as illithid-memory.md, user rules kept, toolRules state), config.toml marker block (${VAR} kept, secret resolved, other tables intact), skills, agents, [models] default, re-sync 0, delete candidate, GROK_HOME',
-        !bad.length,
-        bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}`
-      )
-    }
-
-    // aj2c. Grok's Claude reading — default writes nothing; grokReadsClaude=false writes [compat.claude] in the app block;
-    // a user [compat.claude] wins; back on and retiring remove the block
-    {
-      const bad: string[] = []
-      const H = cHome('illithid-m7-Gc-', grokFiles, ['claude', 'grok'])
-      seedG(H)
-      const sync = (): void => void syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      const cfg = join(H, '.grok/config.toml')
-      const compat = (): Json | undefined => ((parseToml(read(cfg)) as Json).compat as Json | undefined)?.claude as Json | undefined
-      sync()
-      const c0 = read(cfg)
-      if (c0.includes('illithid compat') || compat() !== undefined) bad.push('default wrote compat')
-      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending at default')
-
-      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
-      const pc = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokCompat')
-      if (!pc?.changed || pc.error) bad.push(`plan ${pc?.error ?? 'no change'}`)
-      sync()
-      const c1 = read(cfg)
-      if (compat()?.skills !== false || compat()?.mcps !== false) bad.push(`compat ${JSON.stringify(compat())}`)
-      if (removeBlockMulti(c1, [GROK_COMPAT_MARKERS]) !== c0) bad.push('content outside the compat block changed')
-      if (blockBodyMulti(c1, [TOML_MCP_MARKERS]) !== blockBodyMulti(c0, [TOML_MCP_MARKERS])) bad.push('mcp block changed')
-      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending after writing compat')
-      // the Skills/MCP views read what Grok actually does from config.toml
-      if (readsSkills(H, envC).grokReadsClaude !== false || readsMcp(H, envC).grokReadsClaude !== false) bad.push('reads: effective off not reported')
-
-      // an app-owned server table written by hand right before the compat block: stripping it must keep the compat markers
-      const i1 = c1.indexOf(GROK_COMPAT_MARKERS[0])
-      writeFileSync(cfg, `${c1.slice(0, i1)}[mcp_servers."g-stdio"]\ncommand = "hand"\n\n${c1.slice(i1)}`)
-      sync()
-      if (!read(cfg).includes(GROK_COMPAT_MARKERS[0]) || !read(cfg).includes(GROK_COMPAT_MARKERS[1]) || compat()?.skills !== false)
-        bad.push(`compat markers lost when stripping an owned table: ${JSON.stringify(read(cfg).slice(-300))}`)
-      if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending after stripping an owned table')
-      writeFileSync(cfg, c1)
-      sync()
-
-      // the user's own [compat.claude] wins: the app block goes, their table stays
-      writeFileSync(cfg, c0.trimEnd() + '\n\n[compat.claude]\nskills = true\n')
-      sync()
-      if (read(cfg).includes('illithid compat') || compat()?.skills !== true || compat()?.mcps !== undefined) bad.push(`user compat ${JSON.stringify(compat())}`)
-      if (readsSkills(H, envC).grokReadsClaude !== undefined) bad.push('reads: user skills = true should read as on')
-      writeFileSync(cfg, c0)
-      sync()
-      if (compat()?.skills !== false) bad.push('block not restored after the user table left')
-
-      // back on → block removed, file as at default
-      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: undefined })
-      sync()
-      if (read(cfg) !== c0) bad.push('turning back on left changes')
-
-      // retiring Grok removes the block
-      writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
-      sync()
-      setToolsInUse(H, ['claude'])
-      sync()
-      if (read(cfg).includes('illithid')) bad.push('retire left an app block')
-
-      check(
-        'aj2c. Grok Claude reading — default writes nothing, off writes [compat.claude] skills/mcps=false in its own block (rest byte-identical, re-sync 0), user table wins, back on and retire remove it',
-        !bad.length,
-        bad.length ? bad.join('; ') : 'default 0 bytes, block written/removed, user [compat.claude] kept'
-      )
-    }
-
-    // aj3. import from ~/.grok and Grok sessions (scan, transcript, usage)
-    {
-      const bad: string[] = []
-      const H = cHome('illithid-m7-G3-', {
-        ...grokFiles,
-        '.grok/config.toml': G_CONFIG + '\n[mcp_servers.web]\nurl = "https://w.example/mcp"\n\n[mcp_servers.web.headers]\nAuthorization = "Bearer ${W_TOKEN}"\n'
-      }, ['claude', 'grok'])
-      const pl = planImport(H, 'tool:grok')
-      const names = (xs: { name: string }[]): string => xs.map((x) => x.name).sort().join(',')
-      if (names(pl.rules) !== 'user.md' || names(pl.mcp) !== 'mine,web' || !names(pl.skills).includes('own') || !names(pl.agents).includes('mine')) bad.push(`plan ${names(pl.rules)} | ${names(pl.mcp)} | ${names(pl.skills)} | ${names(pl.agents)}`)
-      const web = pl.mcp.find((x) => x.name === 'web')?.variants[0].server as Json | undefined
-      // Authorization: Bearer ${VAR} becomes the library's bearerEnv
-      if (web?.transport !== 'http' || web.bearerEnv !== 'W_TOKEN') bad.push(`web ${JSON.stringify(web)}`)
-      const sels = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents].filter((c) => c.portability !== 'toolOnly').map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
-      applyImport(H, sels, 'tool:grok', { secrets: memC })
-      if (JSON.stringify(readManifest(H).manifest.rules['user.md'] ?? {}) !== '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}') bad.push(`toggles ${JSON.stringify(readManifest(H).manifest.rules['user.md'])}`)
-      // the imported ~/.grok/rules/user.md is adopted in place (same path as the app copy): nothing pending after the approved Sync
-      if (!readState(H).state.toolRules?.grok?.['user.md']) bad.push('user.md not adopted')
-      mkdirSync(join(H, '.claude'), { recursive: true })
-      syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
-      if (pendingSyncCount(H, envC, memC) !== 0) bad.push(`pending after import+sync ${planSyncAll(H, envC, memC).rules.filter((x) => x.action !== 'inSync').map((x) => `${x.tool}:${x.name}:${x.action}:${x.reason}`).join(',')}`)
-      // sessions
-      const sdir = join(H, '.grok/sessions', encodeURIComponent('/tmp/gp'), '01a0e595-ded6-7120-89f3-dfb150e34e68')
-      mkdirSync(sdir, { recursive: true })
-      writeFileSync(join(sdir, 'summary.json'), JSON.stringify({ info: { id: 'x', cwd: '/tmp/gp' }, generated_title: 'Grok title', created_at: '2026-09-20T01:00:00Z', updated_at: '2026-09-20T02:00:00Z', num_chat_messages: 4 }))
-      writeFileSync(
-        join(sdir, 'chat_history.jsonl'),
-        [
-          { type: 'system', content: 'sys' },
-          { type: 'user', content: [{ type: 'text', text: 'grok question' }] },
-          { type: 'assistant', content: 'grok answer', model_id: 'grok-4.7', tool_calls: [{ id: 'c1', name: 'use_tool', arguments: JSON.stringify({ tool_name: 'kaneo__get_task', tool_input: { id: 'GROKARGSECRET' } }) }] },
-          { type: 'tool_result', tool_call_id: 'c1', content: 'out' }
-        ].map((x) => JSON.stringify(x)).join('\n') + '\n'
-      )
-      const ss = scanSessions(H, ['grok']).sessions
-      const s0 = ss[0]
-      if (ss.length !== 1 || s0.title !== 'Grok title' || s0.cwd !== '/tmp/gp' || s0.resumeCommand !== "cd -- /tmp/gp && grok --resume 01a0e595-ded6-7120-89f3-dfb150e34e68") bad.push(`scan ${JSON.stringify(s0)}`)
-      const tr = await readSessionTranscript(H, 'grok', '01a0e595-ded6-7120-89f3-dfb150e34e68')
-      if (tr.messages.map((m) => `${m.role}:${m.kind ?? 'text'}`).join(',') !== 'user:text,assistant:text,assistant:tool') bad.push(`transcript ${tr.messages.map((m) => m.role).join(',')}`)
-      await indexSessions(H, scanSessions(H, ['grok']).sessions)
-      const u = usageOf(H, 'mcp', 'kaneo', { now: Date.parse('2026-09-24T00:00:00Z') })
-      if (u?.total !== 1 || u.byModel[0]?.model !== 'grok-4.7' || u.byTool[0]?.tool !== 'grok') bad.push(`usage ${JSON.stringify(u?.byTool)}`)
-      // turning Grok on for a library imported before Grok existed: items off for every other tool are off for Grok too
-      {
-        const S = cHome('illithid-m7-G4-', {}, ['claude'])
-        createRule(S, 'notes.md', '# notes\n')
-        for (const t of ['claude', 'codex', 'opencode', 'gemini', 'copilot'] as ToolId[]) setToggle(S, 'rules', 'notes.md', t, false)
-        createRule(S, 'shared.md', '# shared\n')
-        const n = seedNewToolToggles(S, 'grok')
-        const mf = readManifest(S).manifest.rules
-        if (n !== 1 || mf['notes.md']?.grok !== false || mf['shared.md']?.grok === false) bad.push(`seed ${n} ${JSON.stringify(mf)}`)
-      }
-      // [models] default refusal only for root-level inline/dotted models, not a models key in another table
-      {
-        const S = cHome('illithid-m7-G5-', { '.grok/config.toml': '[profile]\nmodels = ["a"]\n' }, ['grok'])
-        try {
-          setModel(S, 'grok', 'models.default', 'grok-4.7')
-          if ((parseToml(read(join(S, '.grok/config.toml'))) as { models?: Json }).models?.default !== 'grok-4.7') bad.push('models.default not appended')
-        } catch (e) {
-          bad.push(`setModel refused ${(e as Error).message}`)
+      const envC: Env = { PATH: '' }
+      const memC = memorySecretBackend()
+      const cHome = (
+        prefix: string,
+        files: Record<string, string>,
+        toolsInUse?: ToolId[]
+      ): string => {
+        const H = makeFixture(prefix)
+        unlinkSync(join(H, '.agents'))
+        for (const [rel, body] of Object.entries(files)) {
+          mkdirSync(join(H, rel, '..'), { recursive: true })
+          writeFileSync(join(H, rel), body)
         }
+        if (toolsInUse) writeConfig(H, { version: 1, toolsInUse })
+        initLibrary(H)
+        return H
       }
-      check('aj3. Grok import (rules except app copies, config.toml mcp_servers with headers, skills, agents, source-only toggles) and sessions (summary.json title/cwd/resume, chat_history transcript, use_tool MCP usage)', !bad.length, bad.length ? bad.join('; ') : 'import + 1 session, usage kaneo 1 by grok-4.7')
+      const ctree = (H: string, rel: string): string => {
+        const p = join(H, rel)
+        if (!existsSync(p)) return 'absent'
+        return readdirSync(p, { recursive: true })
+          .map(String)
+          .sort()
+          .map((n) =>
+            lstatSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : `${n}/`
+          )
+          .join(',')
+      }
+      const G_CONFIG =
+        '# mine\n[ui]\ncompact_mode = true\n\n[models]\ndefault = "grok-4.7"\n\n[mcp_servers.mine]\ncommand = "my-server"\n'
+      const grokFiles = {
+        '.grok/config.toml': G_CONFIG,
+        '.grok/rules/user.md': '# Mine\n\n- Personal rule.\n',
+        '.grok/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n\nOwn.\n',
+        '.grok/agents/mine.md': '---\nname: mine\ndescription: Mine\n---\n\nMine.\n'
+      }
+      const seedG = (H: string): void => {
+        createRule(H, 'style.md', '# Style\n\n- Be brief.\n')
+        createRule(H, 'extra.md', '# Extra\n')
+        mkdirSync(libraryPaths(H).memoryDir, { recursive: true })
+        writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n\n- [Note](notes/a.md) — a note\n')
+        createSkill(H, 'gsk', 'Grok skill')
+        createAgent(H, 'helper', 'Helps')
+        writeAgentDoc(H, 'helper', {
+          description: 'Helps',
+          body: 'Help out.\n',
+          tools: { grok: { model: 'grok-4.7' } }
+        })
+        upsertMcpServer(H, 'g-stdio', {
+          transport: 'stdio',
+          command: 'npx',
+          args: ['-y', 'srv'],
+          env: { API_KEY: '${API_KEY}' }
+        })
+        upsertMcpServer(H, 'g-http', {
+          transport: 'http',
+          url: 'https://mcp.example.com/mcp',
+          bearerEnv: 'G_TOKEN',
+          headers: { 'X-Team': '${TEAM}' }
+        })
+        upsertMcpServer(
+          H,
+          'g-sec',
+          {
+            transport: 'stdio',
+            command: 'sec',
+            env: { API_TOKEN: 'sk-fixture-literal-1234567890abcdef' }
+          },
+          { secrets: memC }
+        )
+      }
+
+      // aj1. not chosen — ~/.grok byte-identical
+      {
+        const bad: string[] = []
+        for (const [label, inUse] of [
+          ['unset', undefined],
+          ['explicit', ['claude', 'codex', 'copilot']]
+        ] as [string, ToolId[] | undefined][]) {
+          const H = cHome(
+            `illithid-m7-G1${label}-`,
+            { ...grokFiles, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' },
+            inUse
+          )
+          seedG(H)
+          const g0 = ctree(H, '.grok')
+          const p = planSyncAll(H, envC, memC)
+          if (
+            p.targets.some((c) => c.id === 'grokMcp') ||
+            [...p.rules, ...p.skills, ...p.agents].some((x) => x.tool === 'grok')
+          )
+            bad.push(`${label}: plan has Grok items`)
+          syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+          if (ctree(H, '.grok') !== g0) bad.push(`${label}: ~/.grok changed`)
+        }
+        check(
+          'aj1. Grok not chosen — toolsInUse unset and an explicit list without Grok: no Grok plan items, ~/.grok byte-identical',
+          !bad.length,
+          bad.length ? bad.join('; ') : '2 cases unchanged'
+        )
+      }
+
+      // aj2. chosen — rules flat in ~/.grok/rules (user files kept), config.toml marker block, skills, agents, model, re-sync 0, delete, GROK_HOME
+      {
+        const bad: string[] = []
+        const H = cHome('illithid-m7-G2-', grokFiles, ['grok'])
+        seedG(H)
+        const r = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (!r.results) bad.push('sync refused')
+        const rd = join(H, '.grok/rules')
+        if (stripSourceNote(read(join(rd, 'style.md'))) !== readRule(H, 'style.md'))
+          bad.push('rule copy')
+        if (
+          !read(join(rd, 'illithid-memory.md')).includes(
+            `](${join(libraryPaths(H).memoryDir, 'notes/a.md')})`
+          )
+        )
+          bad.push('memory copy')
+        if (read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md'])
+          bad.push('user rule touched')
+        if (!readState(H).state.toolRules?.grok?.['style.md']) bad.push('toolRules.grok state')
+        const cfg = read(join(H, '.grok/config.toml'))
+        if (!cfg.startsWith(G_CONFIG.trimEnd())) bad.push('config.toml outside the block changed')
+        const t = parseToml(cfg) as Json
+        const ms = t.mcp_servers as Json
+        const want: Record<string, unknown> = {
+          mine: { command: 'my-server' },
+          'g-stdio': { command: 'npx', args: ['-y', 'srv'], env: { API_KEY: '${API_KEY}' } },
+          'g-http': {
+            url: 'https://mcp.example.com/mcp',
+            headers: { 'X-Team': '${TEAM}', Authorization: 'Bearer ${G_TOKEN}' }
+          }
+        }
+        for (const [n, w] of Object.entries(want))
+          if (JSON.stringify(ms[n]) !== JSON.stringify(w)) bad.push(`${n} ${JSON.stringify(ms[n])}`)
+        if (
+          ((ms['g-sec'] as Json)?.env as Json)?.API_TOKEN !== 'sk-fixture-literal-1234567890abcdef'
+        )
+          bad.push('secret not resolved')
+        if ((t.models as Json)?.default !== 'grok-4.7' || (t.ui as Json)?.compact_mode !== true)
+          bad.push('other tables')
+        if (
+          dirContentHash(join(H, '.grok/skills/gsk')) !==
+          dirContentHash(join(libraryPaths(H).skillsDir, 'gsk'))
+        )
+          bad.push('skill copy')
+        if (
+          read(join(H, '.grok/skills/own/SKILL.md')) !== grokFiles['.grok/skills/own/SKILL.md'] ||
+          read(join(H, '.grok/agents/mine.md')) !== grokFiles['.grok/agents/mine.md']
+        )
+          bad.push('user skill/agent touched')
+        if (
+          read(join(H, '.grok/agents/helper.md')) !==
+          '---\nname: helper\ndescription: Helps\nmodel: grok-4.7\n---\n\nHelp out.\n'
+        )
+          bad.push('helper render')
+        for (const rel of ['.claude', '.codex', '.gemini', '.copilot', '.config/opencode'])
+          if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+        const p2 = planSyncAll(H, envC, memC)
+        const busy = [
+          ...p2.targets.filter((c) => c.changed || c.error).map((c) => c.id),
+          ...[...p2.rules, ...p2.skills, ...p2.agents]
+            .filter(
+              (x) => x.action !== 'inSync' && !(x.action === 'skip' && x.reason === 'userOwned')
+            )
+            .map((x) => `${x.name}:${x.action}`)
+        ]
+        if (busy.length) bad.push(`re-plan ${busy.join(',')}`)
+        // default model: [models] default changed in place, the rest of the file intact
+        setModel(H, 'grok', 'models.default', 'grok-5')
+        const cfg2 = read(join(H, '.grok/config.toml'))
+        if (
+          (parseToml(cfg2) as Json as { models: Json }).models.default !== 'grok-5' ||
+          cfg2.replace('"grok-5"', '"grok-4.7"') !== cfg
+        )
+          bad.push('setModel models.default')
+        // a user rule with the library name is left alone (userOwned); turning a rule off deletes only the app copy
+        createRule(H, 'user.md', '# Library user\n')
+        const uo = planSyncAll(H, envC, memC).rules.find(
+          (x) => x.tool === 'grok' && x.name === 'user.md'
+        )
+        if (uo?.action !== 'skip' || uo.reason !== 'userOwned') bad.push(`user.md ${uo?.action}`)
+        setToggle(H, 'rules', 'extra.md', 'grok', false)
+        const rx = syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        const dres = rx.results?.rules
+          .filter((x) => x.action === 'deleteCandidate')
+          .map((x) => `${x.tool}:${x.name}:${x.status}`)
+          .join(',')
+        if (
+          dres !== 'grok:extra.md:done' ||
+          existsSync(join(rd, 'extra.md')) ||
+          read(join(rd, 'user.md')) !== grokFiles['.grok/rules/user.md']
+        )
+          bad.push(`delete ${dres}`)
+        // a copy the user edited in the shared folder is not deleted when the rule goes away
+        createRule(H, 'mine2.md', '# M2\n')
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        writeFileSync(join(rd, 'mine2.md'), '# edited by me\n')
+        setToggle(H, 'rules', 'mine2.md', 'grok', false)
+        const ue = planSyncAll(H, envC, memC).rules.find(
+          (x) => x.tool === 'grok' && x.name === 'mine2.md'
+        )
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (
+          ue?.action !== 'skip' ||
+          ue.reason !== 'userEdited' ||
+          read(join(rd, 'mine2.md')) !== '# edited by me\n'
+        )
+          bad.push(`user-edited copy ${ue?.action}:${ue?.reason}`)
+        // a library rule named like the memory copy is skipped (reservedName)
+        createRule(H, 'illithid-memory.md', '# clash\n')
+        const rn = planSyncAll(H, envC, memC).rules.find(
+          (x) => x.tool === 'grok' && x.name === 'illithid-memory.md'
+        )
+        if (rn?.reason !== 'reservedName') bad.push(`reserved name ${rn?.action}:${rn?.reason}`)
+        // Grok-only keys of the same-name table are kept; an inline mcp_servers entry outside the block is refused (file untouched)
+        const cfgNow = read(join(H, '.grok/config.toml'))
+        writeFileSync(
+          join(H, '.grok/config.toml'),
+          cfgNow.replace(
+            '[mcp_servers.mine]',
+            '[mcp_servers.g-stdio2]\nenabled = false\ntool_timeout_sec = 90\n\n[mcp_servers.mine]'
+          )
+        )
+        upsertMcpServer(H, 'g-stdio2', { transport: 'stdio', command: 'x2' })
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        const k2 = (parseToml(read(join(H, '.grok/config.toml'))) as { mcp_servers: Json })
+          .mcp_servers['g-stdio2'] as Json
+        if (k2?.enabled !== false || k2?.tool_timeout_sec !== 90 || k2?.command !== 'x2')
+          bad.push(`kept keys ${JSON.stringify(k2)}`)
+        const inlineCfg =
+          read(join(H, '.grok/config.toml')) + '\n[mcp_servers]\ng-inline = { command = "y" }\n'
+        writeFileSync(join(H, '.grok/config.toml'), inlineCfg)
+        upsertMcpServer(H, 'g-inline', { transport: 'stdio', command: 'z' })
+        const pin = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokMcp')
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (!pin?.error || read(join(H, '.grok/config.toml')) !== inlineCfg)
+          bad.push(`inline refused ${pin?.error}`)
+        writeFileSync(join(H, '.grok/config.toml'), cfgNow)
+        // GROK_HOME elsewhere → nothing written
+        const envO: Env = { ...envC, GROK_HOME: join(H, 'elsewhere') }
+        createRule(H, 'later.md', '# Later\n')
+        const po = planSyncAll(H, envO, memC)
+        if (
+          po.targets.find((c) => c.id === 'grokMcp')?.skip !== 'grokHomeOverride' ||
+          [...po.rules, ...po.skills, ...po.agents].some((x) => x.tool === 'grok')
+        )
+          bad.push('GROK_HOME override plan')
+        syncAll(H, envO, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (existsSync(join(rd, 'later.md'))) bad.push('written despite GROK_HOME override')
+        check(
+          'aj2. Grok chosen — rules copied flat into ~/.grok/rules (memory as illithid-memory.md, user rules kept, toolRules state), config.toml marker block (${VAR} kept, secret resolved, other tables intact), skills, agents, [models] default, re-sync 0, delete candidate, GROK_HOME',
+          !bad.length,
+          bad.length ? bad.join('; ') : `targets ${r.plan.targets.map((c) => c.id).join(',')}`
+        )
+      }
+
+      // aj2c. Grok's Claude reading — default writes nothing; grokReadsClaude=false writes [compat.claude] in the app block;
+      // a user [compat.claude] wins; back on and retiring remove the block
+      {
+        const bad: string[] = []
+        const H = cHome('illithid-m7-Gc-', grokFiles, ['claude', 'grok'])
+        seedG(H)
+        const sync = (): void =>
+          void syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        const cfg = join(H, '.grok/config.toml')
+        const compat = (): Json | undefined =>
+          ((parseToml(read(cfg)) as Json).compat as Json | undefined)?.claude as Json | undefined
+        sync()
+        const c0 = read(cfg)
+        if (c0.includes('illithid compat') || compat() !== undefined)
+          bad.push('default wrote compat')
+        if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending at default')
+
+        writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
+        const pc = planSyncAll(H, envC, memC).targets.find((c) => c.id === 'grokCompat')
+        if (!pc?.changed || pc.error) bad.push(`plan ${pc?.error ?? 'no change'}`)
+        sync()
+        const c1 = read(cfg)
+        if (compat()?.skills !== false || compat()?.mcps !== false)
+          bad.push(`compat ${JSON.stringify(compat())}`)
+        if (removeBlockMulti(c1, [GROK_COMPAT_MARKERS]) !== c0)
+          bad.push('content outside the compat block changed')
+        if (blockBodyMulti(c1, [TOML_MCP_MARKERS]) !== blockBodyMulti(c0, [TOML_MCP_MARKERS]))
+          bad.push('mcp block changed')
+        if (pendingSyncCount(H, envC, memC) !== 0) bad.push('pending after writing compat')
+        // the Skills/MCP views read what Grok actually does from config.toml
+        if (
+          readsSkills(H, envC).grokReadsClaude !== false ||
+          readsMcp(H, envC).grokReadsClaude !== false
+        )
+          bad.push('reads: effective off not reported')
+
+        // an app-owned server table written by hand right before the compat block: stripping it must keep the compat markers
+        const i1 = c1.indexOf(GROK_COMPAT_MARKERS[0])
+        writeFileSync(
+          cfg,
+          `${c1.slice(0, i1)}[mcp_servers."g-stdio"]\ncommand = "hand"\n\n${c1.slice(i1)}`
+        )
+        sync()
+        if (
+          !read(cfg).includes(GROK_COMPAT_MARKERS[0]) ||
+          !read(cfg).includes(GROK_COMPAT_MARKERS[1]) ||
+          compat()?.skills !== false
+        )
+          bad.push(
+            `compat markers lost when stripping an owned table: ${JSON.stringify(read(cfg).slice(-300))}`
+          )
+        if (pendingSyncCount(H, envC, memC) !== 0)
+          bad.push('pending after stripping an owned table')
+        writeFileSync(cfg, c1)
+        sync()
+
+        // the user's own [compat.claude] wins: the app block goes, their table stays
+        writeFileSync(cfg, c0.trimEnd() + '\n\n[compat.claude]\nskills = true\n')
+        sync()
+        if (
+          read(cfg).includes('illithid compat') ||
+          compat()?.skills !== true ||
+          compat()?.mcps !== undefined
+        )
+          bad.push(`user compat ${JSON.stringify(compat())}`)
+        if (readsSkills(H, envC).grokReadsClaude !== undefined)
+          bad.push('reads: user skills = true should read as on')
+        writeFileSync(cfg, c0)
+        sync()
+        if (compat()?.skills !== false) bad.push('block not restored after the user table left')
+
+        // back on → block removed, file as at default
+        writeConfig(H, { ...readConfig(H).config, grokReadsClaude: undefined })
+        sync()
+        if (read(cfg) !== c0) bad.push('turning back on left changes')
+
+        // retiring Grok removes the block
+        writeConfig(H, { ...readConfig(H).config, grokReadsClaude: false })
+        sync()
+        setToolsInUse(H, ['claude'])
+        sync()
+        if (read(cfg).includes('illithid')) bad.push('retire left an app block')
+
+        check(
+          'aj2c. Grok Claude reading — default writes nothing, off writes [compat.claude] skills/mcps=false in its own block (rest byte-identical, re-sync 0), user table wins, back on and retire remove it',
+          !bad.length,
+          bad.length
+            ? bad.join('; ')
+            : 'default 0 bytes, block written/removed, user [compat.claude] kept'
+        )
+      }
+
+      // aj3. import from ~/.grok and Grok sessions (scan, transcript, usage)
+      {
+        const bad: string[] = []
+        const H = cHome(
+          'illithid-m7-G3-',
+          {
+            ...grokFiles,
+            '.grok/config.toml':
+              G_CONFIG +
+              '\n[mcp_servers.web]\nurl = "https://w.example/mcp"\n\n[mcp_servers.web.headers]\nAuthorization = "Bearer ${W_TOKEN}"\n'
+          },
+          ['claude', 'grok']
+        )
+        const pl = planImport(H, 'tool:grok')
+        const names = (xs: { name: string }[]): string =>
+          xs
+            .map((x) => x.name)
+            .sort()
+            .join(',')
+        if (
+          names(pl.rules) !== 'user.md' ||
+          names(pl.mcp) !== 'mine,web' ||
+          !names(pl.skills).includes('own') ||
+          !names(pl.agents).includes('mine')
+        )
+          bad.push(
+            `plan ${names(pl.rules)} | ${names(pl.mcp)} | ${names(pl.skills)} | ${names(pl.agents)}`
+          )
+        const web = pl.mcp.find((x) => x.name === 'web')?.variants[0].server as Json | undefined
+        // Authorization: Bearer ${VAR} becomes the library's bearerEnv
+        if (web?.transport !== 'http' || web.bearerEnv !== 'W_TOKEN')
+          bad.push(`web ${JSON.stringify(web)}`)
+        const sels = [...pl.rules, ...pl.mcp, ...pl.skills, ...pl.agents]
+          .filter((c) => c.portability !== 'toolOnly')
+          .map((c) => ({ kind: c.kind, name: c.name, replace: [] }))
+        applyImport(H, sels, 'tool:grok', { secrets: memC })
+        if (
+          JSON.stringify(readManifest(H).manifest.rules['user.md'] ?? {}) !==
+          '{"claude":false,"codex":false,"opencode":false,"gemini":false,"copilot":false}'
+        )
+          bad.push(`toggles ${JSON.stringify(readManifest(H).manifest.rules['user.md'])}`)
+        // the imported ~/.grok/rules/user.md is adopted in place (same path as the app copy): nothing pending after the approved Sync
+        if (!readState(H).state.toolRules?.grok?.['user.md']) bad.push('user.md not adopted')
+        mkdirSync(join(H, '.claude'), { recursive: true })
+        syncAll(H, envC, { allowReal: true, approvedOnce: true, secrets: memC })
+        if (pendingSyncCount(H, envC, memC) !== 0)
+          bad.push(
+            `pending after import+sync ${planSyncAll(H, envC, memC)
+              .rules.filter((x) => x.action !== 'inSync')
+              .map((x) => `${x.tool}:${x.name}:${x.action}:${x.reason}`)
+              .join(',')}`
+          )
+        // sessions
+        const sdir = join(
+          H,
+          '.grok/sessions',
+          encodeURIComponent('/tmp/gp'),
+          '01a0e595-ded6-7120-89f3-dfb150e34e68'
+        )
+        mkdirSync(sdir, { recursive: true })
+        writeFileSync(
+          join(sdir, 'summary.json'),
+          JSON.stringify({
+            info: { id: 'x', cwd: '/tmp/gp' },
+            generated_title: 'Grok title',
+            created_at: '2026-09-20T01:00:00Z',
+            updated_at: '2026-09-20T02:00:00Z',
+            num_chat_messages: 4
+          })
+        )
+        writeFileSync(
+          join(sdir, 'chat_history.jsonl'),
+          [
+            { type: 'system', content: 'sys' },
+            { type: 'user', content: [{ type: 'text', text: 'grok question' }] },
+            {
+              type: 'assistant',
+              content: 'grok answer',
+              model_id: 'grok-4.7',
+              tool_calls: [
+                {
+                  id: 'c1',
+                  name: 'use_tool',
+                  arguments: JSON.stringify({
+                    tool_name: 'kaneo__get_task',
+                    tool_input: { id: 'GROKARGSECRET' }
+                  })
+                }
+              ]
+            },
+            { type: 'tool_result', tool_call_id: 'c1', content: 'out' }
+          ]
+            .map((x) => JSON.stringify(x))
+            .join('\n') + '\n'
+        )
+        const ss = scanSessions(H, ['grok']).sessions
+        const s0 = ss[0]
+        if (
+          ss.length !== 1 ||
+          s0.title !== 'Grok title' ||
+          s0.cwd !== '/tmp/gp' ||
+          s0.resumeCommand !== 'cd -- /tmp/gp && grok --resume 01a0e595-ded6-7120-89f3-dfb150e34e68'
+        )
+          bad.push(`scan ${JSON.stringify(s0)}`)
+        const tr = await readSessionTranscript(H, 'grok', '01a0e595-ded6-7120-89f3-dfb150e34e68')
+        if (
+          tr.messages.map((m) => `${m.role}:${m.kind ?? 'text'}`).join(',') !==
+          'user:text,assistant:text,assistant:tool'
+        )
+          bad.push(`transcript ${tr.messages.map((m) => m.role).join(',')}`)
+        await indexSessions(H, scanSessions(H, ['grok']).sessions)
+        const u = usageOf(H, 'mcp', 'kaneo', { now: Date.parse('2026-09-24T00:00:00Z') })
+        if (u?.total !== 1 || u.byModel[0]?.model !== 'grok-4.7' || u.byTool[0]?.tool !== 'grok')
+          bad.push(`usage ${JSON.stringify(u?.byTool)}`)
+        // turning Grok on for a library imported before Grok existed: items off for every other tool are off for Grok too
+        {
+          const S = cHome('illithid-m7-G4-', {}, ['claude'])
+          createRule(S, 'notes.md', '# notes\n')
+          for (const t of ['claude', 'codex', 'opencode', 'gemini', 'copilot'] as ToolId[])
+            setToggle(S, 'rules', 'notes.md', t, false)
+          createRule(S, 'shared.md', '# shared\n')
+          const n = seedNewToolToggles(S, 'grok')
+          const mf = readManifest(S).manifest.rules
+          if (n !== 1 || mf['notes.md']?.grok !== false || mf['shared.md']?.grok === false)
+            bad.push(`seed ${n} ${JSON.stringify(mf)}`)
+        }
+        // [models] default refusal only for root-level inline/dotted models, not a models key in another table
+        {
+          const S = cHome(
+            'illithid-m7-G5-',
+            { '.grok/config.toml': '[profile]\nmodels = ["a"]\n' },
+            ['grok']
+          )
+          try {
+            setModel(S, 'grok', 'models.default', 'grok-4.7')
+            if (
+              (parseToml(read(join(S, '.grok/config.toml'))) as { models?: Json }).models
+                ?.default !== 'grok-4.7'
+            )
+              bad.push('models.default not appended')
+          } catch (e) {
+            bad.push(`setModel refused ${(e as Error).message}`)
+          }
+        }
+        check(
+          'aj3. Grok import (rules except app copies, config.toml mcp_servers with headers, skills, agents, source-only toggles) and sessions (summary.json title/cwd/resume, chat_history transcript, use_tool MCP usage)',
+          !bad.length,
+          bad.length ? bad.join('; ') : 'import + 1 session, usage kaneo 1 by grok-4.7'
+        )
+      }
     }
-  }
 
     // ---- ak. turning a tool off removes the app's copies there (retiring), user files stay, turning it back on restores
     {
@@ -1312,7 +2169,12 @@ async function toolSteps(): Promise<void> {
       unlinkSync(join(H, '.agents'))
       const files: Record<string, string> = {
         '.claude/settings.json': '{}\n',
-        '.claude.json': JSON.stringify({ projects: { keep: true }, mcpServers: { mine: { command: 'mine' } } }, null, 2) + '\n',
+        '.claude.json':
+          JSON.stringify(
+            { projects: { keep: true }, mcpServers: { mine: { command: 'mine' } } },
+            null,
+            2
+          ) + '\n',
         '.claude/rules/user-rule.md': '# user\n',
         '.claude/skills/own/SKILL.md': '---\nname: own\ndescription: Own\n---\n',
         '.codex/AGENTS.md': '# My codex notes\n',
@@ -1332,32 +2194,76 @@ async function toolSteps(): Promise<void> {
       upsertMcpServer(H, 'k-srv', { transport: 'stdio', command: 'npx', args: ['k'] })
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
       const have = (rel: string): boolean => existsSync(join(H, rel))
-      if (!have('.claude/rules/illithid/style.md') || !have('.claude/skills/ksk/SKILL.md') || !have('.claude/agents/kag.md') || !have('.grok/rules/style.md')) bad.push('initial sync')
+      if (
+        !have('.claude/rules/illithid/style.md') ||
+        !have('.claude/skills/ksk/SKILL.md') ||
+        !have('.claude/agents/kag.md') ||
+        !have('.grok/rules/style.md')
+      )
+        bad.push('initial sync')
       // turn Claude off → retiring; the plan removes Claude copies only
       setToolsInUse(H, ['codex', 'grok'])
-      if (JSON.stringify(readConfig(H).config.toolsRetiring) !== '["claude"]') bad.push(`retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      if (JSON.stringify(readConfig(H).config.toolsRetiring) !== '["claude"]')
+        bad.push(`retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
       const p = planSyncAll(H, envK, memK)
-      const claudeDeletes = [...p.rules, ...p.skills, ...p.agents].filter((x) => (x.tool ?? 'claude') === 'claude' && x.action === 'deleteCandidate').map((x) => x.name).sort()
-      if (claudeDeletes.join() !== 'MEMORY.md,kag,ksk,style.md'.split(',').filter((n) => n !== 'MEMORY.md' || existsSync(libraryPaths(H).memoryIndex)).join()) bad.push(`claude deletes ${claudeDeletes}`)
+      const claudeDeletes = [...p.rules, ...p.skills, ...p.agents]
+        .filter((x) => (x.tool ?? 'claude') === 'claude' && x.action === 'deleteCandidate')
+        .map((x) => x.name)
+        .sort()
+      if (
+        claudeDeletes.join() !==
+        'MEMORY.md,kag,ksk,style.md'
+          .split(',')
+          .filter((n) => n !== 'MEMORY.md' || existsSync(libraryPaths(H).memoryIndex))
+          .join()
+      )
+        bad.push(`claude deletes ${claudeDeletes}`)
       if (!p.targets.find((c) => c.id === 'claudeMcp')?.changed) bad.push('claudeMcp not planned')
-      if ([...p.rules, ...p.skills, ...p.agents].some((x) => x.tool && x.tool !== 'claude' && x.action === 'deleteCandidate')) bad.push('other tools touched')
+      if (
+        [...p.rules, ...p.skills, ...p.agents].some(
+          (x) => x.tool && x.tool !== 'claude' && x.action === 'deleteCandidate'
+        )
+      )
+        bad.push('other tools touched')
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
-      if (have('.claude/rules/illithid/style.md') || have('.claude/skills/ksk') || have('.claude/agents/kag.md')) bad.push('Claude copies left')
+      if (
+        have('.claude/rules/illithid/style.md') ||
+        have('.claude/skills/ksk') ||
+        have('.claude/agents/kag.md')
+      )
+        bad.push('Claude copies left')
       const cj = readJson(join(H, '.claude.json'))
-      if (JSON.stringify(cj.mcpServers) !== JSON.stringify({ mine: { command: 'mine' } }) || JSON.stringify(cj.projects) !== '{"keep":true}') bad.push(`claude.json ${JSON.stringify(cj.mcpServers)}`)
-      if (read(join(H, '.claude/rules/user-rule.md')) !== '# user\n' || !have('.claude/skills/own/SKILL.md')) bad.push('Claude user files touched')
-      if (!have('.grok/rules/style.md') || !have('.codex/agents/kag.toml')) bad.push('other tools lost copies')
+      if (
+        JSON.stringify(cj.mcpServers) !== JSON.stringify({ mine: { command: 'mine' } }) ||
+        JSON.stringify(cj.projects) !== '{"keep":true}'
+      )
+        bad.push(`claude.json ${JSON.stringify(cj.mcpServers)}`)
+      if (
+        read(join(H, '.claude/rules/user-rule.md')) !== '# user\n' ||
+        !have('.claude/skills/own/SKILL.md')
+      )
+        bad.push('Claude user files touched')
+      if (!have('.grok/rules/style.md') || !have('.codex/agents/kag.toml'))
+        bad.push('other tools lost copies')
       if (readConfig(H).config.toolsRetiring !== undefined) bad.push('retiring not cleared')
       if (pendingSyncCount(H, envK, memK) !== 0) bad.push('pending after retire')
       // Grok off too: its rules folder keeps the user's file only; config.toml block removed, [ui] kept
       setToolsInUse(H, ['codex'])
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
-      if (have('.grok/rules/style.md') || read(join(H, '.grok/rules/user.md')) !== '# grok user\n' || read(join(H, '.grok/config.toml')).includes('illithid') || !read(join(H, '.grok/config.toml')).includes('compact_mode')) bad.push('Grok retire')
+      if (
+        have('.grok/rules/style.md') ||
+        read(join(H, '.grok/rules/user.md')) !== '# grok user\n' ||
+        read(join(H, '.grok/config.toml')).includes('illithid') ||
+        !read(join(H, '.grok/config.toml')).includes('compact_mode')
+      )
+        bad.push('Grok retire')
       // turned back on before applying: retiring is dropped and nothing is removed
       setToolsInUse(H, ['codex', 'grok', 'claude'])
-      if (readConfig(H).config.toolsRetiring !== undefined) bad.push('retiring kept after turning back on')
+      if (readConfig(H).config.toolsRetiring !== undefined)
+        bad.push('retiring kept after turning back on')
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
-      if (!have('.claude/rules/illithid/style.md') || !have('.grok/rules/style.md')) bad.push('turning back on did not restore copies')
+      if (!have('.claude/rules/illithid/style.md') || !have('.grok/rules/style.md'))
+        bad.push('turning back on did not restore copies')
       check(
         'ak. tool off removes its app copies — Claude off: rules/skills/agents copies and owned ~/.claude.json servers removed, user files and other tools kept, retiring cleared; Grok off: rules copies and config.toml block removed; back on restores',
         !bad.length,
@@ -1373,22 +2279,40 @@ async function toolSteps(): Promise<void> {
       const memK = memorySecretBackend()
       const H = makeFixture('illithid-m7-K5-')
       unlinkSync(join(H, '.agents'))
-      for (const [rel, body] of Object.entries({ '.codex/AGENTS.md': '# mine\n', '.gemini/GEMINI.md': '', '.copilot/config.json': '{}\n' })) {
+      for (const [rel, body] of Object.entries({
+        '.codex/AGENTS.md': '# mine\n',
+        '.gemini/GEMINI.md': '',
+        '.copilot/config.json': '{}\n'
+      })) {
         mkdirSync(join(H, rel, '..'), { recursive: true })
         writeFileSync(join(H, rel), body)
       }
-      writeConfig(H, { version: 1, toolsInUse: ['claude', 'codex', 'gemini', 'copilot'], allowRealApply: true })
+      writeConfig(H, {
+        version: 1,
+        toolsInUse: ['claude', 'codex', 'gemini', 'copilot'],
+        allowRealApply: true
+      })
       initLibrary(H)
       createRule(H, 'style.md', '# Style\n\n- Tabs.\n')
       createRule(H, 'scoped.md', '---\npaths: ["src/**"]\n---\n# Scoped\n')
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
       const claudeCopy = (n: string): string => read(join(H, '.claude/rules', CLAUDE_RULES_DIR, n))
       const src = (n: string): string => `~/.illithid/workspaces/default/rules/${n}`
-      if (!claudeCopy('style.md').startsWith(`${SOURCE_NOTE_PREFIX}${src('style.md')} -->\n# Style`)) bad.push(`note ${JSON.stringify(claudeCopy('style.md'))}`)
-      if (!claudeCopy('scoped.md').startsWith(`---\npaths: ["src/**"]\n---\n${SOURCE_NOTE_PREFIX}`)) bad.push(`frontmatter ${JSON.stringify(claudeCopy('scoped.md'))}`)
-      if (!read(join(H, '.codex/AGENTS.md')).includes('Edit the sources, not this block: `~/.illithid/workspaces/default/rules/<name>.md`')) bad.push('codex block source line')
+      if (
+        !claudeCopy('style.md').startsWith(`${SOURCE_NOTE_PREFIX}${src('style.md')} -->\n# Style`)
+      )
+        bad.push(`note ${JSON.stringify(claudeCopy('style.md'))}`)
+      if (!claudeCopy('scoped.md').startsWith(`---\npaths: ["src/**"]\n---\n${SOURCE_NOTE_PREFIX}`))
+        bad.push(`frontmatter ${JSON.stringify(claudeCopy('scoped.md'))}`)
+      if (
+        !read(join(H, '.codex/AGENTS.md')).includes(
+          'Edit the sources, not this block: `~/.illithid/workspaces/default/rules/<name>.md`'
+        )
+      )
+        bad.push('codex block source line')
       const cop = read(join(H, '.copilot/instructions/illithid/style.instructions.md'))
-      if (!cop.startsWith(`---\napplyTo: "**"\n---\n\n${SOURCE_NOTE_PREFIX}`)) bad.push(`copilot ${JSON.stringify(cop)}`)
+      if (!cop.startsWith(`---\napplyTo: "**"\n---\n\n${SOURCE_NOTE_PREFIX}`))
+        bad.push(`copilot ${JSON.stringify(cop)}`)
       if (editedRules(H, envK).length) bad.push('edited before any edit')
       // an agent edits the Claude copy, the Copilot copy and the Codex block section
       const cp = join(H, '.claude/rules', CLAUDE_RULES_DIR, 'style.md')
@@ -1399,28 +2323,44 @@ async function toolSteps(): Promise<void> {
       writeFileSync(ap, read(ap).replace('# Scoped', '# Scoped from Codex'))
       const snap = [read(cp), read(pp), read(ap)]
       syncAll(H, envK, { allowReal: true, secrets: memK })
-      if (read(cp) !== snap[0] || read(pp) !== snap[1] || read(ap) !== snap[2]) bad.push('automatic sync overwrote tool-side edits')
-      const ed = editedRules(H, envK).map((e) => `${e.tool}:${e.name}:${e.where}`).sort()
-      if (ed.join() !== 'claude:style.md:copy,codex:scoped.md:block,copilot:scoped.md:copy') bad.push(`edited ${ed}`)
+      if (read(cp) !== snap[0] || read(pp) !== snap[1] || read(ap) !== snap[2])
+        bad.push('automatic sync overwrote tool-side edits')
+      const ed = editedRules(H, envK)
+        .map((e) => `${e.tool}:${e.name}:${e.where}`)
+        .sort()
+      if (ed.join() !== 'claude:style.md:copy,codex:scoped.md:block,copilot:scoped.md:copy')
+        bad.push(`edited ${ed}`)
       if (pendingSyncCount(H, envK, memK) === 0) bad.push('edits not pending')
       // keep the Claude version of style.md: library gets it without the note, every tool follows after an approved apply
       adoptEditedRule(H, envK, 'claude', 'style.md')
-      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, two.\n') bad.push(`adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
+      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, two.\n')
+        bad.push(`adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
       // keep the Copilot version of scoped.md: applyTo added by the app is taken back out, the source frontmatter stays
       adoptEditedRule(H, envK, 'copilot', 'scoped.md')
-      if (readRule(H, 'scoped.md') !== '---\npaths: ["src/**"]\n---\n# Scoped\n- Only src.\n') bad.push(`copilot adopted ${JSON.stringify(readRule(H, 'scoped.md'))}`)
+      if (readRule(H, 'scoped.md') !== '---\npaths: ["src/**"]\n---\n# Scoped\n- Only src.\n')
+        bad.push(`copilot adopted ${JSON.stringify(readRule(H, 'scoped.md'))}`)
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
-      if (!read(ap).includes('- Spaces, two.') || !read(ap).includes('- Only src.') || read(ap).includes('Scoped from Codex')) bad.push('codex block after adopt')
-      if (!read(join(H, '.gemini/GEMINI.md')).includes('- Spaces, two.')) bad.push('gemini after adopt')
-      if (editedRules(H, envK).length || pendingSyncCount(H, envK, memK) !== 0) bad.push(`left ${JSON.stringify(editedRules(H, envK))}`)
+      if (
+        !read(ap).includes('- Spaces, two.') ||
+        !read(ap).includes('- Only src.') ||
+        read(ap).includes('Scoped from Codex')
+      )
+        bad.push('codex block after adopt')
+      if (!read(join(H, '.gemini/GEMINI.md')).includes('- Spaces, two.'))
+        bad.push('gemini after adopt')
+      if (editedRules(H, envK).length || pendingSyncCount(H, envK, memK) !== 0)
+        bad.push(`left ${JSON.stringify(editedRules(H, envK))}`)
       // Codex block section adopted
       writeFileSync(ap, read(ap).replace('- Spaces, two.', '- Spaces, four.'))
       adoptEditedRule(H, envK, 'codex', 'style.md')
-      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, four.\n') bad.push(`codex adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
+      if (readRule(H, 'style.md') !== '# Style\n\n- Spaces, four.\n')
+        bad.push(`codex adopted ${JSON.stringify(readRule(H, 'style.md'))}`)
       check(
         'ak3. rule copies carry the source path (after frontmatter; Codex/Gemini block line); tool-side edits held by automatic sync and listed; keep saves them to the library (note and added applyTo removed) and every tool follows',
         !bad.length,
-        bad.length ? bad.join('; ') : 'notes, hold, 3 edits listed, adopted from Claude/Copilot/Codex, synced everywhere'
+        bad.length
+          ? bad.join('; ')
+          : 'notes, hold, 3 edits listed, adopted from Claude/Copilot/Codex, synced everywhere'
       )
     }
 
@@ -1440,7 +2380,9 @@ async function toolSteps(): Promise<void> {
       const others = Object.entries(tools).filter(([t]) => t !== 'claude')
       check(
         'ak4. MCP view — tools not in use are notApplicable (no error dot), the tool in use is synced',
-        tools.claude === 'synced' && others.length > 0 && others.every(([, v]) => v === 'notApplicable'),
+        tools.claude === 'synced' &&
+          others.length > 0 &&
+          others.every(([, v]) => v === 'notApplicable'),
         JSON.stringify(tools)
       )
     }
@@ -1468,19 +2410,35 @@ async function toolSteps(): Promise<void> {
       createSkill(H, 'ksk', 'K skill')
       mkdirSync(join(libraryPaths(H).memoryIndex, '..'), { recursive: true })
       writeFileSync(libraryPaths(H).memoryIndex, '# Memory\n')
-      writePermissions(H, { bash: [['git', 'status']], claudeOnly: { allow: [], deny: [] } } as unknown as Allowlist)
+      writePermissions(H, {
+        bash: [['git', 'status']],
+        claudeOnly: { allow: [], deny: [] }
+      } as unknown as Allowlist)
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
       const codexMd = (): string => read(join(H, '.codex/AGENTS.md'))
       const oc = (): Json => readJson(join(H, '.config/opencode/opencode.json'))
-      if (!codexMd().includes('memory/MEMORY.md') || !existsSync(join(H, '.codex/rules/default.rules')) || !JSON.stringify(oc()).includes('MEMORY.md') || !JSON.stringify(oc().skills ?? {}).includes('skills'))
+      if (
+        !codexMd().includes('memory/MEMORY.md') ||
+        !existsSync(join(H, '.codex/rules/default.rules')) ||
+        !JSON.stringify(oc()).includes('MEMORY.md') ||
+        !JSON.stringify(oc().skills ?? {}).includes('skills')
+      )
         bad.push('initial sync')
       // Codex and OpenCode off: blocks, memory entry, skills.paths and the permissions block go; user text stays
       setToolsInUse(H, ['claude'])
       syncAll(H, envK, { allowReal: true, approvedOnce: true, secrets: memK })
-      if (codexMd() !== '# My codex notes\n') bad.push(`codex AGENTS.md ${JSON.stringify(codexMd())}`)
-      if (read(join(H, '.codex/rules/default.rules')).includes('illithid')) bad.push('codex default.rules block left')
-      if (JSON.stringify(oc().instructions ?? []).includes('MEMORY.md') || oc().skills !== undefined || oc().theme !== 'x') bad.push(`opencode ${JSON.stringify(oc())}`)
-      if (readConfig(H).config.toolsRetiring !== undefined) bad.push(`retiring left ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      if (codexMd() !== '# My codex notes\n')
+        bad.push(`codex AGENTS.md ${JSON.stringify(codexMd())}`)
+      if (read(join(H, '.codex/rules/default.rules')).includes('illithid'))
+        bad.push('codex default.rules block left')
+      if (
+        JSON.stringify(oc().instructions ?? []).includes('MEMORY.md') ||
+        oc().skills !== undefined ||
+        oc().theme !== 'x'
+      )
+        bad.push(`opencode ${JSON.stringify(oc())}`)
+      if (readConfig(H).config.toolsRetiring !== undefined)
+        bad.push(`retiring left ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
       // a retiring tool never gets a file created
       {
         const S = makeFixture('illithid-m7-K3-')
@@ -1490,14 +2448,20 @@ async function toolSteps(): Promise<void> {
         initLibrary(S)
         createRule(S, 'style.md', '# Style\n')
         writeFileSync(libraryPaths(S).memoryIndex, '# Memory\n')
-        writePermissions(S, { bash: [['git', 'status']], claudeOnly: { allow: [], deny: [] } } as unknown as Allowlist)
-        const created = planSyncAll(S, envK, memK).targets.filter((c) => c.id.startsWith('codex') && c.changed).map((c) => c.id)
+        writePermissions(S, {
+          bash: [['git', 'status']],
+          claudeOnly: { allow: [], deny: [] }
+        } as unknown as Allowlist)
+        const created = planSyncAll(S, envK, memK)
+          .targets.filter((c) => c.id.startsWith('codex') && c.changed)
+          .map((c) => c.id)
         if (created.length) bad.push(`retiring creates ${created}`)
       }
       // on → preview cancelled → restore: retiring comes back exactly (nothing new retires)
       setToolsInUse(H, ['claude', 'gemini'])
       toolsInUseSet(H, ['claude'], [])
-      if (readConfig(H).config.toolsRetiring !== undefined) bad.push(`cancel left retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
+      if (readConfig(H).config.toolsRetiring !== undefined)
+        bad.push(`cancel left retiring ${JSON.stringify(readConfig(H).config.toolsRetiring)}`)
       // unset list: tools the app never wrote to don't retire
       {
         const S = makeFixture('illithid-m7-K4-')
@@ -1506,48 +2470,93 @@ async function toolSteps(): Promise<void> {
         mkdirSync(join(S, '.claude'), { recursive: true })
         initLibrary(S)
         toolsInUseSet(S, ['claude'])
-        if (readConfig(S).config.toolsRetiring !== undefined) bad.push(`computed defaults retired ${JSON.stringify(readConfig(S).config.toolsRetiring)}`)
+        if (readConfig(S).config.toolsRetiring !== undefined)
+          bad.push(
+            `computed defaults retired ${JSON.stringify(readConfig(S).config.toolsRetiring)}`
+          )
         // an unknown id in toolsRetiring is dropped, not a config reset
-        writeFileSync(join(S, '.config/illithid/config.json'), JSON.stringify({ version: 1, toolsInUse: ['claude'], allowRealApply: false, toolsRetiring: ['cursor', 'codex'] }))
+        writeFileSync(
+          join(S, '.config/illithid/config.json'),
+          JSON.stringify({
+            version: 1,
+            toolsInUse: ['claude'],
+            allowRealApply: false,
+            toolsRetiring: ['cursor', 'codex']
+          })
+        )
         const rc = readConfig(S)
-        if (rc.error || rc.config.allowRealApply !== false || JSON.stringify(rc.config.toolsRetiring) !== '["codex"]') bad.push(`unknown retiring ${JSON.stringify(rc)}`)
+        if (
+          rc.error ||
+          rc.config.allowRealApply !== false ||
+          JSON.stringify(rc.config.toolsRetiring) !== '["codex"]'
+        )
+          bad.push(`unknown retiring ${JSON.stringify(rc)}`)
       }
       check(
         'ak2. retiring plans only removals (Codex/OpenCode blocks, memory entry, skills.paths, permissions block; no file created), cancel restores retiring, computed defaults never retire, unknown retiring ids dropped',
         !bad.length,
-        bad.length ? bad.join('; ') : 'Codex/OpenCode cleaned, nothing created, cancel/defaults/unknown ids handled'
+        bad.length
+          ? bad.join('; ')
+          : 'Codex/OpenCode cleaned, nothing created, cancel/defaults/unknown ids handled'
       )
     }
 
     // ai1. fingerprint: the preview's plan is applied only while it still matches
     {
       const bad: string[] = []
-      const H = iHome('illithid-m7-I1-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+      const H = iHome(
+        'illithid-m7-I1-',
+        { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' },
+        ['claude']
+      )
       createRule(H, 'a.md', '# A\n')
       upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
       const pv = applyPreview(H, envI)
       const fp = pv.fingerprint
-      if (!fp || fp !== planFingerprint(planSyncAll(H, envI, memI))) bad.push('preview fingerprint ≠ plan fingerprint')
+      if (!fp || fp !== planFingerprint(planSyncAll(H, envI, memI)))
+        bad.push('preview fingerprint ≠ plan fingerprint')
       if (planFingerprint(planSyncAll(H, envI, memI)) !== fp) bad.push('fingerprint not stable')
       // the library changes after the preview → apply refused, tools untouched
       createRule(H, 'b.md', '# B\n')
       const c0 = itree(H, '.claude')
-      const r1 = syncAll(H, envI, { allowReal: true, approvedOnce: true, secrets: memI, expectFingerprint: fp })
-      if (r1.refused !== 'planChanged' || r1.results || itree(H, '.claude') !== c0) bad.push(`changed plan applied (${r1.refused})`)
+      const r1 = syncAll(H, envI, {
+        allowReal: true,
+        approvedOnce: true,
+        secrets: memI,
+        expectFingerprint: fp
+      })
+      if (r1.refused !== 'planChanged' || r1.results || itree(H, '.claude') !== c0)
+        bad.push(`changed plan applied (${r1.refused})`)
       // same fingerprint → applied
       const fp3 = applyPreview(H, envI).fingerprint!
-      const r2 = syncAll(H, envI, { allowReal: true, approvedOnce: true, secrets: memI, expectFingerprint: fp3 })
-      if (r2.refused || !r2.results || !existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'b.md'))) bad.push('matching fingerprint not applied')
+      const r2 = syncAll(H, envI, {
+        allowReal: true,
+        approvedOnce: true,
+        secrets: memI,
+        expectFingerprint: fp3
+      })
+      if (
+        r2.refused ||
+        !r2.results ||
+        !existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'b.md'))
+      )
+        bad.push('matching fingerprint not applied')
       if (applyPreview(H, envI).fingerprint === fp3) bad.push('fingerprint unchanged after apply')
       // the tool rewriting its own keys (outside the owned region) doesn't change it — Claude Code rewrites ~/.claude.json often
       createRule(H, 'c.md', '# C\n')
       const fp4 = applyPreview(H, envI).fingerprint!
       const cj = readJson(join(H, '.claude.json'))
       writeJson(join(H, '.claude.json'), { ...cj, numStartups: 2 })
-      if (planFingerprint(planSyncAll(H, envI, memI)) !== fp4) bad.push('edit outside the owned region changed the fingerprint')
+      if (planFingerprint(planSyncAll(H, envI, memI)) !== fp4)
+        bad.push('edit outside the owned region changed the fingerprint')
       // an edit inside the owned region (a library server's entry) does
-      writeJson(join(H, '.claude.json'), { ...cj, numStartups: 3, mcpServers: { ...(cj.mcpServers as Json), m1: { type: 'stdio', command: 'edited' } } })
-      if (planFingerprint(planSyncAll(H, envI, memI)) === fp4) bad.push('owned-region edit not in the fingerprint')
+      writeJson(join(H, '.claude.json'), {
+        ...cj,
+        numStartups: 3,
+        mcpServers: { ...(cj.mcpServers as Json), m1: { type: 'stdio', command: 'edited' } }
+      })
+      if (planFingerprint(planSyncAll(H, envI, memI)) === fp4)
+        bad.push('owned-region edit not in the fingerprint')
       // a user-owned item (skip) edited → unchanged
       const fp5 = planFingerprint(planSyncAll(H, envI, memI))
       mkdirSync(join(H, '.claude/skills/mine'), { recursive: true })
@@ -1555,11 +2564,14 @@ async function toolSteps(): Promise<void> {
       createSkill(H, 'mine', 'Library one')
       const fp6 = planFingerprint(planSyncAll(H, envI, memI))
       writeFileSync(join(H, '.claude/skills/mine/SKILL.md'), '---\nname: mine\n---\n\nedited\n')
-      if (planFingerprint(planSyncAll(H, envI, memI)) !== fp6 || fp6 !== fp5) bad.push('user-owned skip item affects the fingerprint')
+      if (planFingerprint(planSyncAll(H, envI, memI)) !== fp6 || fp6 !== fp5)
+        bad.push('user-owned skip item affects the fingerprint')
       check(
-        'ai1. HAR-21 preview = apply — preview carries the plan fingerprint; a library or owned-region change after the preview refuses the apply (planChanged, nothing written); tool-owned keys and user-owned items don\'t count; the same fingerprint applies',
+        "ai1. HAR-21 preview = apply — preview carries the plan fingerprint; a library or owned-region change after the preview refuses the apply (planChanged, nothing written); tool-owned keys and user-owned items don't count; the same fingerprint applies",
         !bad.length,
-        bad.length ? bad.join('; ') : 'refused planChanged with ~/.claude byte-identical, matching fingerprint applied, edits outside the owned region and to user-owned items ignored, owned-region edit counted'
+        bad.length
+          ? bad.join('; ')
+          : 'refused planChanged with ~/.claude byte-identical, matching fingerprint applied, edits outside the owned region and to user-owned items ignored, owned-region edit counted'
       )
     }
 
@@ -1571,8 +2583,11 @@ async function toolSteps(): Promise<void> {
       createSkill(H, 'g1', 'One')
       createSkill(H, 'g2', 'Two')
       const sv = readsSkills(H, envI)
-      if (JSON.stringify(sv.toolDisabled) !== '{"gemini":["g1"]}') bad.push(`toolDisabled ${JSON.stringify(sv.toolDisabled)}`)
-      const cellG = statusReport(H, envI, memI).cells.find((c) => c.resource === 'skills' && c.tool === 'gemini')
+      if (JSON.stringify(sv.toolDisabled) !== '{"gemini":["g1"]}')
+        bad.push(`toolDisabled ${JSON.stringify(sv.toolDisabled)}`)
+      const cellG = statusReport(H, envI, memI).cells.find(
+        (c) => c.resource === 'skills' && c.tool === 'gemini'
+      )
       if (!cellG?.detail?.includes('disabled in Gemini settings: g1')) bad.push('status detail')
       setToggle(H, 'skills', 'g1', 'gemini', false)
       if (readsSkills(H, envI).toolDisabled) bad.push('skill off for Gemini still flagged')
@@ -1582,14 +2597,19 @@ async function toolSteps(): Promise<void> {
       check(
         'ai2. HAR-21 Gemini skills.disabled — library skills Gemini turns off are listed for the skills view (toolDisabled.gemini) and the status detail; skills off for Gemini or Gemini not in use are not flagged; nothing written',
         !bad.length,
-        bad.length ? bad.join('; ') : 'toolDisabled {gemini:[g1]} from a commented settings.json, status detail, settings.json unchanged'
+        bad.length
+          ? bad.join('; ')
+          : 'toolDisabled {gemini:[g1]} from a commented settings.json, status detail, settings.json unchanged'
       )
     }
 
     // ai3. toolsInUse unset → in use = default tools whose config folder exists (same list Settings shows); PATH only hints
     {
       const bad: string[] = []
-      const H = iHome('illithid-m7-I3-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' })
+      const H = iHome('illithid-m7-I3-', {
+        '.claude/settings.json': '{}\n',
+        '.claude.json': '{}\n'
+      })
       createRule(H, 'r.md', '# R\n')
       createSkill(H, 's1', 'S')
       createAgent(H, 'a1', 'A')
@@ -1600,26 +2620,46 @@ async function toolSteps(): Promise<void> {
       mkdirSync(bin)
       writeFileSync(join(bin, 'opencode'), '#!/bin/sh\n', { mode: 0o755 })
       const envP: Env = { PATH: bin }
-      if (!detectTools(H, envP).find((d) => d.tool === 'opencode')?.detected) bad.push('PATH hint missing')
+      if (!detectTools(H, envP).find((d) => d.tool === 'opencode')?.detected)
+        bad.push('PATH hint missing')
       const tv = toolsInUseView(H, envP)
-      if (JSON.stringify(tv.inUse) !== '["claude"]' || JSON.stringify(configView(H, false).inUse) !== '["claude"]') bad.push('Settings/config view list differs')
+      if (
+        JSON.stringify(tv.inUse) !== '["claude"]' ||
+        JSON.stringify(configView(H, false).inUse) !== '["claude"]'
+      )
+        bad.push('Settings/config view list differs')
       const p = planSyncAll(H, envP, memI)
-      const tools = new Set([...p.targets.map((c) => ALL_TARGETS.find((t) => t.id === c.id)!.tool), ...[...p.rules, ...p.skills, ...p.agents].map((x) => x.tool ?? 'claude')])
+      const tools = new Set([
+        ...p.targets.map((c) => ALL_TARGETS.find((t) => t.id === c.id)!.tool),
+        ...[...p.rules, ...p.skills, ...p.agents].map((x) => x.tool ?? 'claude')
+      ])
       if ([...tools].join() !== 'claude') bad.push(`plan tools ${[...tools].join()}`)
       const pending = pendingSyncCount(H, envP, memI)
       syncAll(H, envP, { allowReal: true, approvedOnce: true, secrets: memI })
-      for (const rel of ['.codex', '.config/opencode', '.gemini', '.copilot']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
-      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r.md')) || !existsSync(join(H, '.claude/agents/a1.md'))) bad.push('Claude not synced')
+      for (const rel of ['.codex', '.config/opencode', '.gemini', '.copilot'])
+        if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      if (
+        !existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r.md')) ||
+        !existsSync(join(H, '.claude/agents/a1.md'))
+      )
+        bad.push('Claude not synced')
       if (pendingSyncCount(H, envP, memI) !== 0) bad.push('pending after sync')
-      if (statusReport(H, envP, memI).cells.some((c) => c.tool !== 'claude' && c.state !== 'notApplicable')) bad.push('status cells for tools without a folder')
+      if (
+        statusReport(H, envP, memI).cells.some(
+          (c) => c.tool !== 'claude' && c.state !== 'notApplicable'
+        )
+      )
+        bad.push('status cells for tools without a folder')
       // saved from Settings (explicit list) → OpenCode is in use and its files are created
       writeConfig(H, { version: 1, toolsInUse: ['claude', 'opencode'] })
       syncAll(H, envP, { allowReal: true, approvedOnce: true, secrets: memI })
-      if (!existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('saved OpenCode not written')
+      if (!existsSync(join(H, '.config/opencode/opencode.json')))
+        bad.push('saved OpenCode not written')
       // unset again with all three folders present → the old default (all three)
       writeConfig(H, { version: 1 })
       mkdirSync(join(H, '.codex'))
-      if (toolsInUse(H).join() !== 'claude,codex,opencode') bad.push(`three folders → ${toolsInUse(H).join()}`)
+      if (toolsInUse(H).join() !== 'claude,codex,opencode')
+        bad.push(`three folders → ${toolsInUse(H).join()}`)
       // an explicit list is used as-is, installed or not
       writeConfig(H, { version: 1, toolsInUse: ['claude', 'gemini'] })
       if (toolsInUse(H).join() !== 'claude,gemini') bad.push('explicit list changed')
@@ -1633,9 +2673,17 @@ async function toolSteps(): Promise<void> {
     // aj. HAR-22 preview MCP server rows — per tool config file, names and actions only
     {
       const bad: string[] = []
-      const H = iHome('illithid-m7-J1-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n', '.codex/config.toml': '' }, ['claude', 'codex'])
+      const H = iHome(
+        'illithid-m7-J1-',
+        { '.claude/settings.json': '{}\n', '.claude.json': '{}\n', '.codex/config.toml': '' },
+        ['claude', 'codex']
+      )
       upsertMcpServer(H, 's1', { transport: 'stdio', command: 'one' })
-      upsertMcpServer(H, 's2', { transport: 'stdio', command: 'two', env: { TOKEN: 'fixture-literal-value-xyz' } })
+      upsertMcpServer(H, 's2', {
+        transport: 'stdio',
+        command: 'two',
+        env: { TOKEN: 'fixture-literal-value-xyz' }
+      })
       syncAll(H, envI, { allowReal: true, approvedOnce: true, secrets: memI })
       const rows = (): string[] =>
         applyPreview(H, envI)
@@ -1646,16 +2694,38 @@ async function toolSteps(): Promise<void> {
       const off = rows().join(',')
       if (off !== 'codex:~/.codex/config.toml:s1:remove') bad.push(`off ${off}`)
       const fc = planSyncAll(H, envI, memI).targets.find((c) => c.id === 'codexMcp')
-      if (JSON.stringify(fc?.servers) !== '[{"name":"s1","action":"remove"}]') bad.push(`FileChange.servers ${JSON.stringify(fc?.servers)}`)
+      if (JSON.stringify(fc?.servers) !== '[{"name":"s1","action":"remove"}]')
+        bad.push(`FileChange.servers ${JSON.stringify(fc?.servers)}`)
       setToggle(H, 'mcp', 's1', 'codex', true)
       upsertMcpServer(H, 's3', { transport: 'http', url: 'https://s3.example.com/mcp' })
-      upsertMcpServer(H, 's2', { transport: 'stdio', command: 'two', env: { TOKEN: 'fixture-literal-value-changed' } })
+      upsertMcpServer(H, 's2', {
+        transport: 'stdio',
+        command: 'two',
+        env: { TOKEN: 'fixture-literal-value-changed' }
+      })
       const added = rows().join(',')
-      if (added !== 'claude:~/.claude.json:s2:update,claude:~/.claude.json:s3:add,codex:~/.codex/config.toml:s2:update,codex:~/.codex/config.toml:s3:add') bad.push(`add/update ${added}`)
+      if (
+        added !==
+        'claude:~/.claude.json:s2:update,claude:~/.claude.json:s3:add,codex:~/.codex/config.toml:s2:update,codex:~/.codex/config.toml:s3:add'
+      )
+        bad.push(`add/update ${added}`)
       const pv = JSON.stringify(applyPreview(H, envI))
-      if (pv.includes('fixture-literal-value') || pv.includes('"command"')) bad.push('values in preview data')
-      if (serverChanges('claudeMcp', JSON.stringify({ mcpServers: { x: { a: 1, b: 2 } } }), JSON.stringify({ mcpServers: { x: { b: 2, a: 1 } } })).length) bad.push('key reorder counted as update')
-      if (applyPreview(H, envI).items.filter((x) => !x.parent).some((x) => x.kind === 'mcp')) bad.push('server rows counted as top-level')
+      if (pv.includes('fixture-literal-value') || pv.includes('"command"'))
+        bad.push('values in preview data')
+      if (
+        serverChanges(
+          'claudeMcp',
+          JSON.stringify({ mcpServers: { x: { a: 1, b: 2 } } }),
+          JSON.stringify({ mcpServers: { x: { b: 2, a: 1 } } })
+        ).length
+      )
+        bad.push('key reorder counted as update')
+      if (
+        applyPreview(H, envI)
+          .items.filter((x) => !x.parent)
+          .some((x) => x.kind === 'mcp')
+      )
+        bad.push('server rows counted as top-level')
       check(
         'aj. HAR-22 preview MCP server rows — turning a server off for one tool lists {name, remove} under that tool config file only; new/changed servers list add/update under each tool; names only, no values',
         !bad.length,
@@ -1692,15 +2762,18 @@ async function run(): Promise<void> {
     if (JSON.stringify(init.created) !== JSON.stringify(expectCreated))
       bad.push(`created ${init.created.join(',')}`)
     if (!read(join(WS, '.gitignore')).includes('.trash/')) bad.push('.gitignore')
-    if ((readJson(join(WS, 'workspace.json')) as Json).name !== 'default') bad.push('workspace.json name')
+    if ((readJson(join(WS, 'workspace.json')) as Json).name !== 'default')
+      bad.push('workspace.json name')
     const init2 = initLibrary(E)
-    if (init2.created.length || init2.existed.length !== expectCreated.length) bad.push('not idempotent')
+    if (init2.created.length || init2.existed.length !== expectCreated.length)
+      bad.push('not idempotent')
     if (existsSync(join(WS, '.git'))) bad.push('.git created though git defaults to false')
     const s1 = readSources(E)
     if (!s1.libraryExists || s1.rules.length || s1.hasPermissions || mcpEntries(s1.mcp).length)
       bad.push('source state after init')
     // HAR-21: with toolsInUse unset only installed default tools are in use — the three tools' folders stand in for installs
-    for (const d of ['.claude', '.codex', '.config/opencode']) mkdirSync(join(E, d), { recursive: true })
+    for (const d of ['.claude', '.codex', '.config/opencode'])
+      mkdirSync(join(E, d), { recursive: true })
     const r1 = syncAll(E, {}, { allowReal: true })
     if (!r1.results) bad.push('sync did not run after init')
     else {
@@ -1708,20 +2781,39 @@ async function run(): Promise<void> {
       // HAR-12: absent claude/opencode files with nothing to write are left alone quietly (unchanged, nothingToWrite) — not error skips.
       // Before: the 5 required targets (claude 2, opencode 3) were error skips ('file not found') and showed as failures on first run
       const skipped = t.filter((x) => x.status === 'skipped')
-      const quiet = t.filter((x) => x.reason === 'nothingToWrite').map((x) => x.id).sort()
+      const quiet = t
+        .filter((x) => x.reason === 'nothingToWrite')
+        .map((x) => x.id)
+        .sort()
       if (skipped.length) bad.push(`skip ${skipped.map((x) => `${x.id}:${x.reason}`).join(',')}`)
-      for (const id of ['claudeMcp', 'claudePermissions', 'opencodeMcp', 'opencodeRules', 'opencodeSkills'] as const)
+      for (const id of [
+        'claudeMcp',
+        'claudePermissions',
+        'opencodeMcp',
+        'opencodeRules',
+        'opencodeSkills'
+      ] as const)
         if (!quiet.includes(id)) bad.push(`${id} not nothingToWrite (${quiet.join(',')})`)
-      if (readdirSync(join(E, '.claude')).length || existsSync(join(E, '.claude.json')) || readdirSync(join(E, '.config/opencode')).length)
+      if (
+        readdirSync(join(E, '.claude')).length ||
+        existsSync(join(E, '.claude.json')) ||
+        readdirSync(join(E, '.config/opencode')).length
+      )
         bad.push('claude/opencode files created for an empty library')
       if (planAll(E, {}).some((c) => c.error)) bad.push('plan errors for absent files')
       if (t.find((x) => x.id === 'codexRules')?.status !== 'unchanged')
         bad.push('touched codexRules without permissions.json')
       if (existsSync(join(E, '.codex/rules/default.rules'))) bad.push('default.rules created')
       // 0 rules/memory/servers → no empty block
-      if (existsSync(join(E, '.codex/AGENTS.md')) && blockBody(read(join(E, '.codex/AGENTS.md')), MD_BEGIN, MD_END) !== null)
+      if (
+        existsSync(join(E, '.codex/AGENTS.md')) &&
+        blockBody(read(join(E, '.codex/AGENTS.md')), MD_BEGIN, MD_END) !== null
+      )
         bad.push('AGENTS.md app marker block created for empty library')
-      if (existsSync(join(E, '.codex/config.toml')) && read(join(E, '.codex/config.toml')).includes(TOML_MCP_BEGIN))
+      if (
+        existsSync(join(E, '.codex/config.toml')) &&
+        read(join(E, '.codex/config.toml')).includes(TOML_MCP_BEGIN)
+      )
         bad.push('config.toml mcp block created for empty library')
       if (r1.results.rules.length || r1.results.skills.length) bad.push('has rule/skill items')
     }
@@ -1737,7 +2829,8 @@ async function run(): Promise<void> {
     const WS2 = join(E2, '.illithid/workspaces/default')
     const g = initLibrary(E2, { git: true })
     if (g.root !== WS2 || !g.gitInitialized) bad.push('git option')
-    if (libraryRoot(E2) !== WS2 || existsSync(join(E2, 'lib-here'))) bad.push('libraryPath not ignored')
+    if (libraryRoot(E2) !== WS2 || existsSync(join(E2, 'lib-here')))
+      bad.push('libraryPath not ignored')
     if (!existsSync(join(WS2, '.git'))) bad.push('git init not done')
     check(
       'a. first run on empty HOME — libraryExists false → sync refused → initLibrary → empty sync',
@@ -1821,9 +2914,12 @@ async function run(): Promise<void> {
       const sk = s1.results.targets.filter((t) => t.status === 'skipped')
       if (sk.length) bad.push(`target skip ${sk.map((t) => `${t.id}:${t.reason}`).join(',')}`)
       // copies of rules + memory index (MEMORY.md)
-      const rd = s1.results.rules.filter((t) => t.status === 'done' && t.name !== 'MEMORY.md').length
+      const rd = s1.results.rules.filter(
+        (t) => t.status === 'done' && t.name !== 'MEMORY.md'
+      ).length
       if (rd !== legacyRules.length) bad.push(`rule copies ${rd}/${legacyRules.length}`)
-      if (!s1.results.rules.some((t) => t.name === 'MEMORY.md' && t.status === 'done')) bad.push('memory index not copied')
+      if (!s1.results.rules.some((t) => t.name === 'MEMORY.md' && t.status === 'done'))
+        bad.push('memory index not copied')
       const sd = s1.results.skills.filter((t) => t.status === 'done').length
       if (sd !== legacySkills.length * 2) bad.push(`skill copies ${sd}/${legacySkills.length * 2}`)
     }
@@ -1889,9 +2985,18 @@ async function run(): Promise<void> {
     if (before.some((x) => x !== 'needsSync')) bad.push(`status before restore ${before.join(',')}`)
     // Automatic sync leaves the edited rule copy and Codex block for the preview; the edited rule is listed there
     const r0 = syncAll(F, env, { allowReal: true })
-    if (sha(read(ap)) !== snaps.ap || sha(read(rp)) !== snaps.rp) bad.push('automatic sync overwrote tool-side rule edits')
+    if (sha(read(ap)) !== snaps.ap || sha(read(rp)) !== snaps.rp)
+      bad.push('automatic sync overwrote tool-side rule edits')
     const edited = editedRules(F, env)
-    if (!edited.some((e) => e.tool === 'claude' && e.name === legacyRules[0] && e.where === 'copy' && e.text.endsWith('fixture rule edit\n')))
+    if (
+      !edited.some(
+        (e) =>
+          e.tool === 'claude' &&
+          e.name === legacyRules[0] &&
+          e.where === 'copy' &&
+          e.text.endsWith('fixture rule edit\n')
+      )
+    )
       bad.push(`edited ${JSON.stringify(edited.map((e) => [e.tool, e.name, e.where]))}`)
     const r = syncAll(F, env, { allowReal: true, approvedOnce: true })
     // Permissions and skills aren't held: the automatic sync already restored them
@@ -1914,7 +3019,8 @@ async function run(): Promise<void> {
       sha(read(rr.backupPath)) !== snaps.rp
     )
       bad.push(`rule restore ${rr?.status}/${rr?.reason}`)
-    if (stripSourceNote(read(rp)) !== readRule(F, legacyRules[0])) bad.push('rule content not restored')
+    if (stripSourceNote(read(rp)) !== readRule(F, legacyRules[0]))
+      bad.push('rule content not restored')
     const sr = r0.results!.skills.find((x) => x.tool === 'claude' && x.name === K)
     const bak = skillBackupPath(F, 'claude', K)
     if (
@@ -1964,7 +3070,8 @@ async function run(): Promise<void> {
     if (r1.results!.targets.some((t) => t.status === 'skipped')) bad.push('sync skip after add')
     if (!('zz-mcp' in (readJson(join(F, '.claude.json')).mcpServers as Json)))
       bad.push('missing in claude')
-    if (!('zz-mcp' in tomlServers(read(join(F, '.codex/config.toml'))))) bad.push('missing in codex')
+    if (!('zz-mcp' in tomlServers(read(join(F, '.codex/config.toml')))))
+      bad.push('missing in codex')
     if (!('zz-mcp' in (readJson(join(F, '.config/opencode/opencode.json')).mcp as Json)))
       bad.push('missing in opencode')
     if (changedOrError(planAll(F, env)).length) bad.push('re-plan changes after add')
@@ -2080,7 +3187,8 @@ async function run(): Promise<void> {
     deleteMcpServer(F, 'fx-stdio')
     // 2) replace omitted → looksSecret only
     const r2 = applyImport(F, [{ kind: 'mcp', name: 'fx-stdio' }], 'tool:claude')[0]
-    if (JSON.stringify(r2.replaced) !== '["API_KEY"]') bad.push('default substitution is not secret keys only')
+    if (JSON.stringify(r2.replaced) !== '["API_KEY"]')
+      bad.push('default substitution is not secret keys only')
     deleteMcpServer(F, 'fx-stdio')
     // 3) including MODE
     const r3 = applyImport(
@@ -2111,7 +3219,8 @@ async function run(): Promise<void> {
     )[0]
     if (r4.status !== 'refused' || !r4.reason?.startsWith('unknownReplaceKey'))
       bad.push(`unknown key ${r4.status}/${r4.reason}`)
-    if (existsSync(join(libraryPaths(F).mcpsDir, 'fx-stdio.json'))) bad.push('file created despite refusal')
+    if (existsSync(join(libraryPaths(F).mcpsDir, 'fx-stdio.json')))
+      bad.push('file created despite refusal')
     // 5) codex headers: default → bearerEnv, replace [] → literal header restored
     const pc = planImport(F, 'tool:codex')
     const vh = pc.mcp.find((x) => x.name === 'fx_http')?.variants[0]
@@ -2140,7 +3249,8 @@ async function run(): Promise<void> {
     const pall = planImport(F)
     if (!pall.mcp.some((x) => x.name === 'fx-stdio') || !pall.mcp.some((x) => x.name === 'fx_http'))
       bad.push('source-omitted aggregation')
-    if (pall.sources.some((s) => s.kind === 'legacyLibrary')) bad.push('legacy included when source omitted')
+    if (pall.sources.some((s) => s.kind === 'legacyLibrary'))
+      bad.push('legacy included when source omitted')
     // 7) permission and rule candidates from tool sources
     const perm = planImport(F, 'tool:claude').permissions[0]
     if (!perm || perm.variants[0].counts.bash < 1) bad.push('claude permission candidate')
@@ -2184,7 +3294,8 @@ async function run(): Promise<void> {
       bad.push('user-owned is a deletion target')
     if (existsSync(join(F, '.codex/skills/zz-user'))) bad.push('codex copy left')
     const bk = deletedBackup(F, 'skills/codex/zz-user')
-    if (!bk || dirContentHash(bk) !== cxHash || dc?.backupPath !== bk) bad.push('deletion backup source bytes')
+    if (!bk || dirContentHash(bk) !== cxHash || dc?.backupPath !== bk)
+      bad.push('deletion backup source bytes')
     if (readState(F).state.skills?.codex?.['zz-user']) bad.push('state left after delete')
     rmSync(userDir, { recursive: true, force: true })
     check(
@@ -2204,8 +3315,10 @@ async function run(): Promise<void> {
     if (mode(join(lib, 'rules/zz-fixture.md')) !== 0o644) bad.push('new rule mode')
     writeRule(F, 'zz-fixture.md', '# b\n')
     if (readRule(F, 'zz-fixture.md') !== '# b\n') bad.push('rule edit')
-    if (errCode(() => createRule(F, 'zz-fixture.md', 'x')) !== 'exists') bad.push('duplicate create allowed')
-    if (errCode(() => writeRule(F, 'zz-none.md', 'x')) !== 'notFound') bad.push('edit of missing rule allowed')
+    if (errCode(() => createRule(F, 'zz-fixture.md', 'x')) !== 'exists')
+      bad.push('duplicate create allowed')
+    if (errCode(() => writeRule(F, 'zz-none.md', 'x')) !== 'notFound')
+      bad.push('edit of missing rule allowed')
     const t1 = deleteRule(F, 'zz-fixture.md').trashPath
     if (existsSync(join(lib, 'rules/zz-fixture.md')) || read(t1) !== '# b\n')
       bad.push('rule delete (move to .trash)')
@@ -2276,12 +3389,15 @@ async function run(): Promise<void> {
     const fileText = read(join(lib, 'mcps/zz-mcp.json'))
     if (fileText !== JSON.stringify(JSON.parse(fileText), null, 2) + '\n')
       bad.push('indent is not 2 spaces')
-    if (errCode(() => readMcpServer(F, 'zz-none')) !== 'notFound') bad.push('read of missing server')
-    if (errCode(() => deleteMcpServer(F, 'zz-none')) !== 'notFound') bad.push('delete of missing server')
+    if (errCode(() => readMcpServer(F, 'zz-none')) !== 'notFound')
+      bad.push('read of missing server')
+    if (errCode(() => deleteMcpServer(F, 'zz-none')) !== 'notFound')
+      bad.push('delete of missing server')
     const t3 = deleteMcpServer(F, 'zz-mcp').trashPath
     if (existsSync(join(lib, 'mcps/zz-mcp.json')) || mode(t3) !== 0o600)
       bad.push('server delete (.trash 0600)')
-    if (JSON.stringify(listMcpServers(F)) !== JSON.stringify(legacyOrder)) bad.push('list after delete')
+    if (JSON.stringify(listMcpServers(F)) !== JSON.stringify(legacyOrder))
+      bad.push('list after delete')
     // permissions
     const perm0 = readPermissions(F)!
     const badPerms: [string, unknown][] = [
@@ -2379,7 +3495,11 @@ async function run(): Promise<void> {
       bad.push('skill affects codex')
     if (errCode(() => setToggle(F, 'skills', K, 'opencode', false)) !== 'ok')
       bad.push('opencode skill toggle refused')
-    if (planSkillSync(F, env).some((x) => x.tool === 'opencode' && x.name === K && x.action !== 'inSync'))
+    if (
+      planSkillSync(F, env).some(
+        (x) => x.tool === 'opencode' && x.name === K && x.action !== 'inSync'
+      )
+    )
       bad.push('opencode skill off planned a copy change')
     setToggle(F, 'skills', K, 'opencode', true)
     setToggle(F, 'skills', K, 'claude', true)
@@ -2412,7 +3532,8 @@ async function run(): Promise<void> {
     syncAll(F, env, { allowReal: true })
     if (JSON.stringify(readJson(op).instructions) !== JSON.stringify(expected))
       bad.push('file instructions')
-    if (changedOrError(planAll(F, env)).length) bad.push('re-plan changes after opencodeRules applied')
+    if (changedOrError(planAll(F, env)).length)
+      bad.push('re-plan changes after opencodeRules applied')
     // shared symlink: approval gate
     const { legacyLink } = claudeRulesPaths(F)
     symlinkSync(join(F, '.agents/rules'), legacyLink)
@@ -2545,7 +3666,8 @@ async function run(): Promise<void> {
     // A: pullOnStart → B's change comes in
     const pl = await pullOnStart(F)
     if (!pl.ok || pl.skipped) bad.push(`pullOnStart ${pl.ok ? pl.skipped : pl.reason}`)
-    if (readRule(F, ruleA) !== original + '\n<!-- from device-b -->\n') bad.push('content after pull')
+    if (readRule(F, ruleA) !== original + '\n<!-- from device-b -->\n')
+      bad.push('content after pull')
     if ((await history(F, 1))[0]?.device !== 'device-b') bad.push('history device after pull')
     // divergence: B pushes again and A has local changes → A snapshot is diverged
     writeRule(B, ruleB, readRule(B, ruleB) + '\n<!-- b2 -->\n')
@@ -2553,7 +3675,8 @@ async function run(): Promise<void> {
     if (!snB2.ok) bad.push('B snapshot2')
     writeRule(F, ruleA, original + '\n<!-- from device-a -->\n')
     const snA = await snapshot(F, 'a conflicting')
-    if (snA.ok || snA.reason !== 'diverged') bad.push(`diverged check ${snA.ok ? 'ok' : snA.reason}`)
+    if (snA.ok || snA.reason !== 'diverged')
+      bad.push(`diverged check ${snA.ok ? 'ok' : snA.reason}`)
     const sd = await backupStatus(F)
     if (sd.ahead !== 1 || sd.behind !== 1)
       bad.push(`diverged status ahead ${sd.ahead} behind ${sd.behind}`)
@@ -2699,7 +3822,8 @@ async function run(): Promise<void> {
     if (paths3.includes(lp.skillsDir) || !paths3.includes(join(moved, 'skills')))
       bad.push('old path left after move')
     switchWorkspace(F, 'default')
-    if (moved.startsWith(F + '/.illithid/workspaces/')) rmSync(moved, { recursive: true, force: true })
+    if (moved.startsWith(F + '/.illithid/workspaces/'))
+      rmSync(moved, { recursive: true, force: true })
     if (changedOrError(planAll(F, env)).length) bad.push('re-plan changes after switching back')
     check(
       'm. opencodeSkills — skills.paths library path, non-owned and custom kept, key creation, replaced when the library moves',
@@ -2727,7 +3851,8 @@ async function run(): Promise<void> {
     mkdirSync(join(E2, LEGACY_APP_LIBRARY_DIR, 'rules'), { recursive: true })
     const r2 = ensureLibrary(E2)
     if (r2.status !== 'renamePending') bad.push(`only previous name present ${r2.status}`)
-    if (existsSync(join(E2, DEFAULT_LIBRARY_DIR))) bad.push('new library created though only the previous name exists')
+    if (existsSync(join(E2, DEFAULT_LIBRARY_DIR)))
+      bad.push('new library created though only the previous name exists')
     const E3 = makeFixture('illithid-m7-N3-')
     unlinkSync(join(E3, '.agents'))
     mkdirSync(join(E3, LEGACY_APP_CONFIG_DIR), { recursive: true })
@@ -2736,7 +3861,9 @@ async function run(): Promise<void> {
     check(
       'n. auto-create library on start — missing → create, idempotent; only previous-name paths → no create',
       !bad.length,
-      bad.length ? bad.join('; ') : 'empty HOME created (4 dirs, no config) → exists, previous library only / previous config only → renamePending, not created'
+      bad.length
+        ? bad.join('; ')
+        : 'empty HOME created (4 dirs, no config) → exists, previous library only / previous config only → renamePending, not created'
     )
   }
 
@@ -2745,7 +3872,8 @@ async function run(): Promise<void> {
     const bad: string[] = []
     const N = makeLegacyFixture('illithid-m7-O-')
     initLibrary(N)
-    if (importAllFromLegacy(N).results.some((x) => x.status !== 'imported')) bad.push('import failed')
+    if (importAllFromLegacy(N).results.some((x) => x.status !== 'imported'))
+      bad.push('import failed')
     const envN = fakeEnv(N)
     const offServer = listMcpServers(N)[0]
     setToggle(N, 'mcp', offServer, 'codex', false)
@@ -2759,46 +3887,80 @@ async function run(): Promise<void> {
     rmdirSync(join(N, DEFAULT_LIBRARY_DIR, 'workspaces'))
     rmdirSync(join(N, DEFAULT_LIBRARY_DIR))
     renameSync(lib(APP_CONFIG_DIR), lib(LEGACY_APP_CONFIG_DIR))
-    renameSync(join(N, '.claude/rules', CLAUDE_RULES_DIR), join(N, '.claude/rules', LEGACY_CLAUDE_RULES_DIR))
-    renameSync(join(lib(LEGACY_APP_LIBRARY_DIR), MANIFEST_FILE), join(lib(LEGACY_APP_LIBRARY_DIR), LEGACY_MANIFEST_FILE))
+    renameSync(
+      join(N, '.claude/rules', CLAUDE_RULES_DIR),
+      join(N, '.claude/rules', LEGACY_CLAUDE_RULES_DIR)
+    )
+    renameSync(
+      join(lib(LEGACY_APP_LIBRARY_DIR), MANIFEST_FILE),
+      join(lib(LEGACY_APP_LIBRARY_DIR), LEGACY_MANIFEST_FILE)
+    )
     const cfgP = join(lib(LEGACY_APP_CONFIG_DIR), 'config.json')
-    writeJson(cfgP, { ...(existsSync(cfgP) ? readJson(cfgP) : { version: 1 }), libraryPath: '~/' + LEGACY_APP_LIBRARY_DIR })
+    writeJson(cfgP, {
+      ...(existsSync(cfgP) ? readJson(cfgP) : { version: 1 }),
+      libraryPath: '~/' + LEGACY_APP_LIBRARY_DIR
+    })
     const swap = (rel: string, pairs: [string, string][]): void => {
       let t = read(join(N, rel))
       for (const [a, b] of pairs) t = t.split(a).join(b)
       writeFileSync(join(N, rel), t)
     }
     const oldLib = join(N, LEGACY_APP_LIBRARY_DIR)
-    swap('.codex/AGENTS.md', [[MD_BEGIN, LEGACY_APP_MD_BEGIN], [MD_END, LEGACY_APP_MD_END]])
-    swap('.codex/rules/default.rules', [[RULES_BEGIN, LEGACY_APP_RULES_BEGIN], [RULES_END, LEGACY_APP_RULES_END]])
-    swap('.codex/config.toml', [[TOML_MCP_BEGIN, LEGACY_APP_TOML_MCP_BEGIN], [TOML_MCP_END, LEGACY_APP_TOML_MCP_END]])
+    swap('.codex/AGENTS.md', [
+      [MD_BEGIN, LEGACY_APP_MD_BEGIN],
+      [MD_END, LEGACY_APP_MD_END]
+    ])
+    swap('.codex/rules/default.rules', [
+      [RULES_BEGIN, LEGACY_APP_RULES_BEGIN],
+      [RULES_END, LEGACY_APP_RULES_END]
+    ])
+    swap('.codex/config.toml', [
+      [TOML_MCP_BEGIN, LEGACY_APP_TOML_MCP_BEGIN],
+      [TOML_MCP_END, LEGACY_APP_TOML_MCP_END]
+    ])
     swap('.config/opencode/opencode.json', [[newLib + '/', oldLib + '/']])
     swap(join(LEGACY_APP_CONFIG_DIR, 'state.json'), [[newLib + '/', oldLib + '/']])
     const oldRulesDir = join(N, '.claude/rules', LEGACY_CLAUDE_RULES_DIR)
     writeFileSync(join(oldRulesDir, ruleNames[0] + LEGACY_BACKUP_SUFFIX), 'old backup\n')
     // an empty skeleton was created under the new name before the rename (app was running)
     const pre = ensureLibrary(N)
-    if (pre.status !== 'renamePending') bad.push(`ensureLibrary on previous-name layout ${pre.status}`)
+    if (pre.status !== 'renamePending')
+      bad.push(`ensureLibrary on previous-name layout ${pre.status}`)
     initLibrary(N) // no config, so default location → empty skeleton
-    if (ensureLibrary(N).status !== 'renamePending') bad.push('not renamePending after empty skeleton')
+    if (ensureLibrary(N).status !== 'renamePending')
+      bad.push('not renamePending after empty skeleton')
     const pl = planRename(N)
     if (pl.blocked.length) bad.push(`plan blocked ${pl.blocked.join('|')}`)
     if (pl.moves.length !== 2 || !pl.moves.find((m) => m.what === 'library')?.replaceEmptySkeleton)
       bad.push(`plan moves ${pl.moves.length}`)
-    if (!pl.dropLibraryPath || pl.manifests.length !== 1 || pl.stateRewrites < 1 || pl.followUps.length !== 1 || pl.snapshot)
-      bad.push(`plan drop ${pl.dropLibraryPath} manifest ${pl.manifests.length} state ${pl.stateRewrites} follow ${pl.followUps.length} snapshot ${pl.snapshot}`)
+    if (
+      !pl.dropLibraryPath ||
+      pl.manifests.length !== 1 ||
+      pl.stateRewrites < 1 ||
+      pl.followUps.length !== 1 ||
+      pl.snapshot
+    )
+      bad.push(
+        `plan drop ${pl.dropLibraryPath} manifest ${pl.manifests.length} state ${pl.stateRewrites} follow ${pl.followUps.length} snapshot ${pl.snapshot}`
+      )
     const cli = (args: string[]): number =>
-      spawnSync('npx', ['tsx', 'src/cli/index.ts', ...args], { encoding: 'utf8', env: process.env }).status ?? -1
+      spawnSync('npx', ['tsx', 'src/cli/index.ts', ...args], { encoding: 'utf8', env: process.env })
+        .status ?? -1
     if (cli(['rename-migrate', '--home', N]) !== 0) bad.push('CLI plan failed')
     if (!existsSync(oldLib)) bad.push('moved on plan only')
     if (cli(['rename-migrate', '--home', N, '--apply']) !== 0) bad.push('CLI --apply failed')
-    if (existsSync(oldLib) || existsSync(lib(LEGACY_APP_CONFIG_DIR))) bad.push('previous paths left')
-    if (!existsSync(join(newLib, 'rules', ruleNames[0])) || !existsSync(join(lib(APP_CONFIG_DIR), 'state.json')))
+    if (existsSync(oldLib) || existsSync(lib(LEGACY_APP_CONFIG_DIR)))
+      bad.push('previous paths left')
+    if (
+      !existsSync(join(newLib, 'rules', ruleNames[0])) ||
+      !existsSync(join(lib(APP_CONFIG_DIR), 'state.json'))
+    )
       bad.push('no content at new paths')
     if (readConfig(N).config.libraryPath !== undefined) bad.push('libraryPath left')
     if (!existsSync(join(newLib, MANIFEST_FILE)) || existsSync(join(newLib, LEGACY_MANIFEST_FILE)))
       bad.push('manifest name')
-    if (read(join(lib(APP_CONFIG_DIR), 'state.json')).includes(oldLib)) bad.push('previous path in state')
+    if (read(join(lib(APP_CONFIG_DIR), 'state.json')).includes(oldLib))
+      bad.push('previous path in state')
     if (ensureLibrary(N).status !== 'exists') bad.push('ensureLibrary after move')
     if (applyRename(N).plan.needed) bad.push('work left on re-run')
     // sync
@@ -2810,24 +3972,39 @@ async function run(): Promise<void> {
       if (r.results.rules.some((x) => x.status === 'failed' || x.status === 'refused'))
         bad.push('rules failed/refused')
       if (r.results.targets.some((x) => x.status === 'skipped' && x.reason !== 'error'))
-        bad.push(`target skip ${r.results.targets.filter((x) => x.status === 'skipped').map((x) => x.id).join(',')}`)
+        bad.push(
+          `target skip ${r.results.targets
+            .filter((x) => x.status === 'skipped')
+            .map((x) => x.id)
+            .join(',')}`
+        )
     }
     const agents = read(join(N, '.codex/AGENTS.md'))
     const rules = read(join(N, '.codex/rules/default.rules'))
     const toml = read(join(N, '.codex/config.toml'))
     const oc = read(join(N, '.config/opencode/opencode.json'))
-    if (!agents.includes(MD_BEGIN) || agents.includes(LEGACY_APP_MD_BEGIN) || agents.includes(LEGACY_APP_MD_END))
+    if (
+      !agents.includes(MD_BEGIN) ||
+      agents.includes(LEGACY_APP_MD_BEGIN) ||
+      agents.includes(LEGACY_APP_MD_END)
+    )
       bad.push('AGENTS.md marker')
-    if (!rules.includes(RULES_BEGIN) || rules.includes(LEGACY_APP_RULES_BEGIN)) bad.push('default.rules marker')
-    if (!toml.includes(TOML_MCP_BEGIN) || toml.includes(LEGACY_APP_TOML_MCP_BEGIN)) bad.push('config.toml marker')
+    if (!rules.includes(RULES_BEGIN) || rules.includes(LEGACY_APP_RULES_BEGIN))
+      bad.push('default.rules marker')
+    if (!toml.includes(TOML_MCP_BEGIN) || toml.includes(LEGACY_APP_TOML_MCP_BEGIN))
+      bad.push('config.toml marker')
     if (oc.includes(oldLib) || !oc.includes(newLib + '/rules/') || !oc.includes(newLib + '/skills'))
       bad.push('opencode.json paths')
-    if (toml.includes(`[mcp_servers.${offServer}]`) || toml.includes(`[mcp_servers."${offServer}"]`))
+    if (
+      toml.includes(`[mcp_servers.${offServer}]`) ||
+      toml.includes(`[mcp_servers."${offServer}"]`)
+    )
       bad.push('manifest toggles lost')
     const newRulesDir = join(N, '.claude/rules', CLAUDE_RULES_DIR)
     if (existsSync(oldRulesDir)) bad.push('previous rule folder left')
     const newRuleFiles = readdirSync(newRulesDir)
-    if (ruleNames.some((n) => !newRuleFiles.includes(n))) bad.push('rules missing in new rule folder')
+    if (ruleNames.some((n) => !newRuleFiles.includes(n)))
+      bad.push('rules missing in new rule folder')
     if (!newRuleFiles.includes(ruleNames[0] + BACKUP_SUFFIX)) bad.push('backup migration missing')
     const again = planSyncAll(N, envN)
     const left = [
@@ -2841,7 +4018,8 @@ async function run(): Promise<void> {
     writeFileSync(join(oldRulesDir, ruleNames[0]), 'copy\n')
     writeFileSync(join(oldRulesDir, 'mine.md'), 'mine\n')
     const pu = planRuleSync(N, envN).find((x) => x.name === LEGACY_CLAUDE_RULES_DIR)
-    if (pu?.action !== 'skip' || pu.reason !== 'legacyDirUserFiles') bad.push(`plan with mixed user files ${pu?.action}`)
+    if (pu?.action !== 'skip' || pu.reason !== 'legacyDirUserFiles')
+      bad.push(`plan with mixed user files ${pu?.action}`)
     syncAll(N, envN, { allowReal: true })
     if (!existsSync(join(oldRulesDir, 'mine.md')) || !existsSync(join(oldRulesDir, ruleNames[0])))
       bad.push('touched folder mixed with user files')
@@ -2859,7 +4037,8 @@ async function run(): Promise<void> {
     const bad: string[] = []
     const H = makeLegacyFixture('illithid-m7-OH-')
     initLibrary(H)
-    if (importAllFromLegacy(H).results.some((x) => x.status !== 'imported')) bad.push('import failed')
+    if (importAllFromLegacy(H).results.some((x) => x.status !== 'imported'))
+      bad.push('import failed')
     const envH = fakeEnv(H)
     const offServer = listMcpServers(H)[0]
     setToggle(H, 'mcp', offServer, 'codex', false)
@@ -2873,12 +4052,18 @@ async function run(): Promise<void> {
     writeJson(op, oc0)
     if (!syncAll(H, envH, { allowReal: true }).results) bad.push('initial sync did not run')
     const oc1 = readJson(op)
-    oc1.skills = { ...((oc1.skills as Json) ?? {}), paths: [...(((oc1.skills as Json)?.paths as string[]) ?? []), '/opt/my-skills'] }
+    oc1.skills = {
+      ...((oc1.skills as Json) ?? {}),
+      paths: [...(((oc1.skills as Json)?.paths as string[]) ?? []), '/opt/my-skills']
+    }
     writeJson(op, oc1)
     const ruleNames = readdirSync(join(libraryRoot(H), 'rules')).filter((f) => f.endsWith('.md'))
     // artifacts in the app data root, and index/rollback/backups in the config folder
     mkdirSync(join(newRoot, 'artifacts/logo'), { recursive: true })
-    writeFileSync(join(newRoot, 'artifacts/logo/a.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]))
+    writeFileSync(
+      join(newRoot, 'artifacts/logo/a.png'),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
+    )
     writeFileSync(join(newRoot, 'artifacts/manifest.json'), '{"tool":"Claude Code"}\n')
     writeFileSync(join(newCfg, 'search.sqlite'), Buffer.alloc(4096, 7))
     writeFileSync(join(newCfg, 'search.sqlite-wal'), '')
@@ -2888,7 +4073,13 @@ async function run(): Promise<void> {
     writeFileSync(join(newCfg, 'backups/deleted/x/r.md'), 'deleted\n')
 
     // switch to the previous-name (harnesssync) layout — same shape as the real HOME
-    const HS = { lib: '.harnesssync', cfg: '.config/harnesssync', rules: 'harnesssync', manifest: 'harnesssync.json', bak: '.harnesssync.bak' }
+    const HS = {
+      lib: '.harnesssync',
+      cfg: '.config/harnesssync',
+      rules: 'harnesssync',
+      manifest: 'harnesssync.json',
+      bak: '.harnesssync.bak'
+    }
     const oldRoot = join(H, HS.lib)
     const oldCfg = join(H, HS.cfg)
     renameSync(newRoot, oldRoot)
@@ -2906,16 +4097,29 @@ async function run(): Promise<void> {
       for (const [a, b] of pairs) t = t.split(a).join(b)
       writeFileSync(join(H, rel), t)
     }
-    swap('.codex/AGENTS.md', [[MD_BEGIN, LEGACY_HS_MD_BEGIN], [MD_END, LEGACY_HS_MD_END], ['Illithid', 'HarnessSync']])
-    swap('.codex/rules/default.rules', [[RULES_BEGIN, LEGACY_HS_RULES_BEGIN], [RULES_END, LEGACY_HS_RULES_END]])
-    swap('.codex/config.toml', [[TOML_MCP_BEGIN, LEGACY_HS_TOML_MCP_BEGIN], [TOML_MCP_END, LEGACY_HS_TOML_MCP_END]])
+    swap('.codex/AGENTS.md', [
+      [MD_BEGIN, LEGACY_HS_MD_BEGIN],
+      [MD_END, LEGACY_HS_MD_END],
+      ['Illithid', 'HarnessSync']
+    ])
+    swap('.codex/rules/default.rules', [
+      [RULES_BEGIN, LEGACY_HS_RULES_BEGIN],
+      [RULES_END, LEGACY_HS_RULES_END]
+    ])
+    swap('.codex/config.toml', [
+      [TOML_MCP_BEGIN, LEGACY_HS_TOML_MCP_BEGIN],
+      [TOML_MCP_END, LEGACY_HS_TOML_MCP_END]
+    ])
     swap('.config/opencode/opencode.json', [[newRoot + '/', oldRoot + '/']])
     swap(join(HS.cfg, 'state.json'), [[newRoot + '/', oldRoot + '/']])
     // previous-name backups next to tool files (must stay as-is)
     const toolBaks = ['.codex/AGENTS.md', '.codex/config.toml'].map((r) => join(H, r + HS.bak))
     for (const b of toolBaks) writeFileSync(b, 'previous\n')
     const oc2 = read(op)
-    if (!oc2.includes(oldRoot + '/workspaces/default/rules/') || !oc2.includes(oldRoot + '/workspaces/default/skills'))
+    if (
+      !oc2.includes(oldRoot + '/workspaces/default/rules/') ||
+      !oc2.includes(oldRoot + '/workspaces/default/skills')
+    )
       bad.push('setup: no previous opencode path')
     const stateOld = read(join(oldCfg, 'state.json'))
     const stateOldRefs = stateOld.split(oldRoot + '/').length - 1
@@ -2944,15 +4148,28 @@ async function run(): Promise<void> {
     if (!pend.includes(oldRoot) || !pend.includes(oldCfg)) bad.push(`pending ${pend.join(',')}`)
     if (!autoRenamePending(H)) bad.push('autoRenamePending false')
     const pl = planRename(H)
-    if (pl.generation !== 'harnesssync' || pl.blocked.length || pl.moves.length !== 2 || pl.moves.some((m) => m.replaceEmptySkeleton))
+    if (
+      pl.generation !== 'harnesssync' ||
+      pl.blocked.length ||
+      pl.moves.length !== 2 ||
+      pl.moves.some((m) => m.replaceEmptySkeleton)
+    )
       bad.push(`plan ${JSON.stringify({ g: pl.generation, b: pl.blocked, m: pl.moves.length })}`)
-    if (pl.manifests.length !== wsIds.length || pl.stateRewrites !== stateOldRefs || !pl.snapshot || pl.followUps.length !== 1)
-      bad.push(`plan manifest ${pl.manifests.length}/${wsIds.length} state ${pl.stateRewrites}/${stateOldRefs} snap ${!!pl.snapshot} follow ${pl.followUps.length}`)
+    if (
+      pl.manifests.length !== wsIds.length ||
+      pl.stateRewrites !== stateOldRefs ||
+      !pl.snapshot ||
+      pl.followUps.length !== 1
+    )
+      bad.push(
+        `plan manifest ${pl.manifests.length}/${wsIds.length} state ${pl.stateRewrites}/${stateOldRefs} snap ${!!pl.snapshot} follow ${pl.followUps.length}`
+      )
     if (!existsSync(oldRoot) || existsSync(newRoot)) bad.push('moved on plan only')
 
     // auto-migrate on start (ensureLibrary)
     const en = ensureLibrary(H)
-    if (en.status !== 'exists' || en.renamed?.length !== 2) bad.push(`ensureLibrary ${JSON.stringify(en)}`)
+    if (en.status !== 'exists' || en.renamed?.length !== 2)
+      bad.push(`ensureLibrary ${JSON.stringify(en)}`)
     if (existsSync(oldRoot) || existsSync(oldCfg)) bad.push('previous paths left')
     // bytes kept: on/off files renamed only, state.json rewritten, a new snapshot tar added
     const afterLib = bytes(newRoot)
@@ -2964,57 +4181,97 @@ async function run(): Promise<void> {
     }
     if (afterLib.size !== beforeLib.size) libDiff.push(`count ${beforeLib.size}→${afterLib.size}`)
     if (libDiff.length) bad.push(`library bytes ${libDiff.slice(0, 5).join(',')}`)
-    const cfgDiff = [...beforeCfg].filter(([k, v]) => k !== 'state.json' && afterCfg.get(k) !== v).map(([k]) => k)
+    const cfgDiff = [...beforeCfg]
+      .filter(([k, v]) => k !== 'state.json' && afterCfg.get(k) !== v)
+      .map(([k]) => k)
     const snaps = [...afterCfg.keys()].filter((k) => /^rollback\/pre-illithid-.*\.tar$/.test(k))
     if (cfgDiff.length || snaps.length !== 1 || afterCfg.size !== beforeCfg.size + 1)
-      bad.push(`config bytes ${cfgDiff.join(',')} snap ${snaps.length} count ${beforeCfg.size}→${afterCfg.size}`)
+      bad.push(
+        `config bytes ${cfgDiff.join(',')} snap ${snaps.length} count ${beforeCfg.size}→${afterCfg.size}`
+      )
     for (const id of wsIds)
-      if (existsSync(join(newRoot, 'workspaces', id, HS.manifest)) || !existsSync(join(newRoot, 'workspaces', id, MANIFEST_FILE)))
+      if (
+        existsSync(join(newRoot, 'workspaces', id, HS.manifest)) ||
+        !existsSync(join(newRoot, 'workspaces', id, MANIFEST_FILE))
+      )
         bad.push(`${id} on/off file name`)
     const stateNew = read(join(newCfg, 'state.json'))
-    if (stateNew.includes(HS.lib) || stateNew.split(newRoot + '/').length - 1 < stateOldRefs) bad.push('state path rewrite')
+    if (stateNew.includes(HS.lib) || stateNew.split(newRoot + '/').length - 1 < stateOldRefs)
+      bad.push('state path rewrite')
     // snapshot content: both folders, search.sqlite* and rollback/ excluded
     const tarList = snaps.length
-      ? execFileSync('tar', ['-tf', join(newCfg, snaps[0])], { encoding: 'utf8' }).split('\n').filter(Boolean)
+      ? execFileSync('tar', ['-tf', join(newCfg, snaps[0])], { encoding: 'utf8' })
+          .split('\n')
+          .filter(Boolean)
       : []
-    if (!tarList.some((x) => x.startsWith(HS.lib + '/workspaces/default/rules/')) || !tarList.some((x) => x === HS.cfg + '/state.json'))
+    if (
+      !tarList.some((x) => x.startsWith(HS.lib + '/workspaces/default/rules/')) ||
+      !tarList.some((x) => x === HS.cfg + '/state.json')
+    )
       bad.push('previous folders missing in snapshot')
     if (tarList.some((x) => x.includes('search.sqlite') || x.includes(HS.cfg + '/rollback')))
       bad.push('index/rollback included in snapshot')
     // tool files still unchanged (migration moves app paths only)
-    if (!read(join(H, '.codex/AGENTS.md')).includes(LEGACY_HS_MD_BEGIN)) bad.push('AGENTS.md changed by migration alone')
+    if (!read(join(H, '.codex/AGENTS.md')).includes(LEGACY_HS_MD_BEGIN))
+      bad.push('AGENTS.md changed by migration alone')
 
     // first sync: markers, opencode paths, Claude rule folder
     const r = syncAll(H, envH, { allowReal: true })
     if (!r.results) bad.push('sync did not run')
     else {
       const mig = r.results.rules.find((x) => x.action === 'migrateLegacyDir')
-      if (mig?.status !== 'done' || mig.name !== HS.rules) bad.push(`rule folder migration ${mig?.name}:${mig?.status}`)
-      if (r.results.rules.some((x) => x.status === 'failed' || x.status === 'refused')) bad.push('rules failed/refused')
+      if (mig?.status !== 'done' || mig.name !== HS.rules)
+        bad.push(`rule folder migration ${mig?.name}:${mig?.status}`)
+      if (r.results.rules.some((x) => x.status === 'failed' || x.status === 'refused'))
+        bad.push('rules failed/refused')
       if (r.results.targets.some((x) => x.status === 'skipped' && x.reason !== 'error'))
-        bad.push(`target skip ${r.results.targets.filter((x) => x.status === 'skipped').map((x) => x.id).join(',')}`)
+        bad.push(
+          `target skip ${r.results.targets
+            .filter((x) => x.status === 'skipped')
+            .map((x) => x.id)
+            .join(',')}`
+        )
     }
     const agents = read(join(H, '.codex/AGENTS.md'))
     const rules = read(join(H, '.codex/rules/default.rules'))
     const toml = read(join(H, '.codex/config.toml'))
-    for (const [n, t] of [['AGENTS.md', agents], ['default.rules', rules], ['config.toml', toml]] as const)
+    for (const [n, t] of [
+      ['AGENTS.md', agents],
+      ['default.rules', rules],
+      ['config.toml', toml]
+    ] as const)
       if (/(BEGIN|END) harnesssync/.test(t)) bad.push(`${n} harnesssync block left`)
     if (!agents.includes(MD_BEGIN) || !agents.includes(MD_END)) bad.push('AGENTS.md new marker')
-    if (!rules.includes(RULES_BEGIN) || !toml.includes(TOML_MCP_BEGIN)) bad.push('default.rules/config.toml new marker')
-    if (toml.includes(`[mcp_servers.${offServer}]`) || toml.includes(`[mcp_servers."${offServer}"]`)) bad.push('manifest toggles lost')
+    if (!rules.includes(RULES_BEGIN) || !toml.includes(TOML_MCP_BEGIN))
+      bad.push('default.rules/config.toml new marker')
+    if (
+      toml.includes(`[mcp_servers.${offServer}]`) ||
+      toml.includes(`[mcp_servers."${offServer}"]`)
+    )
+      bad.push('manifest toggles lost')
     const oc = readJson(op)
     const instr = (oc.instructions as unknown[]).map(String)
     const skp = (((oc.skills as Json)?.paths as unknown[]) ?? []).map(String)
-    if ([...instr, ...skp].some((x) => x.includes(HS.lib))) bad.push(`previous opencode paths left ${[...instr, ...skp].filter((x) => x.includes(HS.lib)).join(',')}`)
-    if (!instr.some((x) => x.startsWith(newRoot + '/workspaces/default/rules/')) || !skp.includes(newRoot + '/workspaces/default/skills'))
+    if ([...instr, ...skp].some((x) => x.includes(HS.lib)))
+      bad.push(
+        `previous opencode paths left ${[...instr, ...skp].filter((x) => x.includes(HS.lib)).join(',')}`
+      )
+    if (
+      !instr.some((x) => x.startsWith(newRoot + '/workspaces/default/rules/')) ||
+      !skp.includes(newRoot + '/workspaces/default/skills')
+    )
       bad.push('no new opencode paths')
-    if (!instr.includes('~/my-notes.md') || !skp.includes('/opt/my-skills')) bad.push('opencode user entries lost')
+    if (!instr.includes('~/my-notes.md') || !skp.includes('/opt/my-skills'))
+      bad.push('opencode user entries lost')
     const newRulesDir = join(H, '.claude/rules', CLAUDE_RULES_DIR)
     if (existsSync(oldRulesDir)) bad.push('previous rule folder left')
     const newRuleFiles = existsSync(newRulesDir) ? readdirSync(newRulesDir) : []
-    if (ruleNames.some((n) => !newRuleFiles.includes(n))) bad.push('rules missing in new rule folder')
-    if (!newRuleFiles.includes(ruleNames[0] + BACKUP_SUFFIX)) bad.push('rule backup migration missing')
-    if (toolBaks.some((b) => read(b) !== 'previous\n')) bad.push('previous-name .bak next to tool file changed')
+    if (ruleNames.some((n) => !newRuleFiles.includes(n)))
+      bad.push('rules missing in new rule folder')
+    if (!newRuleFiles.includes(ruleNames[0] + BACKUP_SUFFIX))
+      bad.push('rule backup migration missing')
+    if (toolBaks.some((b) => read(b) !== 'previous\n'))
+      bad.push('previous-name .bak next to tool file changed')
     const again = planSyncAll(H, envH)
     const left = [
       ...changedOrError(again.targets),
@@ -3023,11 +4280,16 @@ async function run(): Promise<void> {
     ]
     if (left.length) bad.push(`changes left on re-sync ${left.join(',')}`)
     // idempotent
-    if (autoRenamePending(H) || renamePendingPaths(H).length) bad.push('pending left after migration')
+    if (autoRenamePending(H) || renamePendingPaths(H).length)
+      bad.push('pending left after migration')
     if (applyRename(H).plan.needed) bad.push('work left on re-run')
     const en2 = ensureLibrary(H)
-    if (en2.status !== 'exists' || en2.renamed) bad.push(`ensureLibrary on re-run ${JSON.stringify(en2)}`)
-    if ([...bytes(newCfg).keys()].filter((k) => k.startsWith('rollback/pre-illithid-')).length !== 1) bad.push('re-run added a snapshot')
+    if (en2.status !== 'exists' || en2.renamed)
+      bad.push(`ensureLibrary on re-run ${JSON.stringify(en2)}`)
+    if (
+      [...bytes(newCfg).keys()].filter((k) => k.startsWith('rollback/pre-illithid-')).length !== 1
+    )
+      bad.push('re-run added a snapshot')
 
     // new path pre-exists: if both the previous and new folders exist, move nothing and migrateFailed
     const C = makeFixture('illithid-m7-OC-')
@@ -3038,9 +4300,13 @@ async function run(): Promise<void> {
     writeFileSync(join(C, DEFAULT_LIBRARY_DIR, 'workspaces/default/rules/b.md'), 'b\n')
     const ec = ensureLibrary(C)
     if (ec.status !== 'migrateFailed') bad.push(`conflict ensureLibrary ${ec.status}`)
-    if (!existsSync(join(C, HS.lib, 'workspaces/default/rules/a.md')) || !existsSync(join(C, DEFAULT_LIBRARY_DIR, 'workspaces/default/rules/b.md')))
+    if (
+      !existsSync(join(C, HS.lib, 'workspaces/default/rules/a.md')) ||
+      !existsSync(join(C, DEFAULT_LIBRARY_DIR, 'workspaces/default/rules/b.md'))
+    )
       bad.push('moved despite conflict')
-    if (existsSync(join(C, APP_CONFIG_DIR, 'rollback')) || existsSync(join(C, HS.cfg))) bad.push('snapshot despite conflict')
+    if (existsSync(join(C, APP_CONFIG_DIR, 'rollback')) || existsSync(join(C, HS.cfg)))
+      bad.push('snapshot despite conflict')
     // if the new path is an empty skeleton, clear it and move
     const C2 = makeFixture('illithid-m7-OS-')
     unlinkSync(join(C2, '.agents'))
@@ -3049,8 +4315,13 @@ async function run(): Promise<void> {
     writeFileSync(join(C2, HS.lib, 'workspaces/default/rules/a.md'), 'a\n')
     initLibrary(C2)
     const pl2 = planRename(C2)
-    if (!pl2.moves.find((m) => m.what === 'library')?.replaceEmptySkeleton) bad.push('no empty-skeleton replacement plan')
-    if (ensureLibrary(C2).status !== 'exists' || read(join(C2, DEFAULT_LIBRARY_DIR, 'workspaces/default/rules/a.md')) !== 'a\n' || existsSync(join(C2, HS.lib)))
+    if (!pl2.moves.find((m) => m.what === 'library')?.replaceEmptySkeleton)
+      bad.push('no empty-skeleton replacement plan')
+    if (
+      ensureLibrary(C2).status !== 'exists' ||
+      read(join(C2, DEFAULT_LIBRARY_DIR, 'workspaces/default/rules/a.md')) !== 'a\n' ||
+      existsSync(join(C2, HS.lib))
+    )
       bad.push('empty-skeleton replacement migration')
 
     // keychain: if missing in the new service, read the previous service's value; writes go to the new service
@@ -3060,17 +4331,26 @@ async function run(): Promise<void> {
     const kb = withLegacySecrets(newSvc, [oldSvc])
     if (kb.get(acct) !== 'old-value') bad.push('keychain fallback read')
     kb.set(acct, 'new-value')
-    if (newSvc.get(acct) !== 'new-value' || oldSvc.get(acct) !== 'old-value' || kb.get(acct) !== 'new-value') bad.push('keychain write')
-    if (!kb.delete(acct) || kb.get(acct) !== null) bad.push('fallback revived after keychain delete')
+    if (
+      newSvc.get(acct) !== 'new-value' ||
+      oldSvc.get(acct) !== 'old-value' ||
+      kb.get(acct) !== 'new-value'
+    )
+      bad.push('keychain write')
+    if (!kb.delete(acct) || kb.get(acct) !== null)
+      bad.push('fallback revived after keychain delete')
 
     // import a previous-name zip (.harnesssync.zip containing harnesssync.json) → illithid.json
     const zipOld = zipSync({
-      [HS.manifest]: new TextEncoder().encode(JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'),
+      [HS.manifest]: new TextEncoder().encode(
+        JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+      ),
       'rules/z.md': new TextEncoder().encode('z\n')
     })
     const zi = importWorkspace(H, zipOld, { name: 'old-zip' })
     const ziRoot = workspaceRoot(H, zi.id)
-    if (!existsSync(join(ziRoot, MANIFEST_FILE)) || existsSync(join(ziRoot, HS.manifest))) bad.push('previous zip on/off file name')
+    if (!existsSync(join(ziRoot, MANIFEST_FILE)) || existsSync(join(ziRoot, HS.manifest)))
+      bad.push('previous zip on/off file name')
 
     check(
       'o2. rename HarnessSync → Illithid — auto-migrate on start (snapshot), bytes kept, state rewritten → sync replaces markers, opencode paths, rule folder; idempotent, stops on conflict',
@@ -3203,7 +4483,8 @@ async function run(): Promise<void> {
       const c = rep.cells.find((x) => x.resource === 'skills' && x.tool === tool)!
       if (c.detail.includes(' · ~/')) bad.push(`status after apply skills.${tool} ${c.detail}`)
     }
-    if (cell(F, env, 'skills', 'opencode') !== 'synced') bad.push('status after apply skills.opencode')
+    if (cell(F, env, 'skills', 'opencode') !== 'synced')
+      bad.push('status after apply skills.opencode')
     const sk2 = readsSkills(F, env)
     if (sk2.state[on]?.claude !== 'synced' || sk2.state[on]?.codex !== 'synced')
       bad.push('pill after apply')
@@ -3241,7 +4522,8 @@ async function run(): Promise<void> {
     const names = canonicalSkills(F)
     const [a, b] = names
     const op = join(F, '.config/opencode/opencode.json')
-    const rule = (): Json => (((readJson(op).permission as Json | undefined) ?? {}).skill as Json | undefined) ?? {}
+    const rule = (): Json =>
+      (((readJson(op).permission as Json | undefined) ?? {}).skill as Json | undefined) ?? {}
     const setRule = (r: unknown): void => {
       const o = readJson(op)
       const perm: Json = { ...((o.permission as Json | undefined) ?? {}) }
@@ -3251,16 +4533,27 @@ async function run(): Promise<void> {
       else delete o.permission
       writeJson(op, o)
     }
-    const others = (o: Json): string => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'permission')))
+    const others = (o: Json): string =>
+      JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'permission')))
     setRule({ [b]: 'ask', 'x*': 'allow', 'not-in-library': 'deny' })
     syncAll(F, env, { allowReal: true })
-    if (changedOrError(planAll(F, env)).length) bad.push(`setup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
+    if (changedOrError(planAll(F, env)).length)
+      bad.push(`setup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
     const rest0 = others(readJson(op))
 
     // off for OpenCode → deny written after the user's entries; ask replaced; preview lists the skill leaving OpenCode
     setToggle(F, 'skills', b, 'opencode', false)
     const pv = applyPreview(F, env)
-    if (!pv.items.some((x) => x.tool === 'opencode' && x.kind === 'skill' && x.name === b && x.action === 'remove' && x.parent))
+    if (
+      !pv.items.some(
+        (x) =>
+          x.tool === 'opencode' &&
+          x.kind === 'skill' &&
+          x.name === b &&
+          x.action === 'remove' &&
+          x.parent
+      )
+    )
       bad.push('preview: no skill row leaving OpenCode')
     syncAll(F, env, { allowReal: true })
     const r1 = rule()
@@ -3270,8 +4563,10 @@ async function run(): Promise<void> {
     if (r1['x*'] !== 'allow' || r1['not-in-library'] !== 'deny') bad.push('user entries gone')
     if (r1[a] !== undefined) bad.push('entry for a skill on for OpenCode')
     if (others(readJson(op)) !== rest0) bad.push('keys outside permission changed')
-    if (!readState(F).state.owned?.opencodeSkillPermissions?.includes(b)) bad.push('deny not recorded as owned')
-    if (changedOrError(planAll(F, env)).length) bad.push(`re-plan after deny ${changedOrError(planAll(F, env)).join(',')}`)
+    if (!readState(F).state.owned?.opencodeSkillPermissions?.includes(b))
+      bad.push('deny not recorded as owned')
+    if (changedOrError(planAll(F, env)).length)
+      bad.push(`re-plan after deny ${changedOrError(planAll(F, env)).join(',')}`)
     if (readsSkills(F, env).state[b]?.opencode === 'error') bad.push('pill error while off')
 
     // a string rule (one value for every skill) is kept as "*"
@@ -3295,17 +4590,21 @@ async function run(): Promise<void> {
     if (rule()['zz-oc-tmp'] !== 'deny') bad.push('temp skill not denied')
     rmSync(tmp, { recursive: true, force: true })
     syncAll(F, env, { allowReal: true })
-    if (rule()['zz-oc-tmp'] !== undefined) bad.push('owned deny left after the skill left the library')
+    if (rule()['zz-oc-tmp'] !== undefined)
+      bad.push('owned deny left after the skill left the library')
     setToggle(F, 'skills', 'zz-oc-tmp', 'opencode', true)
 
     setRule(undefined)
     syncAll(F, env, { allowReal: true })
-    if (changedOrError(planAll(F, env)).length) bad.push(`cleanup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
+    if (changedOrError(planAll(F, env)).length)
+      bad.push(`cleanup plan changes ${changedOrError(planAll(F, env)).join(',')}`)
 
     check(
       'p2. OpenCode skill toggle — off writes permission.skill deny last (over user wildcards), string rule kept as "*", on removes it, owned deny leaves with the skill, preview row, re-sync 0',
       !bad.length,
-      bad.length ? bad.join('; ') : 'deny written last / removed on, ask replaced, user entries kept, owned recorded, string rule → "*", temp skill deny removed, other keys unchanged'
+      bad.length
+        ? bad.join('; ')
+        : 'deny written last / removed on, ask replaced, user entries kept, owned recorded, string rule → "*", temp skill deny removed, other keys unchanged'
     )
   }
 
@@ -3348,20 +4647,32 @@ async function run(): Promise<void> {
     upsertMcpServer(
       F,
       'zz-sec-stdio',
-      { transport: 'stdio', command: 'npx', args: ['-y', 'x'], env: { API_KEY: E1, MODE: '${ZZ_MODE}' } },
+      {
+        transport: 'stdio',
+        command: 'npx',
+        args: ['-y', 'x'],
+        env: { API_KEY: E1, MODE: '${ZZ_MODE}' }
+      },
       { secrets: mem }
     )
     upsertMcpServer(
       F,
       'zz-sec-env',
-      { transport: 'http', url: 'https://env.invalid/mcp', headers: { 'X-Key': '${ZZ_KEY}' }, bearerEnv: 'ZZ_BEARER' },
+      {
+        transport: 'http',
+        url: 'https://env.invalid/mcp',
+        headers: { 'X-Key': '${ZZ_KEY}' },
+        bearerEnv: 'ZZ_BEARER'
+      },
       { secrets: mem }
     )
     if (leaks(libText())) bad.push('plaintext in library file')
     if (leaks(JSON.stringify(u1))) bad.push('plaintext in upsert result')
     const sh = readMcpServer(F, 'zz-sec-http')
-    if (sh.headers?.['X-Api-Key'] !== 'secret:zz-sec-http/headers/X-Api-Key') bad.push('header reference format')
-    if (sh.bearerToken !== 'secret:zz-sec-http/headers/Authorization') bad.push('bearer reference format')
+    if (sh.headers?.['X-Api-Key'] !== 'secret:zz-sec-http/headers/X-Api-Key')
+      bad.push('header reference format')
+    if (sh.bearerToken !== 'secret:zz-sec-http/headers/Authorization')
+      bad.push('bearer reference format')
     const ss = readMcpServer(F, 'zz-sec-stdio')
     if (ss.env?.API_KEY !== 'secret:zz-sec-stdio/env/API_KEY' || ss.env?.MODE !== '${ZZ_MODE}')
       bad.push('env reference / ${VAR} kept')
@@ -3376,120 +4687,224 @@ async function run(): Promise<void> {
     )
       bad.push(`backend entries ${Object.keys(ent).length}`)
     // validation: malformed references, references to other servers, duplicate bearer refused
-    if (errCode(() => upsertMcpServer(F, 'zz-sec-bad', { transport: 'http', url: 'https://b.invalid', headers: { A: 'secret:nope' } })) !== 'invalidSchema')
+    if (
+      errCode(() =>
+        upsertMcpServer(F, 'zz-sec-bad', {
+          transport: 'http',
+          url: 'https://b.invalid',
+          headers: { A: 'secret:nope' }
+        })
+      ) !== 'invalidSchema'
+    )
       bad.push('malformed reference allowed')
-    if (errCode(() => upsertMcpServer(F, 'zz-sec-bad', { transport: 'http', url: 'https://b.invalid', headers: { 'X-Api-Key': 'secret:zz-sec-http/headers/X-Api-Key' } })) !== 'invalidSchema')
+    if (
+      errCode(() =>
+        upsertMcpServer(F, 'zz-sec-bad', {
+          transport: 'http',
+          url: 'https://b.invalid',
+          headers: { 'X-Api-Key': 'secret:zz-sec-http/headers/X-Api-Key' }
+        })
+      ) !== 'invalidSchema'
+    )
       bad.push('reference to other server allowed')
-    if (errCode(() => upsertMcpServer(F, 'zz-sec-bad', { transport: 'http', url: 'https://b.invalid', bearerToken: 'x', bearerEnv: 'Y' }, { secrets: mem })) !== 'invalidSchema')
+    if (
+      errCode(() =>
+        upsertMcpServer(
+          F,
+          'zz-sec-bad',
+          { transport: 'http', url: 'https://b.invalid', bearerToken: 'x', bearerEnv: 'Y' },
+          { secrets: mem }
+        )
+      ) !== 'invalidSchema'
+    )
       bad.push('bearerToken+bearerEnv allowed')
     if (existsSync(join(lp.mcpsDir, 'zz-sec-bad.json'))) bad.push('refused server file created')
 
     // 2) edit form path (main): read with MASK and saving unchanged keeps it; new plaintext replaces
     const view = mcpRead(F, 'zz-sec-http')
     if (leaks(JSON.stringify(view))) bad.push('plaintext in mcpRead response')
-    if (view.def.headers?.['X-Api-Key'] !== MASK || view.def.bearerToken !== MASK) bad.push('mcpRead MASK')
+    if (view.def.headers?.['X-Api-Key'] !== MASK || view.def.bearerToken !== MASK)
+      bad.push('mcpRead MASK')
     const ro = mcpRead(F, 'zz-sec-env')
     if (ro.def.headers?.['X-Key'] !== '${ZZ_KEY}') bad.push('${VAR} masked')
     mcpSave(F, 'zz-sec-http', view.def, mem)
-    if (readMcpServer(F, 'zz-sec-http').headers?.['X-Api-Key'] !== sh.headers?.['X-Api-Key'] || mem.get('zz-sec-http/headers/X-Api-Key') !== H1)
+    if (
+      readMcpServer(F, 'zz-sec-http').headers?.['X-Api-Key'] !== sh.headers?.['X-Api-Key'] ||
+      mem.get('zz-sec-http/headers/X-Api-Key') !== H1
+    )
       bad.push('not kept when saving MASK')
 
     // 3) sync → literals in 3 tools
     env = fakeEnv(F)
     const r1 = syncAll(F, env, { allowReal: true, secrets: mem })
-    if (r1.results!.targets.some((t) => t.status === 'skipped' || t.serverErrors)) bad.push('sync skip / server error')
+    if (r1.results!.targets.some((t) => t.status === 'skipped' || t.serverErrors))
+      bad.push('sync skip / server error')
     const c = claudeS()
-    if (get(c, 'zz-sec-http', 'headers', 'X-Api-Key') !== H1 || get(c, 'zz-sec-http', 'headers', 'Authorization') !== `Bearer ${B1}`)
+    if (
+      get(c, 'zz-sec-http', 'headers', 'X-Api-Key') !== H1 ||
+      get(c, 'zz-sec-http', 'headers', 'Authorization') !== `Bearer ${B1}`
+    )
       bad.push('claude http literal')
-    if (get(c, 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(c, 'zz-sec-stdio', 'env', 'MODE') !== '${ZZ_MODE}')
+    if (
+      get(c, 'zz-sec-stdio', 'env', 'API_KEY') !== E1 ||
+      get(c, 'zz-sec-stdio', 'env', 'MODE') !== '${ZZ_MODE}'
+    )
       bad.push('claude stdio env')
-    if (get(c, 'zz-sec-env', 'headers', 'X-Key') !== '${ZZ_KEY}' || get(c, 'zz-sec-env', 'headers', 'Authorization') !== 'Bearer ${ZZ_BEARER}')
+    if (
+      get(c, 'zz-sec-env', 'headers', 'X-Key') !== '${ZZ_KEY}' ||
+      get(c, 'zz-sec-env', 'headers', 'Authorization') !== 'Bearer ${ZZ_BEARER}'
+    )
       bad.push('claude ${VAR} server')
     const x = codexS()
-    if (get(x, 'zz-sec-http', 'http_headers', 'X-Api-Key') !== H1 || get(x, 'zz-sec-http', 'http_headers', 'Authorization') !== `Bearer ${B1}`)
+    if (
+      get(x, 'zz-sec-http', 'http_headers', 'X-Api-Key') !== H1 ||
+      get(x, 'zz-sec-http', 'http_headers', 'Authorization') !== `Bearer ${B1}`
+    )
       bad.push('codex http_headers literal')
-    if (get(x, 'zz-sec-http', 'bearer_token') !== undefined || get(x, 'zz-sec-http', 'bearer_token_env_var') !== undefined)
+    if (
+      get(x, 'zz-sec-http', 'bearer_token') !== undefined ||
+      get(x, 'zz-sec-http', 'bearer_token_env_var') !== undefined
+    )
       bad.push('codex bearer key misuse')
-    if (get(x, 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(x, 'zz-sec-stdio', 'env', 'MODE') !== 'fixture-value')
+    if (
+      get(x, 'zz-sec-stdio', 'env', 'API_KEY') !== E1 ||
+      get(x, 'zz-sec-stdio', 'env', 'MODE') !== 'fixture-value'
+    )
       bad.push('codex stdio env')
-    if (get(x, 'zz-sec-env', 'env_http_headers', 'X-Key') !== 'ZZ_KEY' || get(x, 'zz-sec-env', 'bearer_token_env_var') !== 'ZZ_BEARER' || get(x, 'zz-sec-env', 'http_headers') !== undefined)
+    if (
+      get(x, 'zz-sec-env', 'env_http_headers', 'X-Key') !== 'ZZ_KEY' ||
+      get(x, 'zz-sec-env', 'bearer_token_env_var') !== 'ZZ_BEARER' ||
+      get(x, 'zz-sec-env', 'http_headers') !== undefined
+    )
       bad.push('codex ${VAR} server')
     const o = ocS()
-    if (get(o, 'zz-sec-http', 'headers', 'X-Api-Key') !== H1 || get(o, 'zz-sec-http', 'headers', 'Authorization') !== `Bearer ${B1}`)
+    if (
+      get(o, 'zz-sec-http', 'headers', 'X-Api-Key') !== H1 ||
+      get(o, 'zz-sec-http', 'headers', 'Authorization') !== `Bearer ${B1}`
+    )
       bad.push('opencode http literal')
-    if (get(o, 'zz-sec-stdio', 'environment', 'API_KEY') !== E1 || get(o, 'zz-sec-stdio', 'environment', 'MODE') !== '{env:ZZ_MODE}')
+    if (
+      get(o, 'zz-sec-stdio', 'environment', 'API_KEY') !== E1 ||
+      get(o, 'zz-sec-stdio', 'environment', 'MODE') !== '{env:ZZ_MODE}'
+    )
       bad.push('opencode stdio env')
-    if (get(o, 'zz-sec-env', 'headers', 'X-Key') !== '{env:ZZ_KEY}' || get(o, 'zz-sec-env', 'headers', 'Authorization') !== 'Bearer {env:ZZ_BEARER}')
+    if (
+      get(o, 'zz-sec-env', 'headers', 'X-Key') !== '{env:ZZ_KEY}' ||
+      get(o, 'zz-sec-env', 'headers', 'Authorization') !== 'Bearer {env:ZZ_BEARER}'
+    )
       bad.push('opencode ${VAR} server')
     const p1 = planAll(F, env, mem)
-    if (changedOrError(p1).length || p1.some((ch) => ch.serverErrors)) bad.push('re-plan changes after sync')
+    if (changedOrError(p1).length || p1.some((ch) => ch.serverErrors))
+      bad.push('re-plan changes after sync')
     // no plaintext in results, summary, status, or plan metadata (notes, errors)
     const exposed = JSON.stringify({
       results: r1.results,
       summary: summarizeSync(r1),
       status: statusReport(F, env, mem),
-      meta: p1.map((ch) => ({ id: ch.id, notes: ch.notes, error: ch.error, serverErrors: ch.serverErrors }))
+      meta: p1.map((ch) => ({
+        id: ch.id,
+        notes: ch.notes,
+        error: ch.error,
+        serverErrors: ch.serverErrors
+      }))
     })
     if (leaks(exposed)) bad.push('plaintext in results/status')
 
     // 4) missing value → error only for that server (previous entry kept), other servers still applied
     mem.delete('zz-sec-stdio/env/API_KEY')
-    upsertMcpServer(F, 'zz-sec-http', { ...readMcpServer(F, 'zz-sec-http'), headers: { 'X-Api-Key': H2 } }, { secrets: mem })
+    upsertMcpServer(
+      F,
+      'zz-sec-http',
+      { ...readMcpServer(F, 'zz-sec-http'), headers: { 'X-Api-Key': H2 } },
+      { secrets: mem }
+    )
     if (leaks(libText())) bad.push('library plaintext after replace')
     const r2 = syncAll(F, env, { allowReal: true, secrets: mem })
     const errs = r2.results!.targets.filter((t) => t.serverErrors)
     if (
-      errs.map((t) => t.id).sort().join() !== 'claudeMcp,codexMcp,opencodeMcp' ||
-      errs.some((t) => Object.keys(t.serverErrors!).join() !== 'zz-sec-stdio' || t.status !== 'written')
+      errs
+        .map((t) => t.id)
+        .sort()
+        .join() !== 'claudeMcp,codexMcp,opencodeMcp' ||
+      errs.some(
+        (t) => Object.keys(t.serverErrors!).join() !== 'zz-sec-stdio' || t.status !== 'written'
+      )
     )
       bad.push(`missing-value error targets ${errs.map((t) => t.id).join(',')}`)
     if (summarizeSync(r2)['target.serverError'] !== 3) bad.push('summary serverError')
-    if (!errs.every((t) => t.serverErrors!['zz-sec-stdio'].includes('zz-sec-stdio/env/API_KEY'))) bad.push('account missing in error message')
-    if (leaks(JSON.stringify(r2.results) + JSON.stringify(statusReport(F, env, mem).cells))) bad.push('plaintext in missing-value results')
-    if (get(claudeS(), 'zz-sec-http', 'headers', 'X-Api-Key') !== H2 || get(codexS(), 'zz-sec-http', 'http_headers', 'X-Api-Key') !== H2 || get(ocS(), 'zz-sec-http', 'headers', 'X-Api-Key') !== H2)
+    if (!errs.every((t) => t.serverErrors!['zz-sec-stdio'].includes('zz-sec-stdio/env/API_KEY')))
+      bad.push('account missing in error message')
+    if (leaks(JSON.stringify(r2.results) + JSON.stringify(statusReport(F, env, mem).cells)))
+      bad.push('plaintext in missing-value results')
+    if (
+      get(claudeS(), 'zz-sec-http', 'headers', 'X-Api-Key') !== H2 ||
+      get(codexS(), 'zz-sec-http', 'http_headers', 'X-Api-Key') !== H2 ||
+      get(ocS(), 'zz-sec-http', 'headers', 'X-Api-Key') !== H2
+    )
       bad.push('other server not applied')
-    if (get(claudeS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(codexS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 || get(ocS(), 'zz-sec-stdio', 'environment', 'API_KEY') !== E1)
+    if (
+      get(claudeS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 ||
+      get(codexS(), 'zz-sec-stdio', 'env', 'API_KEY') !== E1 ||
+      get(ocS(), 'zz-sec-stdio', 'environment', 'API_KEY') !== E1
+    )
       bad.push('previous entry of missing server not kept')
     // Tools not in use (Gemini while toolsInUse is unset) have notApplicable cells
-    const mcpCells = statusReport(F, env, mem).cells.filter((cc) => cc.resource === 'mcp' && toolsInUse(F).includes(cc.tool))
-    if (!mcpCells.length || mcpCells.some((cc) => cc.state !== 'error')) bad.push('status not error when missing')
+    const mcpCells = statusReport(F, env, mem).cells.filter(
+      (cc) => cc.resource === 'mcp' && toolsInUse(F).includes(cc.tool)
+    )
+    if (!mcpCells.length || mcpCells.some((cc) => cc.state !== 'error'))
+      bad.push('status not error when missing')
     mem.set('zz-sec-stdio/env/API_KEY', E1)
     syncAll(F, env, { allowReal: true, secrets: mem })
-    if (changedOrError(planAll(F, env, mem)).length) bad.push('re-plan changes after value restored')
+    if (changedOrError(planAll(F, env, mem)).length)
+      bad.push('re-plan changes after value restored')
     if (mem.get('zz-sec-http/headers/X-Api-Key') !== H2) bad.push('replacement value stored')
 
     // 5) import: tool literals → backend + reference, no raw values in plan/results
     const cj = readJson(join(F, '.claude.json'))
-    ;(cj.mcpServers as Json)['zz-imp'] = { type: 'http', url: 'https://imp.invalid/mcp', headers: { 'X-Token': I1 } }
+    ;(cj.mcpServers as Json)['zz-imp'] = {
+      type: 'http',
+      url: 'https://imp.invalid/mcp',
+      headers: { 'X-Token': I1 }
+    }
     writeJson(join(F, '.claude.json'), cj)
     const ip = planImport(F, 'tool:claude')
     if (leaks(JSON.stringify(ip))) bad.push('plaintext in import plan')
     const ir = applyImport(F, [{ kind: 'mcp', name: 'zz-imp' }], 'tool:claude', { secrets: mem })[0]
     if (ir.status !== 'imported' || leaks(JSON.stringify(ir))) bad.push(`import ${ir.status}`)
-    if (readMcpServer(F, 'zz-imp').headers?.['X-Token'] !== 'secret:zz-imp/headers/X-Token' || mem.get('zz-imp/headers/X-Token') !== I1)
+    if (
+      readMcpServer(F, 'zz-imp').headers?.['X-Token'] !== 'secret:zz-imp/headers/X-Token' ||
+      mem.get('zz-imp/headers/X-Token') !== I1
+    )
       bad.push('import reference / backend')
     if (leaks(libText())) bad.push('library plaintext after import')
     syncAll(F, env, { allowReal: true, secrets: mem })
     // HAR-12: imported from Claude → enabled for Claude only; Codex gets it only after it is turned on there
-    if (get(claudeS(), 'zz-imp', 'headers', 'X-Token') !== I1) bad.push('imported server claude literal')
-    if ('zz-imp' in codexS() || 'zz-imp' in ocS()) bad.push('imported server reached tools other than its source')
+    if (get(claudeS(), 'zz-imp', 'headers', 'X-Token') !== I1)
+      bad.push('imported server claude literal')
+    if ('zz-imp' in codexS() || 'zz-imp' in ocS())
+      bad.push('imported server reached tools other than its source')
     setToggle(F, 'mcp', 'zz-imp', 'codex', true)
     syncAll(F, env, { allowReal: true, secrets: mem })
-    if (get(codexS(), 'zz-imp', 'http_headers', 'X-Token') !== I1) bad.push('imported server codex literal')
+    if (get(codexS(), 'zz-imp', 'http_headers', 'X-Token') !== I1)
+      bad.push('imported server codex literal')
 
     // 6) delete → backend entries removed, removed from tools
     const d1 = deleteMcpServer(F, 'zz-sec-http', { secrets: mem })
     const d2 = deleteMcpServer(F, 'zz-sec-stdio', { secrets: mem })
     const d3 = deleteMcpServer(F, 'zz-imp', { secrets: mem })
     deleteMcpServer(F, 'zz-sec-env', { secrets: mem })
-    if (d1.secretsDeleted !== 2 || d2.secretsDeleted !== 1 || d3.secretsDeleted !== 1) bad.push('delete count')
-    if (Object.keys(mem.entries()).length) bad.push(`backend left after delete ${Object.keys(mem.entries()).length}`)
+    if (d1.secretsDeleted !== 2 || d2.secretsDeleted !== 1 || d3.secretsDeleted !== 1)
+      bad.push('delete count')
+    if (Object.keys(mem.entries()).length)
+      bad.push(`backend left after delete ${Object.keys(mem.entries()).length}`)
     if (leaks(read(d1.trashPath))) bad.push('plaintext in trash file')
     syncAll(F, env, { allowReal: true, secrets: mem })
     for (const n of ['zz-sec-http', 'zz-sec-stdio', 'zz-sec-env', 'zz-imp'])
       if (n in claudeS() || n in codexS() || n in ocS()) bad.push(`${n} left in tools`)
     if (changedOrError(planAll(F, env)).length) bad.push('re-plan changes after delete')
-    if (JSON.stringify(listMcpServers(F)) !== JSON.stringify(legacyOrder)) bad.push('order not restored')
+    if (JSON.stringify(listMcpServers(F)) !== JSON.stringify(legacyOrder))
+      bad.push('order not restored')
 
     check(
       'q. MCP secrets — memory backend: upsert plaintext → secret: reference, sync literals to 3 tools (codex http_headers), error only for missing servers with previous entry kept, import and delete, ${VAR} unchanged',
@@ -3543,10 +4958,7 @@ async function run(): Promise<void> {
         ''
       ].join('\n')
     )
-    writeFileSync(
-      join(G, '.codex/AGENTS.md'),
-      `Codex-only text\n\n${MD_BEGIN}\nbody\n${MD_END}\n`
-    )
+    writeFileSync(join(G, '.codex/AGENTS.md'), `Codex-only text\n\n${MD_BEGIN}\nbody\n${MD_END}\n`)
     const skill = (dir: string, body = 'regular skill'): void => {
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 'SKILL.md'), `---\nname: x\ndescription: x\n---\n${body}\n`)
@@ -3566,7 +4978,9 @@ async function run(): Promise<void> {
     const h0 = toolHash()
 
     const pc = planImport(G, 'tool:codex')
-    const mcpJ = Object.fromEntries(pc.mcp.map((c) => [c.name, `${c.portability}:${c.reasons.join('+')}`]))
+    const mcpJ = Object.fromEntries(
+      pc.mcp.map((c) => [c.name, `${c.portability}:${c.reasons.join('+')}`])
+    )
     const expectMcp: Record<string, string> = {
       'zz-rel': 'toolOnly:relativeCommand',
       'zz-bundle': 'toolOnly:appBundle',
@@ -3579,7 +4993,9 @@ async function run(): Promise<void> {
     }
     for (const [n, want] of Object.entries(expectMcp))
       if (mcpJ[n] !== want) bad.push(`mcp ${n} ${mcpJ[n]} ≠ ${want}`)
-    const skJ = Object.fromEntries(pc.skills.map((c) => [c.name, `${c.portability}:${c.reasons.join('+')}`]))
+    const skJ = Object.fromEntries(
+      pc.skills.map((c) => [c.name, `${c.portability}:${c.reasons.join('+')}`])
+    )
     const expectSkill: Record<string, string> = {
       '.zz-hidden': 'toolOnly:hiddenDir',
       synced: 'toolOnly:toolInternalDir',
@@ -3600,17 +5016,28 @@ async function run(): Promise<void> {
       bad.push(`claude plugin skill ${ns?.portability}`)
     // classifier functions — paths not scanned yet (memory, instructions)
     const ctx = { home: G, codexPlugins: new Set<string>() }
-    if (memoryPortability(ctx, join(G, '.claude/projects/-x/memory/a.md')).portability !== 'toolOnly')
+    if (
+      memoryPortability(ctx, join(G, '.claude/projects/-x/memory/a.md')).portability !== 'toolOnly'
+    )
       bad.push('claude auto memory')
     if (memoryPortability(ctx, join(G, '.codex/memories/a.md')).portability !== 'toolOnly')
       bad.push('codex memory')
     if (memoryPortability(ctx, join(G, '.agents/memory/a.md')).portability !== 'ok')
       bad.push('library memory')
-    if (rulePortability(ctx, 'CLAUDE.md', join(G, '.claude/CLAUDE.md')).reasons.join() !== 'toolInstructions')
+    if (
+      rulePortability(ctx, 'CLAUDE.md', join(G, '.claude/CLAUDE.md')).reasons.join() !==
+      'toolInstructions'
+    )
       bad.push('CLAUDE.md')
-    if (rulePortability(ctx, 'AGENTS.md', join(G, 'repo/AGENTS.md')).reasons.join() !== 'projectScoped')
+    if (
+      rulePortability(ctx, 'AGENTS.md', join(G, 'repo/AGENTS.md')).reasons.join() !==
+      'projectScoped'
+    )
       bad.push('project AGENTS.md')
-    if (rulePortability(ctx, '30-safety.md', join(G, '.claude/rules/30-safety.md')).portability !== 'ok')
+    if (
+      rulePortability(ctx, '30-safety.md', join(G, '.claude/rules/30-safety.md')).portability !==
+      'ok'
+    )
       bad.push('regular rule')
 
     // choosing toolOnly → refused, nothing created in the library
@@ -3627,7 +5054,8 @@ async function run(): Promise<void> {
       'tool:codex'
     )
     for (const r of refused)
-      if (r.status !== 'refused' || r.reason !== 'toolOnly') bad.push(`${r.name} ${r.status}/${r.reason}`)
+      if (r.status !== 'refused' || r.reason !== 'toolOnly')
+        bad.push(`${r.name} ${r.status}/${r.reason}`)
     for (const f of ['zz-rel.json', 'zz-bundle.json', 'zz-plugin.json'])
       if (existsSync(join(lp.mcpsDir, f))) bad.push(`${f} created`)
     if (existsSync(join(lp.skillsDir, 'zz-plug'))) bad.push('plugin skill copied')
@@ -3644,7 +5072,8 @@ async function run(): Promise<void> {
       ],
       'tool:codex'
     )
-    for (const r of okRes) if (r.status !== 'imported') bad.push(`${r.name} ${r.status}/${r.reason}`)
+    for (const r of okRes)
+      if (r.status !== 'imported') bad.push(`${r.name} ${r.status}/${r.reason}`)
     if (readMcpServer(G, 'zz-http').url !== 'https://zz.invalid/mcp') bad.push('zz-http content')
     if (!existsSync(join(lp.skillsDir, 'zz-plain/SKILL.md'))) bad.push('zz-plain not copied')
     if (toolHash() !== h0) bad.push('tool-side files changed')
@@ -3671,8 +5100,10 @@ async function run(): Promise<void> {
     writeFileSync(md(A), orig)
     const d0 = readSkillDoc(F, A)
     const extraKeys = ['allowed-tools', 'metadata', 'license']
-    if (d0.frontmatterName !== A || d0.description !== 'folded text\n') bad.push('read name/description')
-    if (JSON.stringify(Object.keys(d0.extra)) !== JSON.stringify(extraKeys)) bad.push('read extra keys')
+    if (d0.frontmatterName !== A || d0.description !== 'folded text\n')
+      bad.push('read name/description')
+    if (JSON.stringify(Object.keys(d0.extra)) !== JSON.stringify(extraKeys))
+      bad.push('read extra keys')
     if (d0.body !== '# zz-doc\n\nbody\n') bad.push('read body')
     // saving the same values → bytes unchanged
     writeSkillDoc(F, A, { description: d0.description, body: d0.body })
@@ -3690,13 +5121,28 @@ async function run(): Promise<void> {
       JSON.stringify(['name', 'description', ...extraKeys])
     )
       bad.push('frontmatter key order')
-    for (const line of ['# keep comment', 'allowed-tools: [Read, Bash]', '  tags: [a, b]', 'license: MIT'])
+    for (const line of [
+      '# keep comment',
+      'allowed-tools: [Read, Bash]',
+      '  tags: [a, b]',
+      'license: MIT'
+    ])
       if (!t1.split('\n').includes(line)) bad.push(`original line kept: ${line}`)
     // single-line special value round trip (YAML reserved words, numbers, colons, surrounding spaces, Unicode)
-    for (const v of ['yes', '123', 'a: b', ' spaced ', '\uD55C\uAE00 \uC124\uBA85 — \uB300\uC2DC', 'x #y', '- dash', '"q"'])
+    for (const v of [
+      'yes',
+      '123',
+      'a: b',
+      ' spaced ',
+      '\uD55C\uAE00 \uC124\uBA85 — \uB300\uC2DC',
+      'x #y',
+      '- dash',
+      '"q"'
+    ])
       try {
         writeSkillDoc(F, A, { description: v, body: d1.body })
-        if (readSkillDoc(F, A).description !== v) bad.push(`single-line round trip ${JSON.stringify(v)}`)
+        if (readSkillDoc(F, A).description !== v)
+          bad.push(`single-line round trip ${JSON.stringify(v)}`)
       } catch (e) {
         bad.push(`single-line save error ${JSON.stringify(v)}: ${(e as Error).message}`)
       }
@@ -3706,27 +5152,35 @@ async function run(): Promise<void> {
     // before rename: app copies in two tools + codex off (to check the manifest key move)
     syncAll(F, env, { allowReal: true })
     const st0 = readState(F).state
-    if (!st0.skills?.claude?.[A] || !st0.skills?.codex?.[A]) bad.push('no app copy record before rename')
+    if (!st0.skills?.claude?.[A] || !st0.skills?.codex?.[A])
+      bad.push('no app copy record before rename')
     setToggle(F, 'skills', A, 'codex', false)
     const stBefore = JSON.stringify(readState(F).state.skills)
     // refused: same name, existing name, format, missing skill
     createSkill(F, 'zz-doc-other', 'other')
-    if (errCode(() => renameSkill(F, A, 'zz-doc-other')) !== 'exists') bad.push('existing target allowed')
+    if (errCode(() => renameSkill(F, A, 'zz-doc-other')) !== 'exists')
+      bad.push('existing target allowed')
     if (errCode(() => renameSkill(F, A, A)) !== 'invalidName') bad.push('same name allowed')
-    if (errCode(() => renameSkill(F, A, 'Bad/Name')) !== 'invalidName') bad.push('name format allowed')
-    if (errCode(() => renameSkill(F, 'zz-none', B)) !== 'notFound') bad.push('missing skill allowed')
-    if (!existsSync(md(A)) || read(md('zz-doc-other')).includes(multi)) bad.push('changed after refusal')
+    if (errCode(() => renameSkill(F, A, 'Bad/Name')) !== 'invalidName')
+      bad.push('name format allowed')
+    if (errCode(() => renameSkill(F, 'zz-none', B)) !== 'notFound')
+      bad.push('missing skill allowed')
+    if (!existsSync(md(A)) || read(md('zz-doc-other')).includes(multi))
+      bad.push('changed after refusal')
     deleteSkill(F, 'zz-doc-other')
     const before = read(md(A))
     const r = renameSkill(F, A, B)
     if (r.name !== B) bad.push('returned name')
     if (existsSync(join(skillsDir, A)) || !existsSync(md(B))) bad.push('folder move')
     const d2 = readSkillDoc(F, B)
-    if (d2.frontmatterName !== B || d2.description !== multi || d2.body !== d1.body) bad.push('frontmatter name')
+    if (d2.frontmatterName !== B || d2.description !== multi || d2.body !== d1.body)
+      bad.push('frontmatter name')
     if (JSON.stringify(d2.extra) !== JSON.stringify(d0.extra)) bad.push('extra after rename')
-    if (read(md(B)) !== before.replace(`name: ${A}\n`, `name: ${B}\n`)) bad.push('changes beyond the name line')
+    if (read(md(B)) !== before.replace(`name: ${A}\n`, `name: ${B}\n`))
+      bad.push('changes beyond the name line')
     const mf = readJson(join(libraryRoot(F), MANIFEST_FILE)) as { skills: Json }
-    if (A in mf.skills || JSON.stringify(mf.skills[B]) !== '{"codex":false}') bad.push('manifest key move')
+    if (A in mf.skills || JSON.stringify(mf.skills[B]) !== '{"codex":false}')
+      bad.push('manifest key move')
     if (JSON.stringify(readState(F).state.skills) !== stBefore) bad.push('rename changed state')
     // sync: new name claude copy, codex is off so no copy, old-name app copies are deleteCandidate (display only) in both tools
     const rs = syncAll(F, env, { allowReal: true })
@@ -3745,7 +5199,8 @@ async function run(): Promise<void> {
     if (!existsSync(join(F, '.claude/skills', B, 'SKILL.md'))) bad.push('no new copy')
     // cleanup
     for (const tool of ['claude', 'codex']) {
-      for (const n of [A, B]) rmSync(join(F, `.${tool}/skills`, n), { recursive: true, force: true })
+      for (const n of [A, B])
+        rmSync(join(F, `.${tool}/skills`, n), { recursive: true, force: true })
     }
     const st = readState(F).state
     for (const tool of ['claude', 'codex'] as const)
@@ -3789,11 +5244,17 @@ async function run(): Promise<void> {
       mem(SA, 'MEMORY.md'),
       '# Memory Index\n\n- [\uC5D0\uC774\uC6D0](a1.md) — \uD558\uB098\n- [\uC5D0\uC774\uD22C](a2.md) — \uB458\n- [\uC5D0\uC774\uC4F0\uB9AC](a3.md) — \uC14B\n- [\uC0AC\uB77C\uC9D0](gone.md) — \uC5C6\uC74C\n'
     )
-    for (const [f, ty] of [['a1.md', 'feedback'], ['a2.md', 'project'], ['a3.md', 'user'], ['a4.md', 'reference']])
+    for (const [f, ty] of [
+      ['a1.md', 'feedback'],
+      ['a2.md', 'project'],
+      ['a3.md', 'user'],
+      ['a4.md', 'reference']
+    ])
       writeFileSync(mem(SA, f), fm(f.replace('.md', ''), ty))
     writeFileSync(
       join(P, SA, 's1.jsonl'),
-      JSON.stringify({ type: 'user', cwd: '/private/tmp/illithid-none-xyz', sessionId: 's1' }) + '\n'
+      JSON.stringify({ type: 'user', cwd: '/private/tmp/illithid-none-xyz', sessionId: 's1' }) +
+        '\n'
     )
     writeFileSync(mem(SB, 'MEMORY.md'), '- [\uBE44\uC6D0](b1.md) — \uBE44\n')
     writeFileSync(mem(SB, 'b1.md'), fm('b1', 'feedback'))
@@ -3825,13 +5286,21 @@ async function run(): Promise<void> {
     /** paths changed (added, removed, modified) between before→after */
     const diff = (a: Map<string, string>, b: Map<string, string>): string[] =>
       [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k)).sort()
-    const expectOnly = (label: string, a: Map<string, string>, b: Map<string, string>, want: string[]): void => {
+    const expectOnly = (
+      label: string,
+      a: Map<string, string>,
+      b: Map<string, string>,
+      want: string[]
+    ): void => {
       const got = diff(a, b)
       const w = [...want].sort()
       if (JSON.stringify(got) !== JSON.stringify(w))
-        bad.push(`${label} changed paths ${got.map((p) => p.replace(F, '')).join(',')} ≠ ${w.map((p) => p.replace(F, '')).join(',')}`)
+        bad.push(
+          `${label} changed paths ${got.map((p) => p.replace(F, '')).join(',')} ≠ ${w.map((p) => p.replace(F, '')).join(',')}`
+        )
     }
-    const lines = (p: string): string[] => (existsSync(p) ? read(p).split('\n').filter(Boolean) : [])
+    const lines = (p: string): string[] =>
+      existsSync(p) ? read(p).split('\n').filter(Boolean) : []
     const count = (p: string, tag: string): number => lines(p).filter((l) => l.includes(tag)).length
 
     // scan
@@ -3840,16 +5309,21 @@ async function run(): Promise<void> {
     if (!pa) bad.push('scan A missing')
     else {
       if (pa.files.length !== 4) bad.push(`scan A files ${pa.files.length}`)
-      if (pa.cwd !== '/private/tmp/illithid-none-xyz' || !pa.temp || !pa.missing) bad.push('scan A cwd/temp/missing')
-      if (JSON.stringify(pa.index.broken) !== '["gone.md"]') bad.push(`scan broken ${pa.index.broken}`)
+      if (pa.cwd !== '/private/tmp/illithid-none-xyz' || !pa.temp || !pa.missing)
+        bad.push('scan A cwd/temp/missing')
+      if (JSON.stringify(pa.index.broken) !== '["gone.md"]')
+        bad.push(`scan broken ${pa.index.broken}`)
       const a1 = pa.files.find((f) => f.file === 'a1.md')
       const a4 = pa.files.find((f) => f.file === 'a4.md')
-      if (a1?.title !== '\uC5D0\uC774\uC6D0' || a1.type !== 'feedback' || !a1.inIndex) bad.push('scan a1')
+      if (a1?.title !== '\uC5D0\uC774\uC6D0' || a1.type !== 'feedback' || !a1.inIndex)
+        bad.push('scan a1')
       if (a4?.title !== 'a4' || a4.inIndex || a4.type !== 'reference') bad.push('scan a4')
     }
-    if (sc.projects.some((x) => x.slug === SC || x.slug === '-fixture-link')) bad.push('empty slot or symlink slot in scan')
+    if (sc.projects.some((x) => x.slug === SC || x.slug === '-fixture-link'))
+      bad.push('empty slot or symlink slot in scan')
     if (!sc.shared || sc.limits.lines !== 200) bad.push('scan shared/limits')
-    if (readClaudeMemoryFile(F, SA, 'MEMORY.md') !== read(mem(SA, 'MEMORY.md'))) bad.push('read MEMORY.md')
+    if (readClaudeMemoryFile(F, SA, 'MEMORY.md') !== read(mem(SA, 'MEMORY.md')))
+      bad.push('read MEMORY.md')
     if (claudeProjectSlug('/Users/x/Work space/.claude/\uD55C') !== '-Users-x-Work-space--claude--')
       bad.push(`slug conversion ${claudeProjectSlug('/Users/x/Work space/.claude/\uD55C')}`)
 
@@ -3867,7 +5341,11 @@ async function run(): Promise<void> {
       ['read ../', () => readClaudeMemoryFile(F, SA, '../s1.jsonl'), 'invalidName'],
       ['MEMORY.md trash', () => trashClaudeMemory(F, SA, 'MEMORY.md'), 'invalidName'],
       ['MEMORY.md move', () => moveClaudeMemory(F, SA, 'MEMORY.md', SB), 'invalidName'],
-      ['MEMORY.md promote', () => promoteClaudeMemory(F, SA, 'MEMORY.md', 'feedback'), 'invalidName'],
+      [
+        'MEMORY.md promote',
+        () => promoteClaudeMemory(F, SA, 'MEMORY.md', 'feedback'),
+        'invalidName'
+      ],
       ['type', () => promoteClaudeMemory(F, SA, 'a1.md', 'misc'), 'invalidName'],
       ['move target ../', () => moveClaudeMemory(F, SA, 'a1.md', '../x'), 'invalidName'],
       ['move same slot', () => moveClaudeMemory(F, SA, 'a1.md', SA), 'invalidName'],
@@ -3888,16 +5366,25 @@ async function run(): Promise<void> {
     const r1 = promoteClaudeMemory(F, SA, 'a1.md', 'feedback')
     const libA1 = join(libMem, 'feedback/a1.md')
     if (!existsSync(libA1) || read(libA1) !== a1Bytes) bad.push('promote body')
-    if (lines(sharedIdx).length !== sharedN + 1 || count(sharedIdx, '](feedback/a1.md)') !== 1) bad.push('promote shared index +1')
-    if (!lines(sharedIdx).includes('- [\uC5D0\uC774\uC6D0](feedback/a1.md) — \uD558\uB098')) bad.push('promote line link')
-    if (lines(mem(SA, 'MEMORY.md')).length !== aN - 1 || count(mem(SA, 'MEMORY.md'), '](a1.md)')) bad.push('promote source index -1')
-    if (existsSync(mem(SA, 'a1.md')) || !r1.trashPath || read(r1.trashPath) !== a1Bytes) bad.push('promote source trash')
-    if (!r1.trashPath?.includes(`/.trash/`) || !r1.trashPath.endsWith(`/tool-memory/claude/${SA}/a1.md`)) bad.push('promote trash path')
+    if (lines(sharedIdx).length !== sharedN + 1 || count(sharedIdx, '](feedback/a1.md)') !== 1)
+      bad.push('promote shared index +1')
+    if (!lines(sharedIdx).includes('- [\uC5D0\uC774\uC6D0](feedback/a1.md) — \uD558\uB098'))
+      bad.push('promote line link')
+    if (lines(mem(SA, 'MEMORY.md')).length !== aN - 1 || count(mem(SA, 'MEMORY.md'), '](a1.md)'))
+      bad.push('promote source index -1')
+    if (existsSync(mem(SA, 'a1.md')) || !r1.trashPath || read(r1.trashPath) !== a1Bytes)
+      bad.push('promote source trash')
+    if (
+      !r1.trashPath?.includes(`/.trash/`) ||
+      !r1.trashPath.endsWith(`/tool-memory/claude/${SA}/a1.md`)
+    )
+      bad.push('promote trash path')
     expectOnly('promote', s1, snap(), [mem(SA, 'a1.md'), mem(SA, 'MEMORY.md'), libA1, sharedIdx])
     // promoting the same path again → refused
     writeFileSync(mem(SA, 'a1.md'), fm('a1-again', 'feedback'))
     const s1b = snap()
-    if (errCode(() => promoteClaudeMemory(F, SA, 'a1.md', 'feedback')) !== 'exists') bad.push('promote to same path allowed')
+    if (errCode(() => promoteClaudeMemory(F, SA, 'a1.md', 'feedback')) !== 'exists')
+      bad.push('promote to same path allowed')
     expectOnly('promote refused', s1b, snap(), [])
 
     // move a2 → C (no memory folder → created)
@@ -3906,13 +5393,27 @@ async function run(): Promise<void> {
     const a2Bytes = read(mem(SA, 'a2.md'))
     moveClaudeMemory(F, SA, 'a2.md', SC)
     if (read(mem(SC, 'a2.md')) !== a2Bytes || existsSync(mem(SA, 'a2.md'))) bad.push('move file')
-    if (JSON.stringify(lines(mem(SC, 'MEMORY.md'))) !== JSON.stringify(['- [\uC5D0\uC774\uD22C](a2.md) — \uB458'])) bad.push('move target index')
-    if (lines(mem(SA, 'MEMORY.md')).length !== aN2 - 1 || count(mem(SA, 'MEMORY.md'), '](a2.md)')) bad.push('move source index -1')
-    expectOnly('move', s2, snap(), [mem(SA, 'a2.md'), mem(SA, 'MEMORY.md'), mem(SC, 'a2.md'), mem(SC, 'MEMORY.md')])
+    if (
+      JSON.stringify(lines(mem(SC, 'MEMORY.md'))) !==
+      JSON.stringify(['- [\uC5D0\uC774\uD22C](a2.md) — \uB458'])
+    )
+      bad.push('move target index')
+    if (lines(mem(SA, 'MEMORY.md')).length !== aN2 - 1 || count(mem(SA, 'MEMORY.md'), '](a2.md)'))
+      bad.push('move source index -1')
+    expectOnly('move', s2, snap(), [
+      mem(SA, 'a2.md'),
+      mem(SA, 'MEMORY.md'),
+      mem(SC, 'a2.md'),
+      mem(SC, 'MEMORY.md')
+    ])
     // move a4 (not in index) → B: source index unchanged, frontmatter line in target
     const s2b = snap()
     const r2b = moveClaudeMemory(F, SA, 'a4.md', SB)
-    if (r2b.removedLines !== 0 || count(mem(SB, 'MEMORY.md'), '- [a4](a4.md) — a4 \uC124\uBA85') !== 1) bad.push('move frontmatter line')
+    if (
+      r2b.removedLines !== 0 ||
+      count(mem(SB, 'MEMORY.md'), '- [a4](a4.md) — a4 \uC124\uBA85') !== 1
+    )
+      bad.push('move frontmatter line')
     expectOnly('move a4', s2b, snap(), [mem(SA, 'a4.md'), mem(SB, 'a4.md'), mem(SB, 'MEMORY.md')])
 
     // trash a3 (a recreated a1 remains in A, so the index stays)
@@ -3920,12 +5421,14 @@ async function run(): Promise<void> {
     const aN3 = lines(mem(SA, 'MEMORY.md')).length
     const r3 = trashClaudeMemory(F, SA, 'a3.md')
     if (existsSync(mem(SA, 'a3.md')) || !existsSync(r3.path)) bad.push('trash move')
-    if (lines(mem(SA, 'MEMORY.md')).length !== aN3 - 1 || r3.indexTrashPath) bad.push('trash index -1')
+    if (lines(mem(SA, 'MEMORY.md')).length !== aN3 - 1 || r3.indexTrashPath)
+      bad.push('trash index -1')
     expectOnly('trash', s3, snap(), [mem(SA, 'a3.md'), mem(SA, 'MEMORY.md')])
     // trash d1 → slot becomes empty, so the index is trashed too
     const s4 = snap()
     const r4 = trashClaudeMemory(F, SD, 'd1.md')
-    if (!r4.indexTrashPath || existsSync(mem(SD, 'MEMORY.md')) || !existsSync(r4.indexTrashPath)) bad.push('empty-slot index trash')
+    if (!r4.indexTrashPath || existsSync(mem(SD, 'MEMORY.md')) || !existsSync(r4.indexTrashPath))
+      bad.push('empty-slot index trash')
     expectOnly('trash empty slot', s4, snap(), [mem(SD, 'd1.md'), mem(SD, 'MEMORY.md')])
 
     // Codex scan (read)
@@ -3935,7 +5438,8 @@ async function run(): Promise<void> {
     const cx = scanCodexMemory(F)
     const cm = cx.find((e) => e.name === 'MEMORY.md')
     const cr = cx.find((e) => e.name === 'rollout_summaries')
-    if (cm?.lines !== 2 || cm.kind !== 'file' || cr?.kind !== 'dir' || cr.files !== 1) bad.push('codex scan')
+    if (cm?.lines !== 2 || cm.kind !== 'file' || cr?.kind !== 'dir' || cr.files !== 1)
+      bad.push('codex scan')
     // fixed order and non-memory excluded, rollouts newest first, continued reads, paths refused
     const CXR = join(F, '.codex/memories')
     writeFileSync(join(CXR, 'memory_summary.md'), 's\n')
@@ -3944,18 +5448,27 @@ async function run(): Promise<void> {
     writeFileSync(join(CXR, 'rollout_summaries/.hidden.md'), 'h\n')
     writeFileSync(join(CXR, 'rollout_summaries/old.md'), 'o\n')
     utimesSync(join(CXR, 'rollout_summaries/old.md'), 1000, 1000)
-    const order = scanCodexMemory(F).map((e) => e.name).join(',')
+    const order = scanCodexMemory(F)
+      .map((e) => e.name)
+      .join(',')
     if (order !== 'memory_summary.md,MEMORY.md,rollout_summaries') bad.push(`codex order ${order}`)
-    const ro = listCodexRolloutSummaries(F).map((e) => e.name).join(',')
+    const ro = listCodexRolloutSummaries(F)
+      .map((e) => e.name)
+      .join(',')
     if (ro !== 'r.md,old.md') bad.push(`rollout list ${ro}`)
-    const big = Array.from({ length: 3000 }, (_, i) => `- \uC904 ${i} \uD55C\uAE00 ✓ ${'x'.repeat(i % 50)}`).join('\n') + '\n'
+    const big =
+      Array.from(
+        { length: 3000 },
+        (_, i) => `- \uC904 ${i} \uD55C\uAE00 ✓ ${'x'.repeat(i % 50)}`
+      ).join('\n') + '\n'
     writeFileSync(join(CXR, 'raw_memories.md'), big)
     let acc = ''
     let off: number | undefined = 0
     let chunks = 0
     while (off !== undefined && chunks < 50) {
       const c = readCodexMemoryFile(F, 'raw_memories.md', off, 16 * 1024)
-      if (c.truncated !== (c.nextOffset !== undefined) || (c.truncated && !c.text.endsWith('\n'))) bad.push('continued read boundary')
+      if (c.truncated !== (c.nextOffset !== undefined) || (c.truncated && !c.text.endsWith('\n')))
+        bad.push('continued read boundary')
       acc += c.text
       off = c.nextOffset
       chunks++
@@ -4014,7 +5527,11 @@ async function run(): Promise<void> {
     createAgent(F, A, 'tmp')
     writeAgentDoc(F, A, { description: desc, body, tools })
     const d0 = readAgentDoc(F, A)
-    if (d0.description !== desc || d0.body !== body || JSON.stringify(d0.tools) !== JSON.stringify(tools))
+    if (
+      d0.description !== desc ||
+      d0.body !== body ||
+      JSON.stringify(d0.tools) !== JSON.stringify(tools)
+    )
       bad.push('source round trip')
     // saving the same values → bytes unchanged
     const libText = read(lib(A))
@@ -4031,41 +5548,57 @@ async function run(): Promise<void> {
     else {
       const c = matter(read(pc))
       if (
-        c.data.name !== A || c.data.description !== desc || c.data.model !== 'opus' ||
-        c.data.effort !== 'high' || c.content.trim() !== body.trim()
+        c.data.name !== A ||
+        c.data.description !== desc ||
+        c.data.model !== 'opus' ||
+        c.data.effort !== 'high' ||
+        c.content.trim() !== body.trim()
       )
         bad.push('Claude render values')
       const x = parseToml(read(px)) as Json
       if (
-        x.name !== A || x.description !== desc || x.model !== 'gpt-6-astra' ||
-        x.model_reasoning_effort !== 'xhigh' || x.developer_instructions !== body.trim()
+        x.name !== A ||
+        x.description !== desc ||
+        x.model !== 'gpt-6-astra' ||
+        x.model_reasoning_effort !== 'xhigh' ||
+        x.developer_instructions !== body.trim()
       )
         bad.push('Codex TOML values')
       const o = matter(read(po))
       if (
-        o.data.description !== desc || o.data.mode !== 'subagent' || o.data.model !== 'openai/gpt-5.5' ||
-        'reasoningEffort' in o.data || 'name' in o.data || o.content.trim() !== body.trim()
+        o.data.description !== desc ||
+        o.data.mode !== 'subagent' ||
+        o.data.model !== 'openai/gpt-5.5' ||
+        'reasoningEffort' in o.data ||
+        'name' in o.data ||
+        o.content.trim() !== body.trim()
       )
         bad.push('OpenCode render values')
       if (mode(pc) !== 0o644) bad.push('Claude file mode')
     }
     const st1 = readState(F).state.agents
-    if (!(['claude', 'codex', 'opencode'] as const).every((t) => st1?.[t]?.[A])) bad.push('state.agents record')
+    if (!(['claude', 'codex', 'opencode'] as const).every((t) => st1?.[t]?.[A]))
+      bad.push('state.agents record')
     // second sync writes 0, status synced
     const s2 = syncAll(F, env, { allowReal: true })
-    const w2 = Object.entries(summarizeSync(s2)).filter(([k]) => k.includes('written') || k.endsWith('.done'))
+    const w2 = Object.entries(summarizeSync(s2)).filter(
+      ([k]) => k.includes('written') || k.endsWith('.done')
+    )
     if (w2.length) bad.push(`re-sync changes ${w2.map(([k, v]) => `${k}=${v}`).join(',')}`)
     for (const t of ['claude', 'codex', 'opencode'])
-      if (cell(F, env, 'agents', t) !== 'synced') bad.push(`status agents/${t}=${cell(F, env, 'agents', t)}`)
+      if (cell(F, env, 'agents', t) !== 'synced')
+        bad.push(`status agents/${t}=${cell(F, env, 'agents', t)}`)
 
     // tool-side edit → restored from source, backup outside the agents folder
     writeFileSync(pc, read(pc) + '\nlocal edit\n')
     const s3 = syncAll(F, env, { allowReal: true })
     const up = s3.results?.agents.find((x) => x.tool === 'claude' && x.name === A)
-    if (up?.status !== 'done' || up.reason !== 'restored') bad.push(`drift restore ${up?.status}:${up?.reason}`)
+    if (up?.status !== 'done' || up.reason !== 'restored')
+      bad.push(`drift restore ${up?.status}:${up?.reason}`)
     const bak = agentBackupPath(F, 'claude', `${A}.md`)
     if (!existsSync(bak) || !read(bak).includes('local edit')) bad.push('drift backup')
-    if (readdirSync(join(F, '.claude/agents')).some((n) => n !== `${A}.md`)) bad.push('backup/tmp left in agents folder')
+    if (readdirSync(join(F, '.claude/agents')).some((n) => n !== `${A}.md`))
+      bad.push('backup/tmp left in agents folder')
 
     // same-name user file without a record → userOwned skip for claude only, bytes unchanged
     const userText = '---\nname: zz-user\ndescription: mine\n---\n\nuser owned\n'
@@ -4074,8 +5607,10 @@ async function run(): Promise<void> {
     const s4 = syncAll(F, env, { allowReal: true })
     const u4 = (s4.results?.agents ?? []).filter((x) => x.name === U)
     const uc = s4.plan.agents.find((x) => x.name === U && x.tool === 'claude')
-    if (uc?.action !== 'skip' || uc.reason !== 'userOwned') bad.push(`user file ${uc?.action}:${uc?.reason}`)
-    if (u4.filter((x) => x.status === 'done').length !== 2) bad.push('other tools copied next to user file')
+    if (uc?.action !== 'skip' || uc.reason !== 'userOwned')
+      bad.push(`user file ${uc?.action}:${uc?.reason}`)
+    if (u4.filter((x) => x.status === 'done').length !== 2)
+      bad.push('other tools copied next to user file')
     if (read(agentToolPath(F, 'claude', U)) !== userText) bad.push('user file bytes changed')
     if (readState(F).state.agents?.claude?.[U]) bad.push('user file recorded in state')
 
@@ -4085,7 +5620,12 @@ async function run(): Promise<void> {
     setToggle(F, 'agents', A, 'codex', false)
     const s5 = syncAll(F, env, { allowReal: true })
     const cands = s5.plan.agents.filter((x) => x.action === 'deleteCandidate')
-    if (cands.length !== 1 || cands[0].tool !== 'codex' || cands[0].name !== A || cands[0].reason !== 'disabled')
+    if (
+      cands.length !== 1 ||
+      cands[0].tool !== 'codex' ||
+      cands[0].name !== A ||
+      cands[0].reason !== 'disabled'
+    )
       bad.push(`off candidates ${cands.map((x) => `${x.tool}/${x.name}:${x.reason}`).join(',')}`)
     const d5 = s5.results?.agents.find((x) => x.action === 'deleteCandidate')
     if (d5?.status !== 'done' || existsSync(px)) bad.push(`off delete ${d5?.status}:${d5?.reason}`)
@@ -4099,10 +5639,14 @@ async function run(): Promise<void> {
       { kind: 'agent', tool: 'claude', name: A, path: pc, currentHash: 'x' },
       { kind: 'agent', tool: 'claude', name: U, path: agentToolPath(F, 'claude', U) }
     ])
-    if (rj.some((x) => x.status !== 'refused')) bad.push(`manual delete refusal ${rj.map((x) => `${x.status}:${x.reason}`).join(',')}`)
-    if (read(agentToolPath(F, 'claude', U)) !== userText || !existsSync(pc)) bad.push('refused request changed files')
+    if (rj.some((x) => x.status !== 'refused'))
+      bad.push(`manual delete refusal ${rj.map((x) => `${x.status}:${x.reason}`).join(',')}`)
+    if (read(agentToolPath(F, 'claude', U)) !== userText || !existsSync(pc))
+      bad.push('refused request changed files')
     const s6 = syncAll(F, env, { allowReal: true })
-    if (Object.keys(agentSum(s6)).some((k) => k.endsWith('.done') || k.endsWith('.pendingApproval')))
+    if (
+      Object.keys(agentSum(s6)).some((k) => k.endsWith('.done') || k.endsWith('.pendingApproval'))
+    )
       bad.push(`sync after delete ${JSON.stringify(agentSum(s6))}`)
 
     // rename: file, name, manifest moved; old-name app files become delete candidates
@@ -4110,10 +5654,17 @@ async function run(): Promise<void> {
     if (existsSync(lib(A)) || readAgentDoc(F, A2).description !== desc) bad.push('rename file')
     if (!read(lib(A2)).includes(`name: ${A2}`)) bad.push('rename frontmatter name')
     const mf = readJson(join(libraryRoot(F), MANIFEST_FILE)) as { agents?: Json }
-    if (JSON.stringify(mf.agents?.[A2]) !== '{"codex":false}' || mf.agents?.[A]) bad.push('rename manifest')
+    if (JSON.stringify(mf.agents?.[A2]) !== '{"codex":false}' || mf.agents?.[A])
+      bad.push('rename manifest')
     const s7 = syncAll(F, env, { allowReal: true })
-    const new7 = (s7.results?.agents ?? []).filter((x) => x.name === A2 && x.status === 'done').map((x) => x.tool).sort()
-    const old7 = (s7.results?.agents ?? []).filter((x) => x.name === A && x.action === 'deleteCandidate').map((x) => `${x.tool}:${x.status}`).sort()
+    const new7 = (s7.results?.agents ?? [])
+      .filter((x) => x.name === A2 && x.status === 'done')
+      .map((x) => x.tool)
+      .sort()
+    const old7 = (s7.results?.agents ?? [])
+      .filter((x) => x.name === A && x.action === 'deleteCandidate')
+      .map((x) => `${x.tool}:${x.status}`)
+      .sort()
     if (new7.join(',') !== 'claude,opencode') bad.push(`new name copy ${new7}`)
     if (old7.join(',') !== 'claude:done,opencode:done') bad.push(`old name delete ${old7}`)
     if (existsSync(pc) || existsSync(po)) bad.push('old name files left')
@@ -4127,10 +5678,13 @@ async function run(): Promise<void> {
       errCode(() => createAgent(F, 'zz-empty', ' ')),
       errCode(() => renameAgent(F, A2, U)),
       errCode(() => renameAgent(F, A2, '../../x')),
-      errCode(() => writeAgentDoc(F, A2, { description: desc, body, tools: { claude: { model: 'a\nb' } } })),
+      errCode(() =>
+        writeAgentDoc(F, A2, { description: desc, body, tools: { claude: { model: 'a\nb' } } })
+      ),
       errCode(() => writeAgentDoc(F, A2, { description: desc, body, tools: { foo: {} } as never }))
     ]
-    const want = 'invalidName,invalidName,invalidName,exists,invalidSchema,exists,invalidName,invalidSchema,invalidSchema'
+    const want =
+      'invalidName,invalidName,invalidName,exists,invalidSchema,exists,invalidName,invalidSchema,invalidSchema'
     if (rejects.join(',') !== want) bad.push(`refused ${rejects.join(',')}`)
 
     // cleanup: delete from library → approve candidate deletion → remove user file
@@ -4139,10 +5693,12 @@ async function run(): Promise<void> {
     const s8 = syncAll(F, env, { allowReal: true })
     const d8 = (s8.results?.agents ?? []).filter((x) => x.action === 'deleteCandidate')
     if (!d8.length || d8.some((x) => x.status !== 'done')) bad.push('cleanup delete failed')
-    if (read(agentToolPath(F, 'claude', U)) !== userText) bad.push('user file changed during cleanup')
+    if (read(agentToolPath(F, 'claude', U)) !== userText)
+      bad.push('user file changed during cleanup')
     unlinkSync(agentToolPath(F, 'claude', U))
     const st9 = readState(F).state.agents ?? {}
-    if (Object.values(st9).some((m) => m && Object.keys(m).length)) bad.push('state left after cleanup')
+    if (Object.values(st9).some((m) => m && Object.keys(m).length))
+      bad.push('state left after cleanup')
     if (setToggle(F, 'agents', A2, 'codex', true).agents[A2]) bad.push('cleanup toggle')
     check(
       'u. agents — rendered to 3 tools (incl. Codex TOML) with matching values, re-sync 0, drift restored with backup outside folder, user files unchanged, tool off → that tool only backed up and moved immediately, rename, refusals',
@@ -4156,7 +5712,8 @@ async function run(): Promise<void> {
   // ---- v. agent import — scan/convert 3 tools, exclude app-owned, primary and built-in toolOnly, tool-specific key warnings, apply, adopt, rescan 0
   {
     const bad: string[] = []
-    const agentsOf = (id: string): ReturnType<typeof planImport>['agents'] => planImport(F, id).agents
+    const agentsOf = (id: string): ReturnType<typeof planImport>['agents'] =>
+      planImport(F, id).agents
     const lib2 = (n: string): string => join(libraryPaths(F).agentsDir, `${n}.md`)
     const summary = (id: string): string =>
       agentsOf(id)
@@ -4185,7 +5742,10 @@ async function run(): Promise<void> {
       join(F, '.config/opencode/agents/zz-oc.md'),
       '---\ndescription: OC agent\nmode: subagent\nmodel: openai/gpt-5.5\nreasoningEffort: high\ntemperature: 0.1\n---\n\nDo oc.\n'
     )
-    writeFileSync(join(F, '.config/opencode/agent/zz-prim.md'), '---\ndescription: Primary\nmode: primary\n---\n\nMain.\n')
+    writeFileSync(
+      join(F, '.config/opencode/agent/zz-prim.md'),
+      '---\ndescription: Primary\nmode: primary\n---\n\nMain.\n'
+    )
     const singText = '---\ndescription: Singular dir\nmode: subagent\n---\n\nSing.\n'
     writeFileSync(join(F, '.config/opencode/agent/zz-sing.md'), singText)
     const cxText = read(join(F, '.codex/agents/zz-cx.toml'))
@@ -4213,8 +5773,10 @@ async function run(): Promise<void> {
     const ocWithAgents = read(ocPath)
 
     const pc = agentsOf('tool:claude')
-    if (summary('tool:claude') !== 'Bad Name:ok,zz-imp:warn,zz-same:ok') bad.push(`claude candidates ${summary('tool:claude')}`)
-    if (!pc.find((c) => c.name === 'Bad Name')?.conflicts.includes('invalidName')) bad.push('invalid name invalidName')
+    if (summary('tool:claude') !== 'Bad Name:ok,zz-imp:warn,zz-same:ok')
+      bad.push(`claude candidates ${summary('tool:claude')}`)
+    if (!pc.find((c) => c.name === 'Bad Name')?.conflicts.includes('invalidName'))
+      bad.push('invalid name invalidName')
     const imp = pc.find((c) => c.name === 'zz-imp')?.variants[0]
     if (
       !imp ||
@@ -4227,87 +5789,164 @@ async function run(): Promise<void> {
       bad.push('claude converted values/warnings')
     else {
       const d = parseAgentText('zz-imp', imp.text)
-      if (JSON.stringify(d.tools) !== '{"claude":{"model":"sonnet","effort":"high"}}' || d.body !== 'Check things.\n')
+      if (
+        JSON.stringify(d.tools) !== '{"claude":{"model":"sonnet","effort":"high"}}' ||
+        d.body !== 'Check things.\n'
+      )
         bad.push('claude library format')
     }
-    if (pc.some((c) => c.name === 'zz-owned') || agentsOf('tool:codex').some((c) => c.name === 'zz-owned') || agentsOf('tool:opencode').some((c) => c.name === 'zz-owned'))
+    if (
+      pc.some((c) => c.name === 'zz-owned') ||
+      agentsOf('tool:codex').some((c) => c.name === 'zz-owned') ||
+      agentsOf('tool:opencode').some((c) => c.name === 'zz-owned')
+    )
       bad.push('app-owned copy is a candidate')
     const cx = agentsOf('tool:codex').find((c) => c.name === 'zz-cx')?.variants[0]
-    if (!cx || cx.model !== 'gpt-unknown-9' || cx.effort !== 'max' || JSON.stringify(cx.warnings) !== '["sandbox_mode"]')
+    if (
+      !cx ||
+      cx.model !== 'gpt-unknown-9' ||
+      cx.effort !== 'max' ||
+      JSON.stringify(cx.warnings) !== '["sandbox_mode"]'
+    )
       bad.push('codex converted values/warnings')
-    else if (parseAgentText('zz-cx', cx.text).body !== 'Do codex.\n') bad.push('codex developer_instructions → body')
+    else if (parseAgentText('zz-cx', cx.text).body !== 'Do codex.\n')
+      bad.push('codex developer_instructions → body')
     const po = agentsOf('tool:opencode')
-    if (summary('tool:opencode') !== 'build:toolOnly,zz-inline:ok,zz-oc:warn,zz-prim:toolOnly,zz-sing:ok')
+    if (
+      summary('tool:opencode') !==
+      'build:toolOnly,zz-inline:ok,zz-oc:warn,zz-prim:toolOnly,zz-sing:ok'
+    )
       bad.push(`opencode candidates ${summary('tool:opencode')}`)
-    if (JSON.stringify(po.find((c) => c.name === 'zz-prim')?.reasons) !== '["primaryAgent"]') bad.push('primary reason')
-    if (JSON.stringify(po.find((c) => c.name === 'build')?.reasons) !== '["builtinAgent"]') bad.push('built-in reason')
+    if (JSON.stringify(po.find((c) => c.name === 'zz-prim')?.reasons) !== '["primaryAgent"]')
+      bad.push('primary reason')
+    if (JSON.stringify(po.find((c) => c.name === 'build')?.reasons) !== '["builtinAgent"]')
+      bad.push('built-in reason')
     const ocv = po.find((c) => c.name === 'zz-oc')?.variants[0]
-    if (!ocv || ocv.effort !== 'high' || JSON.stringify(ocv.warnings) !== '["temperature"]') bad.push('opencode converted values/warnings')
+    if (!ocv || ocv.effort !== 'high' || JSON.stringify(ocv.warnings) !== '["temperature"]')
+      bad.push('opencode converted values/warnings')
     const inl = po.find((c) => c.name === 'zz-inline')?.variants[0]
-    if (!inl || parseAgentText('zz-inline', inl.text).body !== 'Inline prompt\n' || inl.model !== 'openai/gpt-5.5')
+    if (
+      !inl ||
+      parseAgentText('zz-inline', inl.text).body !== 'Inline prompt\n' ||
+      inl.model !== 'openai/gpt-5.5'
+    )
       bad.push('opencode inline prompt → body')
 
     // apply: 2 claude (different bytes → back up, move and convert 1; same bytes → adopt 1), invalid name and primary refused
-    const r1 = applyImport(F, [
-      { kind: 'agent', name: 'zz-imp' },
-      { kind: 'agent', name: 'zz-same' },
-      { kind: 'agent', name: 'Bad Name' }
-    ], 'tool:claude')
+    const r1 = applyImport(
+      F,
+      [
+        { kind: 'agent', name: 'zz-imp' },
+        { kind: 'agent', name: 'zz-same' },
+        { kind: 'agent', name: 'Bad Name' }
+      ],
+      'tool:claude'
+    )
     const res = (x: (typeof r1)[number]): string =>
       `${x.name}:${x.status}:${x.reason ?? ''}:${(x.converted ?? []).join('+')}:${(x.adopted ?? []).join('+')}:${(x.userOwned ?? []).join('+')}:${x.inlineRemains ? 'inline' : ''}`
     const r1s = r1.map(res).join(',')
-    if (r1s !== 'zz-imp:imported::claude:::,zz-same:imported:::claude::,Bad Name:refused:invalidName::::')
+    if (
+      r1s !==
+      'zz-imp:imported::claude:::,zz-same:imported:::claude::,Bad Name:refused:invalidName::::'
+    )
       bad.push(`claude apply ${r1s}`)
     const rp = applyImport(F, [{ kind: 'agent', name: 'zz-prim' }], 'tool:opencode')
     if (rp[0]?.reason !== 'toolOnly') bad.push(`primary apply ${rp[0]?.status}:${rp[0]?.reason}`)
-    if (JSON.stringify(listAgents(F)) !== '["zz-imp","zz-same"]') bad.push(`library ${listAgents(F)}`)
+    if (JSON.stringify(listAgents(F)) !== '["zz-imp","zz-same"]')
+      bad.push(`library ${listAgents(F)}`)
     if (read(lib2('zz-imp')) !== imp?.text) bad.push('library file = candidate text')
     // HAR-12: import leaves the source in place (pendingRetire) — it is backed up and replaced by the next sync
-    if (read(join(cDir, 'zz-imp.md')) !== impText || importedBackup('claude/agents/zz-imp.md')) bad.push('source moved at import')
-    if (!readState(F).state.pendingRetire?.some((p) => p.kind === 'agent' && p.tool === 'claude' && p.name === 'zz-imp')) bad.push('pendingRetire not recorded')
-    if (read(join(cDir, 'zz-same.md')) !== sameText || !readState(F).state.agents?.claude?.['zz-same'])
+    if (read(join(cDir, 'zz-imp.md')) !== impText || importedBackup('claude/agents/zz-imp.md'))
+      bad.push('source moved at import')
+    if (
+      !readState(F).state.pendingRetire?.some(
+        (p) => p.kind === 'agent' && p.tool === 'claude' && p.name === 'zz-imp'
+      )
+    )
+      bad.push('pendingRetire not recorded')
+    if (
+      read(join(cDir, 'zz-same.md')) !== sameText ||
+      !readState(F).state.agents?.claude?.['zz-same']
+    )
       bad.push('adopt (bytes unchanged, state)')
     const sy = syncAll(F, env, { allowReal: true })
-    const act = (n: string, t: string): string => sy.plan.agents.find((x) => x.name === n && x.tool === t)?.action ?? '-'
-    if (act('zz-same', 'claude') !== 'inSync' || act('zz-imp', 'claude') !== 'replaceImported') bad.push(`sync after apply ${act('zz-same', 'claude')}/${act('zz-imp', 'claude')}`)
+    const act = (n: string, t: string): string =>
+      sy.plan.agents.find((x) => x.name === n && x.tool === t)?.action ?? '-'
+    if (act('zz-same', 'claude') !== 'inSync' || act('zz-imp', 'claude') !== 'replaceImported')
+      bad.push(`sync after apply ${act('zz-same', 'claude')}/${act('zz-imp', 'claude')}`)
     const ib = importedBackup('claude/agents/zz-imp.md')
     if (!ib || read(ib) !== impText) bad.push('conversion backup source bytes')
-    if (readState(F).state.pendingRetire?.some((p) => p.name === 'zz-imp')) bad.push('pendingRetire left after sync')
-    const acts2 = planSyncAll(F, env).agents.filter((x) => x.name === 'zz-imp').map((x) => x.action)
+    if (readState(F).state.pendingRetire?.some((p) => p.name === 'zz-imp'))
+      bad.push('pendingRetire left after sync')
+    const acts2 = planSyncAll(F, env)
+      .agents.filter((x) => x.name === 'zz-imp')
+      .map((x) => x.action)
     if (acts2.some((a) => a !== 'inSync')) bad.push(`not inSync after conversion ${acts2}`)
-    if (read(join(cDir, 'zz-imp.md')) !== renderAgent('claude', readAgentDoc(F, 'zz-imp'))) bad.push('render result after conversion')
+    if (read(join(cDir, 'zz-imp.md')) !== renderAgent('claude', readAgentDoc(F, 'zz-imp')))
+      bad.push('render result after conversion')
     // codex and opencode apply: agents/ converted, agent/ (singular) backed up and moved, inline leaves opencode.json unchanged + warning
     const r2 = [
       ...applyImport(F, [{ kind: 'agent', name: 'zz-cx' }], 'tool:codex'),
-      ...applyImport(F, [{ kind: 'agent', name: 'zz-oc' }, { kind: 'agent', name: 'zz-inline' }, { kind: 'agent', name: 'zz-sing' }], 'tool:opencode')
+      ...applyImport(
+        F,
+        [
+          { kind: 'agent', name: 'zz-oc' },
+          { kind: 'agent', name: 'zz-inline' },
+          { kind: 'agent', name: 'zz-sing' }
+        ],
+        'tool:opencode'
+      )
     ]
     const r2s = r2.map(res).join(',')
-    if (r2s !== 'zz-cx:imported::codex:::,zz-oc:imported::opencode:::,zz-inline:imported:::::inline,zz-sing:imported::opencode:::')
+    if (
+      r2s !==
+      'zz-cx:imported::codex:::,zz-oc:imported::opencode:::,zz-inline:imported:::::inline,zz-sing:imported::opencode:::'
+    )
       bad.push(`codex/opencode apply ${r2s}`)
-    if (read(join(F, '.codex/agents/zz-cx.toml')) !== cxText || read(join(F, '.config/opencode/agent/zz-sing.md')) !== singText)
+    if (
+      read(join(F, '.codex/agents/zz-cx.toml')) !== cxText ||
+      read(join(F, '.config/opencode/agent/zz-sing.md')) !== singText
+    )
       bad.push('codex/opencode source moved at import')
     if (read(ocPath) !== ocWithAgents) bad.push('opencode.json bytes changed')
     syncAll(F, env, { allowReal: true })
     const xb = importedBackup('codex/agents/zz-cx.toml')
     const ob = importedBackup('opencode/agents/zz-oc.md')
     const sb = importedBackup('opencode/agent/zz-sing.md')
-    if (!xb || read(xb) !== cxText || !ob || read(ob) !== ocAgentText || !sb || read(sb) !== singText)
+    if (
+      !xb ||
+      read(xb) !== cxText ||
+      !ob ||
+      read(ob) !== ocAgentText ||
+      !sb ||
+      read(sb) !== singText
+    )
       bad.push('codex/opencode backup source bytes')
     if (existsSync(join(F, '.config/opencode/agent/zz-sing.md'))) bad.push('agent/ source left')
     if (read(ocPath) !== ocWithAgents) bad.push('opencode.json bytes changed by sync')
-    const notIn = planSyncAll(F, env).agents.filter((x) => x.action !== 'inSync').map((x) => `${x.tool}/${x.name}:${x.action}`)
+    const notIn = planSyncAll(F, env)
+      .agents.filter((x) => x.action !== 'inSync')
+      .map((x) => `${x.tool}/${x.name}:${x.action}`)
     if (notIn.length) bad.push(`sync after conversion ${notIn}`)
-    if (!existsSync(agentToolPath(F, 'opencode', 'zz-sing'))) bad.push('import from agent/ not applied to agents/')
+    if (!existsSync(agentToolPath(F, 'opencode', 'zz-sing')))
+      bad.push('import from agent/ not applied to agents/')
     // rescan: imported items have 0 candidates (only invalid names and toolOnly remain)
-    const left = ['tool:claude', 'tool:codex', 'tool:opencode'].flatMap((id) => agentsOf(id).map((c) => c.name)).sort()
-    if (JSON.stringify(left) !== '["Bad Name","build","zz-prim"]') bad.push(`rescan candidates ${left}`)
+    const left = ['tool:claude', 'tool:codex', 'tool:opencode']
+      .flatMap((id) => agentsOf(id).map((c) => c.name))
+      .sort()
+    if (JSON.stringify(left) !== '["Bad Name","build","zz-prim"]')
+      bad.push(`rescan candidates ${left}`)
     // user file different from the library → existsInLibrary; refused without overwrite, trashed with it
-    writeFileSync(join(F, '.config/opencode/agent/zz-imp.md'), '---\ndescription: Imported agent\n---\n\nCheck more.\n')
+    writeFileSync(
+      join(F, '.config/opencode/agent/zz-imp.md'),
+      '---\ndescription: Imported agent\n---\n\nCheck more.\n'
+    )
     const ex = agentsOf('tool:opencode').find((c) => c.name === 'zz-imp')
     if (!ex?.conflicts.includes('existsInLibrary')) bad.push('existsInLibrary')
     const r3 = applyImport(F, [{ kind: 'agent', name: 'zz-imp' }], 'tool:opencode')
     const r4 = applyImport(F, [{ kind: 'agent', name: 'zz-imp', overwrite: true }], 'tool:opencode')
-    if (r3[0]?.reason !== 'existsInLibrary' || r4[0]?.status !== 'imported' || !r4[0].trashPath) bad.push('overwrite')
+    if (r3[0]?.reason !== 'existsInLibrary' || r4[0]?.status !== 'imported' || !r4[0].trashPath)
+      bad.push('overwrite')
     if (readAgentDoc(F, 'zz-imp').body !== 'Check more.\n') bad.push('overwritten body')
 
     // cleanup
@@ -4326,8 +5965,11 @@ async function run(): Promise<void> {
       if (existsSync(p)) unlinkSync(p)
     writeFileSync(ocPath, ocOrig)
     const st9 = readState(F).state.agents ?? {}
-    if (Object.values(st9).some((m) => m && Object.keys(m).length)) bad.push('state left after cleanup')
-    const rest = ['.claude/agents', '.codex/agents', '.config/opencode/agents'].flatMap((d) => readdirSync(join(F, d)))
+    if (Object.values(st9).some((m) => m && Object.keys(m).length))
+      bad.push('state left after cleanup')
+    const rest = ['.claude/agents', '.codex/agents', '.config/opencode/agents'].flatMap((d) =>
+      readdirSync(join(F, d))
+    )
     if (rest.length) bad.push(`tool files after cleanup ${rest}`)
     check(
       'v. agent import — 3-tool scan and converted values, app-owned excluded, primary and built-in toolOnly, tool-specific key warnings, source files backed up and moved then converted (inSync), same bytes adopted, inline unchanged + warning, rescan 0, overwrite',
@@ -4362,11 +6004,16 @@ async function run(): Promise<void> {
     }
     // 1) build with the new layout and sync → revert to the root-style layout (mimics previous app state)
     initLibrary(W)
-    if (importAllFromLegacy(W).results.some((x) => x.status !== 'imported')) bad.push('import failed')
+    if (importAllFromLegacy(W).results.some((x) => x.status !== 'imported'))
+      bad.push('import failed')
     const envW = fakeEnv(W)
     syncAll(W, envW, { allowReal: true })
     const git = (...a: string[]): string =>
-      execFileSync('git', ['-C', wsDefault, '-c', 'user.name=fx', '-c', 'user.email=fx@invalid', ...a], { encoding: 'utf8' })
+      execFileSync(
+        'git',
+        ['-C', wsDefault, '-c', 'user.name=fx', '-c', 'user.email=fx@invalid', ...a],
+        { encoding: 'utf8' }
+      )
     git('init', '-q')
     git('add', '-A')
     git('commit', '-qm', 'fx')
@@ -4381,7 +6028,12 @@ async function run(): Promise<void> {
     rmdirSync(join(flat, 'workspaces'))
     const toFlat = (rel: string): void => {
       const p = join(W, rel)
-      writeFileSync(p, read(p).split(wsDefault + '/').join(flat + '/'))
+      writeFileSync(
+        p,
+        read(p)
+          .split(wsDefault + '/')
+          .join(flat + '/')
+      )
     }
     toFlat('.config/opencode/opencode.json')
     toFlat('.config/illithid/state.json')
@@ -4389,25 +6041,35 @@ async function run(): Promise<void> {
     const pm = planMigrateToWorkspaces(W)
     for (const e of ['.git', '.trash', 'artifacts', 'rules', 'mcps', 'memory', '.gitignore'])
       if (!pm.entries.includes(e)) bad.push(`${e} missing from migration targets`)
-    if (!pm.needed || pm.conflicts.length || pm.stateRewrites < 1) bad.push(`plan ${JSON.stringify({ n: pm.needed, c: pm.conflicts, s: pm.stateRewrites })}`)
+    if (!pm.needed || pm.conflicts.length || pm.stateRewrites < 1)
+      bad.push(`plan ${JSON.stringify({ n: pm.needed, c: pm.conflicts, s: pm.stateRewrites })}`)
     const en = ensureLibrary(W)
     if (en.status !== 'exists' || !en.migrated?.length) bad.push(`ensureLibrary ${en.status}`)
     const after = hashTree(wsDefault, ['workspace.json'])
     const diff = [...before.keys()].filter((k) => before.get(k) !== after.get(k))
-    if (diff.length || after.size !== before.size) bad.push(`bytes not kept ${diff.length}/${after.size}-${before.size}`)
-    if (JSON.stringify(readdirSync(flat)) !== JSON.stringify(['workspaces'])) bad.push(`entries left at root ${readdirSync(flat).join(',')}`)
+    if (diff.length || after.size !== before.size)
+      bad.push(`bytes not kept ${diff.length}/${after.size}-${before.size}`)
+    if (JSON.stringify(readdirSync(flat)) !== JSON.stringify(['workspaces']))
+      bad.push(`entries left at root ${readdirSync(flat).join(',')}`)
     if (git('rev-parse', 'HEAD').trim() !== head0) bad.push('.git HEAD')
     const rb = join(W, '.config/illithid/rollback')
-    const snaps = existsSync(rb) ? readdirSync(rb).filter((f) => f.startsWith('pre-workspaces-') && f.endsWith('.tar')) : []
+    const snaps = existsSync(rb)
+      ? readdirSync(rb).filter((f) => f.startsWith('pre-workspaces-') && f.endsWith('.tar'))
+      : []
     if (snaps.length !== 1) bad.push('no snapshot tar')
     const stTxt = read(join(W, '.config/illithid/state.json'))
-    if (stTxt.includes(flat + '/rules') || stTxt.includes(flat + '/skills')) bad.push('root-style paths in state')
+    if (stTxt.includes(flat + '/rules') || stTxt.includes(flat + '/skills'))
+      bad.push('root-style paths in state')
     const again = migrateToWorkspaces(W)
     if (!again.ok || again.moved.length || again.plan.needed) bad.push('re-run not idempotent')
     const rs = syncAll(W, envW, { allowReal: true })
     if (!rs.results) bad.push('sync did not run after migration')
     const ocAfterMig = read(join(W, '.config/opencode/opencode.json'))
-    if (ocAfterMig.includes(flat + '/rules') || ocAfterMig.includes(flat + '/skills"') || !ocAfterMig.includes(wsDefault + '/rules/'))
+    if (
+      ocAfterMig.includes(flat + '/rules') ||
+      ocAfterMig.includes(flat + '/skills"') ||
+      !ocAfterMig.includes(wsDefault + '/rules/')
+    )
       bad.push('opencode.json paths after migration')
     if (changedOrError(planAll(W, envW)).length) bad.push('re-plan changes after migration')
     // stop on conflict
@@ -4417,7 +6079,8 @@ async function run(): Promise<void> {
     writeFileSync(join(WC, '.illithid/rules/a.md'), 'a\n')
     mkdirSync(join(WC, '.illithid/workspaces/default/rules'), { recursive: true })
     const cr = migrateToWorkspaces(WC)
-    if (cr.ok || cr.moved.length || !existsSync(join(WC, '.illithid/rules/a.md'))) bad.push('proceeded despite conflict')
+    if (cr.ok || cr.moved.length || !existsSync(join(WC, '.illithid/rules/a.md')))
+      bad.push('proceeded despite conflict')
     if (ensureLibrary(WC).status !== 'migrateFailed') bad.push('conflict ensureLibrary')
     const migDetail = `migrated ${pm.entries.length} entries (incl. .git, .trash, artifacts), ${after.size} files byte-identical, HEAD identical, state ${pm.stateRewrites}, tar 1, idempotent, stops on conflict`
 
@@ -4435,61 +6098,104 @@ async function run(): Promise<void> {
     const userBefore = sha(read(join(userSkill, 'SKILL.md')))
     const ws2 = createWorkspace(W, '\uD68C\uC0AC', { from: 'empty' })
     if (ws2.id !== 'workspace' || listWorkspaces(W).length !== 2) bad.push(`created id ${ws2.id}`)
-    if (errCode(() => createWorkspace(W, '\uD68C\uC0AC')) === 'ok') bad.push('same-name create allowed')
+    if (errCode(() => createWorkspace(W, '\uD68C\uC0AC')) === 'ok')
+      bad.push('same-name create allowed')
     switchWorkspace(W, ws2.id)
     const ws2Root = libraryRoot(W)
     createRule(W, 'zz-company.md', '# company\n')
-    writeFileSync(join(ws2Root, 'memory/MEMORY.md'), '# mem\n- [a](feedback/a.md)\n- [w](https://x.invalid/a.md)\n')
+    writeFileSync(
+      join(ws2Root, 'memory/MEMORY.md'),
+      '# mem\n- [a](feedback/a.md)\n- [w](https://x.invalid/a.md)\n'
+    )
     const sw = syncAll(W, {}, { allowReal: true })
     if (!sw.results) bad.push('switch sync did not run')
     const now = readdirSync(claudeRules)
-    if (!now.includes('zz-company.md') || !now.includes('MEMORY.md')) bad.push('new workspace rules/memory missing')
+    if (!now.includes('zz-company.md') || !now.includes('MEMORY.md'))
+      bad.push('new workspace rules/memory missing')
     if (defaultRules.some((n) => now.includes(n))) bad.push('previous workspace rules left')
-    if (!defaultRules.every((n) => deletedBackup(W, `rules/${n}`))) bad.push('no backup of previous rules')
+    if (!defaultRules.every((n) => deletedBackup(W, `rules/${n}`)))
+      bad.push('no backup of previous rules')
     const memCopy = read(join(claudeRules, 'MEMORY.md'))
-    if (!memCopy.includes(`](${join(ws2Root, 'memory/feedback/a.md')})`) || !memCopy.includes('](https://x.invalid/a.md)'))
+    if (
+      !memCopy.includes(`](${join(ws2Root, 'memory/feedback/a.md')})`) ||
+      !memCopy.includes('](https://x.invalid/a.md)')
+    )
       bad.push('memory link conversion')
     const oc1 = read(opP)
-    if (oc1.includes(wsDefault + '/') || !oc1.includes('/fixture/user-own.md') || !oc1.includes(ws2Root + '/rules/zz-company.md'))
+    if (
+      oc1.includes(wsDefault + '/') ||
+      !oc1.includes('/fixture/user-own.md') ||
+      !oc1.includes(ws2Root + '/rules/zz-company.md')
+    )
       bad.push('opencode.json switch paths')
     if (sha(read(join(userSkill, 'SKILL.md'))) !== userBefore) bad.push('user skill changed')
     // memory delete → copy deletion applied immediately
     unlinkSync(join(ws2Root, 'memory/MEMORY.md'))
     syncAll(W, {}, { allowReal: true })
-    if (existsSync(join(claudeRules, 'MEMORY.md')) || !deletedBackup(W, 'rules/MEMORY.md')) bad.push('copy left without memory')
+    if (existsSync(join(claudeRules, 'MEMORY.md')) || !deletedBackup(W, 'rules/MEMORY.md'))
+      bad.push('copy left without memory')
     switchWorkspace(W, 'default')
     syncAll(W, envW, { allowReal: true })
     const back = readdirSync(claudeRules)
-    if (!defaultRules.every((n) => back.includes(n)) || back.includes('zz-company.md')) bad.push('rules after switching back')
+    if (!defaultRules.every((n) => back.includes(n)) || back.includes('zz-company.md'))
+      bad.push('rules after switching back')
     if (read(opP).includes(ws2Root + '/')) bad.push('switch path in opencode after switching back')
     if (changedOrError(planAll(W, envW)).length) bad.push('re-plan changes after switching back')
 
     // 3) zip round trip
     const mem = memorySecretBackend()
     const PLAIN = 'fxsecWsZip-Qa1Ws2Ed3Rf4Tg5Yh6'
-    upsertMcpServer(W, 'zz-wsec', { transport: 'stdio', command: 'x', env: { TOKEN: PLAIN } }, { secrets: mem })
+    upsertMcpServer(
+      W,
+      'zz-wsec',
+      { transport: 'stdio', command: 'x', env: { TOKEN: PLAIN } },
+      { secrets: mem }
+    )
     const ex = exportWorkspace(W, { appVersion: '0.0.0-fx' })
     const unz = unzipSync(ex.data)
     const names = Object.keys(unz)
-    if (names.some((n) => /^(\.git|\.trash|artifacts)\//.test(n) || n.endsWith('.DS_Store'))) bad.push('excluded entries in zip')
-    if (Buffer.from(ex.data).includes(PLAIN) || Object.values(unz).some((b) => Buffer.from(b).includes(PLAIN))) bad.push('plaintext secret in zip')
+    if (names.some((n) => /^(\.git|\.trash|artifacts)\//.test(n) || n.endsWith('.DS_Store')))
+      bad.push('excluded entries in zip')
+    if (
+      Buffer.from(ex.data).includes(PLAIN) ||
+      Object.values(unz).some((b) => Buffer.from(b).includes(PLAIN))
+    )
+      bad.push('plaintext secret in zip')
     const meta = JSON.parse(Buffer.from(unz['workspace.json']).toString()) as Json
-    if (meta.name !== 'default' || meta.appVersion !== '0.0.0-fx' || typeof meta.exportedAt !== 'string') bad.push('workspace.json metadata')
+    if (
+      meta.name !== 'default' ||
+      meta.appVersion !== '0.0.0-fx' ||
+      typeof meta.exportedAt !== 'string'
+    )
+      bad.push('workspace.json metadata')
     const imp = importWorkspace(W, ex.data, { secrets: memorySecretBackend() })
-    if (imp.name !== 'default-2' || listWorkspaces(W).find((x) => x.active)?.id !== 'default') bad.push(`import name / switch ${imp.name}`)
+    if (imp.name !== 'default-2' || listWorkspaces(W).find((x) => x.active)?.id !== 'default')
+      bad.push(`import name / switch ${imp.name}`)
     if (!imp.missingSecrets.includes('zz-wsec/env/TOKEN')) bad.push('missing secrets list')
     const src = hashTree(wsDefault, ['.git', '.trash', 'artifacts', 'workspace.json'])
     const dst = hashTree(workspaceRoot(W, imp.id), ['workspace.json'])
     const zdiff = [...src.keys()].filter((k) => src.get(k) !== dst.get(k))
-    if (zdiff.length || src.size !== dst.size) bad.push(`round trip content diff ${zdiff.slice(0, 3).join(',')} ${src.size}/${dst.size}`)
+    if (zdiff.length || src.size !== dst.size)
+      bad.push(`round trip content diff ${zdiff.slice(0, 3).join(',')} ${src.size}/${dst.size}`)
     if (existsSync(join(workspaceRoot(W, imp.id), '.git'))) bad.push('.git in imported workspace')
 
     // 4) 5 malicious zips
     const count0 = listWorkspaces(W).length
     const evil: [string, Uint8Array][] = [
-      ['parent path', zipSync({ 'rules/a.md': new Uint8Array(1), '../evil.md': new Uint8Array(1) })],
+      [
+        'parent path',
+        zipSync({ 'rules/a.md': new Uint8Array(1), '../evil.md': new Uint8Array(1) })
+      ],
       ['absolute path', zipSync({ '/abs/evil.md': new Uint8Array(1) })],
-      ['symlink', zipSync({ 'rules/link.md': [new TextEncoder().encode('/etc/passwd'), { os: 3, attrs: 0o120777 * 65536 }] })],
+      [
+        'symlink',
+        zipSync({
+          'rules/link.md': [
+            new TextEncoder().encode('/etc/passwd'),
+            { os: 3, attrs: 0o120777 * 65536 }
+          ]
+        })
+      ],
       ['disallowed top level', zipSync({ 'evil/x.md': new Uint8Array(1) })],
       ['too large', zipSync({ 'rules/big.md': new Uint8Array(51 * 1024 * 1024) }, { level: 1 })]
     ]
@@ -4507,13 +6213,24 @@ async function run(): Promise<void> {
       else rej.push(`${label}:${code}`)
     }
     if (listWorkspaces(W).length !== count0) bad.push('malicious zip created a workspace')
-    if (readdirSync(join(W, '.illithid/workspaces')).some((n) => n.startsWith('.'))) bad.push('temp folder left')
-    if (existsSync(join(W, 'evil.md')) || existsSync(join(W, '.illithid/evil.md'))) bad.push('file created at parent path')
+    if (readdirSync(join(W, '.illithid/workspaces')).some((n) => n.startsWith('.')))
+      bad.push('temp folder left')
+    if (existsSync(join(W, 'evil.md')) || existsSync(join(W, '.illithid/evil.md')))
+      bad.push('file created at parent path')
 
     // 5) shared secret protection
-    upsertMcpServer(W, 'zz-share', { transport: 'stdio', command: 'x', env: { K: 'fxsecShare-Zx9Cv8Bn7' } }, { secrets: mem })
+    upsertMcpServer(
+      W,
+      'zz-share',
+      { transport: 'stdio', command: 'x', env: { K: 'fxsecShare-Zx9Cv8Bn7' } },
+      { secrets: mem }
+    )
     const cl = createWorkspace(W, 'fx-clone', { from: 'current' })
-    if (existsSync(join(workspaceRoot(W, cl.id), '.git')) || existsSync(join(workspaceRoot(W, cl.id), '.trash'))) bad.push('.git/.trash in clone')
+    if (
+      existsSync(join(workspaceRoot(W, cl.id), '.git')) ||
+      existsSync(join(workspaceRoot(W, cl.id), '.trash'))
+    )
+      bad.push('.git/.trash in clone')
     deleteMcpServer(W, 'zz-share', { secrets: mem })
     if (mem.get('zz-share/env/K') === null) bad.push('secret used by another workspace deleted')
     switchWorkspace(W, cl.id)
@@ -4530,30 +6247,49 @@ async function run(): Promise<void> {
         return (e as { code?: string }).code ?? 'other'
       }
     }
-    if (wsCode(() => renameWorkspace(W, ws2.id, 'default')) !== 'nameExists') bad.push('duplicate-name rename allowed')
-    if (wsCode(() => renameWorkspace(W, ws2.id, '  ')) !== 'invalidName') bad.push('empty-name rename allowed')
+    if (wsCode(() => renameWorkspace(W, ws2.id, 'default')) !== 'nameExists')
+      bad.push('duplicate-name rename allowed')
+    if (wsCode(() => renameWorkspace(W, ws2.id, '  ')) !== 'invalidName')
+      bad.push('empty-name rename allowed')
     const rn = renameWorkspace(W, ws2.id, '\uD68C\uC0AC2')
-    if (rn.id !== ws2.id || !existsSync(workspaceRoot(W, ws2.id)) || listWorkspaces(W).find((x) => x.id === ws2.id)?.name !== '\uD68C\uC0AC2')
+    if (
+      rn.id !== ws2.id ||
+      !existsSync(workspaceRoot(W, ws2.id)) ||
+      listWorkspaces(W).find((x) => x.id === ws2.id)?.name !== '\uD68C\uC0AC2'
+    )
       bad.push('rename')
-    if (renameWorkspace(W, ws2.id, '\uD68C\uC0AC2').name !== '\uD68C\uC0AC2') bad.push('same-name re-save')
+    if (renameWorkspace(W, ws2.id, '\uD68C\uC0AC2').name !== '\uD68C\uC0AC2')
+      bad.push('same-name re-save')
     const secretsBefore = ['zz-wsec/env/TOKEN'].map((a) => mem.get(a))
-    if (wsCode(() => deleteWorkspace(W, 'default')) !== 'defaultWorkspace') bad.push('default delete allowed')
+    if (wsCode(() => deleteWorkspace(W, 'default')) !== 'defaultWorkspace')
+      bad.push('default delete allowed')
     switchWorkspace(W, ws2.id)
-    if (wsCode(() => deleteWorkspace(W, ws2.id)) !== 'activeWorkspace') bad.push('active delete allowed')
+    if (wsCode(() => deleteWorkspace(W, ws2.id)) !== 'activeWorkspace')
+      bad.push('active delete allowed')
     switchWorkspace(W, 'default')
     const delTree = hashTree(workspaceRoot(W, ws2.id))
     const dr = deleteWorkspace(W, ws2.id)
-    if (existsSync(workspaceRoot(W, ws2.id)) || listWorkspaces(W).some((x) => x.id === ws2.id)) bad.push('still listed after delete')
-    if (!dr.backupPath.startsWith(join(W, '.config/illithid/backups/workspaces') + '/')) bad.push('backup location')
+    if (existsSync(workspaceRoot(W, ws2.id)) || listWorkspaces(W).some((x) => x.id === ws2.id))
+      bad.push('still listed after delete')
+    if (!dr.backupPath.startsWith(join(W, '.config/illithid/backups/workspaces') + '/'))
+      bad.push('backup location')
     const bt = hashTree(dr.backupPath)
-    if (bt.size !== delTree.size || [...delTree].some(([k, v]) => bt.get(k) !== v)) bad.push('deletion backup byte diff')
-    if (JSON.stringify(['zz-wsec/env/TOKEN'].map((a) => mem.get(a))) !== JSON.stringify(secretsBefore)) bad.push('delete touched the keychain')
+    if (bt.size !== delTree.size || [...delTree].some(([k, v]) => bt.get(k) !== v))
+      bad.push('deletion backup byte diff')
+    if (
+      JSON.stringify(['zz-wsec/env/TOKEN'].map((a) => mem.get(a))) !== JSON.stringify(secretsBefore)
+    )
+      bad.push('delete touched the keychain')
     const WL = makeFixture('illithid-m7-WL-')
     unlinkSync(join(WL, '.agents'))
     mkdirSync(join(WL, '.illithid/workspaces/solo/rules'), { recursive: true })
-    if (wsCode(() => deleteWorkspace(WL, 'solo')) !== 'lastWorkspace' || !existsSync(join(WL, '.illithid/workspaces/solo/rules')))
+    if (
+      wsCode(() => deleteWorkspace(WL, 'solo')) !== 'lastWorkspace' ||
+      !existsSync(join(WL, '.illithid/workspaces/solo/rules'))
+    )
       bad.push('deleting the last one allowed')
-    if (wsCode(() => deleteWorkspace(W, 'nope')) !== 'notFound') bad.push('missing workspace delete')
+    if (wsCode(() => deleteWorkspace(W, 'nope')) !== 'notFound')
+      bad.push('missing workspace delete')
 
     check(
       'w. workspaces — migration, switch, zip round trip, malicious zip, shared secrets, rename, delete',
@@ -4571,11 +6307,17 @@ async function run(): Promise<void> {
     const B = 'zz-rule-b.md'
     const rules = libraryPaths(F).rulesDir
     const cdir = claudeRulesPaths(F).dir
-    const ocOf = (): string[] => (readJson(join(F, '.config/opencode/opencode.json')).instructions as string[]) ?? []
-    const codexBody = (): string => blockBody(read(join(F, '.codex/AGENTS.md')), MD_BEGIN, MD_END) ?? ''
+    const ocOf = (): string[] =>
+      (readJson(join(F, '.config/opencode/opencode.json')).instructions as string[]) ?? []
+    const codexBody = (): string =>
+      blockBody(read(join(F, '.codex/AGENTS.md')), MD_BEGIN, MD_END) ?? ''
     createRule(F, A, '# zz rule\n\nbody\n')
     syncAll(F, env, { allowReal: true })
-    if (!existsSync(join(cdir, A)) || !ocOf().includes(join(rules, A)) || !codexBody().includes(`<!-- rules/${A} -->`))
+    if (
+      !existsSync(join(cdir, A)) ||
+      !ocOf().includes(join(rules, A)) ||
+      !codexBody().includes(`<!-- rules/${A} -->`)
+    )
       bad.push('not in 3 tools before rename')
     setToggle(F, 'rules', A, 'codex', false)
     const aBytes = read(join(cdir, A))
@@ -4594,32 +6336,46 @@ async function run(): Promise<void> {
       ['missing rule', () => renameRule(F, 'zz-none.md', B), 'notFound'],
       ['from escape', () => renameRule(F, '../illithid.json', B), 'invalidName']
     ]
-    for (const [label, fn, code] of rej) if (errCode(fn) !== code) bad.push(`refused ${label}: ${errCode(fn)}`)
-    if (!existsSync(join(rules, A)) || existsSync(join(rules, B))) bad.push('files changed after refusal')
+    for (const [label, fn, code] of rej)
+      if (errCode(fn) !== code) bad.push(`refused ${label}: ${errCode(fn)}`)
+    if (!existsSync(join(rules, A)) || existsSync(join(rules, B)))
+      bad.push('files changed after refusal')
     deleteRule(F, 'zz-rule-other.md')
     // input without .md → appended, manifest {codex:false} moved, state unchanged
     const r = renameRule(F, A, 'zz-rule-b')
     if (r.name !== B) bad.push(`returned name ${r.name}`)
-    if (existsSync(join(rules, A)) || read(join(rules, B)) !== '# zz rule\n\nbody\n') bad.push('file move')
+    if (existsSync(join(rules, A)) || read(join(rules, B)) !== '# zz rule\n\nbody\n')
+      bad.push('file move')
     const mf = readJson(join(libraryRoot(F), MANIFEST_FILE)) as { rules: Json }
-    if (A in mf.rules || JSON.stringify(mf.rules[B]) !== '{"codex":false}') bad.push('manifest key move')
+    if (A in mf.rules || JSON.stringify(mf.rules[B]) !== '{"codex":false}')
+      bad.push('manifest key move')
     if (JSON.stringify(readState(F).state.rules) !== stBefore) bad.push('rename changed state')
     // sync: claude copies new name and moves old name to backups/deleted immediately, opencode path replaced, codex is off so not in block
     const rs = syncAll(F, env, { allowReal: true })
-    const item = (n: string): { action?: string; status?: string } => rs.results!.rules.find((x) => x.name === n) ?? {}
-    if (item(B).action !== 'copy' || item(B).status !== 'done') bad.push(`new name ${item(B).action}/${item(B).status}`)
-    if (item(A).action !== 'deleteCandidate' || item(A).status !== 'done') bad.push(`old name ${item(A).action}/${item(A).status}`)
-    if (existsSync(join(cdir, A)) || stripSourceNote(read(join(cdir, B))) !== read(join(rules, B))) bad.push('claude copy')
+    const item = (n: string): { action?: string; status?: string } =>
+      rs.results!.rules.find((x) => x.name === n) ?? {}
+    if (item(B).action !== 'copy' || item(B).status !== 'done')
+      bad.push(`new name ${item(B).action}/${item(B).status}`)
+    if (item(A).action !== 'deleteCandidate' || item(A).status !== 'done')
+      bad.push(`old name ${item(A).action}/${item(A).status}`)
+    if (existsSync(join(cdir, A)) || stripSourceNote(read(join(cdir, B))) !== read(join(rules, B)))
+      bad.push('claude copy')
     const bk = deletedBackup(F, `rules/${A}`)
     if (!bk || read(bk) !== aBytes) bad.push('old name backup bytes')
     const oc = ocOf()
-    if (oc.includes(join(rules, A)) || !oc.includes(join(rules, B))) bad.push('opencode instructions path')
-    if (codexBody().includes(`<!-- rules/${A} -->`) || codexBody().includes(`<!-- rules/${B} -->`)) bad.push('codex off block')
+    if (oc.includes(join(rules, A)) || !oc.includes(join(rules, B)))
+      bad.push('opencode instructions path')
+    if (codexBody().includes(`<!-- rules/${A} -->`) || codexBody().includes(`<!-- rules/${B} -->`))
+      bad.push('codex off block')
     // turning codex on puts the new name in the block, re-plan 0
     setToggle(F, 'rules', B, 'codex', true)
     syncAll(F, env, { allowReal: true })
-    if (!codexBody().includes(`<!-- rules/${B} -->`) || codexBody().includes(`<!-- rules/${A} -->`)) bad.push('codex block new name')
-    if (changedOrError(planAll(F, env)).length || planRuleSync(F, env).some((x) => x.action !== 'inSync'))
+    if (!codexBody().includes(`<!-- rules/${B} -->`) || codexBody().includes(`<!-- rules/${A} -->`))
+      bad.push('codex block new name')
+    if (
+      changedOrError(planAll(F, env)).length ||
+      planRuleSync(F, env).some((x) => x.action !== 'inSync')
+    )
       bad.push('re-plan changes after rename')
     // cleanup
     deleteRule(F, B)
@@ -4664,14 +6420,16 @@ async function run(): Promise<void> {
     if (snap() !== s0) bad.push('pendingSyncCount changed files')
     if (!(p1 > base) || p1 !== p1b) bad.push(`pending ${base} → ${p1}/${p1b}`)
     const planOnly = syncAll(F, env, { allowReal: false })
-    if (planOnly.results || snap() !== s0 || existsSync(join(cdir, R))) bad.push('allowReal=false sync changed tools')
+    if (planOnly.results || snap() !== s0 || existsSync(join(cdir, R)))
+      bad.push('allowReal=false sync changed tools')
     if (pendingSyncCount(F, env) !== p1) bad.push('pending changed after plan sync')
     // sidebar button = syncNow(approvedOnce) → syncAll({ allowReal: true, approvedOnce: true })
     const once = syncAll(F, env, { allowReal: true, approvedOnce: true })
     const p2 = pendingSyncCount(F, env)
     if (!once.results) bad.push(`one-time apply refused ${once.refused ?? ''}`)
     if (p2 !== 0) bad.push(`pending after one-time apply ${p2}`)
-    if (!existsSync(join(cdir, R)) || stripSourceNote(read(join(cdir, R))) !== '# zz pending\n') bad.push('no claude copy')
+    if (!existsSync(join(cdir, R)) || stripSourceNote(read(join(cdir, R))) !== '# zz pending\n')
+      bad.push('no claude copy')
     if (readConfig(F).config.allowRealApply !== false) bad.push('one-time apply changed settings')
     const s1 = snap()
     pendingSyncCount(F, env)
@@ -4710,13 +6468,22 @@ async function run(): Promise<void> {
         userID: 'fx-user',
         projects: { '/fx/proj': { allowedTools: [], hasTrustDialogAccepted: true } },
         mcpServers: {
-          'u-gh': { type: 'stdio', command: 'npx', args: ['-y', 'fx-gh'], env: { GITHUB_TOKEN: FAKE_TOKEN } },
+          'u-gh': {
+            type: 'stdio',
+            command: 'npx',
+            args: ['-y', 'fx-gh'],
+            env: { GITHUB_TOKEN: FAKE_TOKEN }
+          },
           'u-http': { type: 'http', url: 'https://mcp.fx.invalid/mcp' }
         }
       },
       settings: {
         model: 'opus',
-        permissions: { allow: ['Bash(npm test:*)', 'Read(~/fx)'], deny: ['Bash(rm:*)'], defaultMode: 'acceptEdits' },
+        permissions: {
+          allow: ['Bash(npm test:*)', 'Read(~/fx)'],
+          deny: ['Bash(rm:*)'],
+          defaultMode: 'acceptEdits'
+        },
         hooks: { Stop: [] },
         env: { FX: '1' }
       },
@@ -4779,7 +6546,8 @@ async function run(): Promise<void> {
       const root = importedBackupRoot(Z)
       if (!existsSync(root)) return null
       const suffix = rel.replace(/^\.config\/opencode\//, 'opencode/').replace(/^\./, '')
-      for (const ts of readdirSync(root).sort().reverse()) if (existsSync(join(root, ts, suffix))) return read(join(root, ts, suffix))
+      for (const ts of readdirSync(root).sort().reverse())
+        if (existsSync(join(root, ts, suffix))) return read(join(root, ts, suffix))
       return null
     }
     const bytes = (rel: string, orig: string): St =>
@@ -4790,7 +6558,8 @@ async function run(): Promise<void> {
           : !existsSync(join(Z, rel))
             ? 'deleted'
             : 'changed'
-    const sub = (v: unknown, orig: unknown): St => (v === undefined ? 'deleted' : same(v, orig) ? 'kept' : 'changed')
+    const sub = (v: unknown, orig: unknown): St =>
+      v === undefined ? 'deleted' : same(v, orig) ? 'kept' : 'changed'
     const omit = (o: Json | null, k: string): Json | null => {
       if (!o) return null
       const { [k]: _x, ...rest } = o
@@ -4800,40 +6569,86 @@ async function run(): Promise<void> {
     const { mcpServers: _cm, ...claudeOther } = U.claudeJson
     void _cm
     const ITEMS: [string, () => St][] = [
-      ['claude.json mcpServers.u-gh', () => sub((tryJson('.claude.json')?.mcpServers as Json | undefined)?.['u-gh'], U.claudeJson.mcpServers['u-gh'])],
-      ['claude.json mcpServers.u-http', () => sub((tryJson('.claude.json')?.mcpServers as Json | undefined)?.['u-http'], U.claudeJson.mcpServers['u-http'])],
-      ['claude.json other keys', () => sub(omit(tryJson('.claude.json'), 'mcpServers') ?? undefined, claudeOther)],
+      [
+        'claude.json mcpServers.u-gh',
+        () =>
+          sub(
+            (tryJson('.claude.json')?.mcpServers as Json | undefined)?.['u-gh'],
+            U.claudeJson.mcpServers['u-gh']
+          )
+      ],
+      [
+        'claude.json mcpServers.u-http',
+        () =>
+          sub(
+            (tryJson('.claude.json')?.mcpServers as Json | undefined)?.['u-http'],
+            U.claudeJson.mcpServers['u-http']
+          )
+      ],
+      [
+        'claude.json other keys',
+        () => sub(omit(tryJson('.claude.json'), 'mcpServers') ?? undefined, claudeOther)
+      ],
       ['settings.json whole', () => sub(tryJson('.claude/settings.json') ?? undefined, U.settings)],
       ['CLAUDE.md', () => bytes('.claude/CLAUDE.md', U.claudeMd)],
       [
         'claude rules/my-rule.md',
         () => {
           const s = bytes('.claude/rules/my-rule.md', U.rule)
-          return s === 'kept' && existsSync(join(Z, '.claude/rules', CLAUDE_RULES_DIR, 'my-rule.md')) ? 'duplicate' : s
+          return s === 'kept' &&
+            existsSync(join(Z, '.claude/rules', CLAUDE_RULES_DIR, 'my-rule.md'))
+            ? 'duplicate'
+            : s
         }
       ],
       ['claude skills/my-skill', () => bytes('.claude/skills/my-skill/SKILL.md', U.skill)],
       ['claude agents/my-agent.md', () => bytes('.claude/agents/my-agent.md', U.agent)],
-      ['codex config.toml mcp_servers.x', () => sub((tryToml()?.mcp_servers as Json | undefined)?.x, (parseToml(U.codexToml) as Json & { mcp_servers: Json }).mcp_servers.x)],
-      ['codex config.toml other keys', () => sub(omit(tryToml(), 'mcp_servers') ?? undefined, omit(parseToml(U.codexToml) as Json, 'mcp_servers'))],
+      [
+        'codex config.toml mcp_servers.x',
+        () =>
+          sub(
+            (tryToml()?.mcp_servers as Json | undefined)?.x,
+            (parseToml(U.codexToml) as Json & { mcp_servers: Json }).mcp_servers.x
+          )
+      ],
+      [
+        'codex config.toml other keys',
+        () =>
+          sub(
+            omit(tryToml(), 'mcp_servers') ?? undefined,
+            omit(parseToml(U.codexToml) as Json, 'mcp_servers')
+          )
+      ],
       [
         'codex AGENTS.md user body',
         () =>
           !existsSync(join(Z, '.codex/AGENTS.md'))
             ? 'deleted'
-            : outsideBlockMulti(read(join(Z, '.codex/AGENTS.md')), [MD_MARKERS, ...LEGACY_MD_MARKERS]).trim() === U.agentsMd.trim()
+            : outsideBlockMulti(read(join(Z, '.codex/AGENTS.md')), [
+                  MD_MARKERS,
+                  ...LEGACY_MD_MARKERS
+                ]).trim() === U.agentsMd.trim()
               ? 'kept'
               : 'changed'
       ],
       ['codex skills/c-skill', () => bytes('.codex/skills/c-skill/SKILL.md', U.cSkill)],
       ['codex agents/c-agent.toml', () => bytes('.codex/agents/c-agent.toml', U.cAgent)],
-      ['opencode.json mcp.o-srv', () => sub((tryJson('.config/opencode/opencode.json')?.mcp as Json | undefined)?.['o-srv'], ocJson.mcp['o-srv'])],
+      [
+        'opencode.json mcp.o-srv',
+        () =>
+          sub(
+            (tryJson('.config/opencode/opencode.json')?.mcp as Json | undefined)?.['o-srv'],
+            ocJson.mcp['o-srv']
+          )
+      ],
       [
         'opencode.json other keys',
         () => {
           const o = tryJson('.config/opencode/opencode.json')
           if (!o) return 'deleted'
-          return o.model === ocJson.model && o.$schema === ocJson.$schema && (o.instructions as string[] | undefined)?.includes(ocKeep)
+          return o.model === ocJson.model &&
+            o.$schema === ocJson.$schema &&
+            (o.instructions as string[] | undefined)?.includes(ocKeep)
             ? 'kept'
             : 'changed'
         }
@@ -4865,22 +6680,32 @@ async function run(): Promise<void> {
       walk(Z, '')
       return m
     }
-    const added = (a: Map<string, string>, b: Map<string, string>): string[] => [...b.keys()].filter((k) => !a.has(k))
-    const removed = (a: Map<string, string>, b: Map<string, string>): string[] => [...a.keys()].filter((k) => !b.has(k))
+    const added = (a: Map<string, string>, b: Map<string, string>): string[] =>
+      [...b.keys()].filter((k) => !a.has(k))
+    const removed = (a: Map<string, string>, b: Map<string, string>): string[] =>
+      [...a.keys()].filter((k) => !b.has(k))
     const modified = (a: Map<string, string>, b: Map<string, string>): string[] =>
       [...a.keys()].filter((k) => b.has(k) && a.get(k) !== b.get(k))
-    const isApp = (k: string): boolean => k.startsWith('.illithid/') || k.startsWith(APP_CONFIG_DIR + '/') || k.endsWith(BACKUP_SUFFIX)
+    const isApp = (k: string): boolean =>
+      k.startsWith('.illithid/') || k.startsWith(APP_CONFIG_DIR + '/') || k.endsWith(BACKUP_SUFFIX)
     const planDesc = (): string[] => {
       const p = planSyncAll(Z, envZ, memZ)
       return [
-        ...p.targets.filter((c) => c.changed || c.error).map((c) => `target:${c.id}${c.error ? '(error)' : ''}`),
+        ...p.targets
+          .filter((c) => c.changed || c.error)
+          .map((c) => `target:${c.id}${c.error ? '(error)' : ''}`),
         ...p.rules.filter((x) => x.action !== 'inSync').map((x) => `rule:${x.name}:${x.action}`),
-        ...p.skills.filter((x) => x.action !== 'inSync').map((x) => `skill:${x.tool}/${x.name}:${x.action}${x.reason ? `(${x.reason})` : ''}`),
-        ...p.agents.filter((x) => x.action !== 'inSync').map((x) => `agent:${x.tool}/${x.name}:${x.action}${x.reason ? `(${x.reason})` : ''}`),
+        ...p.skills
+          .filter((x) => x.action !== 'inSync')
+          .map((x) => `skill:${x.tool}/${x.name}:${x.action}${x.reason ? `(${x.reason})` : ''}`),
+        ...p.agents
+          .filter((x) => x.action !== 'inSync')
+          .map((x) => `agent:${x.tool}/${x.name}:${x.action}${x.reason ? `(${x.reason})` : ''}`),
         ...p.errors.map((e) => `error:${e.split(':')[0]}`)
       ]
     }
-    const once = (): SyncAllResultZ => syncAll(Z, envZ, { allowReal: true, approvedOnce: true, secrets: memZ })
+    const once = (): SyncAllResultZ =>
+      syncAll(Z, envZ, { allowReal: true, approvedOnce: true, secrets: memZ })
     type SyncAllResultZ = ReturnType<typeof syncAll>
 
     // z1. first run — ensureLibrary → library skeleton only, plan sync (allowReal=false) writes nothing
@@ -4891,18 +6716,24 @@ async function run(): Promise<void> {
       const t1 = tree()
       const made = added(t0, t1)
       if (en.status !== 'created') bad.push(`ensureLibrary ${en.status}`)
-      if (made.some((k) => !k.startsWith('.illithid/workspaces/default/'))) bad.push(`created outside library ${made.join(',')}`)
-      if (modified(t0, t1).length || removed(t0, t1).length) bad.push('ensureLibrary changed existing files')
-      if (readConfig(Z).exists || readConfig(Z).config.allowRealApply) bad.push('config created / allowRealApply on')
+      if (made.some((k) => !k.startsWith('.illithid/workspaces/default/')))
+        bad.push(`created outside library ${made.join(',')}`)
+      if (modified(t0, t1).length || removed(t0, t1).length)
+        bad.push('ensureLibrary changed existing files')
+      if (readConfig(Z).exists || readConfig(Z).config.allowRealApply)
+        bad.push('config created / allowRealApply on')
       const r = syncAll(Z, envZ, { allowReal: false, secrets: memZ })
       const t2 = tree()
-      if (r.results || modified(t1, t2).length || added(t1, t2).length) bad.push('allowReal=false sync wrote')
+      if (r.results || modified(t1, t2).length || added(t1, t2).length)
+        bad.push('allowReal=false sync wrote')
       const off = judge('1')
       bad.push(...off)
       check(
         'z1. new user first run — ensureLibrary creates skeleton only, allowReal=false sync writes nothing, 16 user items kept',
         !bad.length,
-        bad.length ? bad.join('; ') : `created ${made.length} (${made.map((k) => k.split('/').pop()).join(', ')}), no config.json, plan sync writes 0, kept ${ITEMS.length}/${ITEMS.length}`
+        bad.length
+          ? bad.join('; ')
+          : `created ${made.length} (${made.map((k) => k.split('/').pop()).join(', ')}), no config.json, plan sync writes 0, kept ${ITEMS.length}/${ITEMS.length}`
       )
     }
 
@@ -4914,7 +6745,8 @@ async function run(): Promise<void> {
       const t0 = tree()
       pendingZ = pendingSyncCount(Z, envZ, memZ)
       planZ = planDesc()
-      if (tree().size !== t0.size || modified(t0, tree()).length) bad.push('computing changed files')
+      if (tree().size !== t0.size || modified(t0, tree()).length)
+        bad.push('computing changed files')
       if (planZ.length !== pendingZ) bad.push(`pending ${pendingZ} ≠ plan ${planZ.length}`)
       // 0 rules/memory/servers/skills → no empty block or skills.paths written, so pending 0
       if (pendingZ !== 0) bad.push(`pending ${pendingZ} for empty library: ${planZ.join(',')}`)
@@ -4955,7 +6787,10 @@ async function run(): Promise<void> {
     {
       const bad: string[] = []
       const pi = planImport(Z)
-      const kinds: [ImportKind, { name: string; portability: string; variants: { id: string }[] }[]][] = [
+      const kinds: [
+        ImportKind,
+        { name: string; portability: string; variants: { id: string }[] }[]
+      ][] = [
         ['rule', pi.rules],
         ['memory', pi.memory],
         ['permissions', pi.permissions],
@@ -4963,19 +6798,31 @@ async function run(): Promise<void> {
         ['mcp', pi.mcp],
         ['agent', pi.agents]
       ]
-      const cands = kinds.flatMap(([k, arr]) => arr.map((c) => `${k}:${c.name}${c.portability === 'toolOnly' ? '(toolOnly)' : ''}`))
+      const cands = kinds.flatMap(([k, arr]) =>
+        arr.map((c) => `${k}:${c.name}${c.portability === 'toolOnly' ? '(toolOnly)' : ''}`)
+      )
       const sels: ImportSelection[] = kinds.flatMap(([k, arr]) =>
         arr
           .filter((c) => c.portability !== 'toolOnly')
-          .map((c) => ({ kind: k, name: c.name, ...(c.variants.length > 1 ? { variant: c.variants[0].id } : {}) }))
+          .map((c) => ({
+            kind: k,
+            name: c.name,
+            ...(c.variants.length > 1 ? { variant: c.variants[0].id } : {})
+          }))
       )
       const ir = applyImport(Z, sels, undefined, { secrets: memZ })
       const notImported = ir.filter((x) => x.status !== 'imported')
-      if (notImported.length) bad.push(`import failed ${notImported.map((x) => `${x.name}:${x.reason}`).join(',')}`)
-      const converted = ir.filter((x) => x.converted?.length).map((x) => `${x.name}→${x.converted!.join('/')}`)
-      const adopted = ir.filter((x) => x.adopted?.length).map((x) => `${x.name}→${x.adopted!.join('/')}`)
+      if (notImported.length)
+        bad.push(`import failed ${notImported.map((x) => `${x.name}:${x.reason}`).join(',')}`)
+      const converted = ir
+        .filter((x) => x.converted?.length)
+        .map((x) => `${x.name}→${x.converted!.join('/')}`)
+      const adopted = ir
+        .filter((x) => x.adopted?.length)
+        .map((x) => `${x.name}→${x.adopted!.join('/')}`)
       // HAR-12: import itself moves nothing — originals stay until the approved Sync below switches them over
-      if (!existsSync(join(Z, '.claude/rules/my-rule.md')) || existsSync(importedBackupRoot(Z))) bad.push('original moved at import')
+      if (!existsSync(join(Z, '.claude/rules/my-rule.md')) || existsSync(importedBackupRoot(Z)))
+        bad.push('original moved at import')
       const t0 = tree()
       const r = once()
       const t1 = tree()
@@ -4986,23 +6833,45 @@ async function run(): Promise<void> {
       // imported items may only be kept or moved (source in backups/imported) — no duplicates, losses, or changes without backup
       bad.push(...judge('4').filter((x) => !x.endsWith('=moved')))
       // no double-loaded rules: the user source is moved and only the app copy remains
-      if (existsSync(join(Z, '.claude/rules/my-rule.md')) || !existsSync(join(Z, '.claude/rules', CLAUDE_RULES_DIR, 'my-rule.md')))
+      if (
+        existsSync(join(Z, '.claude/rules/my-rule.md')) ||
+        !existsSync(join(Z, '.claude/rules', CLAUDE_RULES_DIR, 'my-rule.md'))
+      )
         bad.push('Claude rule source / app copy state')
       // skills: same bytes → adopted (recorded in state), otherwise the source is moved — the tool has only one app-owned copy
       const stS = readState(Z).state.skills ?? {}
-      if (!stS.claude?.['my-skill'] || !stS.codex?.['c-skill']) bad.push('user skill not adopted as app-owned')
+      if (!stS.claude?.['my-skill'] || !stS.codex?.['c-skill'])
+        bad.push('user skill not adopted as app-owned')
       // OpenCode instructions: only the imported rule's original path entry is removed; other entries and key order kept, original file bytes unchanged
       const oc4 = readJson(join(Z, '.config/opencode/opencode.json'))
       const ins4 = (oc4.instructions as string[] | undefined) ?? []
       if (ins4.includes(ocUserInstr)) bad.push('imported rule original path left in instructions')
       if (!ins4.includes(ocKeep)) bad.push('other instructions entries lost')
-      if (JSON.stringify(Object.keys(oc4).filter((k) => k in ocJson)) !== JSON.stringify(Object.keys(ocJson))) bad.push('opencode.json key order changed')
+      if (
+        JSON.stringify(Object.keys(oc4).filter((k) => k in ocJson)) !==
+        JSON.stringify(Object.keys(ocJson))
+      )
+        bad.push('opencode.json key order changed')
       if (read(join(Z, 'notes/oc.md')) !== ocRuleText) bad.push('original rule file bytes changed')
-      if (ir.find((x) => x.name === 'oc.md')?.warnings?.includes('opencodeInstructionRemains')) bad.push('instructions removal failure warning')
-      if (ir.some((x) => x.userOwned?.length)) bad.push(`userOwned left ${ir.filter((x) => x.userOwned?.length).map((x) => x.name).join(',')}`)
+      if (ir.find((x) => x.name === 'oc.md')?.warnings?.includes('opencodeInstructionRemains'))
+        bad.push('instructions removal failure warning')
+      if (ir.some((x) => x.userOwned?.length))
+        bad.push(
+          `userOwned left ${ir
+            .filter((x) => x.userOwned?.length)
+            .map((x) => x.name)
+            .join(',')}`
+        )
       // re-run idempotent
       const pi2 = planImport(Z)
-      const left = [...pi2.rules, ...pi2.memory, ...pi2.permissions, ...pi2.skills, ...pi2.mcp, ...pi2.agents].filter((c) => c.portability !== 'toolOnly')
+      const left = [
+        ...pi2.rules,
+        ...pi2.memory,
+        ...pi2.permissions,
+        ...pi2.skills,
+        ...pi2.mcp,
+        ...pi2.agents
+      ].filter((c) => c.portability !== 'toolOnly')
       const ir2 = applyImport(Z, sels, undefined, { secrets: memZ })
       const t2 = tree()
       const r2 = once()
@@ -5010,17 +6879,28 @@ async function run(): Promise<void> {
       const t3 = tree()
       if (left.length) bad.push(`rescan candidates ${left.map((c) => c.name).join(',')}`)
       if (ir2.some((x) => x.status === 'imported')) bad.push('re-import imported again')
-      if (modified(t2, t3).filter((k) => !k.startsWith(APP_CONFIG_DIR + '/')).length || s2['target.written']) bad.push('re-Sync wrote')
+      if (
+        modified(t2, t3).filter((k) => !k.startsWith(APP_CONFIG_DIR + '/')).length ||
+        s2['target.written']
+      )
+        bad.push('re-Sync wrote')
       if (pendingSyncCount(Z, envZ, memZ) !== 0) bad.push('re-pending ≠ 0')
       postImport = t3
       // raw token of the imported MCP does not remain as plaintext in the library (workspaces) (goes to the secret backend)
-      if ([...t3.keys()].filter((k) => k.startsWith('.illithid/')).some((k) => read(join(Z, k)).includes(FAKE_TOKEN)))
+      if (
+        [...t3.keys()]
+          .filter((k) => k.startsWith('.illithid/'))
+          .some((k) => read(join(Z, k)).includes(FAKE_TOKEN))
+      )
         bad.push('raw token in library')
       claudeAfterImport = readJson(join(Z, '.claude.json'))
       check(
         'z4. import all → Sync — converted to app-owned (source kept or moved to backups/imported), no duplicates (no double-loaded rules), re-import and re-Sync idempotent',
         !bad.length,
-        `${bad.length ? 'FAIL: ' + bad.join('; ') + ' | ' : ''}candidates ${cands.join(', ')}; imported ${ir.length - notImported.length}, source moved (converted) ${converted.join(',') || '-'}, adopted ${adopted.join(',') || '-'}; new tool-side files ${newTool.length}; re-import ${ir2.map((x) => x.reason).filter((v, i, a) => a.indexOf(v) === i).join(',')}`
+        `${bad.length ? 'FAIL: ' + bad.join('; ') + ' | ' : ''}candidates ${cands.join(', ')}; imported ${ir.length - notImported.length}, source moved (converted) ${converted.join(',') || '-'}, adopted ${adopted.join(',') || '-'}; new tool-side files ${newTool.length}; re-import ${ir2
+          .map((x) => x.reason)
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(',')}`
       )
     }
 
@@ -5038,23 +6918,32 @@ async function run(): Promise<void> {
       const gone = removed(t0, t1).filter((k) => !isApp(k))
       judge('5')
       const expectOff = new Set(['claude.json mcpServers.u-gh', 'claude skills/my-skill'])
-      for (const k of expectOff) if (table[k]['5'] !== 'deleted') bad.push(`off ${k} = ${table[k]['5']}`)
-      const newOff = ITEMS.map(([k]) => k).filter((k) => table[k]['5'] !== table[k]['4'] && !expectOff.has(k))
+      for (const k of expectOff)
+        if (table[k]['5'] !== 'deleted') bad.push(`off ${k} = ${table[k]['5']}`)
+      const newOff = ITEMS.map(([k]) => k).filter(
+        (k) => table[k]['5'] !== table[k]['4'] && !expectOff.has(k)
+      )
       bad.push(...newOff.map((k) => `${k}=${table[k]['5']}`))
       const skillBak = deletedBackup(Z, 'skills/claude/my-skill/SKILL.md')
-      if (!skillBak || read(skillBak) !== U.skill) bad.push('skill deletion backup missing / bytes differ')
+      if (!skillBak || read(skillBak) !== U.skill)
+        bad.push('skill deletion backup missing / bytes differ')
       const mcpBak = deletedBackup(Z, 'mcp/claude/u-gh.json')
       if (!mcpBak) bad.push('no MCP definition backup before removal')
       else {
         if (mode(mcpBak) !== 0o600) bad.push(`MCP backup mode ${mode(mcpBak).toString(8)}`)
-        if (!same(readJson(mcpBak)['u-gh'], U.claudeJson.mcpServers['u-gh'])) bad.push('MCP backup definition differs')
+        if (!same(readJson(mcpBak)['u-gh'], U.claudeJson.mcpServers['u-gh']))
+          bad.push('MCP backup definition differs')
       }
       setToggle(Z, 'skills', 'my-skill', 'claude', true)
       setToggle(Z, 'mcp', 'u-gh', 'claude', true)
       syncAll(Z, envZ, { allowReal: true, secrets: memZ })
       const back = (readJson(join(Z, '.claude.json')).mcpServers as Json)['u-gh']
-      if (!same(back, U.claudeJson.mcpServers['u-gh'])) bad.push('re-enabled u-gh differs from original definition')
-      if (!existsSync(join(Z, '.claude/skills/my-skill/SKILL.md')) || read(join(Z, '.claude/skills/my-skill/SKILL.md')) !== U.skill)
+      if (!same(back, U.claudeJson.mcpServers['u-gh']))
+        bad.push('re-enabled u-gh differs from original definition')
+      if (
+        !existsSync(join(Z, '.claude/skills/my-skill/SKILL.md')) ||
+        read(join(Z, '.claude/skills/my-skill/SKILL.md')) !== U.skill
+      )
         bad.push('re-enabled my-skill missing / content differs')
       if (pendingSyncCount(Z, envZ, memZ) !== 0) bad.push('pending ≠ 0 after restore')
       check(
@@ -5075,7 +6964,9 @@ async function run(): Promise<void> {
       put('.claude/skills/late-skill/SKILL.md', '---\nname: late-skill\ndescription: late\n---\n')
       put('.claude/rules/late-rule.md', '# late\n')
       const lateTree = (): string[] =>
-        ['.claude/skills/late-skill/SKILL.md', '.claude/rules/late-rule.md'].map((k) => (existsSync(join(Z, k)) ? sha(read(join(Z, k))) : 'absent'))
+        ['.claude/skills/late-skill/SKILL.md', '.claude/rules/late-rule.md'].map((k) =>
+          existsSync(join(Z, k)) ? sha(read(join(Z, k))) : 'absent'
+        )
       const late0 = lateTree()
       const txt = (rel: string): string => (existsSync(join(Z, rel)) ? read(join(Z, rel)) : '')
       const texts = (): Record<string, string> => ({
@@ -5087,7 +6978,9 @@ async function run(): Promise<void> {
       const t0 = tree()
       const b = texts()
       const ws = createWorkspace(Z, '\uBE48 \uC791\uC5C5\uACF5\uAC04', { from: 'empty' })
-      const preview = previewSwitch(Z, envZ, ws.id, memZ).map((x) => `${x.kind}:${x.tool}:${x.name}`)
+      const preview = previewSwitch(Z, envZ, ws.id, memZ).map(
+        (x) => `${x.kind}:${x.tool}:${x.name}`
+      )
       if (tree().size !== t0.size + 2) bad.push('preview wrote files') // + 2 skeleton entries for the new workspace
       switchWorkspace(Z, ws.id)
       const r = once()
@@ -5098,11 +6991,14 @@ async function run(): Promise<void> {
       const actual = new Set<string>()
       for (const k of removed(t0, t1)) {
         let m: RegExpExecArray | null
-        if ((m = /^\.claude\/rules\/illithid\/([^/]+)$/.exec(k))) actual.add(`${m[1] === 'MEMORY.md' ? 'memory' : 'rule'}:claude:${m[1]}`)
-        else if ((m = /^\.(claude|codex)\/skills\/([^/]+)\//.exec(k))) actual.add(`skill:${m[1]}:${m[2]}`)
+        if ((m = /^\.claude\/rules\/illithid\/([^/]+)$/.exec(k)))
+          actual.add(`${m[1] === 'MEMORY.md' ? 'memory' : 'rule'}:claude:${m[1]}`)
+        else if ((m = /^\.(claude|codex)\/skills\/([^/]+)\//.exec(k)))
+          actual.add(`skill:${m[1]}:${m[2]}`)
         else if ((m = /^\.claude\/agents\/([^/]+)\.md$/.exec(k))) actual.add(`agent:claude:${m[1]}`)
         else if ((m = /^\.codex\/agents\/([^/]+)\.toml$/.exec(k))) actual.add(`agent:codex:${m[1]}`)
-        else if ((m = /^\.config\/opencode\/agents\/([^/]+)\.md$/.exec(k))) actual.add(`agent:opencode:${m[1]}`)
+        else if ((m = /^\.config\/opencode\/agents\/([^/]+)\.md$/.exec(k)))
+          actual.add(`agent:opencode:${m[1]}`)
       }
       const jsonKeys = (t: string, key: string): string[] => {
         try {
@@ -5118,11 +7014,18 @@ async function run(): Promise<void> {
           return []
         }
       }
-      for (const n of jsonKeys(b.claude, 'mcpServers')) if (!jsonKeys(a.claude, 'mcpServers').includes(n)) actual.add(`mcp:claude:${n}`)
-      for (const n of tomlKeys(b.toml)) if (!tomlKeys(a.toml).includes(n)) actual.add(`mcp:codex:${n}`)
-      for (const n of jsonKeys(b.oc, 'mcp')) if (!jsonKeys(a.oc, 'mcp').includes(n)) actual.add(`mcp:opencode:${n}`)
+      for (const n of jsonKeys(b.claude, 'mcpServers'))
+        if (!jsonKeys(a.claude, 'mcpServers').includes(n)) actual.add(`mcp:claude:${n}`)
+      for (const n of tomlKeys(b.toml))
+        if (!tomlKeys(a.toml).includes(n)) actual.add(`mcp:codex:${n}`)
+      for (const n of jsonKeys(b.oc, 'mcp'))
+        if (!jsonKeys(a.oc, 'mcp').includes(n)) actual.add(`mcp:opencode:${n}`)
       const blockRules = (t: string): string[] =>
-        [...(blockBodyMulti(t, [MD_MARKERS, ...LEGACY_MD_MARKERS]) ?? '').matchAll(/^<!-- (rules|memory)\/(.+?) -->$/gm)].map((m) => `${m[1] === 'memory' ? 'memory' : 'rule'}:codex:${m[2]}`)
+        [
+          ...(blockBodyMulti(t, [MD_MARKERS, ...LEGACY_MD_MARKERS]) ?? '').matchAll(
+            /^<!-- (rules|memory)\/(.+?) -->$/gm
+          )
+        ].map((m) => `${m[1] === 'memory' ? 'memory' : 'rule'}:codex:${m[2]}`)
       for (const x of blockRules(b.agents)) if (!blockRules(a.agents).includes(x)) actual.add(x)
       const ocList = (t: string, f: (o: Json) => unknown): string[] => {
         try {
@@ -5132,41 +7035,65 @@ async function run(): Promise<void> {
           return []
         }
       }
-      const instr = (t: string): string[] => ocList(t, (o) => o.instructions).map((x) => x.split('/').pop()!)
-      for (const n of instr(b.oc)) if (!instr(a.oc).includes(n)) actual.add(`${n === 'MEMORY.md' ? 'memory' : 'rule'}:opencode:${n}`)
+      const instr = (t: string): string[] =>
+        ocList(t, (o) => o.instructions).map((x) => x.split('/').pop()!)
+      for (const n of instr(b.oc))
+        if (!instr(a.oc).includes(n))
+          actual.add(`${n === 'MEMORY.md' ? 'memory' : 'rule'}:opencode:${n}`)
       const skillsIn = (t: string): string[] =>
         ocList(t, (o) => (o.skills as Json | undefined)?.paths).flatMap((d) =>
           existsSync(d) ? readdirSync(d).filter((n) => existsSync(join(d, n, 'SKILL.md'))) : []
         )
-      for (const n of skillsIn(b.oc)) if (!skillsIn(a.oc).includes(n)) actual.add(`skill:opencode:${n}`)
+      for (const n of skillsIn(b.oc))
+        if (!skillsIn(a.oc).includes(n)) actual.add(`skill:opencode:${n}`)
       const act = [...actual].sort()
       const pre = [...preview].sort()
       if (JSON.stringify(act) !== JSON.stringify(pre))
-        bad.push(`preview≠actual — preview only ${pre.filter((x) => !act.includes(x)).join(',') || '-'} / actual only ${act.filter((x) => !pre.includes(x)).join(',') || '-'}`)
+        bad.push(
+          `preview≠actual — preview only ${pre.filter((x) => !act.includes(x)).join(',') || '-'} / actual only ${act.filter((x) => !pre.includes(x)).join(',') || '-'}`
+        )
       judge('6')
       // user items not imported are kept (CLAUDE.md, settings, other keys, AGENTS.md body + late-* added after import)
-      const notImported = ['claude.json other keys', 'settings.json whole', 'CLAUDE.md', 'codex config.toml other keys', 'codex AGENTS.md user body', 'opencode.json other keys']
-      for (const k of notImported) if (table[k]['6'] !== 'kept') bad.push(`empty workspace: ${k}=${table[k]['6']}`)
-      if (JSON.stringify(lateTree()) !== JSON.stringify(late0)) bad.push('non-imported late skill/rule changed')
-      if (!same((readJson(join(Z, '.claude.json')).mcpServers as Json)['late-srv'], lateSrv)) bad.push('non-imported late-srv changed')
+      const notImported = [
+        'claude.json other keys',
+        'settings.json whole',
+        'CLAUDE.md',
+        'codex config.toml other keys',
+        'codex AGENTS.md user body',
+        'opencode.json other keys'
+      ]
+      for (const k of notImported)
+        if (table[k]['6'] !== 'kept') bad.push(`empty workspace: ${k}=${table[k]['6']}`)
+      if (JSON.stringify(lateTree()) !== JSON.stringify(late0))
+        bad.push('non-imported late skill/rule changed')
+      if (!same((readJson(join(Z, '.claude.json')).mcpServers as Json)['late-srv'], lateSrv))
+        bad.push('non-imported late-srv changed')
       switchWorkspace(Z, 'default')
       const r2 = once()
       const t2 = tree()
       if (!r2.results) bad.push('switch-back Sync refused')
-      const notRestored = [...postImport.keys()].filter((k) => !isApp(k) && k !== '.claude.json' && postImport.get(k) !== t2.get(k))
+      const notRestored = [...postImport.keys()].filter(
+        (k) => !isApp(k) && k !== '.claude.json' && postImport.get(k) !== t2.get(k)
+      )
       if (notRestored.length) bad.push(`not restored after switching back ${notRestored.join(',')}`)
       // server order may change after turning off and switching (compare semantically)
       const canon = (v: unknown): unknown =>
         Array.isArray(v)
           ? v.map(canon)
           : v && typeof v === 'object'
-            ? Object.fromEntries(Object.keys(v as Json).sort().map((k) => [k, canon((v as Json)[k])]))
+            ? Object.fromEntries(
+                Object.keys(v as Json)
+                  .sort()
+                  .map((k) => [k, canon((v as Json)[k])])
+              )
             : v
       const cBack = readJson(join(Z, '.claude.json'))
       const { 'late-srv': lateBack, ...restSrv } = cBack.mcpServers as Json
       if (!same(lateBack, lateSrv)) bad.push('late-srv differs after switching back')
-      if (!same(canon({ ...cBack, mcpServers: restSrv }), canon(claudeAfterImport))) bad.push('claude.json content differs after switching back')
-      if (JSON.stringify(lateTree()) !== JSON.stringify(late0)) bad.push('late skill/rule changed after switching back')
+      if (!same(canon({ ...cBack, mcpServers: restSrv }), canon(claudeAfterImport)))
+        bad.push('claude.json content differs after switching back')
+      if (JSON.stringify(lateTree()) !== JSON.stringify(late0))
+        bad.push('late skill/rule changed after switching back')
       if (pendingSyncCount(Z, envZ, memZ) !== 0) bad.push('pending ≠ 0 after switching back')
       judge('6back')
       check(
@@ -5181,7 +7108,10 @@ async function run(): Promise<void> {
     check(
       'z-table. user items × stages (kept/moved/changed/deleted/duplicate)',
       true,
-      ['item | ' + cols.join(' | '), ...ITEMS.map(([k]) => `${k} | ${cols.map((c) => table[k]?.[c] ?? '-').join(' | ')}`)].join('\n      ')
+      [
+        'item | ' + cols.join(' | '),
+        ...ITEMS.map(([k]) => `${k} | ${cols.map((c) => table[k]?.[c] ?? '-').join(' | ')}`)
+      ].join('\n      ')
     )
   }
 
@@ -5203,7 +7133,10 @@ async function run(): Promise<void> {
     put('.claude/plans/sub/manifest.json', JSON.stringify({ tool: 'built-in image_gen' }))
     put('.claude/plans/sub/q.md', '# q\n')
     // library: per-project manifest
-    put(`${lib}/projA/manifest.json`, JSON.stringify({ tool: 'Claude Code (python-generated SVG)' }))
+    put(
+      `${lib}/projA/manifest.json`,
+      JSON.stringify({ tool: 'Claude Code (python-generated SVG)' })
+    )
     put(`${lib}/projA/a1.svg`)
     put(`${lib}/projA/deep/x/a2.md`, '# a2\n') // inherits manifest from above
     put(`${lib}/projA/deep/x/a3.md`, '# a3\n')
@@ -5224,10 +7157,12 @@ async function run(): Promise<void> {
     const bad: string[] = []
     const srcs = defaultArtifactSources(K)
     const gi = srcs.find((x) => x.label === '~/.codex/generated_images')
-    if (!gi || gi.project !== 'first-segment') bad.push('generated_images collection location missing')
+    if (!gi || gi.project !== 'first-segment')
+      bad.push('generated_images collection location missing')
     const cache = newManifestCache()
     const items = scanArtifacts(K, srcs, cache)
-    const toolAt = (rel: string): string => items.find((a) => a.path === join(K, rel))?.tool ?? 'missing'
+    const toolAt = (rel: string): string =>
+      items.find((a) => a.path === join(K, rel))?.tool ?? 'missing'
     const expect: [string, string][] = [
       ['.claude/plans/p1.md', 'claude'],
       ['.claude/plans/sub/q.md', 'claude'],
@@ -5259,7 +7194,8 @@ async function run(): Promise<void> {
     if (cache.reads !== libManifests) bad.push(`manifest reads ${cache.reads} ≠ ${libManifests}`)
     // rescan with the same cache → 0 extra reads
     scanArtifacts(K, srcs, cache)
-    if (cache.reads !== libManifests) bad.push(`rescan extra manifest reads ${cache.reads - libManifests}`)
+    if (cache.reads !== libManifests)
+      bad.push(`rescan extra manifest reads ${cache.reads - libManifests}`)
     const byTool = new Map<string, number>()
     for (const a of items) byTool.set(a.tool, (byTool.get(a.tool) ?? 0) + 1)
     check(
@@ -5280,51 +7216,138 @@ async function run(): Promise<void> {
     const claudeFile = join(S, '.claude/projects/-tmp-proj', `${cid}.jsonl`)
     mkdirSync(join(S, '.claude/projects/-tmp-proj'), { recursive: true })
     const jl = (xs: unknown[]): string => xs.map((x) => JSON.stringify(x)).join('\n') + '\n'
-    const cu = (text: string, ts: string): Json => ({ type: 'user', sessionId: cid, cwd: '/tmp/proj', timestamp: ts, message: { role: 'user', content: text } })
+    const cu = (text: string, ts: string): Json => ({
+      type: 'user',
+      sessionId: cid,
+      cwd: '/tmp/proj',
+      timestamp: ts,
+      message: { role: 'user', content: text }
+    })
     writeFileSync(
       claudeFile,
       jl([
-        cu('\uD55C\uAE00 \uD615\uD0DC\uC18C\uBD84\uC11D\uAE30 \uC9C8\uBB38\uC785\uB2C8\uB2E4', '2026-09-20T00:00:00Z'),
+        cu(
+          '\uD55C\uAE00 \uD615\uD0DC\uC18C\uBD84\uC11D\uAE30 \uC9C8\uBB38\uC785\uB2C8\uB2E4',
+          '2026-09-20T00:00:00Z'
+        ),
         {
-          type: 'assistant', sessionId: cid, timestamp: '2026-09-20T00:00:01Z',
-          message: { role: 'assistant', content: [{ type: 'text', text: '\uB2F5\uBCC0 English Keyword alpha' }, { type: 'tool_use', name: 'Bash', input: { command: 'echo TOOLONLYSECRET' } }] }
+          type: 'assistant',
+          sessionId: cid,
+          timestamp: '2026-09-20T00:00:01Z',
+          message: {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: '\uB2F5\uBCC0 English Keyword alpha' },
+              { type: 'tool_use', name: 'Bash', input: { command: 'echo TOOLONLYSECRET' } }
+            ]
+          }
         },
-        { type: 'user', sessionId: cid, timestamp: '2026-09-20T00:00:02Z', message: { role: 'user', content: [{ type: 'tool_result', content: 'TOOLRESULTTEXT' }] } },
-        { type: 'assistant', sessionId: cid, timestamp: '2026-09-20T00:00:03Z', message: { role: 'assistant', content: [{ type: 'text', text: '\uB450\uBC88\uC9F8 \uB2F5\uBCC0 \uAC00\uB098' }] } }
+        {
+          type: 'user',
+          sessionId: cid,
+          timestamp: '2026-09-20T00:00:02Z',
+          message: { role: 'user', content: [{ type: 'tool_result', content: 'TOOLRESULTTEXT' }] }
+        },
+        {
+          type: 'assistant',
+          sessionId: cid,
+          timestamp: '2026-09-20T00:00:03Z',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: '\uB450\uBC88\uC9F8 \uB2F5\uBCC0 \uAC00\uB098' }]
+          }
+        }
       ])
     )
     const codexDir = join(S, '.codex/sessions/2026/09/21')
     mkdirSync(codexDir, { recursive: true })
     const codexFile = join(codexDir, `rollout-2026-09-21T00-00-00-${xid}.jsonl`)
-    const ri = (payload: Json, ts: string): Json => ({ type: 'response_item', timestamp: ts, payload })
+    const ri = (payload: Json, ts: string): Json => ({
+      type: 'response_item',
+      timestamp: ts,
+      payload
+    })
     writeFileSync(
       codexFile,
       jl([
-        { type: 'session_meta', timestamp: '2026-09-21T00:00:00Z', payload: { id: xid, cwd: '/tmp/cx', timestamp: '2026-09-21T00:00:00Z' } },
-        ri({ type: 'message', role: 'user', content: [{ type: 'input_text', text: '\uCF54\uB371\uC2A4 \uC9C8\uBB38 \uBCA1\uD130\uAC80\uC0C9 \uD55C' }] }, '2026-09-21T00:00:01Z'),
-        ri({ type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['echo', 'CODEXTOOLOUT'] }) }, '2026-09-21T00:00:02Z'),
+        {
+          type: 'session_meta',
+          timestamp: '2026-09-21T00:00:00Z',
+          payload: { id: xid, cwd: '/tmp/cx', timestamp: '2026-09-21T00:00:00Z' }
+        },
+        ri(
+          {
+            type: 'message',
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: '\uCF54\uB371\uC2A4 \uC9C8\uBB38 \uBCA1\uD130\uAC80\uC0C9 \uD55C'
+              }
+            ]
+          },
+          '2026-09-21T00:00:01Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'shell',
+            arguments: JSON.stringify({ command: ['echo', 'CODEXTOOLOUT'] })
+          },
+          '2026-09-21T00:00:02Z'
+        ),
         ri({ type: 'function_call_output', output: 'CODEXTOOLRESULT' }, '2026-09-21T00:00:03Z'),
-        ri({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '\uCF54\uB371\uC2A4 \uB2F5\uBCC0 Zeta' }] }, '2026-09-21T00:00:04Z')
+        ri(
+          {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: '\uCF54\uB371\uC2A4 \uB2F5\uBCC0 Zeta' }]
+          },
+          '2026-09-21T00:00:04Z'
+        )
       ])
     )
     // OpenCode: session, message, part (only the needed columns)
     const ocDir = join(S, '.local/share/opencode')
     mkdirSync(ocDir, { recursive: true })
-    const { DatabaseSync: Db } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+    const { DatabaseSync: Db } = process.getBuiltinModule('node:sqlite') as {
+      DatabaseSync: typeof DatabaseSync
+    }
     const oc = new Db(join(ocDir, 'opencode.db'))
     oc.exec(`create table session(id text primary key, title text, directory text, parent_id text, time_created integer, time_updated integer);
       create table message(id text primary key, session_id text, time_created integer, data text);
       create table part(id text primary key, message_id text, time_created integer, data text);`)
     const T0 = Date.parse('2026-09-22T00:00:00Z')
-    oc.prepare('insert into session values (?, ?, ?, null, ?, ?)').run('ses_oc1', '\uC624\uD508\uCF54\uB4DC \uC138\uC158', '/tmp/oc', T0, T0 + 3)
+    oc.prepare('insert into session values (?, ?, ?, null, ?, ?)').run(
+      'ses_oc1',
+      '\uC624\uD508\uCF54\uB4DC \uC138\uC158',
+      '/tmp/oc',
+      T0,
+      T0 + 3
+    )
     const ocMsg = (id: string, role: string, t: number, parts: Json[]): void => {
-      oc.prepare('insert into message values (?, ?, ?, ?)').run(id, 'ses_oc1', t, JSON.stringify({ role, time: { created: t } }))
-      parts.forEach((p, i) => oc.prepare('insert into part values (?, ?, ?, ?)').run(`${id}_p${i}`, id, t + i, JSON.stringify(p)))
+      oc.prepare('insert into message values (?, ?, ?, ?)').run(
+        id,
+        'ses_oc1',
+        t,
+        JSON.stringify({ role, time: { created: t } })
+      )
+      parts.forEach((p, i) =>
+        oc
+          .prepare('insert into part values (?, ?, ?, ?)')
+          .run(`${id}_p${i}`, id, t + i, JSON.stringify(p))
+      )
     }
-    ocMsg('msg_1', 'user', T0 + 1, [{ type: 'text', text: '\uC624\uD508\uCF54\uB4DC \uC9C8\uBB38 \uD55C\uAE00' }])
+    ocMsg('msg_1', 'user', T0 + 1, [
+      { type: 'text', text: '\uC624\uD508\uCF54\uB4DC \uC9C8\uBB38 \uD55C\uAE00' }
+    ])
     ocMsg('msg_2', 'assistant', T0 + 2, [
       { type: 'text', text: '\uC624\uD508\uCF54\uB4DC \uB2F5\uBCC0 omega' },
-      { type: 'tool', tool: 'bash', state: { title: 'OCTOOLTITLE', input: { command: 'x' }, output: 'OCTOOLOUT' } }
+      {
+        type: 'tool',
+        tool: 'bash',
+        state: { title: 'OCTOOLTITLE', input: { command: 'x' }, output: 'OCTOOLOUT' }
+      }
     ])
     oc.close()
 
@@ -5332,7 +7355,8 @@ async function run(): Promise<void> {
     const dbFile = searchIndexPath(S)
     if (!dbFile.startsWith(S + '/.config/illithid/')) bad.push(`index path ${dbFile}`)
     const r1 = await indexSessions(S, scan())
-    if (r1.indexed !== 3 || r1.failed) bad.push(`first index ${r1.indexed}/${r1.sessions} failed ${r1.failed}`)
+    if (r1.indexed !== 3 || r1.failed)
+      bad.push(`first index ${r1.indexed}/${r1.sessions} failed ${r1.failed}`)
 
     const transcripts = new Map<string, Awaited<ReturnType<typeof readSessionTranscript>>>()
     const verify = async (q: string, want: string[], label: string): Promise<number> => {
@@ -5343,12 +7367,17 @@ async function run(): Promise<void> {
       let hits = 0
       for (const x of r.results) {
         const k = `${x.tool}:${x.id}`
-        if (!transcripts.has(k)) transcripts.set(k, await readSessionTranscript(S, x.tool, x.id, { limit: 100000 }))
+        if (!transcripts.has(k))
+          transcripts.set(k, await readSessionTranscript(S, x.tool, x.id, { limit: 100000 }))
         for (const h of x.hits) {
           hits++
           const m = transcripts.get(k)!.messages.find((mm) => mm.index === h.idx)
-          if (!m || !m.text.toLowerCase().includes(q.toLowerCase()) || m.role !== h.role) bad.push(`${label} "${q}" idx ${h.idx} mismatch`)
-          if (!h.marks.length || h.marks.some(([a, b]) => h.snippet.slice(a, b).toLowerCase() !== q.toLowerCase()))
+          if (!m || !m.text.toLowerCase().includes(q.toLowerCase()) || m.role !== h.role)
+            bad.push(`${label} "${q}" idx ${h.idx} mismatch`)
+          if (
+            !h.marks.length ||
+            h.marks.some(([a, b]) => h.snippet.slice(a, b).toLowerCase() !== q.toLowerCase())
+          )
             bad.push(`${label} "${q}" highlight range mismatch`)
         }
       }
@@ -5363,8 +7392,20 @@ async function run(): Promise<void> {
     hitN += await verify('\uAC00\uB098', [C], '2 chars')
     hitN += await verify('\uD55C', [C, X, O], '1 char')
     hitN += await verify('\uB2F5\uBCC0', [C, X, O], '2 chars shared')
-    if (searchSessions(S, '\uAC00\uB098').mode !== 'like' || searchSessions(S, '\uD615\uD0DC\uC18C').mode !== 'fts') bad.push('mode detection')
-    for (const q of ['TOOLONLYSECRET', 'TOOLRESULTTEXT', 'CODEXTOOLOUT', 'CODEXTOOLRESULT', 'OCTOOLTITLE', 'OCTOOLOUT', 'echo'])
+    if (
+      searchSessions(S, '\uAC00\uB098').mode !== 'like' ||
+      searchSessions(S, '\uD615\uD0DC\uC18C').mode !== 'fts'
+    )
+      bad.push('mode detection')
+    for (const q of [
+      'TOOLONLYSECRET',
+      'TOOLRESULTTEXT',
+      'CODEXTOOLOUT',
+      'CODEXTOOLRESULT',
+      'OCTOOLTITLE',
+      'OCTOOLOUT',
+      'echo'
+    ])
       if (searchSessions(S, q).results.length) bad.push(`tool output indexed: ${q}`)
     // quotes and special characters don't cause FTS syntax errors
     for (const q of ['"\uB2F5\uBCC0', 'a"b"c', 'AND OR', '100%', '_x'])
@@ -5384,30 +7425,58 @@ async function run(): Promise<void> {
     // idempotent: no changes → 0 writes
     const h0 = sha(readFileSync(dbFile))
     const r2 = await indexSessions(S, scan())
-    if (r2.indexed || r2.removed || r2.changes || sha(readFileSync(dbFile)) !== h0) bad.push(`re-run writes ${r2.changes} reindexed ${r2.indexed}`)
+    if (r2.indexed || r2.removed || r2.changes || sha(readFileSync(dbFile)) !== h0)
+      bad.push(`re-run writes ${r2.changes} reindexed ${r2.indexed}`)
 
     // edit: one line appended to the Claude file → only that session
-    writeFileSync(claudeFile, read(claudeFile) + jl([cu('\uCD94\uAC00\uB41C \uBB38\uC7A5 \uB378\uD0C0', '2026-09-23T00:00:00Z')]))
+    writeFileSync(
+      claudeFile,
+      read(claudeFile) +
+        jl([cu('\uCD94\uAC00\uB41C \uBB38\uC7A5 \uB378\uD0C0', '2026-09-23T00:00:00Z')])
+    )
     const r3 = await indexSessions(S, scan())
-    if (r3.indexed !== 1 || r3.removed) bad.push(`reindex after edit ${r3.indexed}, removed ${r3.removed}`)
+    if (r3.indexed !== 1 || r3.removed)
+      bad.push(`reindex after edit ${r3.indexed}, removed ${r3.removed}`)
     hitN += await verify('\uCD94\uAC00\uB41C \uBB38\uC7A5', [C], 'edit applied')
     // OpenCode: message added + time_updated
     const oc2 = new Db(join(ocDir, 'opencode.db'))
-    oc2.prepare('insert into message values (?, ?, ?, ?)').run('msg_3', 'ses_oc1', T0 + 10, JSON.stringify({ role: 'user', time: { created: T0 + 10 } }))
-    oc2.prepare('insert into part values (?, ?, ?, ?)').run('msg_3_p0', 'msg_3', T0 + 10, JSON.stringify({ type: 'text', text: '\uC624\uD508\uCF54\uB4DC \uD6C4\uC18D \uC2DC\uADF8\uB9C8' }))
+    oc2
+      .prepare('insert into message values (?, ?, ?, ?)')
+      .run(
+        'msg_3',
+        'ses_oc1',
+        T0 + 10,
+        JSON.stringify({ role: 'user', time: { created: T0 + 10 } })
+      )
+    oc2.prepare('insert into part values (?, ?, ?, ?)').run(
+      'msg_3_p0',
+      'msg_3',
+      T0 + 10,
+      JSON.stringify({
+        type: 'text',
+        text: '\uC624\uD508\uCF54\uB4DC \uD6C4\uC18D \uC2DC\uADF8\uB9C8'
+      })
+    )
     oc2.prepare('update session set time_updated = ? where id = ?').run(T0 + 11, 'ses_oc1')
     oc2.close()
     const r4 = await indexSessions(S, scan())
     if (r4.indexed !== 1) bad.push(`OpenCode change reindex ${r4.indexed}`)
     hitN += await verify('\uD6C4\uC18D \uC2DC\uADF8\uB9C8', [O], 'OpenCode applied')
     // tools whose scan failed (incomplete list) are not removed
-    const r5 = await indexSessions(S, scan().filter((x) => x.tool !== 'opencode'), { completeTools: ['claude', 'codex'] })
-    if (r5.removed || !searchSessions(S, '\uC2DC\uADF8\uB9C8').results.length) bad.push('OpenCode removed from incomplete list')
+    const r5 = await indexSessions(
+      S,
+      scan().filter((x) => x.tool !== 'opencode'),
+      { completeTools: ['claude', 'codex'] }
+    )
+    if (r5.removed || !searchSessions(S, '\uC2DC\uADF8\uB9C8').results.length)
+      bad.push('OpenCode removed from incomplete list')
     // delete: Codex file → removed from the index
     unlinkSync(codexFile)
     const r6 = await indexSessions(S, scan())
-    if (r6.removed !== 1 || r6.indexed) bad.push(`delete removed ${r6.removed}, reindexed ${r6.indexed}`)
-    if (searchSessions(S, '\uBCA1\uD130\uAC80\uC0C9').results.length) bad.push('deleted session found by search')
+    if (r6.removed !== 1 || r6.indexed)
+      bad.push(`delete removed ${r6.removed}, reindexed ${r6.indexed}`)
+    if (searchSessions(S, '\uBCA1\uD130\uAC80\uC0C9').results.length)
+      bad.push('deleted session found by search')
     const r7 = await indexSessions(S, scan())
     if (r7.changes) bad.push(`re-run writes after delete ${r7.changes}`)
 
@@ -5428,92 +7497,240 @@ async function run(): Promise<void> {
     const cid = '33333333-aaaa-4bbb-8ccc-000000000003'
     const cdir = join(U, '.claude/projects/-tmp-u')
     mkdirSync(join(cdir, cid, 'subagents'), { recursive: true })
-    const ca = (model: string, ts: string, blocks: Json[]): Json => ({ type: 'assistant', sessionId: cid, timestamp: ts, message: { role: 'assistant', model, content: blocks } })
+    const ca = (model: string, ts: string, blocks: Json[]): Json => ({
+      type: 'assistant',
+      sessionId: cid,
+      timestamp: ts,
+      message: { role: 'assistant', model, content: blocks }
+    })
     const claudeMain = join(cdir, `${cid}.jsonl`)
     writeFileSync(
       claudeMain,
       jl([
-        { type: 'user', sessionId: cid, cwd: '/tmp/u', timestamp: '2026-09-20T01:00:00Z', message: { role: 'user', content: 'hi' } },
-        { type: 'user', sessionId: cid, timestamp: '2026-09-20T01:30:00Z', message: { role: 'user', content: '<command-message>docx</command-message>\n<command-name>/docx</command-name>' } },
+        {
+          type: 'user',
+          sessionId: cid,
+          cwd: '/tmp/u',
+          timestamp: '2026-09-20T01:00:00Z',
+          message: { role: 'user', content: 'hi' }
+        },
+        {
+          type: 'user',
+          sessionId: cid,
+          timestamp: '2026-09-20T01:30:00Z',
+          message: {
+            role: 'user',
+            content: '<command-message>docx</command-message>\n<command-name>/docx</command-name>'
+          }
+        },
         ca('claude-opus-5', '2026-09-20T01:00:01Z', [
           { type: 'tool_use', name: 'Skill', input: { skill: 'pdf', args: 'USAGEARGSECRET' } },
           { type: 'tool_use', name: 'mcp__kaneo__get_task', input: { taskId: 'USAGEARGSECRET' } }
         ]),
-        ca('claude-sonnet-5', '2026-09-21T01:00:00Z', [{ type: 'tool_use', name: 'mcp__kaneo__list', input: {} }])
+        ca('claude-sonnet-5', '2026-09-21T01:00:00Z', [
+          { type: 'tool_use', name: 'mcp__kaneo__list', input: {} }
+        ])
       ])
     )
     writeFileSync(
       join(cdir, cid, 'subagents', 'agent-a.jsonl'),
-      jl([{ type: 'assistant', isSidechain: true, timestamp: '2026-09-20T02:00:00Z', message: { role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'tool_use', name: 'mcp__kaneo__x', input: {} }] } }])
+      jl([
+        {
+          type: 'assistant',
+          isSidechain: true,
+          timestamp: '2026-09-20T02:00:00Z',
+          message: {
+            role: 'assistant',
+            model: 'claude-haiku-4-5',
+            content: [{ type: 'tool_use', name: 'mcp__kaneo__x', input: {} }]
+          }
+        }
+      ])
     )
     const xid = '44444444-aaaa-4bbb-8ccc-000000000004'
     const xdir = join(U, '.codex/sessions/2026/09/22')
     mkdirSync(xdir, { recursive: true })
-    const ri = (payload: Json, ts: string): Json => ({ type: 'response_item', timestamp: ts, payload })
+    const ri = (payload: Json, ts: string): Json => ({
+      type: 'response_item',
+      timestamp: ts,
+      payload
+    })
     writeFileSync(
       join(xdir, `rollout-2026-09-22T00-00-00-${xid}.jsonl`),
       jl([
-        { type: 'session_meta', timestamp: '2026-09-22T00:00:00Z', payload: { id: xid, cwd: '/tmp/x', timestamp: '2026-09-22T00:00:00Z' } },
+        {
+          type: 'session_meta',
+          timestamp: '2026-09-22T00:00:00Z',
+          payload: { id: xid, cwd: '/tmp/x', timestamp: '2026-09-22T00:00:00Z' }
+        },
         { type: 'turn_context', timestamp: '2026-09-22T00:00:01Z', payload: { model: 'gpt-5.5' } },
-        ri({ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'q' }] }, '2026-09-22T00:00:01Z'),
-        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'cat ~/.agents/skills/pdf/SKILL.md' }) }, '2026-09-22T00:00:02Z'),
-        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'sed -n 1,50p ~/.agents/skills/pdf/SKILL.md' }) }, '2026-09-22T00:00:03Z'),
-        ri({ type: 'function_call', name: 'save_issue', namespace: 'mcp__linear', arguments: '{}' }, '2026-09-22T00:00:04Z'),
-        ri({ type: 'function_call', name: 'search', namespace: 'mcp__brave_search', arguments: '{}' }, '2026-09-22T00:00:05Z'),
-        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: "sed -i 's/a/b/' ~/.agents/skills/pdf/SKILL.md" }) }, '2026-09-22T00:00:06Z'),
-        ri({ type: 'custom_tool_call', name: 'apply_patch', input: '*** Update File: skills/xlsx/SKILL.md' }, '2026-09-22T00:00:07Z'),
-        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'type C:\\Users\\a\\.agents\\skills\\docx\\SKILL.md' }) }, '2026-09-22T00:00:08Z'),
+        ri(
+          { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'q' }] },
+          '2026-09-22T00:00:01Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'exec',
+            arguments: JSON.stringify({ cmd: 'cat ~/.agents/skills/pdf/SKILL.md' })
+          },
+          '2026-09-22T00:00:02Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'exec',
+            arguments: JSON.stringify({ cmd: 'sed -n 1,50p ~/.agents/skills/pdf/SKILL.md' })
+          },
+          '2026-09-22T00:00:03Z'
+        ),
+        ri(
+          { type: 'function_call', name: 'save_issue', namespace: 'mcp__linear', arguments: '{}' },
+          '2026-09-22T00:00:04Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'search',
+            namespace: 'mcp__brave_search',
+            arguments: '{}'
+          },
+          '2026-09-22T00:00:05Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'exec',
+            arguments: JSON.stringify({ cmd: "sed -i 's/a/b/' ~/.agents/skills/pdf/SKILL.md" })
+          },
+          '2026-09-22T00:00:06Z'
+        ),
+        ri(
+          {
+            type: 'custom_tool_call',
+            name: 'apply_patch',
+            input: '*** Update File: skills/xlsx/SKILL.md'
+          },
+          '2026-09-22T00:00:07Z'
+        ),
+        ri(
+          {
+            type: 'function_call',
+            name: 'exec',
+            arguments: JSON.stringify({ cmd: 'type C:\\Users\\a\\.agents\\skills\\docx\\SKILL.md' })
+          },
+          '2026-09-22T00:00:08Z'
+        ),
         { type: 'turn_context', timestamp: '2026-09-22T00:01:00Z', payload: { model: 'gpt-6' } },
-        ri({ type: 'function_call', name: 'exec', arguments: JSON.stringify({ cmd: 'cat skills/pdf/SKILL.md' }) }, '2026-09-22T00:01:01Z')
+        ri(
+          {
+            type: 'function_call',
+            name: 'exec',
+            arguments: JSON.stringify({ cmd: 'cat skills/pdf/SKILL.md' })
+          },
+          '2026-09-22T00:01:01Z'
+        )
       ])
     )
     const ocDir = join(U, '.local/share/opencode')
     mkdirSync(ocDir, { recursive: true })
-    const { DatabaseSync: Db } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+    const { DatabaseSync: Db } = process.getBuiltinModule('node:sqlite') as {
+      DatabaseSync: typeof DatabaseSync
+    }
     const oc = new Db(join(ocDir, 'opencode.db'))
     oc.exec(`create table session(id text primary key, title text, directory text, parent_id text, time_created integer, time_updated integer);
       create table message(id text primary key, session_id text, time_created integer, data text);
       create table part(id text primary key, message_id text, time_created integer, data text);`)
     const T0 = Date.parse('2026-09-23T00:00:00Z')
-    oc.prepare('insert into session values (?, ?, ?, null, ?, ?)').run('ses_u1', 'u', '/tmp/o', T0, T0 + 3)
-    oc.prepare('insert into message values (?, ?, ?, ?)').run('m1', 'ses_u1', T0 + 1, JSON.stringify({ role: 'user', time: { created: T0 + 1 } }))
-    oc.prepare('insert into message values (?, ?, ?, ?)').run('m2', 'ses_u1', T0 + 2, JSON.stringify({ role: 'assistant', modelID: 'kimi-k2', time: { created: T0 + 2 } }))
+    oc.prepare('insert into session values (?, ?, ?, null, ?, ?)').run(
+      'ses_u1',
+      'u',
+      '/tmp/o',
+      T0,
+      T0 + 3
+    )
+    oc.prepare('insert into message values (?, ?, ?, ?)').run(
+      'm1',
+      'ses_u1',
+      T0 + 1,
+      JSON.stringify({ role: 'user', time: { created: T0 + 1 } })
+    )
+    oc.prepare('insert into message values (?, ?, ?, ?)').run(
+      'm2',
+      'ses_u1',
+      T0 + 2,
+      JSON.stringify({ role: 'assistant', modelID: 'kimi-k2', time: { created: T0 + 2 } })
+    )
     ;[
       { type: 'tool', tool: 'skill', state: { input: { name: 'pdf' } } },
-      { type: 'tool', tool: 'brave-search_brave_web_search', state: { input: { q: 'USAGEARGSECRET' } } },
+      {
+        type: 'tool',
+        tool: 'brave-search_brave_web_search',
+        state: { input: { q: 'USAGEARGSECRET' } }
+      },
       { type: 'tool', tool: 'bash', state: { input: { command: 'ls' } } }
-    ].forEach((p, i) => oc.prepare('insert into part values (?, ?, ?, ?)').run(`m2_p${i}`, 'm2', T0 + 2 + i, JSON.stringify(p)))
+    ].forEach((p, i) =>
+      oc
+        .prepare('insert into part values (?, ?, ?, ?)')
+        .run(`m2_p${i}`, 'm2', T0 + 2 + i, JSON.stringify(p))
+    )
     oc.close()
 
     const now = Date.parse('2026-09-24T12:00:00Z')
-    const EMPTY: NonNullable<ReturnType<typeof usageOf>> = { total: -1, recent: 0, days: 0, byModel: [], byTool: [], daily: [], dailyByModel: { models: [], others: false, days: [] } }
+    const EMPTY: NonNullable<ReturnType<typeof usageOf>> = {
+      total: -1,
+      recent: 0,
+      days: 0,
+      byModel: [],
+      byTool: [],
+      daily: [],
+      dailyByModel: { models: [], others: false, days: [] }
+    }
     if (usageOf(U, 'skill', 'pdf', { now }) !== null) bad.push('no index should read as null')
     const r1 = await indexSessions(U, scanSessions(U).sessions)
     if (r1.failed) bad.push(`index failed ${r1.failed}`)
-    const pdf = (usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY)
-    const kaneo = (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY)
-    const linear = (usageOf(U, 'mcp', 'linear', { now }) ?? EMPTY)
-    const brave = (usageOf(U, 'mcp', 'brave-search', { now }) ?? EMPTY)
-    const brav = (usageOf(U, 'mcp', 'brave', { now }) ?? EMPTY)
-    const tools = (u: { byTool: { tool: string; n: number }[] }): string => u.byTool.map((x) => `${x.tool}:${x.n}`).join(',')
+    const pdf = usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY
+    const kaneo = usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY
+    const linear = usageOf(U, 'mcp', 'linear', { now }) ?? EMPTY
+    const brave = usageOf(U, 'mcp', 'brave-search', { now }) ?? EMPTY
+    const brav = usageOf(U, 'mcp', 'brave', { now }) ?? EMPTY
+    const tools = (u: { byTool: { tool: string; n: number }[] }): string =>
+      u.byTool.map((x) => `${x.tool}:${x.n}`).join(',')
     // pdf: Claude 1 + Codex 2 (turn 1 read twice = 1, turn 2 = 1) + OpenCode 1
-    if (pdf.total !== 4 || tools(pdf) !== 'codex:2,claude:1,opencode:1') bad.push(`pdf ${pdf.total} ${tools(pdf)}`)
-    if (pdf.byModel.map((m) => m.model).sort().join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2') bad.push(`pdf models ${JSON.stringify(pdf.byModel)}`)
+    if (pdf.total !== 4 || tools(pdf) !== 'codex:2,claude:1,opencode:1')
+      bad.push(`pdf ${pdf.total} ${tools(pdf)}`)
+    if (
+      pdf.byModel
+        .map((m) => m.model)
+        .sort()
+        .join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2'
+    )
+      bad.push(`pdf models ${JSON.stringify(pdf.byModel)}`)
     // kaneo: main 2 + subagent 1 (haiku)
-    if (kaneo.total !== 3 || !kaneo.byModel.some((m) => m.model === 'claude-haiku-4-5')) bad.push(`kaneo ${JSON.stringify(kaneo.byModel)}`)
+    if (kaneo.total !== 3 || !kaneo.byModel.some((m) => m.model === 'claude-haiku-4-5'))
+      bad.push(`kaneo ${JSON.stringify(kaneo.byModel)}`)
     // brave-search: OpenCode prefix 1 + Codex normalized namespace mcp__brave_search 1
-    if (linear.total !== 1 || brave.total !== 2 || brav.total !== 0) bad.push(`linear ${linear.total} brave ${brave.total} brav ${brav.total}`)
+    if (linear.total !== 1 || brave.total !== 2 || brav.total !== 0)
+      bad.push(`linear ${linear.total} brave ${brave.total} brav ${brav.total}`)
     const docx = usageOf(U, 'skill', 'docx', { now }) ?? EMPTY
     const xlsx = usageOf(U, 'skill', 'xlsx', { now }) ?? EMPTY
     // docx: Claude /docx typed + Codex Windows path; xlsx: only edited via apply_patch → 0
     if (docx.total !== 2 || xlsx.total !== 0) bad.push(`docx ${docx.total} xlsx ${xlsx.total}`)
-    if (pdf.daily.length !== 30 || pdf.recent !== 4 || pdf.since !== '2026-09-20') bad.push(`daily ${pdf.daily.length} recent ${pdf.recent} since ${pdf.since}`)
+    if (pdf.daily.length !== 30 || pdf.recent !== 4 || pdf.since !== '2026-09-20')
+      bad.push(`daily ${pdf.daily.length} recent ${pdf.recent} since ${pdf.since}`)
     // per-model daily lines: every model of the period, sums match the daily totals
     const dm = pdf.dailyByModel
     const lineSum = dm.days.reduce((a, d) => a + d.n.reduce((x, y) => x + y, 0), 0)
-    if (dm.models.slice().sort().join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2' || dm.others || lineSum !== pdf.recent || dm.days.length !== 30)
+    if (
+      dm.models.slice().sort().join() !== 'claude-opus-5,gpt-5.5,gpt-6,kimi-k2' ||
+      dm.others ||
+      lineSum !== pdf.recent ||
+      dm.days.length !== 30
+    )
       bad.push(`dailyByModel ${JSON.stringify(dm.models)} others ${dm.others} sum ${lineSum}`)
-    const { DatabaseSync: Db2 } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+    const { DatabaseSync: Db2 } = process.getBuiltinModule('node:sqlite') as {
+      DatabaseSync: typeof DatabaseSync
+    }
     const udb = new Db2(searchIndexPath(U))
     const usageText = JSON.stringify(udb.prepare('select * from usage').all())
     udb.close()
@@ -5523,17 +7740,33 @@ async function run(): Promise<void> {
     if (r2.indexed !== 0) bad.push(`re-run indexed ${r2.indexed}`)
     writeFileSync(
       join(cdir, cid, 'subagents', 'agent-b.jsonl'),
-      jl([{ type: 'assistant', isSidechain: true, timestamp: '2026-09-21T02:00:00Z', message: { role: 'assistant', model: 'claude-haiku-4-5', content: [{ type: 'tool_use', name: 'mcp__kaneo__y', input: {} }] } }])
+      jl([
+        {
+          type: 'assistant',
+          isSidechain: true,
+          timestamp: '2026-09-21T02:00:00Z',
+          message: {
+            role: 'assistant',
+            model: 'claude-haiku-4-5',
+            content: [{ type: 'tool_use', name: 'mcp__kaneo__y', input: {} }]
+          }
+        }
+      ])
     )
     const r3 = await indexSessions(U, scanSessions(U).sessions)
-    if (r3.indexed !== 1 || (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4) bad.push(`subagent change indexed ${r3.indexed} kaneo ${(usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total}`)
+    if (r3.indexed !== 1 || (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4)
+      bad.push(
+        `subagent change indexed ${r3.indexed} kaneo ${(usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total}`
+      )
     // DST: 30 unique calendar days across a clock change
     {
       const tz = process.env.TZ
       process.env.TZ = 'America/New_York'
       try {
         for (const at of ['2026-11-03T04:30:00Z', '2026-03-09T05:30:00Z']) {
-          const d = (usageOf(U, 'skill', 'pdf', { now: Date.parse(at) }) ?? EMPTY).daily.map((x) => x.day)
+          const d = (usageOf(U, 'skill', 'pdf', { now: Date.parse(at) }) ?? EMPTY).daily.map(
+            (x) => x.day
+          )
           if (new Set(d).size !== 30) bad.push(`DST ${at} ${new Set(d).size} unique days`)
         }
       } finally {
@@ -5543,30 +7776,53 @@ async function run(): Promise<void> {
     }
     // upgrade: an index built before usage existed reads every session once, then nothing
     {
-      const { DatabaseSync: Db3 } = process.getBuiltinModule('node:sqlite') as { DatabaseSync: typeof DatabaseSync }
+      const { DatabaseSync: Db3 } = process.getBuiltinModule('node:sqlite') as {
+        DatabaseSync: typeof DatabaseSync
+      }
       const d3 = new Db3(searchIndexPath(U))
       d3.exec(`drop table usage; delete from meta where key = 'usageSchema'`)
       d3.close()
-      if (usageOf(U, 'skill', 'pdf', { now }) !== null) bad.push('missing usage table should read as null')
+      if (usageOf(U, 'skill', 'pdf', { now }) !== null)
+        bad.push('missing usage table should read as null')
       const up1 = await indexSessions(U, scanSessions(U).sessions)
       const up2 = await indexSessions(U, scanSessions(U).sessions)
-      if (up1.indexed !== 3 || up2.indexed !== 0 || (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4) bad.push(`upgrade ${up1.indexed}/${up2.indexed}`)
+      if (
+        up1.indexed !== 3 ||
+        up2.indexed !== 0 ||
+        (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 4
+      )
+        bad.push(`upgrade ${up1.indexed}/${up2.indexed}`)
     }
     // delete: Claude session gone → its usage gone
     rmSync(claudeMain)
     await indexSessions(U, scanSessions(U).sessions)
-    if ((usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 0 || (usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY).total !== 3) bad.push('delete did not remove usage')
+    if (
+      (usageOf(U, 'mcp', 'kaneo', { now }) ?? EMPTY).total !== 0 ||
+      (usageOf(U, 'skill', 'pdf', { now }) ?? EMPTY).total !== 3
+    )
+      bad.push('delete did not remove usage')
     // Gemini (no local sample): activate_skill and <server>__<tool> by rule
     const g = new UsageCounter('gemini', '2026-09-24T00:00:00Z')
-    g.add({ name: 'activate_skill', input: { name: 'pdf' }, model: 'gemini-2.5-pro', at: '2026-09-24T00:00:00Z' })
+    g.add({
+      name: 'activate_skill',
+      input: { name: 'pdf' },
+      model: 'gemini-2.5-pro',
+      at: '2026-09-24T00:00:00Z'
+    })
     g.add({ name: 'kaneo__get_task', input: {}, model: 'gemini-2.5-pro' })
     g.add({ name: 'run_shell_command', input: { command: 'ls' } })
-    const grows = [...g.rows.values()].map((r) => `${r.kind}:${r.name}:${r.model}:${r.n}`).sort().join(',')
-    if (grows !== 'mcp:kaneo:gemini-2.5-pro:1,skill:pdf:gemini-2.5-pro:1') bad.push(`gemini ${grows}`)
+    const grows = [...g.rows.values()]
+      .map((r) => `${r.kind}:${r.name}:${r.model}:${r.n}`)
+      .sort()
+      .join(',')
+    if (grows !== 'mcp:kaneo:gemini-2.5-pro:1,skill:pdf:gemini-2.5-pro:1')
+      bad.push(`gemini ${grows}`)
     check(
       'ac2. usage stats — Claude (incl. subagents), Codex (namespace, SKILL.md once per turn), OpenCode (skill, server_ prefix), models, days, incremental, delete, no arguments stored',
       !bad.length,
-      bad.length ? bad.join('; ') : 'pdf 4 (codex 2, claude 1, opencode 1; sed -i / apply_patch not counted), docx 2 (/docx, Windows path), kaneo 3→4 with subagents, brave-search 2 (Codex brave_search), null before index, upgrade reads once, delete removes usage'
+      bad.length
+        ? bad.join('; ')
+        : 'pdf 4 (codex 2, claude 1, opencode 1; sed -i / apply_patch not counted), docx 2 (/docx, Windows path), kaneo 3→4 with subagents, brave-search 2 (Codex brave_search), null before index, upgrade reads once, delete removes usage'
     )
   }
 
@@ -5576,7 +7832,8 @@ async function run(): Promise<void> {
     const B = makeFixture('illithid-m7-B-')
     const cfg = join(B, APP_CONFIG_DIR)
     const now = Date.parse('2026-09-27T12:00:00Z')
-    const iso = (daysAgo: number): string => new Date(now - daysAgo * 86_400_000).toISOString().replace(/[:.]/g, '-')
+    const iso = (daysAgo: number): string =>
+      new Date(now - daysAgo * 86_400_000).toISOString().replace(/[:.]/g, '-')
     const put = (p: string, bytes = 10): void => {
       mkdirSync(join(p, '..'), { recursive: true })
       writeFileSync(p, 'x'.repeat(bytes))
@@ -5596,12 +7853,19 @@ async function run(): Promise<void> {
     put(join(cfg, 'backups/imported', iso(1), 'y.md'))
     put(join(cfg, 'backups/workspaces', iso(100), 'w/rules/r.md'), 30)
     // skills: 5 stamped entries → oldest 2 are targets; single-copy layout (no timestamps) → kept
-    for (let i = 0; i < 5; i++) put(join(cfg, 'backups/skills/claude/foo', iso(i * 10 + 1), 'SKILL.md'), 7)
+    for (let i = 0; i < 5; i++)
+      put(join(cfg, 'backups/skills/claude/foo', iso(i * 10 + 1), 'SKILL.md'), 7)
     put(join(cfg, 'backups/skills/codex/bar/SKILL.md'))
     // agents backups are outside the rules → never targets
     put(join(cfg, 'backups/agents/claude', iso(200)))
     // rollback: 5 tars by mtime → oldest 2 are targets; non-tar kept
-    const tars = ['g1-20260901-000000.tar', 'pre-dev-20260902-000000.tar', 'pre-x-20260903-000000.tar', 'pre-y-20260904-000000.tar', 'pre-z-20260905-000000.tar']
+    const tars = [
+      'g1-20260901-000000.tar',
+      'pre-dev-20260902-000000.tar',
+      'pre-x-20260903-000000.tar',
+      'pre-y-20260904-000000.tar',
+      'pre-z-20260905-000000.tar'
+    ]
     tars.forEach((n, i) => {
       put(join(cfg, 'rollback', n), 1000)
       const t = new Date(now - (10 - i) * 86_400_000)
@@ -5623,22 +7887,44 @@ async function run(): Promise<void> {
       `rollback/${tars[1]}`
     ].sort()
     if (got.join() !== want.join()) bad.push(`targets [${got.join(', ')}]`)
-    if (plan.items.some((i) => !i.path.startsWith(join(cfg, 'backups') + '/') && !i.path.startsWith(join(cfg, 'rollback') + '/')))
+    if (
+      plan.items.some(
+        (i) =>
+          !i.path.startsWith(join(cfg, 'backups') + '/') &&
+          !i.path.startsWith(join(cfg, 'rollback') + '/')
+      )
+    )
       bad.push('target outside backups/rollback')
     const sizeOf = (r: string): number => plan.items.find((i) => rel(i.path) === r)?.size ?? -1
-    if (sizeOf(`backups/deleted/${iso(40)}`) !== 100 || sizeOf(`rollback/${tars[0]}`) !== 1000) bad.push('sizes')
-    if (plan.count !== want.length || plan.bytes !== plan.items.reduce((n, i) => n + i.size, 0)) bad.push('count/bytes')
+    if (sizeOf(`backups/deleted/${iso(40)}`) !== 100 || sizeOf(`rollback/${tars[0]}`) !== 1000)
+      bad.push('sizes')
+    if (plan.count !== want.length || plan.bytes !== plan.items.reduce((n, i) => n + i.size, 0))
+      bad.push('count/bytes')
     // overrides: shorter age, fewer rollbacks kept
     const p3 = planBackupCleanup(B, { now, days: 3, keepRollback: 1 })
-    if (p3.items.some((i) => rel(i.path).startsWith('backups/imported'))) bad.push('backups/imported targeted with days=3')
-    if (!p3.items.some((i) => rel(i.path) === `backups/deleted/${iso(5)}`) || p3.items.filter((i) => i.kind === 'rollback').length !== 4)
+    if (p3.items.some((i) => rel(i.path).startsWith('backups/imported')))
+      bad.push('backups/imported targeted with days=3')
+    if (
+      !p3.items.some((i) => rel(i.path) === `backups/deleted/${iso(5)}`) ||
+      p3.items.filter((i) => i.kind === 'rollback').length !== 4
+    )
       bad.push('days/keepRollback override')
     // config defaults and validation
     const d = retentionOf({ version: 1 })
     if (d.enabled !== true || d.days !== 30 || d.keepRollback !== 3) bad.push('defaults')
-    if (validateConfig({ version: 1, backupRetention: { enabled: true, days: 30, keepRollback: 3 } }).length) bad.push('valid config rejected')
-    for (const br of [{ enabled: 'y', days: 30, keepRollback: 3 }, { enabled: true, days: 0, keepRollback: 3 }, { enabled: true, days: 30, keepRollback: 1.5 }, []])
-      if (!validateConfig({ version: 1, backupRetention: br }).length) bad.push(`invalid config accepted ${JSON.stringify(br)}`)
+    if (
+      validateConfig({ version: 1, backupRetention: { enabled: true, days: 30, keepRollback: 3 } })
+        .length
+    )
+      bad.push('valid config rejected')
+    for (const br of [
+      { enabled: 'y', days: 30, keepRollback: 3 },
+      { enabled: true, days: 0, keepRollback: 3 },
+      { enabled: true, days: 30, keepRollback: 1.5 },
+      []
+    ])
+      if (!validateConfig({ version: 1, backupRetention: br }).length)
+        bad.push(`invalid config accepted ${JSON.stringify(br)}`)
     // forged targets are refused (path escape, wrong shape)
     const forged: [Parameters<typeof isCleanupTarget>[1], string][] = [
       ['deleted', join(outside, iso(90))],
@@ -5650,7 +7936,8 @@ async function run(): Promise<void> {
       ['deleted', join(cfg, 'backups/imported', iso(45))],
       ['workspaces', join(cfg, 'backups/imported', iso(400))]
     ]
-    for (const [k, p] of forged) if (isCleanupTarget(B, k, p)) bad.push(`forged target accepted ${p.replace(B, '')}`)
+    for (const [k, p] of forged)
+      if (isCleanupTarget(B, k, p)) bad.push(`forged target accepted ${p.replace(B, '')}`)
 
     // apply with an injected mover (temp move instead of the Trash)
     const trash = join(B, 'trash-sim')
@@ -5664,16 +7951,33 @@ async function run(): Promise<void> {
     }
     const r = await applyBackupCleanup(B, evil, mover)
     if (r.moved !== plan.count || r.bytes !== plan.bytes) bad.push(`moved ${r.moved}/${plan.count}`)
-    if (r.failed.length !== 1 || r.failed[0].reason !== 'outsideBackups') bad.push(`failed ${JSON.stringify(r.failed.map((f) => f.reason))}`)
+    if (r.failed.length !== 1 || r.failed[0].reason !== 'outsideBackups')
+      bad.push(`failed ${JSON.stringify(r.failed.map((f) => f.reason))}`)
     if (plan.items.some((i) => existsSync(i.path))) bad.push('target still present')
     if (readdirSync(trash).length !== plan.count) bad.push('trash count')
-    if (!existsSync(join(outside, iso(90), 'keep.txt')) || !existsSync(join(outside, 'keep.txt'))) bad.push('outside content touched')
-    for (const k of [`backups/deleted/${iso(5)}`, 'backups/deleted/notes', `backups/imported/${iso(1)}`, `backups/imported/${iso(45)}/x.md`, `backups/imported/${iso(400)}/claude/rules/old.md`, 'backups/skills/codex/bar/SKILL.md', `backups/agents/claude/${iso(200)}`, `rollback/${tars[4]}`, `rollback/${tars[2]}`, 'rollback/notes.txt'])
+    if (!existsSync(join(outside, iso(90), 'keep.txt')) || !existsSync(join(outside, 'keep.txt')))
+      bad.push('outside content touched')
+    for (const k of [
+      `backups/deleted/${iso(5)}`,
+      'backups/deleted/notes',
+      `backups/imported/${iso(1)}`,
+      `backups/imported/${iso(45)}/x.md`,
+      `backups/imported/${iso(400)}/claude/rules/old.md`,
+      'backups/skills/codex/bar/SKILL.md',
+      `backups/agents/claude/${iso(200)}`,
+      `rollback/${tars[4]}`,
+      `rollback/${tars[2]}`,
+      'rollback/notes.txt'
+    ])
       if (!existsSync(join(cfg, k))) bad.push(`kept entry gone: ${k}`)
     if (planBackupCleanup(B, { now }).count) bad.push('second plan not empty')
     // missing item → failed, mover not called
     let called = 0
-    const r2 = await applyBackupCleanup(B, { items: [plan.items[0]], count: 1, bytes: 0 }, () => void called++)
+    const r2 = await applyBackupCleanup(
+      B,
+      { items: [plan.items[0]], count: 1, bytes: 0 },
+      () => void called++
+    )
     if (called || r2.failed[0]?.reason !== 'missing') bad.push('missing item moved')
     // symlinked backups root is never scanned
     const L = makeFixture('illithid-m7-B2-')
@@ -5685,7 +7989,9 @@ async function run(): Promise<void> {
     check(
       'ad. backup retention — age/count rules, newest kept, backups/imported never targeted, forged/escaping targets refused, symlinked root skipped, injected mover',
       !bad.length,
-      bad.length ? bad.join('; ') : `${plan.count} targets (${plan.bytes} B) moved, ${forged.length} forged refused, 10 kept entries intact (incl. 3 backups/imported), re-plan 0`
+      bad.length
+        ? bad.join('; ')
+        : `${plan.count} targets (${plan.bytes} B) moved, ${forged.length} forged refused, 10 kept entries intact (incl. 3 backups/imported), re-plan 0`
     )
   }
 
@@ -5709,11 +8015,24 @@ async function run(): Promise<void> {
     const skScript = put('skills/sk1/scripts/run.py', 'print("skillScriptEcho")\n')
     put('skills/sk1/bin.pyc', Buffer.from([0, 1, 2, 3]))
     put('skills/sk1/weird.md', Buffer.concat([Buffer.from('BINARYMDTEXT'), Buffer.from([0, 0, 0])]))
-    put('mcps/srv.json', JSON.stringify({ transport: 'http', url: 'https://example.invalid/?token=URLSECRETTOKEN', headers: { Authorization: 'secret:srv/headers/Authorization' }, env: { K: 'ENVSECRETVAL' }, bearerEnv: 'BEARERENVNAME', _: 'mcp description omegaMcp' }))
+    put(
+      'mcps/srv.json',
+      JSON.stringify({
+        transport: 'http',
+        url: 'https://example.invalid/?token=URLSECRETTOKEN',
+        headers: { Authorization: 'secret:srv/headers/Authorization' },
+        env: { K: 'ENVSECRETVAL' },
+        bearerEnv: 'BEARERENVNAME',
+        _: 'mcp description omegaMcp'
+      })
+    )
     put('mcps/_order.json', '["srv"]')
     put('artifacts/proj/manifest.json', JSON.stringify({ tool: 'Claude Code' }))
     put('artifacts/proj/a.md', '# Artifact A\nartifact markdown alphaRule shared\n')
-    put('artifacts/proj/b.html', '<html><head><title>B</title><style>.clsStyleX{color:red}</style><script>var SCRIPTSECRET=1</script></head><body><!-- COMMENTX --><p>Hello &amp; <b>bold</b>word &#x41;&#66;</p></body></html>')
+    put(
+      'artifacts/proj/b.html',
+      '<html><head><title>B</title><style>.clsStyleX{color:red}</style><script>var SCRIPTSECRET=1</script></head><body><!-- COMMENTX --><p>Hello &amp; <b>bold</b>word &#x41;&#66;</p></body></html>'
+    )
     put('artifacts/proj/c.txt', 'plain text txtFoxtrot')
     put('artifacts/proj/d.json', '{"k": "jsonGolf"}')
     put('artifacts/proj/e.svg', '<svg><text>SVGTEXTHOTEL</text></svg>')
@@ -5722,15 +8041,27 @@ async function run(): Promise<void> {
 
     const r1 = indexAllDocs(D)
     // rule, agent, memory, skill×2 (SKILL.md, run.py; weird.md binary skipped), mcp, artifacts a/b/c/d
-    if (r1.docs !== 11 || r1.indexed !== 10 || r1.skipped !== 1) bad.push(`first index docs ${r1.docs} indexed ${r1.indexed} skipped ${r1.skipped}`)
+    if (r1.docs !== 11 || r1.indexed !== 10 || r1.skipped !== 1)
+      bad.push(`first index docs ${r1.docs} indexed ${r1.indexed} skipped ${r1.skipped}`)
     const keys = (q: string, o: Parameters<typeof searchDocs>[2] = {}): string[] =>
-      searchDocs(D, q, o).results.map((x) => `${x.kind}:${x.key.replace(/^.*\/artifacts\//, '')}`).sort()
+      searchDocs(D, q, o)
+        .results.map((x) => `${x.kind}:${x.key.replace(/^.*\/artifacts\//, '')}`)
+        .sort()
     const expect = (q: string, want: string[], o: Parameters<typeof searchDocs>[2] = {}): void => {
       const got = keys(q, o)
       if (got.join() !== [...want].sort().join()) bad.push(`"${q}" → [${got.join(', ')}]`)
     }
     const artKey = (name: string): string => {
-      const hit = searchDocs(D, name === 'a.md' ? 'artifact markdown' : name === 'b.html' ? 'Hello' : name === 'c.txt' ? 'txtFoxtrot' : 'jsonGolf').results[0]
+      const hit = searchDocs(
+        D,
+        name === 'a.md'
+          ? 'artifact markdown'
+          : name === 'b.html'
+            ? 'Hello'
+            : name === 'c.txt'
+              ? 'txtFoxtrot'
+              : 'jsonGolf'
+      ).results[0]
       return hit ? `artifact:${hit.key.replace(/^.*\/artifacts\//, '')}` : `artifact:?${name}`
     }
     const A = artKey('a.md')
@@ -5746,14 +8077,37 @@ async function run(): Promise<void> {
     expect('Hello & bold word AB', [artKey('b.html')])
     expect('\uD615\uD0DC\uC18C', ['rule:r1.md'])
     expect('\uAC00\uB098', ['memory:feedback/m1.md'])
-    if (searchDocs(D, '\uAC00\uB098').mode !== 'like' || searchDocs(D, 'alphaRule').mode !== 'fts') bad.push('mode detection')
-    for (const q of ['URLSECRETTOKEN', 'ENVSECRETVAL', 'secret:srv', 'Authorization', 'BEARERENVNAME', 'example.invalid', 'SCRIPTSECRET', 'clsStyleX', 'COMMENTX', '<b>', '&amp;', 'SVGTEXTHOTEL', 'csvIndia', 'BIGDOCJULIET', 'BINARYMDTEXT', 'NOTINDEXEDRULE'])
+    if (searchDocs(D, '\uAC00\uB098').mode !== 'like' || searchDocs(D, 'alphaRule').mode !== 'fts')
+      bad.push('mode detection')
+    for (const q of [
+      'URLSECRETTOKEN',
+      'ENVSECRETVAL',
+      'secret:srv',
+      'Authorization',
+      'BEARERENVNAME',
+      'example.invalid',
+      'SCRIPTSECRET',
+      'clsStyleX',
+      'COMMENTX',
+      '<b>',
+      '&amp;',
+      'SVGTEXTHOTEL',
+      'csvIndia',
+      'BIGDOCJULIET',
+      'BINARYMDTEXT',
+      'NOTINDEXEDRULE'
+    ])
       if (searchDocs(D, q).results.length) bad.push(`not-indexed text found: ${q}`)
     const title = searchDocs(D, 'artifact markdown').results[0]
-    if (title?.title !== 'Artifact A' || title.tool !== 'claude') bad.push(`artifact title/tool ${title?.title}/${title?.tool}`)
+    if (title?.title !== 'Artifact A' || title.tool !== 'claude')
+      bad.push(`artifact title/tool ${title?.title}/${title?.tool}`)
     for (const q of ['alphaRule', '\uAC00\uB098'])
       for (const h of searchDocs(D, q).results)
-        if (!h.marks.length || h.marks.some(([a, b]) => h.snippet.slice(a, b).toLowerCase() !== q.toLowerCase())) bad.push(`highlight "${q}" ${h.kind}`)
+        if (
+          !h.marks.length ||
+          h.marks.some(([a, b]) => h.snippet.slice(a, b).toLowerCase() !== q.toLowerCase())
+        )
+          bad.push(`highlight "${q}" ${h.kind}`)
     expect('alphaRule', [A], { tool: 'claude' })
     expect('alphaRule', [], { tool: 'codex' })
     for (const q of ['"x', 'a"b"c', 'AND OR', '100%', '_x'])
@@ -5762,19 +8116,27 @@ async function run(): Promise<void> {
       } catch (e) {
         bad.push(`search exception "${q}": ${(e as Error).message}`)
       }
-    if (htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>') !== 'a<b>"c" ©') bad.push(`htmlToText ${htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>')}`)
+    if (htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>') !== 'a<b>"c" ©')
+      bad.push(`htmlToText ${htmlToText('<p>a&lt;b&gt;&quot;c&quot;&nbsp;&#169;</p>')}`)
 
     // searchAll: grouped by kind, sessions share the file
     await indexSessions(D, [])
     const all = searchAll(D, 'alphaRule')
-    if (all.docs.rule.length !== 1 || all.docs.artifact.length !== 1 || all.docs.skill.length || all.sessions.results.length) bad.push('searchAll groups')
+    if (
+      all.docs.rule.length !== 1 ||
+      all.docs.artifact.length !== 1 ||
+      all.docs.skill.length ||
+      all.sessions.results.length
+    )
+      bad.push('searchAll groups')
     if (indexStatus(D).docs !== 10) bad.push(`indexStatus docs ${indexStatus(D).docs}`)
 
     // idempotent
     const dbFile = searchIndexPath(D)
     const h0 = sha(readFileSync(dbFile))
     const r2 = indexAllDocs(D)
-    if (r2.indexed || r2.removed || r2.changes || sha(readFileSync(dbFile)) !== h0) bad.push(`re-run writes ${r2.changes} indexed ${r2.indexed}`)
+    if (r2.indexed || r2.removed || r2.changes || sha(readFileSync(dbFile)) !== h0)
+      bad.push(`re-run writes ${r2.changes} indexed ${r2.indexed}`)
     // edit → only that doc; old text gone
     const t1 = new Date(Date.now() + 5000)
     put('rules/r1.md', '# rule\nreplaced body kiloEdit\n')
@@ -5786,7 +8148,8 @@ async function run(): Promise<void> {
     // delete → removed
     unlinkSync(skScript)
     const r4 = indexAllDocs(D)
-    if (r4.removed !== 1 || r4.indexed) bad.push(`delete removed ${r4.removed} indexed ${r4.indexed}`)
+    if (r4.removed !== 1 || r4.indexed)
+      bad.push(`delete removed ${r4.removed} indexed ${r4.indexed}`)
     expect('skillScriptEcho', [])
     // an indexed file becoming too large is dropped
     put('artifacts/proj/c.txt', 'txtFoxtrot ' + 'y'.repeat(1024 * 1024))
@@ -5797,7 +8160,9 @@ async function run(): Promise<void> {
     check(
       'ae. document index — artifacts md/html/txt/json + library rules/skills/memory/agents/mcp, html tags stripped, secrets/images/svg/>1MB/binary not indexed, incremental (edit, delete, size), searchAll groups',
       !bad.length,
-      bad.length ? bad.join('; ') : `${r1.indexed} docs indexed, 16 excluded strings 0 hits, re-run changes 0 and file hash identical, edit 1, delete 1, oversize dropped`
+      bad.length
+        ? bad.join('; ')
+        : `${r1.indexed} docs indexed, 16 excluded strings 0 hits, re-run changes 0 and file hash identical, edit 1, delete 1, oversize dropped`
     )
   }
 
@@ -5805,7 +8170,11 @@ async function run(): Promise<void> {
   {
     const envH: Env = { PATH: '' }
     const memH = memorySecretBackend()
-    const harHome = (prefix: string, files: Record<string, string>, toolsInUse?: ('claude' | 'codex' | 'opencode')[]): string => {
+    const harHome = (
+      prefix: string,
+      files: Record<string, string>,
+      toolsInUse?: ('claude' | 'codex' | 'opencode')[]
+    ): string => {
       const H = makeFixture(prefix)
       unlinkSync(join(H, '.agents'))
       for (const [rel, body] of Object.entries(files)) {
@@ -5821,13 +8190,23 @@ async function run(): Promise<void> {
         .map((r) => {
           const p = join(H, r)
           if (!existsSync(p)) return `${r}:absent`
-          return `${r}:${readdirSync(p, { recursive: true }).map(String).sort().map((n) => (statSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : n)).join(',')}`
+          return `${r}:${readdirSync(p, { recursive: true })
+            .map(String)
+            .sort()
+            .map((n) =>
+              statSync(join(p, n)).isFile() ? `${n}=${sha(readFileSync(join(p, n)))}` : n
+            )
+            .join(',')}`
         })
         .join('|')
     const importedFile = (H: string, rel: string): string | null => {
       const root = importedBackupRoot(H)
       if (!existsSync(root)) return null
-      const hit = readdirSync(root).sort().reverse().map((ts) => join(root, ts, rel)).find((p) => existsSync(p))
+      const hit = readdirSync(root)
+        .sort()
+        .reverse()
+        .map((ts) => join(root, ts, rel))
+        .find((p) => existsSync(p))
       return hit ? read(hit) : null
     }
     const RULE = '# Team style\n\n- Use tabs.\n'
@@ -5848,8 +8227,18 @@ async function run(): Promise<void> {
         '.claude/skills/pr-check/SKILL.md': SKILL,
         '.claude/agents/helper.md': AGENT,
         '.claude/settings.json': '{}\n',
-        '.claude.json': JSON.stringify({ mcpServers: { 'h-srv': { type: 'stdio', command: 'echo', args: ['hi'] } } }, null, 2) + '\n',
-        '.config/opencode/opencode.json': JSON.stringify({ $schema: 'https://opencode.ai/config.json', instructions: [ocRule] }, null, 2) + '\n',
+        '.claude.json':
+          JSON.stringify(
+            { mcpServers: { 'h-srv': { type: 'stdio', command: 'echo', args: ['hi'] } } },
+            null,
+            2
+          ) + '\n',
+        '.config/opencode/opencode.json':
+          JSON.stringify(
+            { $schema: 'https://opencode.ai/config.json', instructions: [ocRule] },
+            null,
+            2
+          ) + '\n',
         '.config/opencode/skills/oc-skill/SKILL.md': OC_SKILL,
         'notes/oc-style.md': OC_RULE
       }
@@ -5866,14 +8255,34 @@ async function run(): Promise<void> {
         .map((c) => ({ kind: c.kind, name: c.name }))
       const ir = [
         ...applyImport(H, sels, 'tool:claude', { secrets: memH }),
-        ...applyImport(H, [{ kind: 'rule', name: 'oc-style.md' }, { kind: 'skill', name: 'oc-skill' }], 'tool:opencode', { secrets: memH })
+        ...applyImport(
+          H,
+          [
+            { kind: 'rule', name: 'oc-style.md' },
+            { kind: 'skill', name: 'oc-skill' }
+          ],
+          'tool:opencode',
+          { secrets: memH }
+        )
       ]
-      const irs = ir.map((x) => `${x.kind}:${x.name}:${x.status}${x.converted ? `:${x.converted.join('+')}` : ''}${x.adopted ? `:adopted=${x.adopted.join('+')}` : ''}`).join(',')
+      const irs = ir
+        .map(
+          (x) =>
+            `${x.kind}:${x.name}:${x.status}${x.converted ? `:${x.converted.join('+')}` : ''}${x.adopted ? `:adopted=${x.adopted.join('+')}` : ''}`
+        )
+        .join(',')
       if (ir.some((x) => x.status !== 'imported' || x.userOwned?.length)) bad.push(`import ${irs}`)
       if (snap(H, toolRels) !== t0) bad.push('import changed tool files')
       if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created at import')
-      const pend = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.tool}:${p.name}`).sort().join(',')
-      if (pend !== 'agent:claude:helper,instruction:opencode:oc-style.md,rule:claude:team-style.md,skill:opencode:oc-skill') bad.push(`pendingRetire ${pend}`)
+      const pend = (readState(H).state.pendingRetire ?? [])
+        .map((p) => `${p.kind}:${p.tool}:${p.name}`)
+        .sort()
+        .join(',')
+      if (
+        pend !==
+        'agent:claude:helper,instruction:opencode:oc-style.md,rule:claude:team-style.md,skill:opencode:oc-skill'
+      )
+        bad.push(`pendingRetire ${pend}`)
       // a Claude skill folder that differs from its library copy (recorded like import does) → replaced in one step with a backup
       createSkill(H, 'diff-skill', 'Library version')
       mkdirSync(join(H, '.claude/skills/diff-skill'), { recursive: true })
@@ -5883,67 +8292,153 @@ async function run(): Promise<void> {
         ...stH,
         pendingRetire: [
           ...(stH.pendingRetire ?? []),
-          { kind: 'skill', tool: 'claude', name: 'diff-skill', path: join(H, '.claude/skills/diff-skill'), hash: dirContentHash(join(H, '.claude/skills/diff-skill')), at: new Date().toISOString() }
+          {
+            kind: 'skill',
+            tool: 'claude',
+            name: 'diff-skill',
+            path: join(H, '.claude/skills/diff-skill'),
+            hash: dirContentHash(join(H, '.claude/skills/diff-skill')),
+            at: new Date().toISOString()
+          }
         ]
       })
       setToggle(H, 'skills', 'diff-skill', 'codex', false)
       const t0b = snap(H, toolRels)
       // (d) toggles: each item on only for its source tool
       const mf = readManifest(H).manifest
-      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string => JSON.stringify(mf[k][n] ?? {})
+      const tg = (k: 'rules' | 'skills' | 'agents' | 'mcp', n: string): string =>
+        JSON.stringify(mf[k][n] ?? {})
       const wantToggles: [string, string][] = [
         // Gemini and Copilot are toggleable for every kind, so they are off too (skills: both joined claude/codex as copy targets;
         // OpenCode skills keep their default — OpenCode already saw them in ~/.claude/skills)
-        [tg('rules', 'team-style.md'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
+        [
+          tg('rules', 'team-style.md'),
+          '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
         [tg('skills', 'pr-check'), '{"codex":false,"gemini":false,"copilot":false,"grok":false}'],
-        [tg('agents', 'helper'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
-        [tg('mcp', 'h-srv'), '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'],
-        [tg('rules', 'oc-style.md'), '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}'],
-        [tg('skills', 'oc-skill'), '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}']
+        [
+          tg('agents', 'helper'),
+          '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
+        [
+          tg('mcp', 'h-srv'),
+          '{"codex":false,"opencode":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
+        [
+          tg('rules', 'oc-style.md'),
+          '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}'
+        ],
+        [
+          tg('skills', 'oc-skill'),
+          '{"claude":false,"codex":false,"gemini":false,"copilot":false,"grok":false}'
+        ]
       ]
       for (const [got, want] of wantToggles) if (got !== want) bad.push(`toggles ${got} ≠ ${want}`)
       // automatic apply off (libWrite path): plan only, nothing written — ~/.claude/rules keeps the original
       const r0 = syncAll(H, envH, { allowReal: false, secrets: memH })
       const acts = [
-        ...r0.plan.rules.filter((x) => x.action !== 'inSync').map((x) => `rule:${x.name}:${x.action}`),
-        ...r0.plan.agents.filter((x) => x.action !== 'inSync').map((x) => `agent:${x.tool}/${x.name}:${x.action}`),
+        ...r0.plan.rules
+          .filter((x) => x.action !== 'inSync')
+          .map((x) => `rule:${x.name}:${x.action}`),
+        ...r0.plan.agents
+          .filter((x) => x.action !== 'inSync')
+          .map((x) => `agent:${x.tool}/${x.name}:${x.action}`),
         ...r0.plan.targets.filter((c) => c.changed).map((c) => `target:${c.id}`)
       ].sort()
-      acts.push(...r0.plan.skills.filter((x) => x.action !== 'inSync').map((x) => `skill:${x.tool}/${x.name}:${x.action}`))
+      acts.push(
+        ...r0.plan.skills
+          .filter((x) => x.action !== 'inSync')
+          .map((x) => `skill:${x.tool}/${x.name}:${x.action}`)
+      )
       if (r0.results || snap(H, toolRels) !== t0b) bad.push('allowReal=false sync wrote')
-      for (const a of ['rule:team-style.md:retireImported', 'agent:claude/helper:replaceImported', 'target:opencodeRules', 'skill:opencode/oc-skill:retireImported', 'skill:claude/diff-skill:replaceImported'])
+      for (const a of [
+        'rule:team-style.md:retireImported',
+        'agent:claude/helper:replaceImported',
+        'target:opencodeRules',
+        'skill:opencode/oc-skill:retireImported',
+        'skill:claude/diff-skill:replaceImported'
+      ])
         if (!acts.includes(a)) bad.push(`plan lacks ${a}: ${acts.join(',')}`)
       const pending0 = pendingSyncCount(H, envH, memH)
       // approved Sync (sidebar button)
       const r1 = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       if (!r1.results) bad.push('approved sync refused')
-      const failed = [...(r1.results?.rules ?? []), ...(r1.results?.skills ?? []), ...(r1.results?.agents ?? [])].filter((x) => x.status === 'failed' || x.status === 'refused')
-      if (failed.length) bad.push(`sync failures ${failed.map((x) => `${x.name}:${x.reason}`).join(',')}`)
+      const failed = [
+        ...(r1.results?.rules ?? []),
+        ...(r1.results?.skills ?? []),
+        ...(r1.results?.agents ?? [])
+      ].filter((x) => x.status === 'failed' || x.status === 'refused')
+      if (failed.length)
+        bad.push(`sync failures ${failed.map((x) => `${x.name}:${x.reason}`).join(',')}`)
       const rulesTop = readdirSync(join(H, '.claude/rules')).sort().join(',')
-      if (rulesTop !== CLAUDE_RULES_DIR) bad.push(`~/.claude/rules = ${rulesTop} (duplicate or missing)`)
-      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE) bad.push('app rule copy')
-      if (importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('rule original not in backups/imported')
-      if (read(join(H, '.claude/agents/helper.md')) !== renderAgent('claude', readAgentDoc(H, 'helper'))) bad.push('agent not replaced by render')
-      if (importedFile(H, 'claude/agents/helper.md') !== AGENT) bad.push('agent original not in backups/imported')
-      if (read(join(H, '.claude/skills/pr-check/SKILL.md')) !== SKILL || !readState(H).state.skills?.claude?.['pr-check']) bad.push('skill adopted copy')
-      const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
-      if (ins.includes(ocRule) || !ins.includes(join(libraryRoot(H), 'rules/oc-style.md')) || ins.some((x) => x.endsWith('team-style.md')))
+      if (rulesTop !== CLAUDE_RULES_DIR)
+        bad.push(`~/.claude/rules = ${rulesTop} (duplicate or missing)`)
+      if (
+        stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE
+      )
+        bad.push('app rule copy')
+      if (importedFile(H, 'claude/rules/team-style.md') !== RULE)
+        bad.push('rule original not in backups/imported')
+      if (
+        read(join(H, '.claude/agents/helper.md')) !==
+        renderAgent('claude', readAgentDoc(H, 'helper'))
+      )
+        bad.push('agent not replaced by render')
+      if (importedFile(H, 'claude/agents/helper.md') !== AGENT)
+        bad.push('agent original not in backups/imported')
+      if (
+        read(join(H, '.claude/skills/pr-check/SKILL.md')) !== SKILL ||
+        !readState(H).state.skills?.claude?.['pr-check']
+      )
+        bad.push('skill adopted copy')
+      const ins =
+        (readJson(join(H, '.config/opencode/opencode.json')).instructions as
+          string[] | undefined) ?? []
+      if (
+        ins.includes(ocRule) ||
+        !ins.includes(join(libraryRoot(H), 'rules/oc-style.md')) ||
+        ins.some((x) => x.endsWith('team-style.md'))
+      )
         bad.push(`opencode instructions ${ins.map((x) => x.replace(H, '~')).join(',')}`)
       if (read(ocRule) !== OC_RULE) bad.push('instruction original file touched')
-      if (existsSync(join(H, '.config/opencode/skills/oc-skill')) || importedFile(H, 'opencode/skills/oc-skill/SKILL.md') !== OC_SKILL) bad.push('OpenCode skill original not retired')
-      const sp = ((readJson(join(H, '.config/opencode/opencode.json')).skills as Json | undefined)?.paths as string[] | undefined) ?? []
-      if (!sp.includes(libraryPaths(H).skillsDir)) bad.push('OpenCode skills.paths lacks the library')
-      if (read(join(H, '.claude/skills/diff-skill/SKILL.md')) === DIFF_SKILL || importedFile(H, 'claude/skills/diff-skill/SKILL.md') !== DIFF_SKILL)
+      if (
+        existsSync(join(H, '.config/opencode/skills/oc-skill')) ||
+        importedFile(H, 'opencode/skills/oc-skill/SKILL.md') !== OC_SKILL
+      )
+        bad.push('OpenCode skill original not retired')
+      const sp =
+        ((readJson(join(H, '.config/opencode/opencode.json')).skills as Json | undefined)?.paths as
+          string[] | undefined) ?? []
+      if (!sp.includes(libraryPaths(H).skillsDir))
+        bad.push('OpenCode skills.paths lacks the library')
+      if (
+        read(join(H, '.claude/skills/diff-skill/SKILL.md')) === DIFF_SKILL ||
+        importedFile(H, 'claude/skills/diff-skill/SKILL.md') !== DIFF_SKILL
+      )
         bad.push('differing Claude skill not replaced with backup')
-      if (existsSync(join(H, '.codex/AGENTS.md')) && read(join(H, '.codex/AGENTS.md')).includes('style.md')) bad.push('rule reached Codex')
-      if (existsSync(join(H, '.codex/config.toml')) && 'h-srv' in tomlServers(read(join(H, '.codex/config.toml')))) bad.push('MCP reached Codex')
-      if (existsSync(join(H, '.config/opencode/agents/helper.md')) || existsSync(join(H, '.codex/agents/helper.toml'))) bad.push('agent reached other tools')
+      if (
+        existsSync(join(H, '.codex/AGENTS.md')) &&
+        read(join(H, '.codex/AGENTS.md')).includes('style.md')
+      )
+        bad.push('rule reached Codex')
+      if (
+        existsSync(join(H, '.codex/config.toml')) &&
+        'h-srv' in tomlServers(read(join(H, '.codex/config.toml')))
+      )
+        bad.push('MCP reached Codex')
+      if (
+        existsSync(join(H, '.config/opencode/agents/helper.md')) ||
+        existsSync(join(H, '.codex/agents/helper.toml'))
+      )
+        bad.push('agent reached other tools')
       if (readState(H).state.pendingRetire?.length) bad.push('pendingRetire left')
       if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending ≠ 0 after Sync')
       check(
         'af1. HAR-12 repro — import with automatic apply off leaves ~/.claude/rules intact; approved Sync writes the app copy and only then moves the original to backups/imported (no gap, no duplicate); imported items on for their source tool only',
         !bad.length,
-        bad.length ? bad.join('; ') : `imported ${irs}; auto-apply-off sync wrote 0 (plan ${acts.join(', ')}); pending ${pending0} → 0; ~/.claude/rules = ${rulesTop}/; originals (rule, agent, OpenCode skill, differing Claude skill) in backups/imported, opencode instructions entry swapped for the library path`
+        bad.length
+          ? bad.join('; ')
+          : `imported ${irs}; auto-apply-off sync wrote 0 (plan ${acts.join(', ')}); pending ${pending0} → 0; ~/.claude/rules = ${rulesTop}/; originals (rule, agent, OpenCode skill, differing Claude skill) in backups/imported, opencode instructions entry swapped for the library path`
       )
     }
 
@@ -5960,54 +8455,97 @@ async function run(): Promise<void> {
       })
       mkdirSync(join(H, '.config/opencode'), { recursive: true })
       writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [nPath(H)] })
-      applyImport(H, [{ kind: 'rule', name: 'r1.md' }, { kind: 'agent', name: 'a1' }], 'tool:claude')
+      applyImport(
+        H,
+        [
+          { kind: 'rule', name: 'r1.md' },
+          { kind: 'agent', name: 'a1' }
+        ],
+        'tool:claude'
+      )
       applyImport(H, [{ kind: 'rule', name: 'n1.md' }], 'tool:opencode')
-      for (const rel of ['.claude/rules/r1.md', '.claude/agents/a1.md', 'notes/n1.md']) writeFileSync(join(H, rel), read(join(H, rel)) + '\nedited later\n')
+      for (const rel of ['.claude/rules/r1.md', '.claude/agents/a1.md', 'notes/n1.md'])
+        writeFileSync(join(H, rel), read(join(H, rel)) + '\nedited later\n')
       const p = planSyncAll(H, envH, memH)
       const pr = p.rules.find((x) => x.path === join(H, '.claude/rules/r1.md'))
       const pa = p.agents.find((x) => x.tool === 'claude' && x.name === 'a1')
-      if (pr?.action !== 'skip' || pr.reason !== 'importedChanged' || pa?.action !== 'skip' || pa.reason !== 'importedChanged')
+      if (
+        pr?.action !== 'skip' ||
+        pr.reason !== 'importedChanged' ||
+        pa?.action !== 'skip' ||
+        pa.reason !== 'importedChanged'
+      )
         bad.push(`plan ${pr?.action}:${pr?.reason} / ${pa?.action}:${pa?.reason}`)
-      const noteKept = p.targets.find((c) => c.id === 'opencodeRules')?.notes.some((n) => n.includes('original changed since import'))
+      const noteKept = p.targets
+        .find((c) => c.id === 'opencodeRules')
+        ?.notes.some((n) => n.includes('original changed since import'))
       if (!noteKept) bad.push('opencodeRules note for changed instruction original')
       const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       const rr = r.results?.rules.find((x) => x.path === join(H, '.claude/rules/r1.md'))
       const ra = r.results?.agents.find((x) => x.tool === 'claude' && x.name === 'a1')
-      if (rr?.status !== 'skipped' || rr.reason !== 'importedChanged' || ra?.status !== 'skipped' || ra.reason !== 'importedChanged')
+      if (
+        rr?.status !== 'skipped' ||
+        rr.reason !== 'importedChanged' ||
+        ra?.status !== 'skipped' ||
+        ra.reason !== 'importedChanged'
+      )
         bad.push(`results ${rr?.status}:${rr?.reason} / ${ra?.status}:${ra?.reason}`)
-      if (!read(join(H, '.claude/rules/r1.md')).includes('edited later') || !read(join(H, '.claude/agents/a1.md')).includes('edited later')) bad.push('edited original moved')
+      if (
+        !read(join(H, '.claude/rules/r1.md')).includes('edited later') ||
+        !read(join(H, '.claude/agents/a1.md')).includes('edited later')
+      )
+        bad.push('edited original moved')
       if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created')
-      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r1.md'))) bad.push('app rule copy missing')
-      const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r1.md')))
+        bad.push('app rule copy missing')
+      const ins =
+        (readJson(join(H, '.config/opencode/opencode.json')).instructions as
+          string[] | undefined) ?? []
       if (!ins.includes(nPath(H))) bad.push('changed instruction entry dropped')
-      if ((readState(H).state.pendingRetire ?? []).length !== 3) bad.push('pendingRetire records dropped')
+      if ((readState(H).state.pendingRetire ?? []).length !== 3)
+        bad.push('pendingRetire records dropped')
       check(
         'af2. HAR-12 hash mismatch — originals edited after import (rule, agent, OpenCode instruction file) are left in place and reported importedChanged; records kept',
         !bad.length,
-        bad.length ? bad.join('; ') : 'plan skip(importedChanged) ×2 + opencodeRules note, Sync results skipped(importedChanged), originals and instructions entry kept, backups/imported not created'
+        bad.length
+          ? bad.join('; ')
+          : 'plan skip(importedChanged) ×2 + opencodeRules note, Sync results skipped(importedChanged), originals and instructions entry kept, backups/imported not created'
       )
     }
 
     // af3. toolsInUse=['claude'] — zero writes and zero folders for Codex and OpenCode; guards; lenient config; detection
     {
       const bad: string[] = []
-      const H = harHome('illithid-m7-H3-', { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+      const H = harHome(
+        'illithid-m7-H3-',
+        { '.claude/settings.json': '{}\n', '.claude.json': '{}\n' },
+        ['claude']
+      )
       createRule(H, 'x.md', '# x\n')
       createSkill(H, 'sk', 'A skill')
       createAgent(H, 'ag', 'An agent')
       upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
       const p = planSyncAll(H, envH, memH)
       const toolOf = (id: string): string => ALL_TARGETS.find((t) => t.id === id)!.tool
-      if (p.targets.some((c) => toolOf(c.id) !== 'claude')) bad.push(`targets ${p.targets.map((c) => c.id).join(',')}`)
-      if (p.skills.some((x) => x.tool !== 'claude') || p.agents.some((x) => x.tool !== 'claude')) bad.push('skill/agent plan for other tools')
+      if (p.targets.some((c) => toolOf(c.id) !== 'claude'))
+        bad.push(`targets ${p.targets.map((c) => c.id).join(',')}`)
+      if (p.skills.some((x) => x.tool !== 'claude') || p.agents.some((x) => x.tool !== 'claude'))
+        bad.push('skill/agent plan for other tools')
       const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       if (!r.results) bad.push('sync refused')
-      for (const rel of ['.codex', '.config/opencode', '.gemini']) if (existsSync(join(H, rel))) bad.push(`${rel} created`)
-      if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'x.md')) || !existsSync(join(H, '.claude/skills/sk/SKILL.md')) || !existsSync(join(H, '.claude/agents/ag.md')))
+      for (const rel of ['.codex', '.config/opencode', '.gemini'])
+        if (existsSync(join(H, rel))) bad.push(`${rel} created`)
+      if (
+        !existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'x.md')) ||
+        !existsSync(join(H, '.claude/skills/sk/SKILL.md')) ||
+        !existsSync(join(H, '.claude/agents/ag.md'))
+      )
         bad.push('Claude copies missing')
-      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {}))) bad.push('Claude MCP missing')
+      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {})))
+        bad.push('Claude MCP missing')
       const cells = statusReport(H, envH, memH).cells
-      if (cells.some((c) => c.tool !== 'claude' && c.state !== 'notApplicable')) bad.push('status cells for tools not in use')
+      if (cells.some((c) => c.tool !== 'claude' && c.state !== 'notApplicable'))
+        bad.push('status cells for tools not in use')
       if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending ≠ 0')
       // guards outside syncAll
       let modelErr = ''
@@ -6018,28 +8556,51 @@ async function run(): Promise<void> {
       }
       if (modelErr !== 'model') bad.push('setModel for a tool not in use not refused')
       writeConfig(H, { ...readConfig(H).config, toolsInUse: ['codex'] })
-      if (errCode(() => trashClaudeMemory(H, 'x', 'y.md')) !== 'toolNotInUse') bad.push('Claude memory write not refused')
+      if (errCode(() => trashClaudeMemory(H, 'x', 'y.md')) !== 'toolNotInUse')
+        bad.push('Claude memory write not refused')
       if (planRuleSync(H).length) bad.push('Claude rule plan not empty')
       // lenient config: a bad toolsInUse is ignored alone (= the default tools, Gemini excluded), the rest of config survives
-      writeJson(join(H, APP_CONFIG_DIR, 'config.json'), { version: 1, allowRealApply: true, toolsInUse: ['vim'] })
+      writeJson(join(H, APP_CONFIG_DIR, 'config.json'), {
+        version: 1,
+        allowRealApply: true,
+        toolsInUse: ['vim']
+      })
       const rc = readConfig(H)
       // (= the default tools that look installed: only ~/.claude exists here — HAR-21)
-      if (rc.error || rc.config.allowRealApply !== true || rc.config.toolsInUse !== undefined || toolsInUse(H).join() !== 'claude')
+      if (
+        rc.error ||
+        rc.config.allowRealApply !== true ||
+        rc.config.toolsInUse !== undefined ||
+        toolsInUse(H).join() !== 'claude'
+      )
         bad.push('bad toolsInUse reset the config')
-      if (!validateConfig({ version: 1, toolsInUse: ['vim'] }).length || validateConfig({ version: 1, toolsInUse: ['codex'] }).length) bad.push('validateConfig toolsInUse')
+      if (
+        !validateConfig({ version: 1, toolsInUse: ['vim'] }).length ||
+        validateConfig({ version: 1, toolsInUse: ['codex'] }).length
+      )
+        bad.push('validateConfig toolsInUse')
       // detection: config folder or executable on PATH (injected PATH, no real lookups)
       const bin = join(H, 'bin')
       mkdirSync(bin)
       writeFileSync(join(bin, 'codex'), '#!/bin/sh\n', { mode: 0o755 })
       writeFileSync(join(bin, 'opencode'), 'not executable\n', { mode: 0o644 })
       const det = detectTools(H, { PATH: bin })
-        .map((d) => `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`)
+        .map(
+          (d) =>
+            `${d.tool}:${d.configFound ? 'cfg' : '-'}:${d.executable ? 'exe' : '-'}:${d.detected}`
+        )
         .join(',')
-      if (det !== 'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false,copilot:-:-:false,grok:-:-:false') bad.push(`detectTools ${det}`)
+      if (
+        det !==
+        'claude:cfg:-:true,codex:-:exe:true,opencode:-:-:false,gemini:-:-:false,copilot:-:-:false,grok:-:-:false'
+      )
+        bad.push(`detectTools ${det}`)
       check(
         'af3. HAR-12 toolsInUse=[claude] — Codex/OpenCode get no files or folders, status notApplicable; setModel and Claude memory writes refused for tools not in use; bad toolsInUse ignored alone; detectTools',
         !bad.length,
-        bad.length ? bad.join('; ') : `targets ${p.targets.map((c) => c.id).join(',')}; ~/.codex and ~/.config/opencode absent after Sync; detect ${det}`
+        bad.length
+          ? bad.join('; ')
+          : `targets ${p.targets.map((c) => c.id).join(',')}; ~/.codex and ~/.config/opencode absent after Sync; detect ${det}`
       )
     }
 
@@ -6055,35 +8616,50 @@ async function run(): Promise<void> {
       upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
       createRule(H, 'x.md', '# x\n')
       const pl = planAll(H, envH, memH)
-      const desc = pl.map((c) => `${c.id}:${c.skip ?? (c.error ? 'error' : c.changed ? 'changed' : 'same')}`).join(',')
+      const desc = pl
+        .map((c) => `${c.id}:${c.skip ?? (c.error ? 'error' : c.changed ? 'changed' : 'same')}`)
+        .join(',')
       const byT = (id: string): FileChange | undefined => pl.find((c) => c.id === id)
       if (pl.some((c) => c.error)) bad.push(`plan errors ${desc}`)
-      if (byT('claudeMcp')?.skip !== 'toolNotInitialized' || byT('claudeMcp')?.changed) bad.push(`claudeMcp ${desc}`)
-      for (const id of ['claudePermissions', 'opencodeMcp', 'opencodeRules']) if (!byT(id)?.changed) bad.push(`${id} not planned (${desc})`)
+      if (byT('claudeMcp')?.skip !== 'toolNotInitialized' || byT('claudeMcp')?.changed)
+        bad.push(`claudeMcp ${desc}`)
+      for (const id of ['claudePermissions', 'opencodeMcp', 'opencodeRules'])
+        if (!byT(id)?.changed) bad.push(`${id} not planned (${desc})`)
       const pend = pendingSyncCount(H, envH, memH)
-      const cell = statusReport(H, envH, memH).cells.find((c) => c.resource === 'mcp' && c.tool === 'claude')
+      const cell = statusReport(H, envH, memH).cells.find(
+        (c) => c.resource === 'mcp' && c.tool === 'claude'
+      )
       if (cell?.state !== 'notApplicable') bad.push(`claude mcp cell ${cell?.state}`)
       const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
       const tr = r.results?.targets ?? []
       const cm = tr.find((x) => x.id === 'claudeMcp')
-      if (cm?.status !== 'unchanged' || cm.reason !== 'toolNotInitialized') bad.push(`claudeMcp result ${cm?.status}:${cm?.reason}`)
-      if (tr.some((x) => x.status === 'skipped')) bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
+      if (cm?.status !== 'unchanged' || cm.reason !== 'toolNotInitialized')
+        bad.push(`claudeMcp result ${cm?.status}:${cm?.reason}`)
+      if (tr.some((x) => x.status === 'skipped'))
+        bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
       if (existsSync(join(H, '.claude.json'))) bad.push('~/.claude.json created')
-      const perms = (readJson(join(H, '.claude/settings.json')).permissions as Json | undefined)?.allow as string[] | undefined
+      const perms = (readJson(join(H, '.claude/settings.json')).permissions as Json | undefined)
+        ?.allow as string[] | undefined
       if (!perms?.includes('Read')) bad.push('settings.json not created with permissions')
       const oc = readJson(join(H, '.config/opencode/opencode.json'))
-      if (!('m1' in ((oc.mcp as Json | undefined) ?? {})) || !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md')))
+      if (
+        !('m1' in ((oc.mcp as Json | undefined) ?? {})) ||
+        !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md'))
+      )
         bad.push('opencode.json not created with mcp + instructions')
       const pend2 = pendingSyncCount(H, envH, memH)
       if (pend2 !== 0) bad.push(`pending after Sync ${pend2}`)
       // once Claude Code has created its state file, the server goes in
       writeFileSync(join(H, '.claude.json'), '{}\n')
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {}))) bad.push('m1 not written after ~/.claude.json appeared')
+      if (!('m1' in ((readJson(join(H, '.claude.json')).mcpServers as Json | undefined) ?? {})))
+        bad.push('m1 not written after ~/.claude.json appeared')
       check(
         'af5. HAR-12 absent tool files — nothing to write is quiet, settings.json/opencode.json created with our keys only, ~/.claude.json never created (toolNotInitialized, not a failure)',
         !bad.length,
-        bad.length ? bad.join('; ') : `plan ${desc}; pending ${pend} → ${pend2}; claudeMcp unchanged(toolNotInitialized) until ~/.claude.json exists`
+        bad.length
+          ? bad.join('; ')
+          : `plan ${desc}; pending ${pend} → ${pend2}; claudeMcp unchanged(toolNotInitialized) until ~/.claude.json exists`
       )
     }
 
@@ -6098,43 +8674,115 @@ async function run(): Promise<void> {
         '.claude.json': '{}\n',
         'notes/n2.md': '# n2\n'
       })
-      writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [join(H, 'notes/n2.md')] })
-      applyImport(H, [{ kind: 'rule', name: 'k1.md' }, { kind: 'agent', name: 'ka' }], 'tool:claude')
-      applyImport(H, [{ kind: 'rule', name: 'n2.md' }, { kind: 'agent', name: 'ko' }], 'tool:opencode')
+      writeJson(join(H, '.config/opencode/opencode.json'), {
+        instructions: [join(H, 'notes/n2.md')]
+      })
+      applyImport(
+        H,
+        [
+          { kind: 'rule', name: 'k1.md' },
+          { kind: 'agent', name: 'ka' }
+        ],
+        'tool:claude'
+      )
+      applyImport(
+        H,
+        [
+          { kind: 'rule', name: 'n2.md' },
+          { kind: 'agent', name: 'ko' }
+        ],
+        'tool:opencode'
+      )
       createSkill(H, 'kskill', 'Library version')
       mkdirSync(join(H, '.claude/skills/kskill'), { recursive: true })
-      writeFileSync(join(H, '.claude/skills/kskill/SKILL.md'), '---\nname: kskill\ndescription: Mine\n---\n\nMine.\n')
+      writeFileSync(
+        join(H, '.claude/skills/kskill/SKILL.md'),
+        '---\nname: kskill\ndescription: Mine\n---\n\nMine.\n'
+      )
       const st6 = readState(H).state
       writeState(H, {
         ...st6,
         pendingRetire: [
           ...(st6.pendingRetire ?? []),
-          { kind: 'skill', tool: 'claude', name: 'kskill', path: join(H, '.claude/skills/kskill'), hash: 'stale', at: new Date().toISOString(), workspace: 'default' }
+          {
+            kind: 'skill',
+            tool: 'claude',
+            name: 'kskill',
+            path: join(H, '.claude/skills/kskill'),
+            hash: 'stale',
+            at: new Date().toISOString(),
+            workspace: 'default'
+          }
         ]
       })
-      for (const rel of ['.claude/rules/k1.md', '.claude/agents/ka.md', '.config/opencode/agent/ko.md', 'notes/n2.md'])
+      for (const rel of [
+        '.claude/rules/k1.md',
+        '.claude/agents/ka.md',
+        '.config/opencode/agent/ko.md',
+        'notes/n2.md'
+      ])
         writeFileSync(join(H, rel), read(join(H, rel)) + '\nedited\n')
       const ch = importedChangedOf(planSyncAll(H, envH, memH))
-      const chDesc = ch.map((x) => `${x.kind}:${x.tool}:${x.name}`).sort().join(',')
-      if (chDesc !== 'agent:claude:ka,agent:opencode:ko,instruction:opencode:n2.md,rule:claude:k1.md,skill:claude:kskill') bad.push(`importedChanged ${chDesc}`)
-      const kept = ch.map((x) => keepImportedOriginal(H, { kind: x.kind, tool: x.tool, path: x.path }))
-      const offs = kept.filter((k) => k.toggledOff).map((k) => `${k.toggledOff!.kind}.${k.name}.${k.toggledOff!.tool}`).sort().join(',')
-      if (offs !== 'agents.ko.opencode,rules.k1.md.claude,rules.n2.md.opencode') bad.push(`toggled off ${offs}`)
+      const chDesc = ch
+        .map((x) => `${x.kind}:${x.tool}:${x.name}`)
+        .sort()
+        .join(',')
+      if (
+        chDesc !==
+        'agent:claude:ka,agent:opencode:ko,instruction:opencode:n2.md,rule:claude:k1.md,skill:claude:kskill'
+      )
+        bad.push(`importedChanged ${chDesc}`)
+      const kept = ch.map((x) =>
+        keepImportedOriginal(H, { kind: x.kind, tool: x.tool, path: x.path })
+      )
+      const offs = kept
+        .filter((k) => k.toggledOff)
+        .map((k) => `${k.toggledOff!.kind}.${k.name}.${k.toggledOff!.tool}`)
+        .sort()
+        .join(',')
+      if (offs !== 'agents.ko.opencode,rules.k1.md.claude,rules.n2.md.opencode')
+        bad.push(`toggled off ${offs}`)
       const mf = readManifest(H).manifest
-      if (mf.agents.ka?.claude === false || mf.skills.kskill?.claude === false) bad.push('slot agent / skill toggled off')
+      if (mf.agents.ka?.claude === false || mf.skills.kskill?.claude === false)
+        bad.push('slot agent / skill toggled off')
       if (readState(H).state.pendingRetire?.length) bad.push('records left')
       if (importedChangedOf(planSyncAll(H, envH, memH)).length) bad.push('still listed after keep')
-      if (errCode(() => keepImportedOriginal(H, { kind: 'rule', tool: 'claude', path: join(H, '.claude/rules/k1.md') })) !== 'notFound') bad.push('second keep not notFound')
+      if (
+        errCode(() =>
+          keepImportedOriginal(H, {
+            kind: 'rule',
+            tool: 'claude',
+            path: join(H, '.claude/rules/k1.md')
+          })
+        ) !== 'notFound'
+      )
+        bad.push('second keep not notFound')
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-      for (const rel of ['.claude/rules/k1.md', '.claude/agents/ka.md', '.config/opencode/agent/ko.md', '.claude/skills/kskill/SKILL.md'])
+      for (const rel of [
+        '.claude/rules/k1.md',
+        '.claude/agents/ka.md',
+        '.config/opencode/agent/ko.md',
+        '.claude/skills/kskill/SKILL.md'
+      ])
         if (!existsSync(join(H, rel))) bad.push(`original gone ${rel}`)
       if (existsSync(importedBackupRoot(H))) bad.push('backups/imported created')
-      if (existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'k1.md')) || existsSync(join(H, '.config/opencode/agents/ko.md'))) bad.push('switched-off item still delivered')
-      if (!((readJson(join(H, '.config/opencode/opencode.json')).instructions as string[]) ?? []).includes(join(H, 'notes/n2.md'))) bad.push('kept instruction entry removed')
+      if (
+        existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'k1.md')) ||
+        existsSync(join(H, '.config/opencode/agents/ko.md'))
+      )
+        bad.push('switched-off item still delivered')
+      if (
+        !(
+          (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[]) ?? []
+        ).includes(join(H, 'notes/n2.md'))
+      )
+        bad.push('kept instruction entry removed')
       check(
         'af6. HAR-12 keepImportedOriginal — importedChangedOf lists rule/skill/agent/instruction; keep drops the record, switches off rule·instruction·other-folder agent for that tool, leaves skill and slot agent toggles; Sync then keeps every original',
         !bad.length,
-        bad.length ? bad.join('; ') : `listed ${chDesc}; toggled off ${offs}; records 0; originals kept after Sync`
+        bad.length
+          ? bad.join('; ')
+          : `listed ${chDesc}; toggled off ${offs}; records 0; originals kept after Sync`
       )
     }
 
@@ -6145,19 +8793,35 @@ async function run(): Promise<void> {
       const notes: string[] = []
       // (1) rule off for OpenCode → its instructions entry and record stay (OpenCode keeps the rule)
       {
-        const H = harHome('illithid-m7-H7a-', { 'notes/n3.md': '# n3\n', '.claude/settings.json': '{}\n', '.claude.json': '{}\n' })
+        const H = harHome('illithid-m7-H7a-', {
+          'notes/n3.md': '# n3\n',
+          '.claude/settings.json': '{}\n',
+          '.claude.json': '{}\n'
+        })
         mkdirSync(join(H, '.config/opencode'), { recursive: true })
-        writeJson(join(H, '.config/opencode/opencode.json'), { instructions: [join(H, 'notes/n3.md')] })
+        writeJson(join(H, '.config/opencode/opencode.json'), {
+          instructions: [join(H, 'notes/n3.md')]
+        })
         applyImport(H, [{ kind: 'rule', name: 'n3.md' }], 'tool:opencode')
         setToggle(H, 'rules', 'n3.md', 'opencode', false)
         syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
-        if (!ins.includes(join(H, 'notes/n3.md'))) bad.push('instruction entry dropped while the library rule is off')
-        if (!readState(H).state.pendingRetire?.some((p) => p.kind === 'instruction')) bad.push('instruction record dropped while the library rule is off')
+        const ins =
+          (readJson(join(H, '.config/opencode/opencode.json')).instructions as
+            string[] | undefined) ?? []
+        if (!ins.includes(join(H, 'notes/n3.md')))
+          bad.push('instruction entry dropped while the library rule is off')
+        if (!readState(H).state.pendingRetire?.some((p) => p.kind === 'instruction'))
+          bad.push('instruction record dropped while the library rule is off')
         setToggle(H, 'rules', 'n3.md', 'opencode', true)
         syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        const ins2 = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
-        if (ins2.includes(join(H, 'notes/n3.md')) || !ins2.includes(join(libraryRoot(H), 'rules/n3.md'))) bad.push('entry not swapped once the rule is on')
+        const ins2 =
+          (readJson(join(H, '.config/opencode/opencode.json')).instructions as
+            string[] | undefined) ?? []
+        if (
+          ins2.includes(join(H, 'notes/n3.md')) ||
+          !ins2.includes(join(libraryRoot(H), 'rules/n3.md'))
+        )
+          bad.push('entry not swapped once the rule is on')
         notes.push('off→kept, on→swapped')
       }
       // (2) toolsInUse unset, no OpenCode, a rule and permissions → no ~/.config/opencode, no ~/.claude/settings.json; not errors
@@ -6170,89 +8834,183 @@ async function run(): Promise<void> {
         writePermissions(H, { bash: [['ls']], claudeOnly: { allow: ['Read'], deny: [] } })
         const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
         const tr = r.results?.targets ?? []
-        if (existsSync(join(H, '.config/opencode')) || existsSync(join(H, '.claude/settings.json'))) bad.push('files created for a user who never chose tools')
-        if (tr.some((x) => x.status === 'skipped')) bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
-        const tni = tr.filter((x) => x.reason === 'toolNotInitialized').map((x) => x.id).sort().join(',')
+        if (existsSync(join(H, '.config/opencode')) || existsSync(join(H, '.claude/settings.json')))
+          bad.push('files created for a user who never chose tools')
+        if (tr.some((x) => x.status === 'skipped'))
+          bad.push(`skipped ${tr.filter((x) => x.status === 'skipped').map((x) => x.id)}`)
+        const tni = tr
+          .filter((x) => x.reason === 'toolNotInitialized')
+          .map((x) => x.id)
+          .sort()
+          .join(',')
         // HAR-21: OpenCode isn't installed, so it isn't in use at all (no opencodeRules plan) — only Claude's settings.json is waiting
-        if (tni !== 'claudePermissions' || tr.some((x) => x.id.startsWith('opencode'))) bad.push(`toolNotInitialized ${tni}`)
-        if (!detectTools(H, { PATH: '' }).find((d) => d.tool === 'opencode' && !d.detected)) bad.push('OpenCode detected after Sync')
+        if (tni !== 'claudePermissions' || tr.some((x) => x.id.startsWith('opencode')))
+          bad.push(`toolNotInitialized ${tni}`)
+        if (!detectTools(H, { PATH: '' }).find((d) => d.tool === 'opencode' && !d.detected))
+          bad.push('OpenCode detected after Sync')
         notes.push(`unset toolsInUse → ${tni} toolNotInitialized`)
         // (3) unknown ids are dropped, known ones kept
-        writeJson(join(H, APP_CONFIG_DIR, 'config.json'), { version: 1, toolsInUse: ['claude', 'vim'] })
-        if (toolsInUse(H).join() !== 'claude' || readConfig(H).error) bad.push(`toolsInUse with an unknown id → ${toolsInUse(H).join()}`)
+        writeJson(join(H, APP_CONFIG_DIR, 'config.json'), {
+          version: 1,
+          toolsInUse: ['claude', 'vim']
+        })
+        if (toolsInUse(H).join() !== 'claude' || readConfig(H).error)
+          bad.push(`toolsInUse with an unknown id → ${toolsInUse(H).join()}`)
       }
       // (4) unreadable original → skip(unreadable), not moved, record kept; readable again → retired
       {
-        const H = harHome('illithid-m7-H7c-', { '.claude/rules/u1.md': '# u1\n', '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+        const H = harHome(
+          'illithid-m7-H7c-',
+          {
+            '.claude/rules/u1.md': '# u1\n',
+            '.claude/settings.json': '{}\n',
+            '.claude.json': '{}\n'
+          },
+          ['claude']
+        )
         applyImport(H, [{ kind: 'rule', name: 'u1.md' }], 'tool:claude')
         chmodSync(join(H, '.claude/rules/u1.md'), 0o000)
-        const it = planSyncAll(H, envH, memH).rules.find((x) => x.path === join(H, '.claude/rules/u1.md'))
+        const it = planSyncAll(H, envH, memH).rules.find(
+          (x) => x.path === join(H, '.claude/rules/u1.md')
+        )
         syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
         chmodSync(join(H, '.claude/rules/u1.md'), 0o644)
-        if (it?.action !== 'skip' || it.reason !== 'unreadable') bad.push(`unreadable plan ${it?.action}:${it?.reason}`)
-        if (!existsSync(join(H, '.claude/rules/u1.md')) || !readState(H).state.pendingRetire?.length) bad.push('unreadable original moved or record dropped')
+        if (it?.action !== 'skip' || it.reason !== 'unreadable')
+          bad.push(`unreadable plan ${it?.action}:${it?.reason}`)
+        if (
+          !existsSync(join(H, '.claude/rules/u1.md')) ||
+          !readState(H).state.pendingRetire?.length
+        )
+          bad.push('unreadable original moved or record dropped')
         syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        if (existsSync(join(H, '.claude/rules/u1.md')) || importedFile(H, 'claude/rules/u1.md') !== '# u1\n') bad.push('not retired once readable')
+        if (
+          existsSync(join(H, '.claude/rules/u1.md')) ||
+          importedFile(H, 'claude/rules/u1.md') !== '# u1\n'
+        )
+          bad.push('not retired once readable')
       }
       // (5) rename before Sync — records follow the library name; originals still retired under their old file names
       {
-        const H = harHome('illithid-m7-H7d-', {
-          '.claude/rules/r5.md': '# r5\n',
-          '.claude/agents/a5.md': '---\nname: a5\ndescription: A5\ntools: Read\n---\n\nA5.\n',
-          '.claude/settings.json': '{}\n',
-          '.claude.json': '{}\n'
-        }, ['claude'])
-        applyImport(H, [{ kind: 'rule', name: 'r5.md' }, { kind: 'agent', name: 'a5' }], 'tool:claude')
+        const H = harHome(
+          'illithid-m7-H7d-',
+          {
+            '.claude/rules/r5.md': '# r5\n',
+            '.claude/agents/a5.md': '---\nname: a5\ndescription: A5\ntools: Read\n---\n\nA5.\n',
+            '.claude/settings.json': '{}\n',
+            '.claude.json': '{}\n'
+          },
+          ['claude']
+        )
+        applyImport(
+          H,
+          [
+            { kind: 'rule', name: 'r5.md' },
+            { kind: 'agent', name: 'a5' }
+          ],
+          'tool:claude'
+        )
         createSkill(H, 's5', 'Library version')
         mkdirSync(join(H, '.claude/skills/s5'), { recursive: true })
-        writeFileSync(join(H, '.claude/skills/s5/SKILL.md'), '---\nname: s5\ndescription: Mine\n---\n\nMine.\n')
+        writeFileSync(
+          join(H, '.claude/skills/s5/SKILL.md'),
+          '---\nname: s5\ndescription: Mine\n---\n\nMine.\n'
+        )
         const st7 = readState(H).state
         writeState(H, {
           ...st7,
           pendingRetire: [
             ...(st7.pendingRetire ?? []),
-            { kind: 'skill', tool: 'claude', name: 's5', path: join(H, '.claude/skills/s5'), hash: dirContentHash(join(H, '.claude/skills/s5')), at: new Date().toISOString(), workspace: 'default' }
+            {
+              kind: 'skill',
+              tool: 'claude',
+              name: 's5',
+              path: join(H, '.claude/skills/s5'),
+              hash: dirContentHash(join(H, '.claude/skills/s5')),
+              at: new Date().toISOString(),
+              workspace: 'default'
+            }
           ]
         })
         renameRule(H, 'r5.md', 'r6.md')
         renameAgent(H, 'a5', 'a6')
         renameSkill(H, 's5', 's6')
-        const names = (readState(H).state.pendingRetire ?? []).map((p) => `${p.kind}:${p.name}`).sort().join(',')
+        const names = (readState(H).state.pendingRetire ?? [])
+          .map((p) => `${p.kind}:${p.name}`)
+          .sort()
+          .join(',')
         if (names !== 'agent:a6,rule:r6.md,skill:s6') bad.push(`records after rename ${names}`)
         const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        const fails = [...(r.results?.rules ?? []), ...(r.results?.skills ?? []), ...(r.results?.agents ?? [])].filter((x) => x.status === 'failed' || x.status === 'refused')
-        if (fails.length) bad.push(`rename sync ${fails.map((x) => `${x.name}:${x.reason}`).join(',')}`)
-        for (const rel of ['.claude/rules/r5.md', '.claude/agents/a5.md', '.claude/skills/s5']) if (existsSync(join(H, rel))) bad.push(`old original left ${rel}`)
-        if (!importedFile(H, 'claude/rules/r5.md') || !importedFile(H, 'claude/agents/a5.md') || !importedFile(H, 'claude/skills/s5/SKILL.md')) bad.push('old originals not in backups/imported')
-        if (!existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r6.md')) || !existsSync(join(H, '.claude/agents/a6.md')) || !existsSync(join(H, '.claude/skills/s6/SKILL.md'))) bad.push('renamed app copies missing')
+        const fails = [
+          ...(r.results?.rules ?? []),
+          ...(r.results?.skills ?? []),
+          ...(r.results?.agents ?? [])
+        ].filter((x) => x.status === 'failed' || x.status === 'refused')
+        if (fails.length)
+          bad.push(`rename sync ${fails.map((x) => `${x.name}:${x.reason}`).join(',')}`)
+        for (const rel of ['.claude/rules/r5.md', '.claude/agents/a5.md', '.claude/skills/s5'])
+          if (existsSync(join(H, rel))) bad.push(`old original left ${rel}`)
+        if (
+          !importedFile(H, 'claude/rules/r5.md') ||
+          !importedFile(H, 'claude/agents/a5.md') ||
+          !importedFile(H, 'claude/skills/s5/SKILL.md')
+        )
+          bad.push('old originals not in backups/imported')
+        if (
+          !existsSync(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'r6.md')) ||
+          !existsSync(join(H, '.claude/agents/a6.md')) ||
+          !existsSync(join(H, '.claude/skills/s6/SKILL.md'))
+        )
+          bad.push('renamed app copies missing')
         if (readState(H).state.pendingRetire?.length) bad.push('records left after rename sync')
         notes.push(`rename records ${names}`)
       }
       // (6) opencode.jsonc with comments → left byte-identical (jsoncUnsupported, shown as a hint), opencode.json never created
       {
         const JSONC = '{\n  // user config\n}\n'
-        const H = harHome('illithid-m7-H7e-', { '.config/opencode/opencode.jsonc': JSONC }, ['opencode'])
+        const H = harHome('illithid-m7-H7e-', { '.config/opencode/opencode.jsonc': JSONC }, [
+          'opencode'
+        ])
         createRule(H, 'x.md', '# x\n')
         const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        if (existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('opencode.json created next to opencode.jsonc')
-        if (read(join(H, '.config/opencode/opencode.jsonc')) !== JSONC) bad.push('commented opencode.jsonc rewritten')
-        if (r.results?.targets.find((x) => x.id === 'opencodeRules')?.reason !== 'jsoncUnsupported') bad.push('jsonc skip reason')
+        if (existsSync(join(H, '.config/opencode/opencode.json')))
+          bad.push('opencode.json created next to opencode.jsonc')
+        if (read(join(H, '.config/opencode/opencode.jsonc')) !== JSONC)
+          bad.push('commented opencode.jsonc rewritten')
+        if (r.results?.targets.find((x) => x.id === 'opencodeRules')?.reason !== 'jsoncUnsupported')
+          bad.push('jsonc skip reason')
         const ni = notInitializedOf(planAll(H, envH, memH))
-        if (ni.length !== 1 || ni[0].reason !== 'jsoncUnsupported' || ni[0].label !== '~/.config/opencode/opencode.jsonc') bad.push(`jsonc hint ${JSON.stringify(ni)}`)
+        if (
+          ni.length !== 1 ||
+          ni[0].reason !== 'jsoncUnsupported' ||
+          ni[0].label !== '~/.config/opencode/opencode.jsonc'
+        )
+          bad.push(`jsonc hint ${JSON.stringify(ni)}`)
       }
       // (7) opencode.jsonc as OpenCode creates it on first run ($schema only), tools never chosen → it is the file written
       {
-        const H = harHome('illithid-m7-H7f-', { '.config/opencode/opencode.jsonc': '{\n  "$schema": "https://opencode.ai/config.json"\n}\n' })
+        const H = harHome('illithid-m7-H7f-', {
+          '.config/opencode/opencode.jsonc':
+            '{\n  "$schema": "https://opencode.ai/config.json"\n}\n'
+        })
         createRule(H, 'x.md', '# x\n')
         upsertMcpServer(H, 'm1', { transport: 'stdio', command: 'echo' })
         const r = syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
         const oc = readJson(join(H, '.config/opencode/opencode.jsonc'))
-        if (existsSync(join(H, '.config/opencode/opencode.json'))) bad.push('opencode.json created next to plain opencode.jsonc')
-        if (oc.$schema !== 'https://opencode.ai/config.json') bad.push('$schema dropped from opencode.jsonc')
-        if (!('m1' in ((oc.mcp as Json | undefined) ?? {})) || !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md')))
+        if (existsSync(join(H, '.config/opencode/opencode.json')))
+          bad.push('opencode.json created next to plain opencode.jsonc')
+        if (oc.$schema !== 'https://opencode.ai/config.json')
+          bad.push('$schema dropped from opencode.jsonc')
+        if (
+          !('m1' in ((oc.mcp as Json | undefined) ?? {})) ||
+          !((oc.instructions as string[] | undefined) ?? []).some((x) => x.endsWith('/x.md'))
+        )
           bad.push('opencode.jsonc not written with mcp + instructions')
-        if (r.results?.targets.some((x) => x.id.startsWith('opencode') && x.reason)) bad.push(`jsonc results ${r.results?.targets.map((x) => `${x.id}:${x.reason ?? x.status}`)}`)
-        if (notInitializedOf(planAll(H, envH, memH)).some((x) => x.tool === 'opencode')) bad.push('OpenCode hint left after writing opencode.jsonc')
+        if (r.results?.targets.some((x) => x.id.startsWith('opencode') && x.reason))
+          bad.push(
+            `jsonc results ${r.results?.targets.map((x) => `${x.id}:${x.reason ?? x.status}`)}`
+          )
+        if (notInitializedOf(planAll(H, envH, memH)).some((x) => x.tool === 'opencode'))
+          bad.push('OpenCode hint left after writing opencode.jsonc')
         if (pendingSyncCount(H, envH, memH) !== 0) bad.push('pending after jsonc sync')
         notes.push('plain jsonc written')
       }
@@ -6262,9 +9020,12 @@ async function run(): Promise<void> {
         createRule(H, 'x.md', '# x\n')
         const hint = notInitializedOf(planAll(H, envH, memH)).filter((x) => x.tool === 'opencode')
         syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-        const ins = (readJson(join(H, '.config/opencode/opencode.json')).instructions as string[] | undefined) ?? []
+        const ins =
+          (readJson(join(H, '.config/opencode/opencode.json')).instructions as
+            string[] | undefined) ?? []
         if (hint.length) bad.push(`OpenCode hint for an existing folder ${JSON.stringify(hint)}`)
-        if (!ins.some((x) => x.endsWith('/x.md'))) bad.push('opencode.json not created for an existing OpenCode folder')
+        if (!ins.some((x) => x.endsWith('/x.md')))
+          bad.push('opencode.json not created for an existing OpenCode folder')
         notes.push('old folder → opencode.json')
       }
       check(
@@ -6278,30 +9039,63 @@ async function run(): Promise<void> {
     {
       const bad: string[] = []
       const OTHER = '# Team style (other workspace)\n'
-      const H = harHome('illithid-m7-H4-', { '.claude/rules/team-style.md': RULE, '.claude/settings.json': '{}\n', '.claude.json': '{}\n' }, ['claude'])
+      const H = harHome(
+        'illithid-m7-H4-',
+        {
+          '.claude/rules/team-style.md': RULE,
+          '.claude/settings.json': '{}\n',
+          '.claude.json': '{}\n'
+        },
+        ['claude']
+      )
       applyImport(H, [{ kind: 'rule', name: 'team-style.md' }], 'tool:claude')
-      const rec = (readState(H).state.pendingRetire ?? []).map((p) => `${p.name}@${p.workspace}`).join(',')
+      const rec = (readState(H).state.pendingRetire ?? [])
+        .map((p) => `${p.name}@${p.workspace}`)
+        .join(',')
       if (rec !== 'team-style.md@default') bad.push(`record ${rec}`)
       const ws = createWorkspace(H, 'other', { from: 'empty' })
       switchWorkspace(H, ws.id)
       createRule(H, 'team-style.md', OTHER)
-      const pOther = planSyncAll(H, envH, memH).rules.map((x) => `${x.name}:${x.action}`).join(',')
-      if (pOther.includes('retireImported') || pOther.includes('importedChanged')) bad.push(`other-workspace plan ${pOther}`)
+      const pOther = planSyncAll(H, envH, memH)
+        .rules.map((x) => `${x.name}:${x.action}`)
+        .join(',')
+      if (pOther.includes('retireImported') || pOther.includes('importedChanged'))
+        bad.push(`other-workspace plan ${pOther}`)
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-      if (read(join(H, '.claude/rules/team-style.md')) !== RULE || existsSync(importedBackupRoot(H))) bad.push('original swapped from another workspace')
-      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== OTHER) bad.push('other-workspace app copy')
-      if ((readState(H).state.pendingRetire ?? []).length !== 1) bad.push('record dropped in another workspace')
+      if (
+        read(join(H, '.claude/rules/team-style.md')) !== RULE ||
+        existsSync(importedBackupRoot(H))
+      )
+        bad.push('original swapped from another workspace')
+      if (
+        stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== OTHER
+      )
+        bad.push('other-workspace app copy')
+      if ((readState(H).state.pendingRetire ?? []).length !== 1)
+        bad.push('record dropped in another workspace')
       switchWorkspace(H, 'default')
-      const pBack = planSyncAll(H, envH, memH).rules.map((x) => `${x.name}:${x.action}`).join(',')
-      if (!pBack.includes('team-style.md:retireImported')) bad.push(`plan after switching back ${pBack}`)
+      const pBack = planSyncAll(H, envH, memH)
+        .rules.map((x) => `${x.name}:${x.action}`)
+        .join(',')
+      if (!pBack.includes('team-style.md:retireImported'))
+        bad.push(`plan after switching back ${pBack}`)
       syncAll(H, envH, { allowReal: true, approvedOnce: true, secrets: memH })
-      if (existsSync(join(H, '.claude/rules/team-style.md')) || importedFile(H, 'claude/rules/team-style.md') !== RULE) bad.push('original not retired after switching back')
-      if (stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE) bad.push('default app copy')
+      if (
+        existsSync(join(H, '.claude/rules/team-style.md')) ||
+        importedFile(H, 'claude/rules/team-style.md') !== RULE
+      )
+        bad.push('original not retired after switching back')
+      if (
+        stripSourceNote(read(join(H, '.claude/rules', CLAUDE_RULES_DIR, 'team-style.md'))) !== RULE
+      )
+        bad.push('default app copy')
       if (readState(H).state.pendingRetire?.length) bad.push('record left after switching back')
       check(
         'af4. HAR-12 pendingRetire per workspace — Sync in another workspace with a same-name rule leaves the original and the record; switching back retires it',
         !bad.length,
-        bad.length ? bad.join('; ') : `record ${rec}; other workspace plan ${pOther}, original kept; back in default plan ${pBack}, original in backups/imported`
+        bad.length
+          ? bad.join('; ')
+          : `record ${rec}; other workspace plan ${pOther}, original kept; back in default plan ${pBack}, original in backups/imported`
       )
     }
   }
@@ -6318,8 +9112,10 @@ async function run(): Promise<void> {
     if (cli(['init']) !== 1) bad.push('init without --home allowed')
     if (cli(['init', '--home', REAL_HOME]) !== 1) bad.push('real HOME init allowed')
     if (cli(['sync', '--apply']) !== 1) bad.push('sync --apply without --home allowed')
-    if (cli(['sync', '--apply', '--home', REAL_HOME]) !== 1) bad.push('real HOME sync --apply allowed')
-    if (cli(['import', 'legacy', '--apply']) !== 1) bad.push('import --apply without --home allowed')
+    if (cli(['sync', '--apply', '--home', REAL_HOME]) !== 1)
+      bad.push('real HOME sync --apply allowed')
+    if (cli(['import', 'legacy', '--apply']) !== 1)
+      bad.push('import --apply without --home allowed')
     if (cli(['toggle', 'mcp', 'x', 'codex', 'off']) !== 1) bad.push('toggle without --home allowed')
     if (cli(['rename-migrate', '--apply']) !== 1)
       bad.push('real HOME rename-migrate --apply without --i-understand allowed')
@@ -6335,18 +9131,24 @@ async function run(): Promise<void> {
     for (const real of realRoots) {
       symlinkSync(real, gLink)
       if (cli(['init', '--home', G]) !== 1)
-        bad.push(`fixture init pointing the library inside real ${real.replace(REAL_HOME, '~')} allowed`)
+        bad.push(
+          `fixture init pointing the library inside real ${real.replace(REAL_HOME, '~')} allowed`
+        )
       if (cli(['import', 'legacy', '--apply', '--home', G]) !== 1)
         bad.push(`real ${real.replace(REAL_HOME, '~')} library import allowed`)
       unlinkSync(gLink)
     }
-    if (cli(['init', '--home', G, '--library', '~/x']) !== 1) bad.push('deprecated --library allowed')
+    if (cli(['init', '--home', G, '--library', '~/x']) !== 1)
+      bad.push('deprecated --library allowed')
     // works in the fixture
     if (cli(['sync', '--home', F]) !== 0) bad.push('fixture sync (plan) failed')
     if (cli(['import-sources', '--home', F]) !== 0) bad.push('import-sources failed')
     if (cli(['import', 'legacy', '--home', F]) !== 0) bad.push('import legacy (plan) failed')
     const H = makeFixture('illithid-m7-H-')
-    if (cli(['init', '--home', H]) !== 0 || !existsSync(join(H, '.illithid/workspaces/default/mcps')))
+    if (
+      cli(['init', '--home', H]) !== 0 ||
+      !existsSync(join(H, '.illithid/workspaces/default/mcps'))
+    )
       bad.push('fixture init failed')
     if (
       cli(['import', 'legacy', '--apply', '--home', H]) !== 0 ||

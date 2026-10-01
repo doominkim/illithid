@@ -10,9 +10,7 @@ export const tokenTotal = (m: ModelSummary): number =>
   m.tokens.cacheWrite +
   m.tokens.output +
   (m.tool === 'opencode' ? m.tokens.reasoning : 0)
-export function modelGroups(
-  models: ModelSummary[]
-): {
+export function modelGroups(models: ModelSummary[]): {
   model: string
   children: ModelSummary[]
   first: string

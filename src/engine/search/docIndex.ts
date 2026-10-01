@@ -36,8 +36,23 @@ export type DocKind = (typeof DOC_KINDS)[number]
 const ARTIFACT_TEXT_EXT = new Set(['.txt', '.json'])
 /** Skill file extensions indexed as text */
 const SKILL_TEXT_EXT = new Set([
-  '.md', '.markdown', '.mdx', '.txt', '.json', '.yaml', '.yml', '.toml',
-  '.py', '.js', '.mjs', '.cjs', '.ts', '.sh', '.html', '.htm', '.csv'
+  '.md',
+  '.markdown',
+  '.mdx',
+  '.txt',
+  '.json',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.py',
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.sh',
+  '.html',
+  '.htm',
+  '.csv'
 ])
 /** mcps/<name>.json fields indexed besides the name */
 const MCP_TEXT_FIELDS = ['description', '_'] as const
@@ -133,9 +148,25 @@ export function artifactDocs(artifacts: Artifact[]): DocSource[] {
   const out: DocSource[] = []
   for (const a of artifacts) {
     const ext = extname(a.path).toLowerCase()
-    const format = a.kind === 'md' ? 'text' : a.kind === 'html' ? 'html' : a.kind === 'other' && ARTIFACT_TEXT_EXT.has(ext) ? 'text' : null
+    const format =
+      a.kind === 'md'
+        ? 'text'
+        : a.kind === 'html'
+          ? 'html'
+          : a.kind === 'other' && ARTIFACT_TEXT_EXT.has(ext)
+            ? 'text'
+            : null
     if (!format || a.size > DOC_SIZE_LIMIT) continue
-    out.push({ kind: 'artifact', key: a.id, title: a.title, tool: a.tool, path: a.path, mtime: Date.parse(a.mtime) || 0, size: a.size, format })
+    out.push({
+      kind: 'artifact',
+      key: a.id,
+      title: a.title,
+      tool: a.tool,
+      path: a.path,
+      mtime: Date.parse(a.mtime) || 0,
+      size: a.size,
+      format
+    })
   }
   return out
 }
@@ -156,13 +187,28 @@ function globFiles(cwd: string, pattern: string): fg.Entry[] {
 export function libraryDocs(home: string): DocSource[] {
   const root = libraryRoot(home)
   const out: DocSource[] = []
-  const add = (kind: DocKind, e: fg.Entry, key: string, title: string, format: DocSource['format'] = 'text'): void => {
+  const add = (
+    kind: DocKind,
+    e: fg.Entry,
+    key: string,
+    title: string,
+    format: DocSource['format'] = 'text'
+  ): void => {
     const size = e.stats?.size ?? 0
     if (size > DOC_SIZE_LIMIT) return
-    out.push({ kind, key, title, path: join(root, e.path), mtime: Math.floor(e.stats?.mtimeMs ?? 0), size, format })
+    out.push({
+      kind,
+      key,
+      title,
+      path: join(root, e.path),
+      mtime: Math.floor(e.stats?.mtimeMs ?? 0),
+      size,
+      format
+    })
   }
   for (const e of globFiles(root, 'rules/*.md')) add('rule', e, e.name, e.name)
-  for (const e of globFiles(root, 'agents/*.md')) add('agent', e, e.name.slice(0, -3), e.name.slice(0, -3))
+  for (const e of globFiles(root, 'agents/*.md'))
+    add('agent', e, e.name.slice(0, -3), e.name.slice(0, -3))
   for (const e of globFiles(root, 'memory/**/*.md')) {
     const rel = e.path.slice('memory/'.length)
     add('memory', e, rel, rel)
@@ -172,7 +218,13 @@ export function libraryDocs(home: string): DocSource[] {
     if (!SKILL_TEXT_EXT.has(ext)) continue
     const [, name, ...rest] = e.path.split('/')
     const rel = rest.join('/')
-    add('skill', e, `${name}/${rel}`, rel === 'SKILL.md' ? name : `${name} · ${rel}`, ext === '.html' || ext === '.htm' ? 'html' : 'text')
+    add(
+      'skill',
+      e,
+      `${name}/${rel}`,
+      rel === 'SKILL.md' ? name : `${name} · ${rel}`,
+      ext === '.html' || ext === '.htm' ? 'html' : 'text'
+    )
   }
   for (const e of globFiles(root, 'mcps/*.json')) {
     if (e.name.startsWith('_')) continue
@@ -182,7 +234,14 @@ export function libraryDocs(home: string): DocSource[] {
   return out
 }
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }
+const ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' '
+}
 
 /** HTML → plain text (scripts, styles, comments and tags removed; common entities decoded) */
 export function htmlToText(html: string): string {
@@ -207,7 +266,8 @@ export function mcpDocText(name: string, raw: string): string {
   const parts = [name]
   try {
     const o = JSON.parse(raw) as Record<string, unknown>
-    for (const f of MCP_TEXT_FIELDS) if (typeof o?.[f] === 'string' && (o[f] as string).trim()) parts.push((o[f] as string).trim())
+    for (const f of MCP_TEXT_FIELDS)
+      if (typeof o?.[f] === 'string' && (o[f] as string).trim()) parts.push((o[f] as string).trim())
   } catch {
     // Invalid JSON → name only
   }
@@ -250,13 +310,19 @@ export interface IndexDocsOptions extends IndexOptions {
 }
 
 /** Incremental document indexing. Never run concurrently on the same file (caller holds the lock) */
-export function indexDocs(home: string, docs: DocSource[], opts: IndexDocsOptions = {}): DocIndexResult {
+export function indexDocs(
+  home: string,
+  docs: DocSource[],
+  opts: IndexDocsOptions = {}
+): DocIndexResult {
   const t0 = Date.now()
   const db = openDocDb(opts.dbPath ?? searchIndexPath(home))
   const base = totalChanges(db)
   try {
     const existing = new Map<string, DocRow>()
-    for (const r of db.prepare('select did, kind, key, title, tool, path, mtime, size from docs').all() as unknown as DocRow[])
+    for (const r of db
+      .prepare('select did, kind, key, title, tool, path, mtime, size from docs')
+      .all() as unknown as DocRow[])
       existing.set(docKey(r.kind, r.key), r)
     const list = new Map<string, DocSource>()
     for (const d of docs) if (!list.has(docKey(d.kind, d.key))) list.set(docKey(d.kind, d.key), d)
@@ -264,10 +330,16 @@ export function indexDocs(home: string, docs: DocSource[], opts: IndexDocsOption
     const delText = db.prepare('delete from doctext where rowid = ?')
     const delDoc = db.prepare('delete from docs where did = ?')
     const complete = new Set<string>(opts.completeKinds ?? DOC_KINDS)
-    const gone = [...existing.entries()].filter(([k, r]) => complete.has(r.kind) && !list.has(k)).map(([, r]) => r)
+    const gone = [...existing.entries()]
+      .filter(([k, r]) => complete.has(r.kind) && !list.has(k))
+      .map(([, r]) => r)
 
-    const ins = db.prepare('insert into docs(kind, key, title, tool, path, mtime, size) values (?, ?, ?, ?, ?, ?, ?)')
-    const upd = db.prepare('update docs set title = ?, tool = ?, path = ?, mtime = ?, size = ? where did = ?')
+    const ins = db.prepare(
+      'insert into docs(kind, key, title, tool, path, mtime, size) values (?, ?, ?, ?, ?, ?, ?)'
+    )
+    const upd = db.prepare(
+      'update docs set title = ?, tool = ?, path = ?, mtime = ?, size = ? where did = ?'
+    )
     const insText = db.prepare('insert into doctext(rowid, text) values (?, ?)')
     const updMeta = db.prepare('update docs set title = ?, tool = ? where did = ?')
 
@@ -282,7 +354,8 @@ export function indexDocs(home: string, docs: DocSource[], opts: IndexDocsOption
       for (const [k, d] of list) {
         const row = existing.get(k)
         if (row && row.path === d.path && row.mtime === d.mtime && row.size === d.size) {
-          if ((row.title ?? '') !== d.title || (row.tool ?? null) !== (d.tool ?? null)) updMeta.run(d.title, d.tool ?? null, row.did)
+          if ((row.title ?? '') !== d.title || (row.tool ?? null) !== (d.tool ?? null))
+            updMeta.run(d.title, d.tool ?? null, row.did)
           continue
         }
         const text = readDocText(d)
@@ -299,7 +372,10 @@ export function indexDocs(home: string, docs: DocSource[], opts: IndexDocsOption
           did = row.did
           delText.run(did)
           upd.run(d.title, d.tool ?? null, d.path, d.mtime, d.size, did)
-        } else did = Number(ins.run(d.kind, d.key, d.title, d.tool ?? null, d.path, d.mtime, d.size).lastInsertRowid)
+        } else
+          did = Number(
+            ins.run(d.kind, d.key, d.title, d.tool ?? null, d.path, d.mtime, d.size).lastInsertRowid
+          )
         insText.run(did, text)
         indexed++
       }
@@ -337,7 +413,11 @@ interface DocHitRow extends DocRow {
   total: number
 }
 
-export function searchDocs(home: string, query: string, opts: DocSearchOptions = {}): DocSearchResponse {
+export function searchDocs(
+  home: string,
+  query: string,
+  opts: DocSearchOptions = {}
+): DocSearchResponse {
   const t0 = Date.now()
   const q = query.trim()
   const mode: 'fts' | 'like' = [...q].length >= 3 ? 'fts' : 'like'
@@ -397,10 +477,17 @@ export function searchDocs(home: string, query: string, opts: DocSearchOptions =
 }
 
 /** Sessions + documents, documents grouped by kind (⌘K) */
-export function searchAll(home: string, query: string, opts: IndexOptions & { limit?: number } = {}): SearchAllResponse {
+export function searchAll(
+  home: string,
+  query: string,
+  opts: IndexOptions & { limit?: number } = {}
+): SearchAllResponse {
   const t0 = Date.now()
   const sessions = searchSessions(home, query, { ...opts, limit: opts.limit ?? 50, perSession: 1 })
-  const docs = Object.fromEntries(DOC_KINDS.map((k) => [k, [] as DocSearchResult[]])) as Record<DocKind, DocSearchResult[]>
+  const docs = Object.fromEntries(DOC_KINDS.map((k) => [k, [] as DocSearchResult[]])) as Record<
+    DocKind,
+    DocSearchResult[]
+  >
   let limited = sessions.limited
   for (const kind of DOC_KINDS) {
     const r = searchDocs(home, query, { ...opts, kind, limit: opts.limit ?? 50 })

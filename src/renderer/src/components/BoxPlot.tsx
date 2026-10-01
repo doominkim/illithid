@@ -18,15 +18,46 @@ interface Props {
 
 /** One-line box plot: whisker min–max, box p25–p75, median line, mean dot, p90 tick */
 export function BoxPlot({ d, domain, height = 18, scale = 'log' }: Props): React.JSX.Element {
-  const x = scale === 'linear' ? (v: number): number => Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0] || 1))) : logScale(domain[0], domain[1])
+  const x =
+    scale === 'linear'
+      ? (v: number): number =>
+          Math.max(0, Math.min(1, (v - domain[0]) / (domain[1] - domain[0] || 1)))
+      : logScale(domain[0], domain[1])
   const pct = (v: number): string => `${(x(v) * 100).toFixed(2)}%`
   const mid = height / 2
   const box = height * 0.62
   return (
-    <svg width="100%" height={height} role="img" aria-hidden="true" style={{ display: 'block', overflow: 'visible' }}>
-      <line x1={pct(d.min)} x2={pct(d.max)} y1={mid} y2={mid} stroke="var(--ac-text-muted)" strokeWidth="1" />
-      <line x1={pct(d.min)} x2={pct(d.min)} y1={mid - 4} y2={mid + 4} stroke="var(--ac-text-muted)" strokeWidth="1" />
-      <line x1={pct(d.max)} x2={pct(d.max)} y1={mid - 4} y2={mid + 4} stroke="var(--ac-text-muted)" strokeWidth="1" />
+    <svg
+      width="100%"
+      height={height}
+      role="img"
+      aria-hidden="true"
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      <line
+        x1={pct(d.min)}
+        x2={pct(d.max)}
+        y1={mid}
+        y2={mid}
+        stroke="var(--ac-text-muted)"
+        strokeWidth="1"
+      />
+      <line
+        x1={pct(d.min)}
+        x2={pct(d.min)}
+        y1={mid - 4}
+        y2={mid + 4}
+        stroke="var(--ac-text-muted)"
+        strokeWidth="1"
+      />
+      <line
+        x1={pct(d.max)}
+        x2={pct(d.max)}
+        y1={mid - 4}
+        y2={mid + 4}
+        stroke="var(--ac-text-muted)"
+        strokeWidth="1"
+      />
       <rect
         x={pct(d.p25)}
         y={mid - box / 2}
@@ -37,8 +68,22 @@ export function BoxPlot({ d, domain, height = 18, scale = 'log' }: Props): React
         stroke="var(--ac-accent)"
         strokeWidth="1"
       />
-      <line x1={pct(d.median)} x2={pct(d.median)} y1={mid - box / 2} y2={mid + box / 2} stroke="var(--ac-text)" strokeWidth="2" />
-      <line x1={pct(d.p90)} x2={pct(d.p90)} y1={mid - 5} y2={mid + 5} stroke="var(--ac-text)" strokeWidth="1.5" />
+      <line
+        x1={pct(d.median)}
+        x2={pct(d.median)}
+        y1={mid - box / 2}
+        y2={mid + box / 2}
+        stroke="var(--ac-text)"
+        strokeWidth="2"
+      />
+      <line
+        x1={pct(d.p90)}
+        x2={pct(d.p90)}
+        y1={mid - 5}
+        y2={mid + 5}
+        stroke="var(--ac-text)"
+        strokeWidth="1.5"
+      />
       <circle cx={pct(d.mean)} cy={mid} r="2.5" fill="var(--ac-text)" />
     </svg>
   )

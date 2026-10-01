@@ -199,7 +199,9 @@ export const codexMcp: TargetDef = {
     // Same-name server tables outside the markers (user area) move into the block (app-owned from then on)
     const outsideBefore = outsideBlockMulti(before, ALL_TOML_MCP_MARKERS)
     const movedIn = enabledServerNames(sources, 'codex').filter((n) =>
-      new RegExp(`^\\[mcp_servers\\.(?:${escapeRe(n)}|"${escapeRe(n)}")\\]`, 'm').test(outsideBefore)
+      new RegExp(`^\\[mcp_servers\\.(?:${escapeRe(n)}|"${escapeRe(n)}")\\]`, 'm').test(
+        outsideBefore
+      )
     )
     const kept = (after.match(/^\[mcp_servers\./gm) ?? []).length
     const legacy = blockBodyMulti(before, LEGACY_TOML_MCP_MARKERS) !== null
@@ -208,7 +210,11 @@ export const codexMcp: TargetDef = {
       notes: [
         ...warnings,
         ...(legacy ? ['legacy marker block → replaced with app marker'] : []),
-        ...(movedIn.length ? [`moved server tables from outside the markers into the block (app-owned from now on): ${movedIn.join(', ')}`] : []),
+        ...(movedIn.length
+          ? [
+              `moved server tables from outside the markers into the block (app-owned from now on): ${movedIn.join(', ')}`
+            ]
+          : []),
         `${kept} mcp_servers tables total (servers outside the SSOT kept)`,
         ...toggleNotes(
           staleServerNames(sources, 'codex', ctx, 'codexMcp'),

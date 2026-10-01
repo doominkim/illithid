@@ -7,7 +7,14 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { StatsHooks, ToolCall, ToolErrorKind, TurnUsage } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 import { classify, dayOf, mcpKey } from './usage'
-import { convertedCost, readPriceBook, ratesFor, type ConvertedCost, type PriceBook, type CostTokens } from './modelPricing'
+import {
+  convertedCost,
+  readPriceBook,
+  ratesFor,
+  type ConvertedCost,
+  type PriceBook,
+  type CostTokens
+} from './modelPricing'
 
 export const MODEL_SCHEMA = '2'
 
@@ -18,7 +25,13 @@ export const MIN_TOOL_CALLS = 100
 /** Tools that start a subagent (Claude, Codex, OpenCode) */
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task', 'spawn_agent', 'task'])
 
-const ERROR_KINDS: readonly ToolErrorKind[] = ['mistake', 'command', 'policy', 'userReject', 'other']
+const ERROR_KINDS: readonly ToolErrorKind[] = [
+  'mistake',
+  'command',
+  'policy',
+  'userReject',
+  'other'
+]
 
 /** Create (or reset on a version change) the model tables. Returns true when they were (re)created */
 export function ensureModelStats(db: DatabaseSync): boolean {
@@ -68,12 +81,22 @@ export function ensureModelStats(db: DatabaseSync): boolean {
   return true
 }
 
-export const MODEL_TABLES = ['model_day', 'model_request', 'model_ctx', 'model_tool', 'model_limit', 'model_cost_turn'] as const
+export const MODEL_TABLES = [
+  'model_day',
+  'model_request',
+  'model_ctx',
+  'model_tool',
+  'model_limit',
+  'model_cost_turn'
+] as const
 
 /** Same model under a dated id or a provider prefix counts as one; different models are never merged */
 export function normalizeModel(model: string | undefined): string | undefined {
   if (!model || model === '<synthetic>') return undefined
-  const m = model.split('/').pop()!.replace(/-\d{8}$/, '')
+  const m = model
+    .split('/')
+    .pop()!
+    .replace(/-\d{8}$/, '')
   return m || undefined
 }
 
@@ -113,11 +136,46 @@ const time = (at: string | undefined): number | undefined => {
 /** Per-session accumulator fed by the transcript readers (StatsHooks) and the tool-call hook */
 export class ModelStatsCounter implements StatsHooks {
   readonly days = new Map<string, DayRow>()
-  readonly requests: { model: string; effort: string; at: string; day: string; dur: number; turns: number; tools: number; subagents: number; out: number }[] = []
-  readonly costTurns: { model: string; effort: string; day: string; requestAt: string | null; context: number; tokens: TurnUsage; recorded: number | null }[] = []
+  readonly requests: {
+    model: string
+    effort: string
+    at: string
+    day: string
+    dur: number
+    turns: number
+    tools: number
+    subagents: number
+    out: number
+  }[] = []
+  readonly costTurns: {
+    model: string
+    effort: string
+    day: string
+    requestAt: string | null
+    context: number
+    tokens: TurnUsage
+    recorded: number | null
+  }[] = []
   readonly ctx: { model: string; effort: string; day: string; ctx: number }[] = []
-  readonly tools = new Map<string, { model: string; effort: string; day: string; kind: string; name: string; calls: number; errors: number }>()
-  readonly limitRows: { at: string; day: string; usedPercent: number; windowMinutes?: number; plan?: string }[] = []
+  readonly tools = new Map<
+    string,
+    {
+      model: string
+      effort: string
+      day: string
+      kind: string
+      name: string
+      calls: number
+      errors: number
+    }
+  >()
+  readonly limitRows: {
+    at: string
+    day: string
+    usedPercent: number
+    windowMinutes?: number
+    plan?: string
+  }[] = []
   private model?: string
   private effort = ''
   /** Current lines come from a subagent transcript */
@@ -172,7 +230,13 @@ export class ModelStatsCounter implements StatsHooks {
     return r
   }
 
-  private toolRow(model: string, effort: string, at: string | undefined, kind: string, name: string): { calls: number; errors: number } {
+  private toolRow(
+    model: string,
+    effort: string,
+    at: string | undefined,
+    kind: string,
+    name: string
+  ): { calls: number; errors: number } {
     const day = dayOf(at, this.fallbackAt)
     const key = `${model}\u0000${effort}\u0000${day}\u0000${kind}\u0000${name}`
     let r = this.tools.get(key)
@@ -183,7 +247,14 @@ export class ModelStatsCounter implements StatsHooks {
     return r
   }
 
-  turn(t: { model?: string; effort?: string; at?: string; endAt?: string; usage: TurnUsage; cost?: number }): void {
+  turn(t: {
+    model?: string
+    effort?: string
+    at?: string
+    endAt?: string
+    usage: TurnUsage
+    cost?: number
+  }): void {
     const model = normalizeModel(t.model) ?? (t.model === '<synthetic>' ? undefined : this.model)
     if (!model) return
     this.model = model
@@ -205,7 +276,15 @@ export class ModelStatsCounter implements StatsHooks {
     r.cost += t.cost ?? 0
     const ctx = u.input + u.cacheRead + u.cacheWrite
     if (ctx > 0) this.ctx.push({ model, effort, day: r.day, ctx })
-    this.costTurns.push({ model, effort, day: r.day, requestAt: !this.sub && this.cur ? this.cur.startAt : null, context: ctx, tokens: { ...u }, recorded: t.cost ?? null })
+    this.costTurns.push({
+      model,
+      effort,
+      day: r.day,
+      requestAt: !this.sub && this.cur ? this.cur.startAt : null,
+      context: ctx,
+      tokens: { ...u },
+      recorded: t.cost ?? null
+    })
     const cur = this.cur
     if (cur && !this.sub) {
       cur.turns++
@@ -231,7 +310,13 @@ export class ModelStatsCounter implements StatsHooks {
         if (this.seenSkillTurn.has(k)) continue
         this.seenSkillTurn.add(k)
       }
-      this.toolRow(model, effort, call.at, kind === 'mcpRaw' ? 'mcp' : kind, kind === 'skill' ? name : mcpKey(name)).calls++
+      this.toolRow(
+        model,
+        effort,
+        call.at,
+        kind === 'mcpRaw' ? 'mcp' : kind,
+        kind === 'skill' ? name : mcpKey(name)
+      ).calls++
     }
     const cur = this.cur
     if (cur && !this.sub) {
@@ -254,7 +339,16 @@ export class ModelStatsCounter implements StatsHooks {
     this.closeRequest()
     const start = time(at)
     if (start === undefined || !at) return
-    this.cur = { start, startAt: at, effort: this.effort, turns: 0, tools: 0, subagents: 0, out: 0, interrupted: false }
+    this.cur = {
+      start,
+      startAt: at,
+      effort: this.effort,
+      turns: 0,
+      tools: 0,
+      subagents: 0,
+      out: 0,
+      interrupted: false
+    }
   }
 
   interrupt(at?: string): void {
@@ -273,8 +367,20 @@ export class ModelStatsCounter implements StatsHooks {
     if (!l.at) return
     const prev = this.limitRows[this.limitRows.length - 1]
     // Only changes are kept (every model call repeats the same value)
-    if (prev && prev.usedPercent === l.usedPercent && prev.windowMinutes === l.windowMinutes && prev.plan === l.plan) return
-    this.limitRows.push({ at: l.at, day: dayOf(l.at, undefined), usedPercent: l.usedPercent, windowMinutes: l.windowMinutes, plan: l.plan })
+    if (
+      prev &&
+      prev.usedPercent === l.usedPercent &&
+      prev.windowMinutes === l.windowMinutes &&
+      prev.plan === l.plan
+    )
+      return
+    this.limitRows.push({
+      at: l.at,
+      day: dayOf(l.at, undefined),
+      usedPercent: l.usedPercent,
+      windowMinutes: l.windowMinutes,
+      plan: l.plan
+    })
   }
 
   /** Requests that ended without a model answer, or were interrupted, carry no duration */
@@ -311,22 +417,78 @@ export class ModelStatsCounter implements StatsHooks {
     )
     for (const r of this.days.values())
       insDay.run(
-        sid, this.tool, r.model, r.effort, r.day, r.subagent, r.turns, r.toolCalls, r.subSessions,
-        r.errors.mistake, r.errors.command, r.errors.policy, r.errors.userReject, r.errors.other, r.interrupts,
-        r.tokens.input, r.tokens.cacheRead, r.tokens.cacheWrite, r.tokens.output, r.tokens.reasoning, r.cost
+        sid,
+        this.tool,
+        r.model,
+        r.effort,
+        r.day,
+        r.subagent,
+        r.turns,
+        r.toolCalls,
+        r.subSessions,
+        r.errors.mistake,
+        r.errors.command,
+        r.errors.policy,
+        r.errors.userReject,
+        r.errors.other,
+        r.interrupts,
+        r.tokens.input,
+        r.tokens.cacheRead,
+        r.tokens.cacheWrite,
+        r.tokens.output,
+        r.tokens.reasoning,
+        r.cost
       )
     const insReq = db.prepare(
       'insert into model_request(sid, tool, model, effort, at, day, dur_sec, turns, tools, subagents, out_tokens) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    for (const r of this.requests) insReq.run(sid, this.tool, r.model, r.effort, r.at, r.day, r.dur, r.turns, r.tools, r.subagents, r.out)
-    const insCost = db.prepare('insert into model_cost_turn(sid, tool, model, effort, day, request_at, context, t_input, t_cache_read, t_cache_write, t_output, t_reasoning, recorded) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    for (const r of this.costTurns) insCost.run(sid, this.tool, r.model, r.effort, r.day, r.requestAt, r.context, r.tokens.input, r.tokens.cacheRead, r.tokens.cacheWrite, r.tokens.output, r.tokens.reasoning, r.recorded)
-    const insCtx = db.prepare('insert into model_ctx(sid, tool, model, effort, day, ctx) values (?, ?, ?, ?, ?, ?)')
+    for (const r of this.requests)
+      insReq.run(
+        sid,
+        this.tool,
+        r.model,
+        r.effort,
+        r.at,
+        r.day,
+        r.dur,
+        r.turns,
+        r.tools,
+        r.subagents,
+        r.out
+      )
+    const insCost = db.prepare(
+      'insert into model_cost_turn(sid, tool, model, effort, day, request_at, context, t_input, t_cache_read, t_cache_write, t_output, t_reasoning, recorded) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    for (const r of this.costTurns)
+      insCost.run(
+        sid,
+        this.tool,
+        r.model,
+        r.effort,
+        r.day,
+        r.requestAt,
+        r.context,
+        r.tokens.input,
+        r.tokens.cacheRead,
+        r.tokens.cacheWrite,
+        r.tokens.output,
+        r.tokens.reasoning,
+        r.recorded
+      )
+    const insCtx = db.prepare(
+      'insert into model_ctx(sid, tool, model, effort, day, ctx) values (?, ?, ?, ?, ?, ?)'
+    )
     for (const r of this.ctx) insCtx.run(sid, this.tool, r.model, r.effort, r.day, r.ctx)
-    const insTool = db.prepare('insert into model_tool(sid, tool, model, effort, day, kind, name, calls, errors) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    for (const r of this.tools.values()) insTool.run(sid, this.tool, r.model, r.effort, r.day, r.kind, r.name, r.calls, r.errors)
-    const insLimit = db.prepare('insert into model_limit(sid, at, day, used_percent, window_minutes, plan) values (?, ?, ?, ?, ?, ?)')
-    for (const r of this.limitRows) insLimit.run(sid, r.at, r.day, r.usedPercent, r.windowMinutes ?? null, r.plan ?? null)
+    const insTool = db.prepare(
+      'insert into model_tool(sid, tool, model, effort, day, kind, name, calls, errors) values (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    for (const r of this.tools.values())
+      insTool.run(sid, this.tool, r.model, r.effort, r.day, r.kind, r.name, r.calls, r.errors)
+    const insLimit = db.prepare(
+      'insert into model_limit(sid, at, day, used_percent, window_minutes, plan) values (?, ?, ?, ?, ?, ?)'
+    )
+    for (const r of this.limitRows)
+      insLimit.run(sid, r.at, r.day, r.usedPercent, r.windowMinutes ?? null, r.plan ?? null)
   }
 }
 
@@ -423,12 +585,23 @@ export interface ModelDetail {
     contextPerTurn: Dist | null
   }
   /** Session holding the maximum of each request metric */
-  maxSessions: { responseSec?: SessionRef; toolsPerRequest?: SessionRef; outputPerRequest?: SessionRef }
+  maxSessions: {
+    responseSec?: SessionRef
+    toolsPerRequest?: SessionRef
+    outputPerRequest?: SessionRef
+  }
   tools: { name: string; calls: number; errors: number }[]
   skills: { name: string; calls: number }[]
   mcp: { name: string; calls: number }[]
   projects: { project: string; turns: number }[]
-  sessions: (SessionRef & { first: string; last: string; turns: number; toolCalls: number; mistakes: number; output: number })[]
+  sessions: (SessionRef & {
+    first: string
+    last: string
+    turns: number
+    toolCalls: number
+    mistakes: number
+    output: number
+  })[]
   /** Codex subscription usage (account-wide, not per model): highest value per day and window */
   limits: { day: string; usedPercent: number; windowMinutes: number | null; plan: string | null }[]
 }
@@ -531,9 +704,21 @@ function summaryOf(r: SumRow, requests: RequestRow[], ctx: number[]): ModelSumma
     requests: requests.length,
     turns: Number(r.turns),
     toolCalls: Number(r.toolCalls),
-    errors: { mistake: Number(r.mistake), command: Number(r.command), policy: Number(r.policy), userReject: Number(r.userReject), other: Number(r.other) },
+    errors: {
+      mistake: Number(r.mistake),
+      command: Number(r.command),
+      policy: Number(r.policy),
+      userReject: Number(r.userReject),
+      other: Number(r.other)
+    },
     interrupts: Number(r.interrupts),
-    tokens: { input: Number(r.input), cacheRead: Number(r.cacheRead), cacheWrite: Number(r.cacheWrite), output: Number(r.output), reasoning: Number(r.reasoning) },
+    tokens: {
+      input: Number(r.input),
+      cacheRead: Number(r.cacheRead),
+      cacheWrite: Number(r.cacheWrite),
+      output: Number(r.output),
+      reasoning: Number(r.reasoning)
+    },
     cost: r.tool === 'opencode' ? Math.round(Number(r.cost) * 10000) / 10000 : null,
     median: {
       responseSec: med(requests.map((q) => q.dur)),
@@ -555,41 +740,137 @@ interface RequestRow {
 }
 
 interface CostTurnRow extends CostTokens {
-  sid: number; requestAt: string | null; day: string; context: number; recorded: number | null
+  sid: number
+  requestAt: string | null
+  day: string
+  context: number
+  recorded: number | null
 }
-function pricingFor(db: DatabaseSync, summary: ModelSummary, w: { sql: string; args: (string | number)[] }, book: PriceBook): { pricing: ConvertedCost; daily: NonNullable<ModelDetail['costDaily']>; distribution: Dist | null } {
+function pricingFor(
+  db: DatabaseSync,
+  summary: ModelSummary,
+  w: { sql: string; args: (string | number)[] },
+  book: PriceBook
+): {
+  pricing: ConvertedCost
+  daily: NonNullable<ModelDetail['costDaily']>
+  distribution: Dist | null
+} {
   const where = `tool = ? and model = ? and effort = ?${w.sql}`
   const args = [summary.tool, summary.model, summary.effort, ...w.args]
-  const rows = tableExists(db, 'model_cost_turn') ? db.prepare(`select sid, request_at as requestAt, day, context, t_input as input, t_cache_read as cacheRead, t_cache_write as cacheWrite, t_output as output, t_reasoning as reasoning, recorded from model_cost_turn where ${where}`).all(...args) as unknown as CostTurnRow[] : []
+  const rows = tableExists(db, 'model_cost_turn')
+    ? (db
+        .prepare(
+          `select sid, request_at as requestAt, day, context, t_input as input, t_cache_read as cacheRead, t_cache_write as cacheWrite, t_output as output, t_reasoning as reasoning, recorded from model_cost_turn where ${where}`
+        )
+        .all(...args) as unknown as CostTurnRow[])
+    : []
   if (!rows.length) {
-    const pricing = convertedCost(summary.model, summary.tool, summary.tokens, summary.requests, summary.cost && summary.cost > 0 ? summary.cost : null, book)
+    const pricing = convertedCost(
+      summary.model,
+      summary.tool,
+      summary.tokens,
+      summary.requests,
+      summary.cost && summary.cost > 0 ? summary.cost : null,
+      book
+    )
     pricing.needsReindex = true
     pricing.medianPerRequest = null
-    const maxContext = Number((db.prepare(`select max(ctx) as max from model_ctx where ${where}`).get(...args) as {max: number | null}).max ?? 0)
-    if (JSON.stringify(ratesFor(summary.model, book, 0)) !== JSON.stringify(ratesFor(summary.model, book, maxContext))) {
-      pricing.converted = null; pricing.parts = null
-      if (pricing.source !== 'recorded') { pricing.total = null; pricing.perRequest = null; pricing.source = 'unpriced' }
+    const maxContext = Number(
+      (
+        db.prepare(`select max(ctx) as max from model_ctx where ${where}`).get(...args) as {
+          max: number | null
+        }
+      ).max ?? 0
+    )
+    if (
+      JSON.stringify(ratesFor(summary.model, book, 0)) !==
+      JSON.stringify(ratesFor(summary.model, book, maxContext))
+    ) {
+      pricing.converted = null
+      pricing.parts = null
+      if (pricing.source !== 'recorded') {
+        pricing.total = null
+        pricing.perRequest = null
+        pricing.source = 'unpriced'
+      }
     }
     return { pricing, daily: [], distribution: null }
   }
-  const measuredRows = rows.filter((r) => r.input + r.output + r.cacheRead + r.cacheWrite + r.reasoning > 0 || r.recorded !== null)
-  const costs = measuredRows.map((r) => ({ row: r, cost: convertedCost(summary.model, summary.tool, r, 1, r.recorded, book, r.context) }))
-  const sum = (list: typeof costs, field: 'total' | 'converted'): number | null => list.some((c) => c.cost[field] === null) ? null : list.reduce((a, c) => a + c.cost[field]!, 0)
-  const total = costs.length ? sum(costs, 'total') : null, converted = costs.length ? sum(costs, 'converted') : null
+  const measuredRows = rows.filter(
+    (r) => r.input + r.output + r.cacheRead + r.cacheWrite + r.reasoning > 0 || r.recorded !== null
+  )
+  const costs = measuredRows.map((r) => ({
+    row: r,
+    cost: convertedCost(summary.model, summary.tool, r, 1, r.recorded, book, r.context)
+  }))
+  const sum = (list: typeof costs, field: 'total' | 'converted'): number | null =>
+    list.some((c) => c.cost[field] === null) ? null : list.reduce((a, c) => a + c.cost[field]!, 0)
+  const total = costs.length ? sum(costs, 'total') : null,
+    converted = costs.length ? sum(costs, 'converted') : null
   const recorded = summary.tool === 'opencode' && rows.every((r) => r.recorded !== null)
-  const parts = converted === null ? null : costs.reduce((a, c) => ({ input: a.input + c.cost.parts!.input, output: a.output + c.cost.parts!.output, cacheRead: a.cacheRead + c.cost.parts!.cacheRead, cacheWrite: a.cacheWrite + c.cost.parts!.cacheWrite }), { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
+  const parts =
+    converted === null
+      ? null
+      : costs.reduce(
+          (a, c) => ({
+            input: a.input + c.cost.parts!.input,
+            output: a.output + c.cost.parts!.output,
+            cacheRead: a.cacheRead + c.cost.parts!.cacheRead,
+            cacheWrite: a.cacheWrite + c.cost.parts!.cacheWrite
+          }),
+          { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+        )
   const days = [...new Set(measuredRows.map((r) => r.day))].sort()
-  const daily = days.map((day) => { const list = costs.filter((c) => c.row.day === day); return { day, cost: list.length ? sum(list, 'total') : null, converted: list.length ? sum(list, 'converted') : null } })
-  const completed = new Set((db.prepare(`select sid, at from model_request where ${where}`).all(...args) as { sid: number; at: string }[]).map((r) => `${r.sid}|${r.at}`))
+  const daily = days.map((day) => {
+    const list = costs.filter((c) => c.row.day === day)
+    return {
+      day,
+      cost: list.length ? sum(list, 'total') : null,
+      converted: list.length ? sum(list, 'converted') : null
+    }
+  })
+  const completed = new Set(
+    (
+      db.prepare(`select sid, at from model_request where ${where}`).all(...args) as {
+        sid: number
+        at: string
+      }[]
+    ).map((r) => `${r.sid}|${r.at}`)
+  )
   const groups = new Map<string, typeof costs>()
   for (const c of costs) {
     const key = `${c.row.sid}|${c.row.requestAt}`
     if (!c.row.requestAt || !completed.has(key)) continue
-    const list = groups.get(key) ?? []; list.push(c); groups.set(key, list)
+    const list = groups.get(key) ?? []
+    list.push(c)
+    groups.set(key, list)
   }
-  const samples = [...groups.values()].map((g) => sum(g, 'total')).filter((c): c is number => c !== null)
+  const samples = [...groups.values()]
+    .map((g) => sum(g, 'total'))
+    .filter((c): c is number => c !== null)
   const distribution = samples.length >= MIN_REQUESTS ? dist(samples) : null
-  return { pricing: { total, converted, perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests, medianPerRequest: distribution?.median ?? null, source: total === null ? 'unpriced' : recorded ? 'recorded' : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null) ? 'mixed' : 'converted', priceSource: costs[0]?.cost.priceSource ?? book.source, date: costs[0]?.cost.date ?? book.date, parts }, daily, distribution }
+  return {
+    pricing: {
+      total,
+      converted,
+      perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests,
+      medianPerRequest: distribution?.median ?? null,
+      source:
+        total === null
+          ? 'unpriced'
+          : recorded
+            ? 'recorded'
+            : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null)
+              ? 'mixed'
+              : 'converted',
+      priceSource: costs[0]?.cost.priceSource ?? book.source,
+      date: costs[0]?.cost.date ?? book.date,
+      parts
+    },
+    daily,
+    distribution
+  }
 }
 
 /** Every model used in the range. null when the index has no model stats yet (the caller should start an index run) */
@@ -599,10 +880,14 @@ export function modelList(home: string, o: ModelRange = {}): ModelSummary[] | nu
   try {
     const r = rangeOf(o)
     const w = dayWhere(r)
-    const rows = db.prepare(`${SUM_SELECT} where 1 = 1${w.sql} group by tool, model, effort`).all(...w.args) as unknown as SumRow[]
+    const rows = db
+      .prepare(`${SUM_SELECT} where 1 = 1${w.sql} group by tool, model, effort`)
+      .all(...w.args) as unknown as SumRow[]
     const reqs = new Map<string, RequestRow[]>()
     for (const q of db
-      .prepare(`select sid, tool, model, effort, dur_sec as dur, turns, tools, subagents, out_tokens as out from model_request where 1 = 1${w.sql}`)
+      .prepare(
+        `select sid, tool, model, effort, dur_sec as dur, turns, tools, subagents, out_tokens as out from model_request where 1 = 1${w.sql}`
+      )
       .all(...w.args) as unknown as (RequestRow & ModelKey)[]) {
       const k = keyStr(q)
       const list = reqs.get(k)
@@ -610,7 +895,9 @@ export function modelList(home: string, o: ModelRange = {}): ModelSummary[] | nu
       else reqs.set(k, [q])
     }
     const ctx = new Map<string, number[]>()
-    for (const c of db.prepare(`select tool, model, effort, ctx from model_ctx where 1 = 1${w.sql}`).all(...w.args) as unknown as (ModelKey & { ctx: number })[]) {
+    for (const c of db
+      .prepare(`select tool, model, effort, ctx from model_ctx where 1 = 1${w.sql}`)
+      .all(...w.args) as unknown as (ModelKey & { ctx: number })[]) {
       const k = keyStr(c)
       const list = ctx.get(k)
       if (list) list.push(Number(c.ctx))
@@ -648,15 +935,44 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
     const k = [key.tool, key.model, key.effort]
     const where = `tool = ? and model = ? and effort = ?${w.sql}`
     const args = [...k, ...w.args]
-    const sum = db.prepare(`${SUM_SELECT} where ${where} group by tool, model, effort`).get(...args) as unknown as SumRow | undefined
+    const sum = db
+      .prepare(`${SUM_SELECT} where ${where} group by tool, model, effort`)
+      .get(...args) as unknown as SumRow | undefined
     const requests = db
-      .prepare(`select sid, dur_sec as dur, turns, tools, subagents, out_tokens as out from model_request where ${where}`)
+      .prepare(
+        `select sid, dur_sec as dur, turns, tools, subagents, out_tokens as out from model_request where ${where}`
+      )
       .all(...args) as unknown as RequestRow[]
-    const ctx = (db.prepare(`select ctx from model_ctx where ${where}`).all(...args) as { ctx: number }[]).map((c) => Number(c.ctx))
+    const ctx = (
+      db.prepare(`select ctx from model_ctx where ${where}`).all(...args) as { ctx: number }[]
+    ).map((c) => Number(c.ctx))
     const summary: ModelSummary = sum
       ? summaryOf(sum, requests, ctx)
       : summaryOf(
-          { tool: key.tool, model: key.model, effort: key.effort, first: '', last: '', active: 0, sessions: 0, subSessions: 0, turns: 0, toolCalls: 0, mistake: 0, command: 0, policy: 0, userReject: 0, other: 0, interrupts: 0, input: 0, cacheRead: 0, cacheWrite: 0, output: 0, reasoning: 0, cost: 0 },
+          {
+            tool: key.tool,
+            model: key.model,
+            effort: key.effort,
+            first: '',
+            last: '',
+            active: 0,
+            sessions: 0,
+            subSessions: 0,
+            turns: 0,
+            toolCalls: 0,
+            mistake: 0,
+            command: 0,
+            policy: 0,
+            userReject: 0,
+            other: 0,
+            interrupts: 0,
+            input: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            output: 0,
+            reasoning: 0,
+            cost: 0
+          },
           [],
           []
         )
@@ -669,10 +985,16 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
           `select day, sum(turns) as turns, sum(t_output) as output, sum(t_input + t_cache_read + t_cache_write) as context from model_day where ${where} group by day order by day`
         )
         .all(...args) as { day: string; turns: number; output: number; context: number }[]
-    ).map((d) => ({ day: d.day, turns: Number(d.turns), output: Number(d.output), context: Number(d.context) }))
+    ).map((d) => ({
+      day: d.day,
+      turns: Number(d.turns),
+      output: Number(d.output),
+      context: Number(d.context)
+    }))
 
     const enough = requests.length >= MIN_REQUESTS
-    const reqDist = (f: (q: RequestRow) => number): Dist | null => (enough ? dist(requests.map(f)) : null)
+    const reqDist = (f: (q: RequestRow) => number): Dist | null =>
+      enough ? dist(requests.map(f)) : null
 
     // Sessions: Claude subagent rows already sit under the parent sid; Codex/OpenCode child sessions roll up to their parent
     const meta = new Map<number, SessionMeta>()
@@ -687,27 +1009,65 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
     const refOf = (sid: number): SessionRef | undefined => {
       const m = meta.get(sid)
       if (!m) {
-        const row = db.prepare('select tool, id, title, project from sessions where sid = ?').get(sid) as unknown as SessionMeta | undefined
-        return row ? { tool: row.tool, id: row.id, title: row.title ?? '', project: row.project ?? undefined } : undefined
+        const row = db
+          .prepare('select tool, id, title, project from sessions where sid = ?')
+          .get(sid) as unknown as SessionMeta | undefined
+        return row
+          ? {
+              tool: row.tool,
+              id: row.id,
+              title: row.title ?? '',
+              project: row.project ?? undefined
+            }
+          : undefined
       }
       return { tool: m.tool, id: m.id, title: m.title ?? '', project: m.project ?? undefined }
     }
     const maxOf = (f: (q: RequestRow) => number): SessionRef | undefined => {
       if (!enough) return undefined
-      const top = requests.reduce<RequestRow | undefined>((a, q) => (!a || f(q) > f(a) ? q : a), undefined)
+      const top = requests.reduce<RequestRow | undefined>(
+        (a, q) => (!a || f(q) > f(a) ? q : a),
+        undefined
+      )
       return top ? refOf(top.sid) : undefined
     }
 
-    const bySession = new Map<number, { first: string; last: string; turns: number; toolCalls: number; mistakes: number; output: number }>()
+    const bySession = new Map<
+      number,
+      {
+        first: string
+        last: string
+        turns: number
+        toolCalls: number
+        mistakes: number
+        output: number
+      }
+    >()
     for (const d of db
       .prepare(
         `select sid, min(day) as first, max(day) as last, sum(turns) as turns, sum(tool_calls) as toolCalls, sum(err_mistake) as mistakes, sum(t_output) as output
          from model_day where ${where} group by sid`
       )
-      .all(...args) as unknown as { sid: number; first: string; last: string; turns: number; toolCalls: number; mistakes: number; output: number }[]) {
+      .all(...args) as unknown as {
+      sid: number
+      first: string
+      last: string
+      turns: number
+      toolCalls: number
+      mistakes: number
+      output: number
+    }[]) {
       const root = rootOf(Number(d.sid))
       const cur = bySession.get(root)
-      if (!cur) bySession.set(root, { first: d.first, last: d.last, turns: Number(d.turns), toolCalls: Number(d.toolCalls), mistakes: Number(d.mistakes), output: Number(d.output) })
+      if (!cur)
+        bySession.set(root, {
+          first: d.first,
+          last: d.last,
+          turns: Number(d.turns),
+          toolCalls: Number(d.toolCalls),
+          mistakes: Number(d.mistakes),
+          output: Number(d.output)
+        })
       else {
         cur.first = d.first < cur.first ? d.first : cur.first
         cur.last = d.last > cur.last ? d.last : cur.last
@@ -727,10 +1087,14 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
       .slice(0, 50)
 
     const toolRows = db
-      .prepare(`select kind, name, sum(calls) as calls, sum(errors) as errors from model_tool where ${where} group by kind, name order by calls desc`)
+      .prepare(
+        `select kind, name, sum(calls) as calls, sum(errors) as errors from model_tool where ${where} group by kind, name order by calls desc`
+      )
       .all(...args) as { kind: string; name: string; calls: number; errors: number }[]
     const pick = (kind: string): { name: string; calls: number; errors: number }[] =>
-      toolRows.filter((t) => t.kind === kind).map((t) => ({ name: t.name, calls: Number(t.calls), errors: Number(t.errors) }))
+      toolRows
+        .filter((t) => t.kind === kind)
+        .map((t) => ({ name: t.name, calls: Number(t.calls), errors: Number(t.errors) }))
 
     const dw = dayWhere(r, 'd.day')
     const projects = (
@@ -751,8 +1115,18 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
                 `select day, max(used_percent) as usedPercent, window_minutes as windowMinutes, max(plan) as plan from model_limit where 1 = 1${lw.sql}
                  group by day, window_minutes order by day`
               )
-              .all(...lw.args) as { day: string; usedPercent: number; windowMinutes: number | null; plan: string | null }[]
-          ).map((l) => ({ day: l.day, usedPercent: Number(l.usedPercent), windowMinutes: l.windowMinutes === null ? null : Number(l.windowMinutes), plan: l.plan }))
+              .all(...lw.args) as {
+              day: string
+              usedPercent: number
+              windowMinutes: number | null
+              plan: string | null
+            }[]
+          ).map((l) => ({
+            day: l.day,
+            usedPercent: Number(l.usedPercent),
+            windowMinutes: l.windowMinutes === null ? null : Number(l.windowMinutes),
+            plan: l.plan
+          }))
         : []
 
     return {
@@ -767,10 +1141,18 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
         outputPerRequest: reqDist((q) => q.out),
         contextPerTurn: dist(ctx)
       },
-      maxSessions: { responseSec: maxOf((q) => q.dur), toolsPerRequest: maxOf((q) => q.tools), outputPerRequest: maxOf((q) => q.out) },
+      maxSessions: {
+        responseSec: maxOf((q) => q.dur),
+        toolsPerRequest: maxOf((q) => q.tools),
+        outputPerRequest: maxOf((q) => q.out)
+      },
       tools: pick('tool').slice(0, 30),
-      skills: pick('skill').slice(0, 30).map(({ name, calls }) => ({ name, calls })),
-      mcp: pick('mcp').slice(0, 30).map(({ name, calls }) => ({ name, calls })),
+      skills: pick('skill')
+        .slice(0, 30)
+        .map(({ name, calls }) => ({ name, calls })),
+      mcp: pick('mcp')
+        .slice(0, 30)
+        .map(({ name, calls }) => ({ name, calls })),
       projects: projects.slice(0, 20),
       sessions,
       limits
@@ -781,7 +1163,12 @@ export function modelDetail(home: string, key: ModelKey, o: ModelRange = {}): Mo
 }
 
 /** Models used in one session (its subagents included), by share of turns. null when there is nothing to read yet */
-export function sessionModels(home: string, tool: string, id: string, o: { dbPath?: string } = {}): { tool: string; model: string; effort: string; turns: number; share: number }[] | null {
+export function sessionModels(
+  home: string,
+  tool: string,
+  id: string,
+  o: { dbPath?: string } = {}
+): { tool: string; model: string; effort: string; turns: number; share: number }[] | null {
   const db = open(o, home)
   if (!db) return null
   try {
@@ -792,7 +1179,13 @@ export function sessionModels(home: string, tool: string, id: string, o: { dbPat
       )
       .all(tool, id, tool, id) as { tool: string; model: string; effort: string; turns: number }[]
     const total = rows.reduce((a, r) => a + Number(r.turns), 0)
-    return rows.map((r) => ({ tool: r.tool, model: r.model, effort: r.effort, turns: Number(r.turns), share: total ? Number(r.turns) / total : 0 }))
+    return rows.map((r) => ({
+      tool: r.tool,
+      model: r.model,
+      effort: r.effort,
+      turns: Number(r.turns),
+      share: total ? Number(r.turns) / total : 0
+    }))
   } finally {
     db.close()
   }

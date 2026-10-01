@@ -6,7 +6,15 @@
  * - The import source is also copied into .agents inside the fixture (to check the legacy import source).
  * - Cleanup removes the copies first (fixtureHome.cleanupFixtures only accepts a .agents symlink).
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { join } from 'node:path'
 import { TARGETS } from '../../src/engine/targets'
 import { initLibrary, importAllFromLegacy } from '../../src/engine'
@@ -16,7 +24,13 @@ export const FIXTURE_LIBRARY = '.illithid'
 const copies: { dir: string; prefix: string }[] = []
 
 /** Parts to copy from a legacy-layout library (also used by m7-fixture) */
-export const LEGACY_PARTS = ['rules', 'memory/MEMORY.md', 'sync/allowlist.json', 'sync/mcp.json', 'skills'] as const
+export const LEGACY_PARTS = [
+  'rules',
+  'memory/MEMORY.md',
+  'sync/allowlist.json',
+  'sync/mcp.json',
+  'skills'
+] as const
 
 /** Makes a copy of the import source (legacySource) legacy library at `to` (symlinks as content, .git excluded) */
 export function copyLegacyLibrary(to: string): void {
@@ -32,12 +46,13 @@ export function copyLegacyLibrary(to: string): void {
   }
 }
 
-
 /** Fixture legacy copy (~/.agents) → create and import a new library via the engine (engine conventions such as mcps/_order.json as-is) */
 export function buildLibraryFromLegacy(F: string): { imported: number; errors: string[] } {
   initLibrary(F)
   const all = importAllFromLegacy(F)
-  const errors = all.results.filter((r) => r.status !== 'imported').map((r) => `${r.kind}:${r.name} ${r.status}${r.reason ? ` (${r.reason})` : ''}`)
+  const errors = all.results
+    .filter((r) => r.status !== 'imported')
+    .map((r) => `${r.kind}:${r.name} ${r.status}${r.reason ? ` (${r.reason})` : ''}`)
   return { imported: all.results.length - errors.length, errors }
 }
 
@@ -64,9 +79,11 @@ export function makeCopyFixture(prefix: string, withLibrary = true): string {
 export function fakeEnv(F: string): Record<string, string> {
   const env: Record<string, string> = {}
   const scan = (text: string): void => {
-    for (const m of text.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)) env[m[1]] = `fixture-value-${m[1].toLowerCase()}`
+    for (const m of text.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g))
+      env[m[1]] = `fixture-value-${m[1].toLowerCase()}`
   }
-  for (const p of [join(F, '.agents/sync/mcp.json')]) if (existsSync(p)) scan(readFileSync(p, 'utf8'))
+  for (const p of [join(F, '.agents/sync/mcp.json')])
+    if (existsSync(p)) scan(readFileSync(p, 'utf8'))
   return env
 }
 
@@ -74,7 +91,10 @@ export function fakeEnv(F: string): Record<string, string> {
 export function seedToolOnlySkill(F: string, tool: 'claude' | 'codex', name: string): void {
   const dir = join(F, tool === 'claude' ? '.claude/skills' : '.codex/skills', name)
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: fixture-only skill for import test\n---\n\n# ${name}\n`)
+  writeFileSync(
+    join(dir, 'SKILL.md'),
+    `---\nname: ${name}\ndescription: fixture-only skill for import test\n---\n\n# ${name}\n`
+  )
 }
 
 /** Cleans up copies. Call before fixtureHome.cleanupFixtures */

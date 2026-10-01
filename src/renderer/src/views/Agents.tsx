@@ -38,7 +38,13 @@ import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
 import { useToolsInUse } from '../lib/config'
-import { grokReadsFromClaude, pillFromCellState, type PillMap, TOOL_NAME, TOOLS } from '../lib/tools'
+import {
+  grokReadsFromClaude,
+  pillFromCellState,
+  type PillMap,
+  TOOL_NAME,
+  TOOLS
+} from '../lib/tools'
 import { lastSyncFailedText, problemText } from '../lib/problemReason'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
@@ -89,14 +95,23 @@ function Agents(): React.JSX.Element {
             return [
               tool,
               // Grok has no switch for Claude agents: they reach Grok whatever config.grokReadsClaude says
-              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
+              tool === 'grok' &&
+              grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false)
                 ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
           const failure = failedIn('agent', name, tool)
-          if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
+          if (failure)
+            return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
-          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true, ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {}) }]
+          return [
+            tool,
+            {
+              ...pillFromCellState(st ?? 'synced'),
+              on: true,
+              ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {})
+            }
+          ]
         })
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
@@ -113,7 +128,9 @@ function Agents(): React.JSX.Element {
   const current = rows.find((r) => r.name === selected) ?? (prev && { ...prev, name: renamed!.to })
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
-    await pending.run(name, tool, () => runWrite(window.api.toggle('agents', name, tool, on), { success: t('toggles.saved') }))
+    await pending.run(name, tool, () =>
+      runWrite(window.api.toggle('agents', name, tool, on), { success: t('toggles.saved') })
+    )
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
@@ -200,7 +217,9 @@ function Agents(): React.JSX.Element {
               key={r.name}
               name={r.name}
               description={r.description}
-              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
+              switchChecked={
+                cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))
+              }
               switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
               footerRight={
@@ -244,14 +263,23 @@ function Agents(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         description={current?.description || undefined}
-        meta={current && <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}.md`}</MetaItem>}
+        meta={
+          current && (
+            <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}.md`}</MetaItem>
+          )
+        }
         copyPath={current ? `${data.dir}/${current.name}.md` : undefined}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="agent-delete"
       >
         {current && (
           <Stack gap="lg">
-            <ToolToggleRow pills={current.pills} onToggle={pillToggle(current)} busy={pending.of(current.name)} testId="agent-detail-tools" />
+            <ToolToggleRow
+              pills={current.pills}
+              onToggle={pillToggle(current)}
+              busy={pending.of(current.name)}
+              testId="agent-detail-tools"
+            />
             <AgentEditor
               key={current.name}
               name={current.name}
@@ -378,19 +406,19 @@ function ToolCard({
           data-testid={`agent-model-${tool}`}
         />
         {(MODEL_CATALOG[tool].efforts.length > 0 || value.effort) && (
-        <Select
-          label={t('agents.effort')}
-          data={efforts}
-          value={value.effort ?? DEFAULT}
-          onChange={(v) =>
-            onChange({
-              ...(value.model ? { model: value.model } : {}),
-              ...(v && v !== DEFAULT ? { effort: v } : {})
-            })
-          }
-          allowDeselect={false}
-          data-testid={`agent-effort-${tool}`}
-        />
+          <Select
+            label={t('agents.effort')}
+            data={efforts}
+            value={value.effort ?? DEFAULT}
+            onChange={(v) =>
+              onChange({
+                ...(value.model ? { model: value.model } : {}),
+                ...(v && v !== DEFAULT ? { effort: v } : {})
+              })
+            }
+            allowDeselect={false}
+            data-testid={`agent-effort-${tool}`}
+          />
         )}
       </Stack>
     </Box>
@@ -456,7 +484,11 @@ function AgentEditor({
 
   if (err) return <ErrorAlert message={err} />
   if (!doc) return <Loading />
-  const cols = { base: 1, md: Math.max(1, shown.length <= 3 ? shown.length : 2), xl: Math.max(1, shown.length) }
+  const cols = {
+    base: 1,
+    md: Math.max(1, shown.length <= 3 ? shown.length : 2),
+    xl: Math.max(1, shown.length)
+  }
   return (
     <Tabs defaultValue="preview" keepMounted={false}>
       <Tabs.List mb="md">
@@ -481,76 +513,82 @@ function AgentEditor({
         </Stack>
       </Tabs.Panel>
       <Tabs.Panel value="edit">
-          <Stack gap="md">
-            <Group gap="xs" align="flex-end">
-              <TextInput
-                label={t('common.name')}
-                value={nameDraft}
-                onChange={(e) => {
-                  setNameDraft(e.currentTarget.value)
-                  setRenameErr(null)
-                }}
-                w={320}
-                error={renameErr ?? undefined}
-                data-testid="agent-name"
-              />
-              <Button
-                variant="default"
-                disabled={!trimmed || trimmed === name}
-                loading={renaming}
-                onClick={() => void rename()}
-                mb={renameErr ? 22 : 0}
-                data-testid="agent-rename"
-              >
-                {t('skills.rename')}
-              </Button>
-            </Group>
-
-            <Box className="ac-card" p="md">
-              <Text size="sm" fw={600} mb="xs">
-                {t('agents.description')}
-              </Text>
-              <Textarea
-                value={desc}
-                onChange={(e) => setDesc(e.currentTarget.value)}
-                autosize
-                minRows={2}
-                maxRows={12}
-                error={!desc.trim()}
-                data-testid="agent-desc"
-              />
-            </Box>
-
-            <SimpleGrid cols={cols} spacing="md">
-              {shown.map((tool) => (
-                <ToolCard
-                  key={tool}
-                  tool={tool}
-                  value={tools[tool] ?? {}}
-                  onChange={(v) => setTools((m) => ({ ...m, [tool]: v }))}
-                />
-              ))}
-            </SimpleGrid>
-
-            <MarkdownEditor
-              key={name}
-              title={t('agents.instructions')}
-              value={doc.body}
-              extraDirty={desc !== doc.description || !sameTools(tools, doc.tools)}
-              onRevert={() => {
-                setDesc(doc.description)
-                setTools(doc.tools)
+        <Stack gap="md">
+          <Group gap="xs" align="flex-end">
+            <TextInput
+              label={t('common.name')}
+              value={nameDraft}
+              onChange={(e) => {
+                setNameDraft(e.currentTarget.value)
+                setRenameErr(null)
               }}
-              onSave={save}
+              w={320}
+              error={renameErr ?? undefined}
+              data-testid="agent-name"
             />
-          </Stack>
+            <Button
+              variant="default"
+              disabled={!trimmed || trimmed === name}
+              loading={renaming}
+              onClick={() => void rename()}
+              mb={renameErr ? 22 : 0}
+              data-testid="agent-rename"
+            >
+              {t('skills.rename')}
+            </Button>
+          </Group>
+
+          <Box className="ac-card" p="md">
+            <Text size="sm" fw={600} mb="xs">
+              {t('agents.description')}
+            </Text>
+            <Textarea
+              value={desc}
+              onChange={(e) => setDesc(e.currentTarget.value)}
+              autosize
+              minRows={2}
+              maxRows={12}
+              error={!desc.trim()}
+              data-testid="agent-desc"
+            />
+          </Box>
+
+          <SimpleGrid cols={cols} spacing="md">
+            {shown.map((tool) => (
+              <ToolCard
+                key={tool}
+                tool={tool}
+                value={tools[tool] ?? {}}
+                onChange={(v) => setTools((m) => ({ ...m, [tool]: v }))}
+              />
+            ))}
+          </SimpleGrid>
+
+          <MarkdownEditor
+            key={name}
+            title={t('agents.instructions')}
+            value={doc.body}
+            extraDirty={desc !== doc.description || !sameTools(tools, doc.tools)}
+            onRevert={() => {
+              setDesc(doc.description)
+              setTools(doc.tools)
+            }}
+            onSave={save}
+          />
+        </Stack>
       </Tabs.Panel>
     </Tabs>
   )
 }
 
 /** Read-only model and effort of one tool (Preview tab) */
-function ToolSummary({ tool, value }: { tool: ToolId; value: { model?: string; effort?: string } }): React.JSX.Element {
+function ToolSummary({
+  tool,
+  value
+}: {
+  tool: ToolId
+  value: { model?: string; effort?: string }
+}): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <Box className="ac-card" p="md" data-testid={`agent-summary-${tool}`}>
@@ -561,7 +599,9 @@ function ToolSummary({ tool, value }: { tool: ToolId; value: { model?: string; e
       <Fields
         rows={[
           [t('agents.model'), value.model ?? t('agents.default')],
-          ...(MODEL_CATALOG[tool].efforts.length > 0 || value.effort ? [[t('agents.effort'), value.effort ?? t('agents.default')] as [string, string]] : [])
+          ...(MODEL_CATALOG[tool].efforts.length > 0 || value.effort
+            ? [[t('agents.effort'), value.effort ?? t('agents.default')] as [string, string]]
+            : [])
         ]}
       />
     </Box>

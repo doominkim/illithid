@@ -15,7 +15,16 @@
  * Usage: npx electron-vite build && npx tsx scripts/readme-demo.ts
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -44,15 +53,30 @@ async function addCursor(page: Page): Promise<void> {
     const dot = document.createElement('div')
     dot.id = 'demo-cursor'
     Object.assign(dot.style, {
-      position: 'fixed', left: '0px', top: '0px', width: '18px', height: '18px', marginLeft: '-9px', marginTop: '-9px',
-      borderRadius: '50%', background: 'rgba(30, 30, 30, 0.35)', border: '2px solid rgba(255, 255, 255, 0.9)',
-      boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.25)', pointerEvents: 'none', zIndex: '2147483647', transition: 'transform 120ms'
+      position: 'fixed',
+      left: '0px',
+      top: '0px',
+      width: '18px',
+      height: '18px',
+      marginLeft: '-9px',
+      marginTop: '-9px',
+      borderRadius: '50%',
+      background: 'rgba(30, 30, 30, 0.35)',
+      border: '2px solid rgba(255, 255, 255, 0.9)',
+      boxShadow: '0 0 0 1px rgba(0, 0, 0, 0.25)',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+      transition: 'transform 120ms'
     })
     document.body.appendChild(dot)
-    document.addEventListener('mousemove', (e) => {
-      dot.style.left = `${e.clientX}px`
-      dot.style.top = `${e.clientY}px`
-    }, true)
+    document.addEventListener(
+      'mousemove',
+      (e) => {
+        dot.style.left = `${e.clientX}px`
+        dot.style.top = `${e.clientY}px`
+      },
+      true
+    )
     document.addEventListener('mousedown', () => (dot.style.transform = 'scale(0.7)'), true)
     document.addEventListener('mouseup', () => (dot.style.transform = 'scale(1)'), true)
   })
@@ -74,11 +98,15 @@ async function clickSlow(page: Page, target: Locator, after = 900): Promise<void
 }
 
 async function waitLoaded(page: Page): Promise<void> {
-  await page.waitForFunction(() => !document.body.innerText.includes('Loading'), undefined, { timeout: 60_000 })
+  await page.waitForFunction(() => !document.body.innerText.includes('Loading'), undefined, {
+    timeout: 60_000
+  })
 }
 
 async function waitState(page: Page, state: 'pending' | 'synced'): Promise<void> {
-  await page.waitForSelector(`[data-testid="sync-button"][data-state="${state}"]`, { timeout: 15_000 })
+  await page.waitForSelector(`[data-testid="sync-button"][data-state="${state}"]`, {
+    timeout: 15_000
+  })
 }
 
 /** Wheel-scroll (under the current pointer) until the target is fully on screen, so long dialogs scroll visibly */
@@ -93,19 +121,29 @@ async function reveal(page: Page, target: Locator): Promise<void> {
 }
 
 /** Sidebar Sync → apply preview (pause on the per-tool list) → Apply */
-async function applyViaPreview(page: Page, tools: string[], hold: number, focus?: string): Promise<void> {
+async function applyViaPreview(
+  page: Page,
+  tools: string[],
+  hold: number,
+  focus?: string
+): Promise<void> {
   await waitState(page, 'pending')
   await clickSlow(page, page.locator('[data-testid="sync-button"]'), 300)
   await page.waitForSelector('[data-testid="apply-preview"]')
   for (const tool of tools) await page.waitForSelector(`[data-testid="apply-preview-${tool}"]`)
-  const target = focus ? `[data-testid="apply-preview"] [data-testid="${focus}"]` : `[data-testid="apply-preview-${tools[tools.length - 1]}"]`
+  const target = focus
+    ? `[data-testid="apply-preview"] [data-testid="${focus}"]`
+    : `[data-testid="apply-preview-${tools[tools.length - 1]}"]`
   await moveTo(page, page.locator(target).first())
   await page.waitForTimeout(hold)
   const apply = page.locator('[data-testid="apply-preview-apply"]')
   await reveal(page, apply)
   await clickSlow(page, apply, 300)
   await waitState(page, 'synced')
-  await page.locator('[data-testid="apply-preview"]').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+  await page
+    .locator('[data-testid="apply-preview"]')
+    .waitFor({ state: 'detached', timeout: 10_000 })
+    .catch(() => {})
 }
 
 /** Tool-side files the demo touches; must stay byte-identical until Apply */
@@ -120,7 +158,8 @@ function toolFiles(home: string): Record<string, string> {
   }
 }
 
-const same = (a: Record<string, string>, b: Record<string, string>): boolean => Object.keys(a).every((k) => a[k] === b[k])
+const same = (a: Record<string, string>, b: Record<string, string>): boolean =>
+  Object.keys(a).every((k) => a[k] === b[k])
 
 /** Skill copy in the tool's skills dir and the MCP server entry in the tool's config */
 function offTargets(home: string): { skill: boolean; mcp: boolean } {
@@ -133,16 +172,30 @@ function offTargets(home: string): { skill: boolean; mcp: boolean } {
     skill = false
   }
   const mcpConfig = join(home, '.copilot/mcp-config.json')
-  const mcp = existsSync(mcpConfig) && MCP in ((JSON.parse(readFileSync(mcpConfig, 'utf8')) as { mcpServers?: Record<string, unknown> }).mcpServers ?? {})
+  const mcp =
+    existsSync(mcpConfig) &&
+    MCP in
+      ((JSON.parse(readFileSync(mcpConfig, 'utf8')) as { mcpServers?: Record<string, unknown> })
+        .mcpServers ?? {})
   return { skill, mcp }
 }
 
 /** Click one tool icon on a card → Sync → preview for that tool → Apply */
-async function toggleOff(page: Page, card: string, tool: string, hold: number, focus = 'apply-preview-action-remove'): Promise<void> {
+async function toggleOff(
+  page: Page,
+  card: string,
+  tool: string,
+  hold: number,
+  focus = 'apply-preview-action-remove'
+): Promise<void> {
   // Rest on the Remove row under the tool (skill copy / MCP server entry)
   const pill = page.locator(`main [data-card="${card}"] [data-tool="${tool}"]`)
   await clickSlow(page, pill, 300)
-  await page.waitForFunction((sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false, `main [data-card="${card}"] [data-tool="${tool}"]`, { timeout: 10_000 })
+  await page.waitForFunction(
+    (sel) => document.querySelector(sel)?.hasAttribute('data-off') ?? false,
+    `main [data-card="${card}"] [data-tool="${tool}"]`,
+    { timeout: 10_000 }
+  )
   await applyViaPreview(page, [tool], hold, focus)
 }
 
@@ -166,28 +219,28 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
 
   // 1. Rules: one edit → Sync → preview for all five tools → Apply
   await scene(page, 'rules', async () => {
-  const card = main.locator(`[data-card="${RULE}"]`)
-  await moveTo(page, card.locator('[data-tool="copilot"]'))
-  await page.waitForTimeout(500)
-  await clickSlow(page, card, 800)
-  await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 500)
-  const area = page.locator('.mantine-Drawer-content textarea').first()
-  await moveTo(page, area)
-  await area.click()
-  await area.evaluate((el: HTMLTextAreaElement, anchor) => {
-    const at = el.value.indexOf(anchor) + anchor.length
-    el.setSelectionRange(at, at)
-  }, ANCHOR)
-  await page.keyboard.type(ADDED, { delay: 45 })
-  await page.waitForTimeout(400)
-  before = toolFiles(home)
-  await clickSlow(page, page.locator('[data-testid="editor-save"]'), 300)
-  await waitState(page, 'pending')
-  await page.waitForTimeout(800)
-  afterSave = toolFiles(home)
-  await applyViaPreview(page, ['claude', 'codex', 'opencode', 'gemini', 'copilot'], 1500)
-  await page.waitForTimeout(700)
-  await page.keyboard.press('Escape')
+    const card = main.locator(`[data-card="${RULE}"]`)
+    await moveTo(page, card.locator('[data-tool="copilot"]'))
+    await page.waitForTimeout(500)
+    await clickSlow(page, card, 800)
+    await clickSlow(page, page.locator('[data-testid="tab-edit"]'), 500)
+    const area = page.locator('.mantine-Drawer-content textarea').first()
+    await moveTo(page, area)
+    await area.click()
+    await area.evaluate((el: HTMLTextAreaElement, anchor) => {
+      const at = el.value.indexOf(anchor) + anchor.length
+      el.setSelectionRange(at, at)
+    }, ANCHOR)
+    await page.keyboard.type(ADDED, { delay: 45 })
+    await page.waitForTimeout(400)
+    before = toolFiles(home)
+    await clickSlow(page, page.locator('[data-testid="editor-save"]'), 300)
+    await waitState(page, 'pending')
+    await page.waitForTimeout(800)
+    afterSave = toolFiles(home)
+    await applyViaPreview(page, ['claude', 'codex', 'opencode', 'gemini', 'copilot'], 1500)
+    await page.waitForTimeout(700)
+    await page.keyboard.press('Escape')
   })
 
   // 2. Skills: turn one skill off for Gemini
@@ -237,10 +290,11 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await reveal(page, chart)
     await moveTo(page, chart)
     const box = await chart.boundingBox()
-    if (box) for (const fx of [0.55, 0.75, 0.9]) {
-      await page.mouse.move(box.x + box.width * fx, box.y + box.height * 0.45, { steps: 15 })
-      await page.waitForTimeout(700)
-    }
+    if (box)
+      for (const fx of [0.55, 0.75, 0.9]) {
+        await page.mouse.move(box.x + box.width * fx, box.y + box.height * 0.45, { steps: 15 })
+        await page.waitForTimeout(700)
+      }
     await page.keyboard.press('Escape')
   })
 
@@ -252,7 +306,11 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await page.waitForTimeout(600)
     for (const i of [0, 1]) await clickSlow(page, picks.nth(i), 400)
     await clickSlow(page, main.locator('[data-testid="market-install-picked"]'), 300)
-    await page.waitForFunction(() => document.body.innerText.includes('Installed'), undefined, { timeout: 90_000 }).catch(() => {})
+    await page
+      .waitForFunction(() => document.body.innerText.includes('Installed'), undefined, {
+        timeout: 90_000
+      })
+      .catch(() => {})
     await page.waitForTimeout(1200)
     await clickSlow(page, page.locator('[data-menu="skills"]'), 600)
     await waitLoaded(page)
@@ -261,20 +319,20 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
 
   // 5. Sessions: open one and walk its requests in Contents
   await scene(page, 'sessions', async () => {
-  await clickSlow(page, page.locator('[data-menu="sessions"]'), 300)
-  await waitLoaded(page)
-  const rows = main.locator('.mantine-NavLink-root')
-  await rows.first().waitFor()
-  await moveTo(page, rows.nth(1))
-  const session = rows.filter({ hasText: 'Write the migration' }).first()
-  await clickSlow(page, (await session.count()) ? session : rows.nth(2), 400)
-  const items = main.locator('[data-testid="contents-item"]')
-  await items.first().waitFor({ timeout: 10_000 })
-  await moveTo(page, items.first())
-  await page.waitForTimeout(1500)
-  for (const i of [1, 2]) if ((await items.count()) > i) await clickSlow(page, items.nth(i), 1000)
-  await moveTo(page, main.locator('[data-testid="resume-copy"]'))
-  await page.waitForTimeout(1000)
+    await clickSlow(page, page.locator('[data-menu="sessions"]'), 300)
+    await waitLoaded(page)
+    const rows = main.locator('.mantine-NavLink-root')
+    await rows.first().waitFor()
+    await moveTo(page, rows.nth(1))
+    const session = rows.filter({ hasText: 'Write the migration' }).first()
+    await clickSlow(page, (await session.count()) ? session : rows.nth(2), 400)
+    const items = main.locator('[data-testid="contents-item"]')
+    await items.first().waitFor({ timeout: 10_000 })
+    await moveTo(page, items.first())
+    await page.waitForTimeout(1500)
+    for (const i of [1, 2]) if ((await items.count()) > i) await clickSlow(page, items.nth(i), 1000)
+    await moveTo(page, main.locator('[data-testid="resume-copy"]'))
+    await page.waitForTimeout(1000)
   })
 
   // Artifacts: reports from every tool in one list, the tool filter and a full-text search
@@ -285,12 +343,17 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await rows.first().waitFor()
     await clickSlow(page, rows.filter({ hasText: 'API latency' }).first(), 1400)
     await clickSlow(page, rows.filter({ hasText: 'Onboarding' }).first(), 1200)
-    const option = (label: string): Locator => page.getByRole('option').getByText(label, { exact: true })
+    const option = (label: string): Locator =>
+      page.getByRole('option').getByText(label, { exact: true })
     await clickSlow(page, page.getByTestId('artifact-tool-filter'), 500)
     await clickSlow(page, option('Claude Code'), 1400)
     await clickSlow(page, page.getByTestId('artifact-tool-filter'), 500)
     await clickSlow(page, option('All tools'), 800)
-    await clickSlow(page, page.getByTestId('artifact-search-mode').getByText('Content', { exact: true }), 400)
+    await clickSlow(
+      page,
+      page.getByTestId('artifact-search-mode').getByText('Content', { exact: true }),
+      400
+    )
     const search = main.getByPlaceholder(/search/i).first()
     await clickSlow(page, search, 200)
     await page.keyboard.type('checkout', { delay: 90 })
@@ -302,14 +365,16 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
   // 6. Stats: cost per request against response time by model, a tool filter and the period list, then one model's cost detail
   await scene(page, 'stats', async () => {
     await clickSlow(page, page.locator('[data-menu="stats"]'), 300)
-    const point = (model: string): Locator => page.locator(`[data-testid="stats-point"][data-model="${model}"]`).first()
+    const point = (model: string): Locator =>
+      page.locator(`[data-testid="stats-point"][data-model="${model}"]`).first()
     await point('claude-opus-5-5').waitFor({ timeout: 60_000 })
     await page.waitForTimeout(1200)
     for (const model of ['claude-haiku-4-5', 'gpt-6.1-sol', 'claude-opus-5-5']) {
       await moveTo(page, point(model))
       await page.waitForTimeout(900)
     }
-    const option = (label: string): Locator => page.getByRole('option').getByText(label, { exact: true })
+    const option = (label: string): Locator =>
+      page.getByRole('option').getByText(label, { exact: true })
     await clickSlow(page, page.getByTestId('stats-tool'), 500)
     await clickSlow(page, option('Codex'), 1800)
     await clickSlow(page, page.getByTestId('stats-tool'), 500)
@@ -344,7 +409,10 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await moveTo(page, page.locator('[data-testid="apply-preview-grok"]'))
     await page.waitForTimeout(1500)
     await clickSlow(page, page.locator('[data-testid="apply-preview-apply"]'), 300)
-    await page.locator('[data-testid="apply-preview"]').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => {})
+    await page
+      .locator('[data-testid="apply-preview"]')
+      .waitFor({ state: 'detached', timeout: 30_000 })
+      .catch(() => {})
     await page.waitForTimeout(2500)
     const codex = page.locator('[data-testid="tool-in-use-codex"]')
     await moveTo(page, codex)
@@ -380,7 +448,9 @@ function verifyOnDisk(home: string): Record<string, boolean> {
   const block = markerBlock(join(home, '.codex/AGENTS.md'))
   const gemini = markerBlock(join(home, '.gemini/GEMINI.md'))
   const copilot = readFileSync(join(home, COPILOT_RULE), 'utf8')
-  const oc = JSON.parse(readFileSync(join(home, '.config/opencode/opencode.json'), 'utf8')) as { instructions?: string[] }
+  const oc = JSON.parse(readFileSync(join(home, '.config/opencode/opencode.json'), 'utf8')) as {
+    instructions?: string[]
+  }
   const instructions = oc.instructions ?? []
   return {
     library: readFileSync(libRule, 'utf8').includes(line),
@@ -388,7 +458,8 @@ function verifyOnDisk(home: string): Record<string, boolean> {
     codex: block.includes(line),
     opencode: instructions.includes(libRule) && readFileSync(libRule, 'utf8').includes(line),
     gemini: gemini.includes(line),
-    copilot: copilot.includes(line) && /^---\n[\s\S]*?applyTo: ["']?\*\*["']?\n[\s\S]*?---\n/.test(copilot)
+    copilot:
+      copilot.includes(line) && /^---\n[\s\S]*?applyTo: ["']?\*\*["']?\n[\s\S]*?---\n/.test(copilot)
   }
 }
 
@@ -399,7 +470,10 @@ interface Frame {
 }
 
 /** PNG screencast frames at device resolution; Chrome sends one per repaint once the previous one is acked */
-async function startCapture(page: Page, dir: string): Promise<{ frames: Frame[]; stop: () => Promise<void> }> {
+async function startCapture(
+  page: Page,
+  dir: string
+): Promise<{ frames: Frame[]; stop: () => Promise<void> }> {
   const cdp = await page.context().newCDPSession(page)
   const frames: Frame[] = []
   const writes: Promise<void>[] = []
@@ -409,7 +483,12 @@ async function startCapture(page: Page, dir: string): Promise<{ frames: Frame[];
     writes.push(writeFile(file, Buffer.from(f.data, 'base64')))
     void cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {})
   })
-  await cdp.send('Page.startScreencast', { format: 'png', maxWidth: SIZE.width * 2, maxHeight: SIZE.height * 2, everyNthFrame: 1 })
+  await cdp.send('Page.startScreencast', {
+    format: 'png',
+    maxWidth: SIZE.width * 2,
+    maxHeight: SIZE.height * 2,
+    everyNthFrame: 1
+  })
   return {
     frames,
     stop: async () => {
@@ -433,14 +512,58 @@ function framesToVideo(frames: Frame[], t0: number, end: number, dir: string): s
   const list = join(dir, 'frames.ffconcat')
   writeFileSync(list, lines.join('\n') + '\n')
   const raw = join(dir, 'raw.mkv')
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-vf', 'fps=30', '-c:v', 'libx264', '-qp', '0', '-preset', 'ultrafast', '-pix_fmt', 'yuv444p', raw])
+  execFileSync(FFMPEG, [
+    '-y',
+    '-loglevel',
+    'error',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    list,
+    '-vf',
+    'fps=30',
+    '-c:v',
+    'libx264',
+    '-qp',
+    '0',
+    '-preset',
+    'ultrafast',
+    '-pix_fmt',
+    'yuv444p',
+    raw
+  ])
   return raw
 }
 
 function encode(raw: string, trim: number, duration: number): void {
   const mp4 = join(OUT_DIR, 'illithid-demo.mp4')
   const cut = ['-ss', trim.toFixed(2), '-t', duration.toFixed(2), '-i', raw]
-  execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...cut, '-vf', 'fps=30,scale=2560:-2:flags=lanczos,setpts=PTS-STARTPTS', '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-tune', 'animation', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-output_ts_offset', '0', '-an', mp4])
+  execFileSync(FFMPEG, [
+    '-y',
+    '-loglevel',
+    'error',
+    ...cut,
+    '-vf',
+    'fps=30,scale=2560:-2:flags=lanczos,setpts=PTS-STARTPTS',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'slow',
+    '-crf',
+    '22',
+    '-tune',
+    'animation',
+    '-pix_fmt',
+    'yuv420p',
+    '-movflags',
+    '+faststart',
+    '-output_ts_offset',
+    '0',
+    '-an',
+    mp4
+  ])
   // One 256-color palette GIF per scene at 1280 px (the README shows 960, so Retina screens get sharper text); drop fps until
   // each fits under 9 MB
   for (const sc of SCENES) {
@@ -457,25 +580,77 @@ function encode(raw: string, trim: number, duration: number): void {
 /** Calls in a demo session over the last 30 days so the MCP detail has a usage chart (Claude and Codex, several models) */
 function seedUsage(home: string): void {
   const sid = 'aaaaaaaa-0000-4000-8000-00000000u5a9'
-  const lines: unknown[] = [{ type: 'user', sessionId: sid, cwd: '/Users/Shared/alex/shop-web', timestamp: new Date(Date.now() - 31 * 86_400_000).toISOString(), message: { role: 'user', content: 'Check the checkout page in the browser.' } }]
+  const lines: unknown[] = [
+    {
+      type: 'user',
+      sessionId: sid,
+      cwd: '/Users/Shared/alex/shop-web',
+      timestamp: new Date(Date.now() - 31 * 86_400_000).toISOString(),
+      message: { role: 'user', content: 'Check the checkout page in the browser.' }
+    }
+  ]
   const models = ['claude-opus-5-5', 'claude-sonnet-5', 'claude-fable-5-1']
   for (let d = 0; d < 30; d++) {
     const n = [0, 1, 3, 2, 0, 4, 1, 2][d % 8] + (d > 22 ? 2 : 0)
     for (let i = 0; i < n; i++)
-      lines.push({ type: 'assistant', sessionId: sid, timestamp: new Date(Date.now() - d * 86_400_000 - i * 60_000).toISOString(), message: { role: 'assistant', model: models[(d + i) % 3], content: [{ type: 'tool_use', name: `mcp__${MCP}__browser_navigate`, input: {} }] } })
+      lines.push({
+        type: 'assistant',
+        sessionId: sid,
+        timestamp: new Date(Date.now() - d * 86_400_000 - i * 60_000).toISOString(),
+        message: {
+          role: 'assistant',
+          model: models[(d + i) % 3],
+          content: [{ type: 'tool_use', name: `mcp__${MCP}__browser_navigate`, input: {} }]
+        }
+      })
   }
-  put(home, `.claude/projects/-Users-Shared-alex-shop-web/${sid}.jsonl`, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  put(
+    home,
+    `.claude/projects/-Users-Shared-alex-shop-web/${sid}.jsonl`,
+    lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
+  )
   const xid = '01a0e700-0000-7000-8000-00000000u5a9'
-  const xl: unknown[] = [{ type: 'session_meta', timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(), payload: { id: xid, cwd: '/Users/Shared/alex/shop-web' } }, { type: 'turn_context', payload: { model: 'gpt-5.6-sol' } }, { type: 'response_item', timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(), payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Smoke-test the signup flow in the browser.' }] } }]
+  const xl: unknown[] = [
+    {
+      type: 'session_meta',
+      timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+      payload: { id: xid, cwd: '/Users/Shared/alex/shop-web' }
+    },
+    { type: 'turn_context', payload: { model: 'gpt-5.6-sol' } },
+    {
+      type: 'response_item',
+      timestamp: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+      payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'Smoke-test the signup flow in the browser.' }]
+      }
+    }
+  ]
   for (let d = 0; d < 20; d++)
-    if (d % 3 !== 1) xl.push({ type: 'response_item', timestamp: new Date(Date.now() - d * 86_400_000).toISOString(), payload: { type: 'function_call', name: 'browser_navigate', namespace: `mcp__${MCP}`, arguments: '{}' } })
-  put(home, `.codex/sessions/2026/09/08/rollout-2026-09-08T10-00-00-${xid}.jsonl`, xl.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    if (d % 3 !== 1)
+      xl.push({
+        type: 'response_item',
+        timestamp: new Date(Date.now() - d * 86_400_000).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'browser_navigate',
+          namespace: `mcp__${MCP}`,
+          arguments: '{}'
+        }
+      })
+  put(
+    home,
+    `.codex/sessions/2026/09/08/rollout-2026-09-08T10-00-00-${xid}.jsonl`,
+    xl.map((l) => JSON.stringify(l)).join('\n') + '\n'
+  )
 }
 
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true })
   const home = '/Users/Shared/alex'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-demo-userdata-'))
   const videoDir = mkdtempSync(join(tmpdir(), 'illithid-demo-frames-'))
@@ -488,8 +663,28 @@ async function main(): Promise<void> {
     // Auto apply off: saves stay in the library until Apply in the preview
     const configPath = join(home, '.config/illithid/config.json')
     const config = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>
-    writeFileSync(configPath, JSON.stringify({ ...config, allowRealApply: false, ui: { language: 'en', colorScheme: 'light', views: { rules: 'grid', skills: 'grid', mcp: 'grid', agents: 'grid' } } }, null, 2) + '\n')
-    const env = { ...baseEnv(home), ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          ...config,
+          allowRealApply: false,
+          ui: {
+            language: 'en',
+            colorScheme: 'light',
+            views: { rules: 'grid', skills: 'grid', mcp: 'grid', agents: 'grid' }
+          }
+        },
+        null,
+        2
+      ) + '\n'
+    )
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: userData,
+      ILLITHID_TEST: '1'
+    }
     const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
     const errors: string[] = []
     let raw = ''
@@ -517,8 +712,17 @@ async function main(): Promise<void> {
       const end = Date.now()
       duration = (end - start) / 1000
       await capture.stop()
-      const size = execFileSync('/usr/bin/sips', ['-g', 'pixelWidth', '-g', 'pixelHeight', capture.frames[0].file], { encoding: 'utf8' })
-      console.log(JSON.stringify({ frames: capture.frames.length, firstFrame: size.replace(/\s+/g, ' ').trim() }))
+      const size = execFileSync(
+        '/usr/bin/sips',
+        ['-g', 'pixelWidth', '-g', 'pixelHeight', capture.frames[0].file],
+        { encoding: 'utf8' }
+      )
+      console.log(
+        JSON.stringify({
+          frames: capture.frames.length,
+          firstFrame: size.replace(/\s+/g, ' ').trim()
+        })
+      )
       raw = framesToVideo(capture.frames, t0, end, videoDir)
     } finally {
       await app.close()

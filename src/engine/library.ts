@@ -86,7 +86,8 @@ function stamp(): string {
 function moveToTrash(home: string, path: string): TrashResult {
   const root = libraryRealRoot(home)
   const real = assertInsideLibrary(home, path)
-  if (!existsSync(real) && !isLink(real)) throw new LibraryError('notFound', 'target does not exist')
+  if (!existsSync(real) && !isLink(real))
+    throw new LibraryError('notFound', 'target does not exist')
   const rel = relative(root, real)
   if (!rel || rel.startsWith(TRASH_DIR + sep) || rel === TRASH_DIR)
     throw new LibraryError('outsideLibrary', 'trash and root cannot be deleted')
@@ -135,7 +136,8 @@ export function readRule(home: string, name: string): string {
 /** Replace an existing rule's content (notFound if missing — use createRule to create) */
 export function writeRule(home: string, name: string, content: string): string {
   const p = rulePath(home, name)
-  if (!existsSync(assertInsideLibrary(home, p))) throw new LibraryError('notFound', 'rule not found')
+  if (!existsSync(assertInsideLibrary(home, p)))
+    throw new LibraryError('notFound', 'rule not found')
   return writeLibFile(home, p, content)
 }
 
@@ -159,13 +161,15 @@ export function renameRule(home: string, from: string, to: string): { name: stri
   const next = typeof to === 'string' && to && !to.endsWith('.md') ? `${to}.md` : to
   const src = rulePath(home, from)
   const dst = rulePath(home, next)
-  if (next.toLowerCase() === 'memory.md') throw new LibraryError('invalidName', 'MEMORY.md is the memory index name')
+  if (next.toLowerCase() === 'memory.md')
+    throw new LibraryError('invalidName', 'MEMORY.md is the memory index name')
   if (from === next) throw new LibraryError('invalidName', 'same name')
   const realSrc = assertInsideLibrary(home, src)
   if (!existsSync(realSrc) || isLink(src) || !lstatSync(realSrc).isFile())
     throw new LibraryError('notFound', 'rule not found')
   const realDst = assertInsideLibrary(home, dst)
-  if (existsSync(realDst) || isLink(dst)) throw new LibraryError('exists', 'a rule with the same name exists')
+  if (existsSync(realDst) || isLink(dst))
+    throw new LibraryError('exists', 'a rule with the same name exists')
   const mf = readManifest(home)
   if (mf.error) throw new LibraryError('invalidSchema', `${MANIFEST_FILE}: ${mf.error}`)
   renameSync(realSrc, realDst)
@@ -295,7 +299,8 @@ export function readSkillFile(home: string, name: string, rel: string): string {
 /** Write a file inside a skill (created if missing). notFound if the skill directory is missing */
 export function writeSkillFile(home: string, name: string, rel: string, content: string): string {
   const dir = skillDir(home, name)
-  if (!existsSync(assertInsideLibrary(home, dir))) throw new LibraryError('notFound', 'skill not found')
+  if (!existsSync(assertInsideLibrary(home, dir)))
+    throw new LibraryError('notFound', 'skill not found')
   return writeLibFile(home, skillFilePath(home, name, rel), content)
 }
 
@@ -396,7 +401,12 @@ function splitDoc(text: string): SplitDoc {
 function joinDoc(d: SplitDoc, fmLines: string[] | null, body: string): string {
   if (!fmLines) return d.bom + body
   const sep = d.has ? d.sep : d.eol
-  return d.bom + ['---', ...fmLines, d.has ? d.close : '---'].join(d.eol) + d.eol + (body ? sep + body : '')
+  return (
+    d.bom +
+    ['---', ...fmLines, d.has ? d.close : '---'].join(d.eol) +
+    d.eol +
+    (body ? sep + body : '')
+  )
 }
 
 function parseFrontmatter(text: string, label = 'SKILL.md'): Record<string, unknown> {
@@ -455,7 +465,8 @@ function keyRange(lines: string[], key: string): [number, number] | null {
 /** Replace key's value in frontmatter lines if present, else insert it (after afterKey, or at the end/start) */
 function setKey(lines: string[], key: string, value: string, insertFirst = false): string[] {
   const entry = yamlValueLines(value)
-  const block = entry.length === 1 ? [`${key}: ${entry[0]}`] : [`${key}: ${entry[0]}`, ...entry.slice(1)]
+  const block =
+    entry.length === 1 ? [`${key}: ${entry[0]}`] : [`${key}: ${entry[0]}`, ...entry.slice(1)]
   const r = keyRange(lines, key)
   if (r) return [...lines.slice(0, r[0]), ...block, ...lines.slice(r[1] + 1)]
   if (insertFirst) return [...block, ...lines]
@@ -480,7 +491,12 @@ function setBlock(lines: string[], key: string, entries: Record<string, string> 
   const r = keyRange(lines, key)
   const kv = Object.entries(entries ?? {})
   const block = kv.length
-    ? [`${key}:`, ...kv.flatMap(([k, v]) => yamlValueLines(v).map((l, i) => (i === 0 ? `  ${k}: ${l}` : `  ${l}`)))]
+    ? [
+        `${key}:`,
+        ...kv.flatMap(([k, v]) =>
+          yamlValueLines(v).map((l, i) => (i === 0 ? `  ${k}: ${l}` : `  ${l}`))
+        )
+      ]
     : []
   if (r) return [...lines.slice(0, r[0]), ...block, ...lines.slice(r[1] + 1)]
   return [...lines, ...block]
@@ -497,8 +513,11 @@ function patchSkillText(text: string, patch: DocPatch, body?: string, label = 'S
     else delete want[k]
   }
   const nextBody = body ?? d.body
-  const blocksChange = Object.keys(patch.blocks ?? {}).some((k) => !isDeepStrictEqual(before[k], want[k]))
-  if (!d.has && patch.name === undefined && !patch.description && !blocksChange) return joinDoc(d, null, nextBody)
+  const blocksChange = Object.keys(patch.blocks ?? {}).some(
+    (k) => !isDeepStrictEqual(before[k], want[k])
+  )
+  if (!d.has && patch.name === undefined && !patch.description && !blocksChange)
+    return joinDoc(d, null, nextBody)
   let lines = d.fmLines
   if (patch.name !== undefined && before.name !== patch.name)
     lines = setKey(lines, 'name', patch.name, true)
@@ -561,7 +580,8 @@ export function renameSkill(home: string, from: string, to: string): { name: str
   if (!existsSync(realSrc) || isLink(src) || !lstatSync(realSrc).isDirectory())
     throw new LibraryError('notFound', 'skill not found')
   const realDst = assertInsideLibrary(home, dst)
-  if (existsSync(realDst) || isLink(dst)) throw new LibraryError('exists', 'a skill with the same name exists')
+  if (existsSync(realDst) || isLink(dst))
+    throw new LibraryError('exists', 'a skill with the same name exists')
   const mf = readManifest(home)
   if (mf.error) throw new LibraryError('invalidSchema', `${MANIFEST_FILE}: ${mf.error}`)
   // Build the new SKILL.md first (on failure nothing changes)
@@ -633,7 +653,8 @@ function agentPath(home: string, name: string): string {
 
 /** Normalize tool settings (drop empty values, validate format). invalidSchema on error */
 function normalizeAgentTools(v: unknown): Record<AgentTool, Record<string, string> | null> {
-  if (v !== undefined && !isObj(v)) throw new LibraryError('invalidSchema', 'tools must be an object')
+  if (v !== undefined && !isObj(v))
+    throw new LibraryError('invalidSchema', 'tools must be an object')
   const src = (v ?? {}) as Record<string, unknown>
   for (const k of Object.keys(src))
     if (!(AGENT_TOOLS as readonly string[]).includes(k))
@@ -641,7 +662,8 @@ function normalizeAgentTools(v: unknown): Record<AgentTool, Record<string, strin
   const out = {} as Record<AgentTool, Record<string, string> | null>
   for (const tool of AGENT_TOOLS) {
     const t = src[tool]
-    if (t !== undefined && t !== null && !isObj(t)) throw new LibraryError('invalidSchema', `${tool} must be an object`)
+    if (t !== undefined && t !== null && !isObj(t))
+      throw new LibraryError('invalidSchema', `${tool} must be an object`)
     const e: Record<string, string> = {}
     for (const key of ['model', 'effort'] as const) {
       const raw = (t as Record<string, unknown> | undefined)?.[key]
@@ -704,7 +726,12 @@ export function writeAgentDoc(home: string, name: string, input: AgentDocInput):
   if (!input.description.trim()) throw new LibraryError('invalidSchema', 'description is required')
   const blocks = normalizeAgentTools(input.tools)
   const text = readAgentText(home, name)
-  const next = patchSkillText(text, { description: input.description, blocks }, input.body, `${name}.md`)
+  const next = patchSkillText(
+    text,
+    { description: input.description, blocks },
+    input.body,
+    `${name}.md`
+  )
   const p = agentPath(home, name)
   if (next === text) return p
   return writeLibFile(home, p, next)
@@ -769,7 +796,8 @@ export function renameAgent(home: string, from: string, to: string): { name: str
   if (!existsSync(realSrc) || isLink(src) || !lstatSync(realSrc).isFile())
     throw new LibraryError('notFound', 'agent not found')
   const realDst = assertInsideLibrary(home, dst)
-  if (existsSync(realDst) || isLink(dst)) throw new LibraryError('exists', 'an agent with the same name exists')
+  if (existsSync(realDst) || isLink(dst))
+    throw new LibraryError('exists', 'an agent with the same name exists')
   const mf = readManifest(home)
   if (mf.error) throw new LibraryError('invalidSchema', `${MANIFEST_FILE}: ${mf.error}`)
   const oldText = readFileSync(realSrc, 'utf8')
@@ -850,7 +878,8 @@ export function validateMcpServer(def: unknown): { errors: string[]; warnings: s
   const d = def as Record<string, unknown> | null
   if (!d || typeof d !== 'object' || Array.isArray(d))
     return { errors: ['definition is not an object'], warnings }
-  if (d.transport !== 'stdio' && d.transport !== 'http') errors.push('transport must be stdio | http')
+  if (d.transport !== 'stdio' && d.transport !== 'http')
+    errors.push('transport must be stdio | http')
   if (d.transport === 'stdio') {
     if (typeof d.command !== 'string' || !d.command.trim()) errors.push('stdio requires command')
     if (d.url !== undefined) errors.push('stdio does not use url')
@@ -861,8 +890,7 @@ export function validateMcpServer(def: unknown): { errors: string[]; warnings: s
     else {
       try {
         const u = new URL(d.url.replace(PLACEHOLDER_RE, 'x'))
-        if (u.protocol !== 'http:' && u.protocol !== 'https:')
-          errors.push('url must be http(s)')
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') errors.push('url must be http(s)')
         if (u.username || u.password)
           warnings.push('url contains user info — replacing with ${VAR} recommended')
         for (const [k, v] of u.searchParams) {
@@ -898,7 +926,9 @@ export function validateMcpServer(def: unknown): { errors: string[]; warnings: s
         if (!r || r.table !== key || r.key !== k)
           errors.push(`${key}.${k} has an invalid secret reference format`)
       } else if (looksLikeSecret(v))
-        warnings.push(`${key}.${k} looks like a secret literal — replacing with a \${VAR} reference recommended`)
+        warnings.push(
+          `${key}.${k} looks like a secret literal — replacing with a \${VAR} reference recommended`
+        )
     }
   }
   if (d.timeoutMs !== undefined && (typeof d.timeoutMs !== 'number' || d.timeoutMs <= 0))

@@ -72,11 +72,20 @@ function moveDir(from: string, to: string): void {
  * are moved to <home>/.config/illithid/backups/deleted/<ts>/…; symlinks only have the link removed.
  * On success the app-ownership record in state is cleared.
  */
-export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest[]): DeleteResult[] {
+export function deleteSyncCandidates(
+  home: string,
+  env: Env,
+  reqs: DeleteRequest[]
+): DeleteResult[] {
   const results: DeleteResult[] = []
   const st = readState(home)
   if (st.error) {
-    return reqs.map((r) => ({ kind: r.kind, name: r.name, status: 'refused', reason: `state.json: ${st.error}` }))
+    return reqs.map((r) => ({
+      kind: r.kind,
+      name: r.name,
+      status: 'refused',
+      reason: `state.json: ${st.error}`
+    }))
   }
   const state = st.state
   const ts = stamp()
@@ -99,13 +108,19 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
         }
         skillPlan ??= planSkillSync(home, env)
         const it = skillPlan.find(
-          (x) => x.action === 'deleteCandidate' && x.tool === req.tool && x.name === req.name && x.path === req.path
+          (x) =>
+            x.action === 'deleteCandidate' &&
+            x.tool === req.tool &&
+            x.name === req.name &&
+            x.path === req.path
         )
         if (!it) {
           refuse('notACandidate')
           continue
         }
-        const roots = tools(home).flatMap((t) => (t.skills.kind === 'symlinkDir' ? [t.skills.dir] : []))
+        const roots = tools(home).flatMap((t) =>
+          t.skills.kind === 'symlinkDir' ? [t.skills.dir] : []
+        )
         if (!roots.some((r) => inside(r, it.path)) || basename(it.path) !== it.name) {
           refuse('outOfScope')
           continue
@@ -116,14 +131,23 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
           continue
         }
         if (it.currentLink !== undefined) {
-          if (!cur.isSymbolicLink() || readlinkSync(it.path) !== it.currentLink || req.currentLink !== it.currentLink) {
+          if (
+            !cur.isSymbolicLink() ||
+            readlinkSync(it.path) !== it.currentLink ||
+            req.currentLink !== it.currentLink
+          ) {
             refuse('changedSinceCheck')
             continue
           }
           unlinkSync(it.path)
           results.push({ ...base, status: 'deleted' })
         } else {
-          if (cur.isSymbolicLink() || !cur.isDirectory() || dirContentHash(it.path) !== it.currentHash || req.currentHash !== it.currentHash) {
+          if (
+            cur.isSymbolicLink() ||
+            !cur.isDirectory() ||
+            dirContentHash(it.path) !== it.currentHash ||
+            req.currentHash !== it.currentHash
+          ) {
             refuse('changedSinceCheck')
             continue
           }
@@ -142,7 +166,11 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
         }
         agentPlan ??= planAgentSync(home, env)
         const it = agentPlan.find(
-          (x) => x.action === 'deleteCandidate' && x.tool === req.tool && x.name === req.name && x.path === req.path
+          (x) =>
+            x.action === 'deleteCandidate' &&
+            x.tool === req.tool &&
+            x.name === req.name &&
+            x.path === req.path
         )
         if (!it) {
           refuse('notACandidate')
@@ -154,7 +182,13 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
           continue
         }
         const cur = lstatSync(it.path, { throwIfNoEntry: false })
-        if (!cur || cur.isSymbolicLink() || !cur.isFile() || fileHash(it.path) !== it.currentHash || req.currentHash !== it.currentHash) {
+        if (
+          !cur ||
+          cur.isSymbolicLink() ||
+          !cur.isFile() ||
+          fileHash(it.path) !== it.currentHash ||
+          req.currentHash !== it.currentHash
+        ) {
           refuse('changedSinceCheck')
           continue
         }
@@ -168,7 +202,11 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
       } else if (req.kind === 'rule') {
         rulePlan ??= planRuleSync(home, env)
         const it = rulePlan.find(
-          (x) => x.action === 'deleteCandidate' && x.tool === req.tool && x.name === req.name && x.path === req.path
+          (x) =>
+            x.action === 'deleteCandidate' &&
+            x.tool === req.tool &&
+            x.name === req.name &&
+            x.path === req.path
         )
         if (!it) {
           refuse('notACandidate')
@@ -181,11 +219,19 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
           continue
         }
         const cur = lstatSync(it.path, { throwIfNoEntry: false })
-        if (!cur || cur.isSymbolicLink() || !cur.isFile() || fileHash(it.path) !== it.currentHash || req.currentHash !== it.currentHash) {
+        if (
+          !cur ||
+          cur.isSymbolicLink() ||
+          !cur.isFile() ||
+          fileHash(it.path) !== it.currentHash ||
+          req.currentHash !== it.currentHash
+        ) {
           refuse('changedSinceCheck')
           continue
         }
-        const backup = it.tool ? join(backupRoot, 'rules', it.tool, file) : join(backupRoot, 'rules', it.name)
+        const backup = it.tool
+          ? join(backupRoot, 'rules', it.tool, file)
+          : join(backupRoot, 'rules', it.name)
         moveDir(it.path, backup)
         results.push({ ...base, status: 'deleted', backupPath: backup })
         const records = it.tool ? state.toolRules?.[it.tool] : state.rules
@@ -197,7 +243,11 @@ export function deleteSyncCandidates(home: string, env: Env, reqs: DeleteRequest
         refuse('unknownKind')
       }
     } catch (e) {
-      results.push({ ...base, status: 'failed', reason: (e as NodeJS.ErrnoException).code ?? (e as Error).message })
+      results.push({
+        ...base,
+        status: 'failed',
+        reason: (e as NodeJS.ErrnoException).code ?? (e as Error).message
+      })
     }
   }
   if (stateDirty) writeState(home, state)

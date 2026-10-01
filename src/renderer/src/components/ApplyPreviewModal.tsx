@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Badge, Box, Button, Group, Modal, Stack, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
-import type { ApplyPreviewAction, ApplyPreviewItem, ApplyPreviewView, EditedRuleItem, ImportedChangedItem, ToolId } from '../../../shared/api'
+import type {
+  ApplyPreviewAction,
+  ApplyPreviewItem,
+  ApplyPreviewView,
+  EditedRuleItem,
+  ImportedChangedItem,
+  ToolId
+} from '../../../shared/api'
 import { LIBRARY_CHANGED, runWrite } from '../lib/mutate'
 import { useSync } from '../lib/sync'
 import { TOOL_NAME, TOOLS } from '../lib/tools'
@@ -29,7 +36,12 @@ interface BodyProps {
 }
 
 /** Sync plan grouped by tool → Apply (one approved sync) */
-export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: BodyProps): React.JSX.Element {
+export function ApplyPreviewBody({
+  cancelLabel,
+  onCancel,
+  onDone,
+  doneLabel
+}: BodyProps): React.JSX.Element {
   const { t } = useTranslation()
   const { applyOnce } = useSync()
   const [view, setView] = useState<ApplyPreviewView | null>(null)
@@ -52,7 +64,10 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
 
   const keep = async (x: ImportedChangedItem): Promise<void> => {
     setKeeping(x.path)
-    const r = await runWrite(window.api.importedKeep({ kind: x.kind, tool: x.tool, path: x.path }), { success: t('preview.kept') })
+    const r = await runWrite(
+      window.api.importedKeep({ kind: x.kind, tool: x.tool, path: x.path }),
+      { success: t('preview.kept') }
+    )
     setKeeping(null)
     if (r !== null) load()
   }
@@ -60,7 +75,9 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
   // A rule an agent edited in a tool: save that version to the library (it then reaches every tool) instead of restoring
   const keepEdited = async (x: EditedRuleItem): Promise<void> => {
     setKeeping(`edited:${x.tool}:${x.name}`)
-    const r = await runWrite(window.api.editedRuleKeep(x.tool, x.name), { success: t('preview.keptEdited') })
+    const r = await runWrite(window.api.editedRuleKeep(x.tool, x.name), {
+      success: t('preview.keptEdited')
+    })
     setKeeping(null)
     if (r !== null) {
       window.dispatchEvent(new Event(LIBRARY_CHANGED))
@@ -91,7 +108,8 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
   const byOrder = (a: ApplyPreviewItem, b: ApplyPreviewItem): number =>
     ACTION_ORDER.indexOf(a.action) - ACTION_ORDER.indexOf(b.action) || a.name.localeCompare(b.name)
   // Top-level rows only; detail rows (parent) are listed under their config file row
-  const byTool = (tool: ToolId): ApplyPreviewItem[] => view.items.filter((x) => x.tool === tool && !x.parent).sort(byOrder)
+  const byTool = (tool: ToolId): ApplyPreviewItem[] =>
+    view.items.filter((x) => x.tool === tool && !x.parent).sort(byOrder)
   const childrenOf = (x: ApplyPreviewItem): ApplyPreviewItem[] =>
     view.items.filter((c) => c.tool === x.tool && c.parent === x.path).sort(byOrder)
   const tools = TOOLS.filter(
@@ -118,7 +136,11 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
             color={ACTION_COLOR[x.action]}
             size="xs"
             fw={500}
-            data-testid={x.kind === 'mcp' ? `apply-preview-mcp-${x.tool}-${x.name}-${x.action}` : `apply-preview-action-${x.action}`}
+            data-testid={
+              x.kind === 'mcp'
+                ? `apply-preview-mcp-${x.tool}-${x.name}-${x.action}`
+                : `apply-preview-action-${x.action}`
+            }
           >
             {t(`preview.action.${x.action}`)}
           </Badge>
@@ -179,7 +201,13 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                       key={`notInitialized:${x.label}`}
                       title={x.label}
                       tags={
-                        <Badge variant="light" color="yellow" size="xs" fw={500} data-testid="apply-preview-not-initialized">
+                        <Badge
+                          variant="light"
+                          color="yellow"
+                          size="xs"
+                          fw={500}
+                          data-testid="apply-preview-not-initialized"
+                        >
                           {t(`sync.${x.reason ?? 'notInitialized'}`, { tool: TOOL_NAME[tool] })}
                         </Badge>
                       }
@@ -196,7 +224,13 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                           <Badge variant="default" size="xs" fw={500} c="dimmed">
                             {t('preview.kind.rule')}
                           </Badge>
-                          <Badge variant="light" color="yellow" size="xs" fw={500} data-testid="apply-preview-edited">
+                          <Badge
+                            variant="light"
+                            color="yellow"
+                            size="xs"
+                            fw={500}
+                            data-testid="apply-preview-edited"
+                          >
                             {t('preview.editedIn', { tool: TOOL_NAME[tool] })}
                           </Badge>
                         </>
@@ -233,13 +267,22 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                       }
                       subtitle={x.path}
                       right={
-                        <Button size="compact-xs" variant="default" loading={keeping === x.path} onClick={() => void keep(x)} data-testid="apply-preview-keep">
+                        <Button
+                          size="compact-xs"
+                          variant="default"
+                          loading={keeping === x.path}
+                          onClick={() => void keep(x)}
+                          data-testid="apply-preview-keep"
+                        >
                           {t('preview.keepOriginal')}
                         </Button>
                       }
                     />
                   ))}
-                {byTool(tool).flatMap((x) => [itemRow(x), ...childrenOf(x).map((c) => itemRow(c, true))])}
+                {byTool(tool).flatMap((x) => [
+                  itemRow(x),
+                  ...childrenOf(x).map((c) => itemRow(c, true))
+                ])}
                 {view.libraryDirect
                   .filter((x) => x.tool === tool)
                   .map((x) => (
@@ -251,7 +294,13 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
                           <Badge variant="default" size="xs" fw={500} c="dimmed">
                             {t(`preview.kind.${x.kind}`)}
                           </Badge>
-                          <Badge variant="light" color="gray" size="xs" fw={500} data-testid="apply-preview-library-direct">
+                          <Badge
+                            variant="light"
+                            color="gray"
+                            size="xs"
+                            fw={500}
+                            data-testid="apply-preview-library-direct"
+                          >
                             {t('preview.libraryDirect')}
                           </Badge>
                         </>
@@ -266,7 +315,12 @@ export function ApplyPreviewBody({ cancelLabel, onCancel, onDone, doneLabel }: B
       <Group justify="flex-end" gap="xs">
         {n > 0 ? (
           <>
-            <Button variant="default" onClick={onCancel} disabled={busy} data-testid="apply-preview-cancel">
+            <Button
+              variant="default"
+              onClick={onCancel}
+              disabled={busy}
+              data-testid="apply-preview-cancel"
+            >
               {cancelLabel}
             </Button>
             <Button onClick={() => void apply()} loading={busy} data-testid="apply-preview-apply">
@@ -314,7 +368,14 @@ export function ApplyPreviewModal({
       radius="lg"
       zIndex={300}
     >
-      {mounted && <ApplyPreviewBody key={session.n} cancelLabel={t('common.cancel')} onCancel={onCancel} onDone={onDone} />}
+      {mounted && (
+        <ApplyPreviewBody
+          key={session.n}
+          cancelLabel={t('common.cancel')}
+          onCancel={onCancel}
+          onDone={onDone}
+        />
+      )}
     </Modal>
   )
 }

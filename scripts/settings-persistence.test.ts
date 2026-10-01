@@ -27,10 +27,21 @@ test('REQ-SETTINGS-PERSISTENCE-6 a malformed ui is dropped while the rest of con
   assert.equal(r.config.activeWorkspace, 'work')
   assert.equal(r.config.updateCheck, false)
   assert.equal(r.config.ui, undefined)
-  for (const ui of [null, [], 'ko', { language: 'fr' }, { colorScheme: 'sepia' }, { views: { skills: 'table' } }, { views: [] }])
+  for (const ui of [
+    null,
+    [],
+    'ko',
+    { language: 'fr' },
+    { colorScheme: 'sepia' },
+    { views: { skills: 'table' } },
+    { views: [] }
+  ])
     assert.ok(validateConfig({ version: 1, ui }).length > 0, JSON.stringify(ui))
   assert.deepEqual(
-    validateConfig({ version: 1, ui: { language: 'ko', colorScheme: 'dark', views: { skills: 'grid', mcp: 'list' } } }),
+    validateConfig({
+      version: 1,
+      ui: { language: 'ko', colorScheme: 'dark', views: { skills: 'grid', mcp: 'list' } }
+    }),
     []
   )
   const ok = homeWith({ version: 1, ui: { language: 'ja', colorScheme: 'light' } })
@@ -39,15 +50,27 @@ test('REQ-SETTINGS-PERSISTENCE-6 a malformed ui is dropped while the rest of con
 
 test('REQ-SETTINGS-PERSISTENCE-1 REQ-SETTINGS-PERSISTENCE-2 REQ-SETTINGS-PERSISTENCE-3 prefs merge per key and per screen; null removes', () => {
   const cur = { language: 'ko' as const, views: { skills: 'grid' as const } }
-  assert.deepEqual(mergeUiPrefs(cur, { colorScheme: 'dark' }), { language: 'ko', colorScheme: 'dark', views: { skills: 'grid' } })
-  assert.deepEqual(mergeUiPrefs(cur, { views: { mcp: 'grid' } }), { language: 'ko', views: { skills: 'grid', mcp: 'grid' } })
+  assert.deepEqual(mergeUiPrefs(cur, { colorScheme: 'dark' }), {
+    language: 'ko',
+    colorScheme: 'dark',
+    views: { skills: 'grid' }
+  })
+  assert.deepEqual(mergeUiPrefs(cur, { views: { mcp: 'grid' } }), {
+    language: 'ko',
+    views: { skills: 'grid', mcp: 'grid' }
+  })
   assert.deepEqual(mergeUiPrefs(cur, { language: null }), { views: { skills: 'grid' } })
   assert.deepEqual(mergeUiPrefs(undefined, { language: 'en' }), { language: 'en' })
 })
 
 test('REQ-LIST-USAGE-7 list sort per screen merges and validates like view modes', () => {
-  assert.deepEqual(mergeUiPrefs({ sorts: { skills: 'usage' } }, { sorts: { mcp: 'name' } }), { sorts: { skills: 'usage', mcp: 'name' } })
-  assert.deepEqual(validateConfig({ version: 1, ui: { sorts: { skills: 'usage', mcp: 'name' } } }), [])
+  assert.deepEqual(mergeUiPrefs({ sorts: { skills: 'usage' } }, { sorts: { mcp: 'name' } }), {
+    sorts: { skills: 'usage', mcp: 'name' }
+  })
+  assert.deepEqual(
+    validateConfig({ version: 1, ui: { sorts: { skills: 'usage', mcp: 'name' } } }),
+    []
+  )
   for (const sorts of [[], 'usage', { skills: 'calls' }])
     assert.ok(validateConfig({ version: 1, ui: { sorts } }).length > 0, JSON.stringify(sorts))
 })

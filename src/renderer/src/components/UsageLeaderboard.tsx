@@ -519,7 +519,10 @@ export function UsageLeaderboard({
                         const text = t('leaderboard.contextChip', {
                           n: formatTokens(point.median.contextPerTurn, i18n.language)
                         })
-                        const w = [...text].reduce((a, c) => a + (c.charCodeAt(0) > 0x2e80 ? 10 : 5.8), 14)
+                        const w = [...text].reduce(
+                          (a, c) => a + (c.charCodeAt(0) > 0x2e80 ? 10 : 5.8),
+                          14
+                        )
                         const cx = Math.min(Math.max(x(point.x) + 10, 70), 970 - w)
                         // Below-right of the point: model labels sit above points
                         const cy = Math.min(y(point.y) + 10, 356)
@@ -596,7 +599,9 @@ export function UsageLeaderboard({
                   textDecoration: hidden.has(k) ? 'line-through' : undefined
                 }}
               >
-                <span><span style={{ color: color(m) }}>●</span> {m.model}</span>
+                <span>
+                  <span style={{ color: color(m) }}>●</span> {m.model}
+                </span>
                 <span className="lb-legend-tool lb-tool-label">
                   <ToolIcon tool={m.tool as ToolId} size={12} />
                   {toolName(m.tool)}

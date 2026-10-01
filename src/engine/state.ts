@@ -127,7 +127,8 @@ export function readState(home: string): StateRead {
       const m: Record<string, RuleCopyEntry> = {}
       for (const [name, v] of Object.entries(byName as Record<string, unknown>)) {
         const e = v as Record<string, unknown> | null
-        if (e && typeof e.contentHash === 'string' && typeof e.at === 'string') m[name] = { contentHash: e.contentHash, at: e.at }
+        if (e && typeof e.contentHash === 'string' && typeof e.at === 'string')
+          m[name] = { contentHash: e.contentHash, at: e.at }
       }
       out[tool as ToolId] = m
     }

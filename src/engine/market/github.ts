@@ -2,7 +2,16 @@
  * Read-only GitHub access for skill downloads. Two API calls per install (HEAD commit + recursive tree, unauthenticated
  * limit 60/hour), file bodies from raw.githubusercontent.com pinned to the commit.
  */
-import { assertRepo, getBytes, getJson, getText, isObj, MarketError, str, type FetchFn } from './http'
+import {
+  assertRepo,
+  getBytes,
+  getJson,
+  getText,
+  isObj,
+  MarketError,
+  str,
+  type FetchFn
+} from './http'
 
 export const GITHUB_API = 'https://api.github.com'
 export const GITHUB_RAW = 'https://raw.githubusercontent.com'
@@ -25,18 +34,29 @@ const SHA_RE = /^[0-9a-f]{40}$/
 export async function resolveSha(fetchFn: FetchFn, repo: string): Promise<string> {
   assertRepo(repo)
   const sha = (
-    await getText(fetchFn, `${GITHUB_API}/repos/${repo}/commits/HEAD`, 1024, { Accept: 'application/vnd.github.sha' })
+    await getText(fetchFn, `${GITHUB_API}/repos/${repo}/commits/HEAD`, 1024, {
+      Accept: 'application/vnd.github.sha'
+    })
   ).trim()
   if (!SHA_RE.test(sha)) throw new MarketError('invalid', 'unexpected commit response')
   return sha
 }
 
 /** Recursive tree at a commit. `root` is the top-level tree SHA */
-export async function listTree(fetchFn: FetchFn, repo: string, sha: string): Promise<{ root: string; entries: TreeEntry[] }> {
+export async function listTree(
+  fetchFn: FetchFn,
+  repo: string,
+  sha: string
+): Promise<{ root: string; entries: TreeEntry[] }> {
   assertRepo(repo)
   if (!SHA_RE.test(sha)) throw new MarketError('invalid', 'invalid commit')
-  const body = await getJson(fetchFn, `${GITHUB_API}/repos/${repo}/git/trees/${sha}?recursive=1`, 16 * 1024 * 1024)
-  if (!isObj(body) || !Array.isArray(body.tree)) throw new MarketError('invalid', 'unexpected tree response')
+  const body = await getJson(
+    fetchFn,
+    `${GITHUB_API}/repos/${repo}/git/trees/${sha}?recursive=1`,
+    16 * 1024 * 1024
+  )
+  if (!isObj(body) || !Array.isArray(body.tree))
+    throw new MarketError('invalid', 'unexpected tree response')
   const out: TreeEntry[] = []
   for (const e of body.tree) {
     if (!isObj(e)) continue
@@ -44,7 +64,13 @@ export async function listTree(fetchFn: FetchFn, repo: string, sha: string): Pro
     const mode = str(e.mode)
     const type = str(e.type)
     if (!path || !mode || !type) continue
-    out.push({ path, mode, type, size: typeof e.size === 'number' ? e.size : undefined, sha: str(e.sha) })
+    out.push({
+      path,
+      mode,
+      type,
+      size: typeof e.size === 'number' ? e.size : undefined,
+      sha: str(e.sha)
+    })
   }
   if (body.truncated === true) throw new MarketError('tooLarge', 'repository is too large to list')
   return { root: str(body.sha) ?? '', entries: out }
@@ -56,7 +82,13 @@ export function dirSha(tree: { root: string; entries: TreeEntry[] }, dir: string
   return tree.entries.find((e) => e.type === 'tree' && e.path === dir)?.sha ?? ''
 }
 
-export async function rawFile(fetchFn: FetchFn, repo: string, sha: string, path: string, maxBytes = SKILL_MAX_FILE_BYTES): Promise<Uint8Array> {
+export async function rawFile(
+  fetchFn: FetchFn,
+  repo: string,
+  sha: string,
+  path: string,
+  maxBytes = SKILL_MAX_FILE_BYTES
+): Promise<Uint8Array> {
   assertRepo(repo)
   if (!SHA_RE.test(sha) || pathProblem(path)) throw new MarketError('invalid', 'invalid file path')
   const url = `${GITHUB_RAW}/${repo}/${sha}/${path.split('/').map(encodeURIComponent).join('/')}`
@@ -113,10 +145,18 @@ export interface SkillFilePlan {
  * Files to download under `dir`. Symlinks (120000), submodules, unsafe paths, .git entries, nested skills (any
  * sub-folder with its own SKILL.md) and case-insensitive duplicates are skipped; limits throw tooLarge
  */
-export function skillFilePlan(tree: TreeEntry[], dir: string): { files: SkillFilePlan[]; skipped: string[] } {
+export function skillFilePlan(
+  tree: TreeEntry[],
+  dir: string
+): { files: SkillFilePlan[]; skipped: string[] } {
   const prefix = dir ? `${dir}/` : ''
   const nested = tree
-    .filter((e) => e.type === 'blob' && e.path.startsWith(prefix) && SKILL_MD.some((f) => e.path.endsWith(`/${f}`)))
+    .filter(
+      (e) =>
+        e.type === 'blob' &&
+        e.path.startsWith(prefix) &&
+        SKILL_MD.some((f) => e.path.endsWith(`/${f}`))
+    )
     .map((e) => e.path.slice(0, e.path.lastIndexOf('/') + 1))
     .filter((d) => d !== prefix)
   const files: SkillFilePlan[] = []
@@ -132,7 +172,12 @@ export function skillFilePlan(tree: TreeEntry[], dir: string): { files: SkillFil
       skipped.push(rel)
       continue
     }
-    if (pathProblem(rel) || pathProblem(e.path) || rel.split('/').some((x) => x === '.git') || lower.has(rel.toLowerCase())) {
+    if (
+      pathProblem(rel) ||
+      pathProblem(e.path) ||
+      rel.split('/').some((x) => x === '.git') ||
+      lower.has(rel.toLowerCase())
+    ) {
       skipped.push(rel)
       continue
     }
@@ -142,8 +187,10 @@ export function skillFilePlan(tree: TreeEntry[], dir: string): { files: SkillFil
     total += size
     files.push({ rel, path: e.path, size, exec: e.mode === '100755' })
   }
-  if (files.length > SKILL_MAX_FILES) throw new MarketError('tooLarge', `too many files (${files.length})`)
+  if (files.length > SKILL_MAX_FILES)
+    throw new MarketError('tooLarge', `too many files (${files.length})`)
   if (total > SKILL_MAX_BYTES) throw new MarketError('tooLarge', 'skill is too large')
-  if (!files.some((f) => SKILL_MD.includes(f.rel))) throw new MarketError('notFound', 'SKILL.md not found')
+  if (!files.some((f) => SKILL_MD.includes(f.rel)))
+    throw new MarketError('notFound', 'SKILL.md not found')
   return { files, skipped }
 }

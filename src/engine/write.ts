@@ -70,10 +70,7 @@ function fsyncDir(dir: string): void {
 }
 
 function tmpPathFor(path: string): string {
-  return join(
-    dirname(path),
-    appTmpName(basename(path), randomBytes(4).toString('hex'))
-  )
+  return join(dirname(path), appTmpName(basename(path), randomBytes(4).toString('hex')))
 }
 
 /** sha256 of the current file content. null if missing */

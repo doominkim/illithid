@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Checkbox, Group, Stack, Stepper, Text, Title, UnstyledButton } from '@mantine/core'
+import {
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Stack,
+  Stepper,
+  Text,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
 import { ArchiveRestore, Download, FileArchive, GitBranch, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ImportSource, ToolDetection, ToolId } from '../../../shared/api'
@@ -17,9 +27,25 @@ import { clearApiCache } from '../lib/useApi'
 
 type Mode = 'import' | 'fresh' | 'restore'
 
-function Choice({ icon, label, onClick, testId }: { icon: React.ReactNode; label: string; onClick: () => void; testId: string }): React.JSX.Element {
+function Choice({
+  icon,
+  label,
+  onClick,
+  testId
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  testId: string
+}): React.JSX.Element {
   return (
-    <UnstyledButton className="ac-card" data-clickable onClick={onClick} p="lg" data-testid={testId}>
+    <UnstyledButton
+      className="ac-card"
+      data-clickable
+      onClick={onClick}
+      p="lg"
+      data-testid={testId}
+    >
       <Group gap={12} wrap="nowrap">
         <Box style={{ color: 'var(--ac-text-muted)', display: 'flex' }}>{icon}</Box>
         <Text fw={600} size="md">
@@ -90,7 +116,8 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
     setBusy(false)
   }
 
-  const sourceOf = (tool: ToolId): ImportSource | undefined => sources.find((s) => s.id === `tool:${tool}`)
+  const sourceOf = (tool: ToolId): ImportSource | undefined =>
+    sources.find((s) => s.id === `tool:${tool}`)
   const detectedValue = (d: ToolDetection): string =>
     [d.configFound ? sourceOf(d.tool)?.path : undefined, d.executable].filter(Boolean).join(' · ')
 
@@ -102,15 +129,32 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
           <Stepper active={step} size="xs">
             <Stepper.Step label={t('onboarding.stepStart')} />
             <Stepper.Step label={t('onboarding.stepTools')} />
-            <Stepper.Step label={mode === 'restore' ? t('onboarding.stepRestore') : t('onboarding.stepImport')} />
+            <Stepper.Step
+              label={mode === 'restore' ? t('onboarding.stepRestore') : t('onboarding.stepImport')}
+            />
             <Stepper.Step label={t('onboarding.stepApply')} />
           </Stepper>
 
           {step === 0 && (
             <Stack gap="sm">
-              <Choice icon={<Download size={20} />} label={t('onboarding.modeImport')} onClick={() => choose('import')} testId="onboarding-mode-import" />
-              <Choice icon={<Sparkles size={20} />} label={t('onboarding.modeFresh')} onClick={() => choose('fresh')} testId="onboarding-mode-fresh" />
-              <Choice icon={<ArchiveRestore size={20} />} label={t('onboarding.modeRestore')} onClick={() => choose('restore')} testId="onboarding-mode-restore" />
+              <Choice
+                icon={<Download size={20} />}
+                label={t('onboarding.modeImport')}
+                onClick={() => choose('import')}
+                testId="onboarding-mode-import"
+              />
+              <Choice
+                icon={<Sparkles size={20} />}
+                label={t('onboarding.modeFresh')}
+                onClick={() => choose('fresh')}
+                testId="onboarding-mode-fresh"
+              />
+              <Choice
+                icon={<ArchiveRestore size={20} />}
+                label={t('onboarding.modeRestore')}
+                onClick={() => choose('restore')}
+                testId="onboarding-mode-restore"
+              />
             </Stack>
           )}
 
@@ -129,7 +173,11 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
                           <Group gap={10} wrap="nowrap">
                             <Checkbox
                               checked={tools.includes(tool)}
-                              onChange={({ currentTarget: { checked } }) => setTools((xs) => TOOLS.filter((x) => (x === tool ? checked : xs.includes(x))))}
+                              onChange={({ currentTarget: { checked } }) =>
+                                setTools((xs) =>
+                                  TOOLS.filter((x) => (x === tool ? checked : xs.includes(x)))
+                                )
+                              }
                               aria-label={TOOL_NAME[tool]}
                               data-testid={`onboarding-tool-${tool}`}
                             />
@@ -146,7 +194,12 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
                   <Button variant="default" onClick={() => setStep(0)}>
                     {t('common.back')}
                   </Button>
-                  <Button disabled={!tools.length} loading={busy} onClick={() => void saveTools()} data-testid="onboarding-tools-next">
+                  <Button
+                    disabled={!tools.length}
+                    loading={busy}
+                    onClick={() => void saveTools()}
+                    data-testid="onboarding-tools-next"
+                  >
                     {t('onboarding.next')}
                   </Button>
                 </Group>
@@ -164,9 +217,22 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
                       key={tool}
                       avatar={<ToolIcon tool={tool} size={22} />}
                       title={TOOL_NAME[tool]}
-                      subtitle={n !== undefined ? t('onboarding.imported', { n }) : src?.available ? src.path : t('import.sourceMissing')}
+                      subtitle={
+                        n !== undefined
+                          ? t('onboarding.imported', { n })
+                          : src?.available
+                            ? src.path
+                            : t('import.sourceMissing')
+                      }
                       right={
-                        <Button size="xs" variant="default" leftSection={<Download size={13} />} disabled={!src?.available} onClick={() => setImportFrom(tool)} data-testid={`onboarding-import-${tool}`}>
+                        <Button
+                          size="xs"
+                          variant="default"
+                          leftSection={<Download size={13} />}
+                          disabled={!src?.available}
+                          onClick={() => setImportFrom(tool)}
+                          data-testid={`onboarding-import-${tool}`}
+                        >
                           {t('common.import')}
                         </Button>
                       }
@@ -189,7 +255,12 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
                 tools={tools}
                 onImported={(rs) => {
                   clearApiCache()
-                  if (importFrom) setImported((m) => ({ ...m, [importFrom]: (m[importFrom] ?? 0) + rs.filter((r) => r.status === 'imported').length }))
+                  if (importFrom)
+                    setImported((m) => ({
+                      ...m,
+                      [importFrom]:
+                        (m[importFrom] ?? 0) + rs.filter((r) => r.status === 'imported').length
+                    }))
                 }}
               />
             </Stack>
@@ -197,8 +268,18 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
 
           {step === 2 && mode === 'restore' && (
             <Stack gap="md">
-              <Choice icon={<FileArchive size={20} />} label={t('onboarding.restoreZip')} onClick={() => void restoreZip()} testId="onboarding-restore-zip" />
-              <Choice icon={<GitBranch size={20} />} label={t('onboarding.restoreBackup')} onClick={() => onDone('backup')} testId="onboarding-restore-backup" />
+              <Choice
+                icon={<FileArchive size={20} />}
+                label={t('onboarding.restoreZip')}
+                onClick={() => void restoreZip()}
+                testId="onboarding-restore-zip"
+              />
+              <Choice
+                icon={<GitBranch size={20} />}
+                label={t('onboarding.restoreBackup')}
+                onClick={() => onDone('backup')}
+                testId="onboarding-restore-backup"
+              />
               <Group>
                 <Button variant="default" onClick={() => setStep(1)} disabled={busy}>
                   {t('common.back')}
@@ -208,7 +289,12 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
           )}
 
           {step === 3 && (
-            <ApplyPreviewBody cancelLabel={t('onboarding.later')} onCancel={() => onDone()} onDone={() => onDone()} doneLabel={t('onboarding.finish')} />
+            <ApplyPreviewBody
+              cancelLabel={t('onboarding.later')}
+              onCancel={() => onDone()}
+              onDone={() => onDone()}
+              doneLabel={t('onboarding.finish')}
+            />
           )}
         </Stack>
       </Box>
@@ -218,13 +304,20 @@ function Onboarding({ onDone }: { onDone: (menu?: Menu) => void }): React.JSX.El
         onBoth={({ grokSkipsClaude }) => {
           setCombo([])
           void (async () => {
-            if (grokSkipsClaude && !(await runWrite(window.api.configSet({ grokReadsClaude: false })))) return
+            if (
+              grokSkipsClaude &&
+              !(await runWrite(window.api.configSet({ grokReadsClaude: false })))
+            )
+              return
             await saveTools(tools, true)
           })()
         }}
         onDropClaude={() => {
           setCombo([])
-          void saveTools(tools.filter((x) => x !== 'claude'), true)
+          void saveTools(
+            tools.filter((x) => x !== 'claude'),
+            true
+          )
         }}
       />
     </Box>

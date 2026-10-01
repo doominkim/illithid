@@ -5,7 +5,15 @@
  * picks up added, modified and deleted files, the Codex thread name, a corrupt cache file and partial scans.
  * Prints PASS/FAIL per step and exits 1 if any step fails.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { scanSessions } from '../src/engine/scan/sessions'
@@ -34,12 +42,22 @@ const cachePath = sessionScanCachePath(home)
 function claudeSession(id: string, text: string): void {
   writeFileSync(
     join(claudeDir, `${id}.jsonl`),
-    jsonl([{ type: 'user', sessionId: id, cwd: '/p/a', timestamp: '2026-09-01T00:00:00Z', message: { role: 'user', content: text } }])
+    jsonl([
+      {
+        type: 'user',
+        sessionId: id,
+        cwd: '/p/a',
+        timestamp: '2026-09-01T00:00:00Z',
+        message: { role: 'user', content: text }
+      }
+    ])
   )
 }
 
 function titles(tools?: Parameters<typeof scanSessions>[1]): Record<string, string> {
-  return Object.fromEntries(scanSessions(home, tools, { cache: true }).sessions.map((s) => [s.id, s.title]))
+  return Object.fromEntries(
+    scanSessions(home, tools, { cache: true }).sessions.map((s) => [s.id, s.title])
+  )
 }
 
 try {
@@ -49,8 +67,15 @@ try {
   writeFileSync(
     codexPath,
     jsonl([
-      { type: 'session_meta', payload: { id: CODEX, cwd: '/p/b', timestamp: '2026-09-01T00:00:00Z' } },
-      { type: 'event_msg', timestamp: '2026-09-01T00:00:01Z', payload: { type: 'user_message', message: 'codex first' } }
+      {
+        type: 'session_meta',
+        payload: { id: CODEX, cwd: '/p/b', timestamp: '2026-09-01T00:00:00Z' }
+      },
+      {
+        type: 'event_msg',
+        timestamp: '2026-09-01T00:00:01Z',
+        payload: { type: 'user_message', message: 'codex first' }
+      }
     ])
   )
 
@@ -58,7 +83,11 @@ try {
   check('first scan', t[CLAUDE] === 'first title' && t[CODEX] === 'codex first', JSON.stringify(t))
   check('cache file written', existsSync(cachePath))
   t = titles()
-  check('second scan from cache', t[CLAUDE] === 'first title' && t[CODEX] === 'codex first', JSON.stringify(t))
+  check(
+    'second scan from cache',
+    t[CLAUDE] === 'first title' && t[CODEX] === 'codex first',
+    JSON.stringify(t)
+  )
 
   claudeSession(CLAUDE, 'changed title')
   // Same-second rewrites can keep mtime; move it forward so the change is visible to the stat check

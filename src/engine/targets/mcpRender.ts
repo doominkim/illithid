@@ -23,7 +23,9 @@ export function renderValue(
     return value.replace(PLACEHOLDER, (_, v: string) => {
       const resolved = env[v]
       if (resolved === undefined) {
-        throw new TargetError(`environment variable ${v} is not set — this target needs a literal, so it is not generated`)
+        throw new TargetError(
+          `environment variable ${v} is not set — this target needs a literal, so it is not generated`
+        )
       }
       return resolved
     })

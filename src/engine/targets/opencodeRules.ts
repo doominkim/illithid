@@ -87,7 +87,9 @@ function dropImportedEntries(
   ctx: BuildContext,
   enabled: string[]
 ): { list: unknown[]; retired: string[]; kept: PendingRetire[] } {
-  const pending = (ctx.pendingRetire ?? []).filter((p) => p.kind === 'instruction' && p.tool === 'opencode')
+  const pending = (ctx.pendingRetire ?? []).filter(
+    (p) => p.kind === 'instruction' && p.tool === 'opencode'
+  )
   if (!pending.length) return { list, retired: [], kept: [] }
   const home = ctx.home
   const abs = (x: string): string => (home && x.startsWith('~/') ? join(home, x.slice(2)) : x)
@@ -156,11 +158,15 @@ export const opencodeRules: TargetDef = {
     notes.push(
       `${KEY}: ${enabledRulePaths(sources).length} rules + ${memoryIndexPath(sources).length} memory (app-owned), ${kept} non-owned entries kept`
     )
-    if (legacyHit) notes.push(`${legacyHit} legacy ~/.agents entries -> replaced with library paths`)
+    if (legacyHit)
+      notes.push(`${legacyHit} legacy ~/.agents entries -> replaced with library paths`)
     const dropped = ((cur as unknown[] | undefined) ?? []).length - list.length
-    if (dropped) notes.push(`${dropped} imported rule entries removed (replaced by the library copy)`)
+    if (dropped)
+      notes.push(`${dropped} imported rule entries removed (replaced by the library copy)`)
     if (imported.kept.length)
-      notes.push(`imported rule entries kept — original changed since import: ${imported.kept.map((p) => p.name).join(', ')}`)
+      notes.push(
+        `imported rule entries kept — original changed since import: ${imported.kept.map((p) => p.name).join(', ')}`
+      )
     notes.push(`${count} keys other than ${KEY} unchanged: ${same ? 'OK' : 'broken!'}`)
     const retired = {
       ...(imported.retired.length ? { retired: imported.retired } : {}),

@@ -111,7 +111,12 @@ test('REQ-STATS-MEDIAN-COST-1 REQ-STATS-MEDIAN-COST-2 per-request median ignores
       counter.prompt(at)
       // One very long request (100x the tokens) among ordinary ones
       const scale = i === 0 ? 100 : 1
-      counter.turn({ model: 'gpt-test', effort: 'high', at, usage: { input: 300000 * scale, cacheRead: 0, cacheWrite: 0, output: 1000, reasoning: 0 } })
+      counter.turn({
+        model: 'gpt-test',
+        effort: 'high',
+        at,
+        usage: { input: 300000 * scale, cacheRead: 0, cacheWrite: 0, output: 1000, reasoning: 0 }
+      })
       counter.requestEnd(at)
     }
     counter.write(db, 1)

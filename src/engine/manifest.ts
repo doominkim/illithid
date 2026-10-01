@@ -146,7 +146,12 @@ export function setToggle(
  * Moves the kind.<from> toggle to kind.<to> on rename (to's old key is replaced by or removed with from's value).
  * Writes nothing if unchanged. true if changed
  */
-export function renameManifestEntry(home: string, kind: ManifestKind, from: string, to: string): boolean {
+export function renameManifestEntry(
+  home: string,
+  kind: ManifestKind,
+  from: string,
+  to: string
+): boolean {
   if (!MANIFEST_KINDS.includes(kind)) throw new ManifestError(`unknown kind: ${String(kind)}`)
   if (!NAME_RE.test(from) || !NAME_RE.test(to)) throw new ManifestError('invalid name format')
   const cur = readManifest(home)

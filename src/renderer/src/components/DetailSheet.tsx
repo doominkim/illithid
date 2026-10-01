@@ -65,7 +65,14 @@ export function DetailSheet({
     >
       <Box p={28} pt={48} mx="auto" maw={maw} data-testid="detail-sheet">
         <Group gap="sm" align="center" wrap="nowrap">
-          <ActionIcon variant="subtle" color="gray" size="lg" onClick={onClose} aria-label={t('common.back')} style={{ flexShrink: 0 }}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="lg"
+            onClick={onClose}
+            aria-label={t('common.back')}
+            style={{ flexShrink: 0 }}
+          >
             <ArrowLeft size={20} />
           </ActionIcon>
           <Title order={1} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>

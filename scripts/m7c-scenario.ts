@@ -11,7 +11,17 @@
  *
  * Run: electron-vite build && npx tsx scripts/m7c-scenario.ts
  */
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -27,8 +37,20 @@ import { LEGACY_MANIFEST_FILES } from '../src/engine/manifest'
 import { BACKUP_SUFFIX, LEGACY_BACKUP_SUFFIXES } from '../src/engine/write'
 import { readConfig, readState } from '../src/engine'
 import { planSyncAll } from '../src/engine/sync'
-import { cleanupFixtures, cleanupOnSignals, legacyAppProbePaths, REAL_HOME } from './lib/fixtureHome'
-import { buildLibraryFromLegacy, cleanupCopyFixtures, fakeEnv, FIXTURE_LIBRARY, makeCopyFixture, seedToolOnlySkill } from './lib/copyFixture'
+import {
+  cleanupFixtures,
+  cleanupOnSignals,
+  legacyAppProbePaths,
+  REAL_HOME
+} from './lib/fixtureHome'
+import {
+  buildLibraryFromLegacy,
+  cleanupCopyFixtures,
+  fakeEnv,
+  FIXTURE_LIBRARY,
+  makeCopyFixture,
+  seedToolOnlySkill
+} from './lib/copyFixture'
 
 const ROOT = resolve(__dirname, '..')
 const OUT = '/tmp/illithid-screens'
@@ -73,7 +95,9 @@ function probe(): Map<string, string> {
 }
 
 async function waitLoaded(page: Page): Promise<void> {
-  await page.waitForFunction((text) => !document.body.innerText.includes(text), LOADING, { timeout: 60_000 })
+  await page.waitForFunction((text) => !document.body.innerText.includes(text), LOADING, {
+    timeout: 60_000
+  })
   await page.waitForTimeout(200)
 }
 async function go(page: Page, menu: string): Promise<void> {
@@ -99,7 +123,12 @@ async function step(page: Page, name: string, fn: () => Promise<void>): Promise<
   try {
     await Promise.race([
       fn(),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`step timeout ${STEP_TIMEOUT / 1000}s`)), STEP_TIMEOUT).unref())
+      new Promise<never>((_, rej) =>
+        setTimeout(
+          () => rej(new Error(`step timeout ${STEP_TIMEOUT / 1000}s`)),
+          STEP_TIMEOUT
+        ).unref()
+      )
     ])
     // The script closes any open modal or sheet
     await page.keyboard.press('Escape').catch(() => {})
@@ -110,8 +139,15 @@ async function step(page: Page, name: string, fn: () => Promise<void>): Promise<
     } catch {
       // The window may have closed
     }
-    const active = await page.evaluate(() => document.querySelector('.ac-nav[data-active]')?.textContent ?? '?').catch(() => '?')
-    check(name, false, `exception: ${(e as Error).message.split('\n').slice(0, 3).join(' | ')} (active menu: ${active})`, file)
+    const active = await page
+      .evaluate(() => document.querySelector('.ac-nav[data-active]')?.textContent ?? '?')
+      .catch(() => '?')
+    check(
+      name,
+      false,
+      `exception: ${(e as Error).message.split('\n').slice(0, 3).join(' | ')} (active menu: ${active})`,
+      file
+    )
   }
 }
 
@@ -129,11 +165,20 @@ async function main(): Promise<void> {
   const projRoot = join(REAL_HOME, '.claude/projects')
   let seededSession = false
   if (existsSync(projRoot)) {
-    const files = readdirSync(projRoot).flatMap((d) => (existsSync(join(projRoot, d)) && lstatSync(join(projRoot, d)).isDirectory() ? readdirSync(join(projRoot, d)).filter((f) => f.endsWith('.jsonl')).map((f) => join(projRoot, d, f)) : []))
+    const files = readdirSync(projRoot).flatMap((d) =>
+      existsSync(join(projRoot, d)) && lstatSync(join(projRoot, d)).isDirectory()
+        ? readdirSync(join(projRoot, d))
+            .filter((f) => f.endsWith('.jsonl'))
+            .map((f) => join(projRoot, d, f))
+        : []
+    )
     // Smallest session that actually has user and AI messages (empty sandbox sessions excluded)
     const hasChat = (f: string): boolean => {
       const txt = readFileSync(f, 'utf8')
-      return (txt.match(/"type":"user"/g) ?? []).length >= 2 && (txt.match(/"type":"assistant"/g) ?? []).length >= 2
+      return (
+        (txt.match(/"type":"user"/g) ?? []).length >= 2 &&
+        (txt.match(/"type":"assistant"/g) ?? []).length >= 2
+      )
     }
     const smallest = files
       .map((f) => ({ f, n: lstatSync(f).size }))
@@ -163,7 +208,12 @@ async function main(): Promise<void> {
   delete env.ELECTRON_RUN_AS_NODE
 
   // ILLITHID_TEST=1 hides the window (offscreen) — it doesn't show on the user's screen or steal focus
-  const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env, timeout: 60_000 })
+  const app = await electron.launch({
+    args: [join(ROOT, 'out/main/index.js')],
+    cwd: ROOT,
+    env,
+    timeout: 60_000
+  })
   const consoleErrors: string[] = []
   try {
     const page = await app.firstWindow()
@@ -182,18 +232,30 @@ async function main(): Promise<void> {
     await step(page, 'A. first run → library created automatically', async () => {
       const deadline = Date.now() + 20_000
       const want = ['rules', 'skills', 'mcps', 'memory']
-      while (Date.now() < deadline && !want.every((d) => existsSync(join(LIB, d)))) await page.waitForTimeout(300)
+      while (Date.now() < deadline && !want.every((d) => existsSync(join(LIB, d))))
+        await page.waitForTimeout(300)
       await waitLoaded(page)
       const dirs = want.filter((d) => existsSync(join(LIB, d)))
       const cfg = readConfig(F)
       const s1 = await shot(page, '01-after-init')
-      check('A. first run → library created automatically', dirs.length === 4, `created ${dirs.join(',')} · config ${cfg.exists ? 'present' : 'absent'}`, s1)
+      check(
+        'A. first run → library created automatically',
+        dirs.length === 4,
+        `created ${dirs.join(',')} · config ${cfg.exists ? 'present' : 'absent'}`,
+        s1
+      )
     })
 
     // Library content: imported by the engine's importAllFromLegacy from the fixture's legacy copy (~/.agents)
     const legacyImport = buildLibraryFromLegacy(F)
-    check('A2. importAllFromLegacy → import rules, skills, MCP, memory, permissions', legacyImport.imported > 0 && legacyImport.errors.length === 0, `imported ${legacyImport.imported} · errors ${legacyImport.errors.slice(0, 3).join(' | ') || 0}`)
-    const skills = existsSync(join(LIB, 'skills')) ? readdirSync(join(LIB, 'skills')).filter((n) => !n.startsWith('.')) : []
+    check(
+      'A2. importAllFromLegacy → import rules, skills, MCP, memory, permissions',
+      legacyImport.imported > 0 && legacyImport.errors.length === 0,
+      `imported ${legacyImport.imported} · errors ${legacyImport.errors.slice(0, 3).join(' | ') || 0}`
+    )
+    const skills = existsSync(join(LIB, 'skills'))
+      ? readdirSync(join(LIB, 'skills')).filter((n) => !n.startsWith('.'))
+      : []
     const skill = skills.find((n) => n === 'find-skills') ?? skills[0]
 
     // ---- B. Allow real apply → immediate sync
@@ -204,14 +266,25 @@ async function main(): Promise<void> {
       await page.waitForSelector('[data-testid="confirm-ok"]')
       await confirm(page)
       // There is no sync screen — call the app's sync API directly
-      await page.evaluate(() => (window as unknown as { api: { syncNow: () => Promise<unknown> } }).api.syncNow())
+      await page.evaluate(() =>
+        (window as unknown as { api: { syncNow: () => Promise<unknown> } }).api.syncNow()
+      )
       await page.waitForTimeout(1500)
       await waitLoaded(page)
       const plan = planSyncAll(F, env)
-      const left = plan.targets.filter((c) => c.changed && !c.error).length + plan.skills.filter((x) => x.action === 'copy').length
+      const left =
+        plan.targets.filter((c) => c.changed && !c.error).length +
+        plan.skills.filter((x) => x.action === 'copy').length
       const managed = readState(F).state.skills ?? {}
       const s = await shot(page, '02-sync-after-allow')
-      check('B. allow real apply → sync now → 0 pending changes, skill copies created', !!readConfig(F).config.allowRealApply && left === 0 && Object.keys(managed.codex ?? {}).length > 0, `allowRealApply on · pending changes ${left} · codex copies ${Object.keys(managed.codex ?? {}).length}`, s)
+      check(
+        'B. allow real apply → sync now → 0 pending changes, skill copies created',
+        !!readConfig(F).config.allowRealApply &&
+          left === 0 &&
+          Object.keys(managed.codex ?? {}).length > 0,
+        `allowRealApply on · pending changes ${left} · codex copies ${Object.keys(managed.codex ?? {}).length}`,
+        s
+      )
     })
 
     // ---- C. Skill codex off → auto sync deletes immediately (moved to backup)
@@ -224,10 +297,17 @@ async function main(): Promise<void> {
       await waitLoaded(page)
       const s1 = await shot(page, '03-skill-codex-off')
       const gone = !existsSync(join(F, '.codex/skills', skill))
-      const backups = existsSync(join(F, '.config/illithid/backups/deleted')) ? readdirSync(join(F, '.config/illithid/backups/deleted')) : []
+      const backups = existsSync(join(F, '.config/illithid/backups/deleted'))
+        ? readdirSync(join(F, '.config/illithid/backups/deleted'))
+        : []
       const cand = planSyncAll(F, env).skills.filter((x) => x.action === 'deleteCandidate').length
       const s3 = await shot(page, '03-after-delete')
-      check('C. skill codex off → auto sync deletes immediately (backup) → 0 candidates', gone && backups.length === 1 && cand === 0, `copy removed ${gone} · backups ${backups.length} · remaining candidates ${cand} (${s1})`, s3)
+      check(
+        'C. skill codex off → auto sync deletes immediately (backup) → 0 candidates',
+        gone && backups.length === 1 && cand === 0,
+        `copy removed ${gone} · backups ${backups.length} · remaining candidates ${cand} (${s1})`,
+        s3
+      )
     })
 
     // ---- D. Save rule edit → auto sync
@@ -247,9 +327,16 @@ async function main(): Promise<void> {
       await waitLoaded(page)
       await page.keyboard.press('Escape')
       const agentsMd = read(join(F, '.codex/AGENTS.md'))
-      const left = planSyncAll(F, env).targets.filter((c) => c.changed && !c.error).map((c) => c.id)
+      const left = planSyncAll(F, env)
+        .targets.filter((c) => c.changed && !c.error)
+        .map((c) => c.id)
       const s2 = await shot(page, '04-rule-synced')
-      check('D. save rule edit → immediate sync → reflected in AGENTS.md block, 0 pending changes', agentsMd.includes(marker) && left.length === 0, `in AGENTS.md ${agentsMd.includes(marker)} · pending changes ${left.join(',') || 0} (${s1})`, s2)
+      check(
+        'D. save rule edit → immediate sync → reflected in AGENTS.md block, 0 pending changes',
+        agentsMd.includes(marker) && left.length === 0,
+        `in AGENTS.md ${agentsMd.includes(marker)} · pending changes ${left.join(',') || 0} (${s1})`,
+        s2
+      )
     })
 
     // ---- E. Add MCP server → auto sync → 3 tool files
@@ -269,7 +356,12 @@ async function main(): Promise<void> {
       const body = await page.evaluate(() => document.body.innerText)
       const leaked = /fixture-value-/.test(body)
       const s2 = await shot(page, '05-mcp-synced')
-      check('E. add MCP server → immediate sync → appears in claude/codex/opencode files, no raw secret on screen', inClaude && inCodex && inOpencode && !leaked, `claude ${inClaude} · codex ${inCodex} · opencode ${inOpencode} · secret exposed ${leaked} (${s1})`, s2)
+      check(
+        'E. add MCP server → immediate sync → appears in claude/codex/opencode files, no raw secret on screen',
+        inClaude && inCodex && inOpencode && !leaked,
+        `claude ${inClaude} · codex ${inCodex} · opencode ${inOpencode} · secret exposed ${leaked} (${s1})`,
+        s2
+      )
     })
 
     // ---- E2. Library watch: rule edited directly in an editor → auto sync
@@ -279,11 +371,22 @@ async function main(): Promise<void> {
       const marker = `m7c-watch-${Date.now()}`
       writeFileSync(target, readFileSync(target, 'utf8') + `\n- ${marker}\n`)
       // watch (800ms debounce) → sync → notification. Wait generously (evaluate callback is a string due to the tsx __name issue)
-      await page.waitForFunction(`document.body.innerText.includes(${JSON.stringify(t_watchText())})`, undefined, { timeout: 15_000 }).catch(() => {})
+      await page
+        .waitForFunction(
+          `document.body.innerText.includes(${JSON.stringify(t_watchText())})`,
+          undefined,
+          { timeout: 15_000 }
+        )
+        .catch(() => {})
       await page.waitForTimeout(2500)
       const agentsMd = read(join(F, '.codex/AGENTS.md'))
       const s1 = await shot(page, '05b-watch-synced')
-      check('E2. edit library file directly → watch → auto sync → reflected in AGENTS.md', agentsMd.includes(marker), `in AGENTS.md ${agentsMd.includes(marker)}`, s1)
+      check(
+        'E2. edit library file directly → watch → auto sync → reflected in AGENTS.md',
+        agentsMd.includes(marker),
+        `in AGENTS.md ${agentsMd.includes(marker)}`,
+        s1
+      )
     })
 
     // ---- F. Import (source: Codex)
@@ -293,7 +396,9 @@ async function main(): Promise<void> {
       await page.waitForSelector('[data-testid="import-source-tool:codex"]', { timeout: 20_000 })
       const s1 = await shot(page, '06-import-sources')
       await page.click('[data-testid="import-source-tool:codex"]')
-      await page.waitForSelector('[data-testid="import-skill-m7c-import-skill"]', { timeout: 30_000 })
+      await page.waitForSelector('[data-testid="import-skill-m7c-import-skill"]', {
+        timeout: 30_000
+      })
       await page.locator('[data-testid="import-skill-m7c-import-skill"]').check({ force: true })
       const s2 = await shot(page, '06-import-plan')
       await page.click('[data-testid="import-apply"]')
@@ -301,7 +406,12 @@ async function main(): Promise<void> {
       const imported = existsSync(join(LIB, 'skills/m7c-import-skill/SKILL.md'))
       const s3 = await shot(page, '06-import-done')
       await page.click('[data-testid="import-close"]')
-      check('F. import: pick source (Codex) → 1 tool-only skill → appears in library', imported, `${FIXTURE_LIBRARY}/skills/m7c-import-skill ${imported} (${s1}, ${s2})`, s3)
+      check(
+        'F. import: pick source (Codex) → 1 tool-only skill → appears in library',
+        imported,
+        `${FIXTURE_LIBRARY}/skills/m7c-import-skill ${imported} (${s1}, ${s2})`,
+        s3
+      )
     })
     // ---- G1. Memory edit → auto sync
     await step(page, 'G1. create and edit memory note', async () => {
@@ -322,7 +432,12 @@ async function main(): Promise<void> {
       await page.keyboard.press('Escape')
       const file = join(LIB, 'memory/feedback/m7c-note.md')
       const s1 = await shot(page, '07-memory')
-      check('G1. create/edit/save memory note → library file', existsSync(file) && read(file).includes('memory edit scenario'), `${existsSync(file) ? 'file present' : 'file missing'}`, s1)
+      check(
+        'G1. create/edit/save memory note → library file',
+        existsSync(file) && read(file).includes('memory edit scenario'),
+        `${existsSync(file) ? 'file present' : 'file missing'}`,
+        s1
+      )
     })
 
     // ---- G3. Backup: connect (bare) → snapshot → change library → restore
@@ -337,7 +452,12 @@ async function main(): Promise<void> {
       await page.waitForTimeout(3000)
       const remoteLog = ((): string[] => {
         try {
-          return execFileSync('git', ['--git-dir', bare, 'log', '--oneline', 'main'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+          return execFileSync('git', ['--git-dir', bare, 'log', '--oneline', 'main'], {
+            encoding: 'utf8'
+          })
+            .trim()
+            .split('\n')
+            .filter(Boolean)
         } catch {
           return []
         }
@@ -358,7 +478,12 @@ async function main(): Promise<void> {
       await page.waitForTimeout(3000)
       const restored = existsSync(victim)
       const s3 = await shot(page, '09-backup-restored')
-      check('G3. connect backup (bare remote) → push snapshot → delete rule → restored', remoteLog.length >= 1 && restored, `remote commits ${remoteLog.length} · deleted rule restored ${restored} (${s1}, ${s2})`, s3)
+      check(
+        'G3. connect backup (bare remote) → push snapshot → delete rule → restored',
+        remoteLog.length >= 1 && restored,
+        `remote commits ${remoteLog.length} · deleted rule restored ${restored} (${s1}, ${s2})`,
+        s3
+      )
     })
 
     // ---- G4. Session transcript
@@ -367,12 +492,26 @@ async function main(): Promise<void> {
       await page.waitForTimeout(1500)
       await waitLoaded(page)
       const msgs = await page.locator('main .ac-card >> text=/./').count()
-      const contents = await page.locator('[data-testid="session-count"]').innerText().catch(() => '')
+      const contents = await page
+        .locator('[data-testid="session-count"]')
+        .innerText()
+        .catch(() => '')
       const body = (await page.evaluate('document.body.innerText')) as string
-      const bubbles = await page.locator('main .ac-card >> text=/^(\uC0AC\uC6A9\uC790|AI)$/').count()
+      const bubbles = await page
+        .locator('main .ac-card >> text=/^(\uC0AC\uC6A9\uC790|AI)$/')
+        .count()
       const contentsItems = await page.locator('main .ac-row .mantine-Badge-root').count()
       const s1 = await shot(page, '10-sessions-transcript')
-      check('G4. session 3-pane: list → history bubbles and numbered Contents', seededSession ? bubbles > 0 && contentsItems > 0 && !/\uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4/.test(body) : true, `session seeded ${seededSession} · list ${contents} · bubbles ${bubbles} · Contents ${contentsItems} (elements ${msgs})`, s1)
+      check(
+        'G4. session 3-pane: list → history bubbles and numbered Contents',
+        seededSession
+          ? bubbles > 0 &&
+              contentsItems > 0 &&
+              !/\uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4/.test(body)
+          : true,
+        `session seeded ${seededSession} · list ${contents} · bubbles ${bubbles} · Contents ${contentsItems} (elements ${msgs})`,
+        s1
+      )
     })
   } finally {
     await app.close()
@@ -380,13 +519,26 @@ async function main(): Promise<void> {
 
   const after = probe()
   const changed = [...before.entries()].filter(([k, v]) => after.get(k) !== v).map(([k]) => k)
-  check('G. real HOME targets (except ~/.claude.json), library, ~/.illithid, ~/.config/illithid mtime unchanged', changed.length === 0, changed.length ? `changed paths: ${changed.join(', ')}` : `${before.size} paths unchanged (~/.illithid ${after.get(join(REAL_HOME, '.illithid')) === 'absent' ? 'absent' : 'pre-existing, unchanged'})`)
-  check('H. no renderer console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | ') || '0')
+  check(
+    'G. real HOME targets (except ~/.claude.json), library, ~/.illithid, ~/.config/illithid mtime unchanged',
+    changed.length === 0,
+    changed.length
+      ? `changed paths: ${changed.join(', ')}`
+      : `${before.size} paths unchanged (~/.illithid ${after.get(join(REAL_HOME, '.illithid')) === 'absent' ? 'absent' : 'pre-existing, unchanged'})`
+  )
+  check(
+    'H. no renderer console errors',
+    consoleErrors.length === 0,
+    consoleErrors.slice(0, 3).join(' | ') || '0'
+  )
 
   cleanupCopyFixtures()
   cleanupFixtures()
   rmSync(env.ILLITHID_USER_DATA, { recursive: true, force: true })
-  for (const r of rows) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.step}\n      ${r.detail}${r.shot ? `\n      ${r.shot}` : ''}`)
+  for (const r of rows)
+    console.log(
+      `${r.ok ? 'PASS' : 'FAIL'}  ${r.step}\n      ${r.detail}${r.shot ? `\n      ${r.shot}` : ''}`
+    )
   const pass = rows.filter((r) => r.ok).length
   console.log(`\nm7c-scenario ${pass}/${rows.length} PASS`)
   if (pass !== rows.length) process.exitCode = 1

@@ -11,7 +11,17 @@
  *
  * Usage: npx electron-vite build && npx tsx scripts/onboarding-check.ts
  */
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Page } from 'playwright-core'
@@ -40,7 +50,8 @@ interface RunResult {
 /** Scenario 1: first run with a Claude rule → onboarding → import → preview → apply */
 async function firstRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-onboarding'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-onboarding-userdata-'))
   put(home, '.claude/rules/my-rule.md', RULE)
@@ -88,14 +99,22 @@ async function firstRun(shots: string): Promise<RunResult> {
     check(!(await tid('onboarding-tool-codex').isChecked()), 'Codex unchecked (not detected)')
     check(!(await tid('onboarding-tool-opencode').isChecked()), 'OpenCode unchecked (not detected)')
     check(!(await tid('onboarding-tool-gemini').isChecked()), 'Gemini CLI unchecked (not detected)')
-    check(!(await tid('onboarding-tool-copilot').isChecked()), 'GitHub Copilot unchecked (not detected)')
+    check(
+      !(await tid('onboarding-tool-copilot').isChecked()),
+      'GitHub Copilot unchecked (not detected)'
+    )
     await shot(page, 'tools')
 
     await tid('onboarding-tools-next').click()
     await tid('onboarding-import-claude').waitFor()
     check(!(await tid('onboarding-import-codex').count()), 'import step lists selected tools only')
-    const cfg = JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')) as { toolsInUse?: string[] }
-    check(JSON.stringify(cfg.toolsInUse) === '["claude"]', `toolsInUse saved as ["claude"] (got ${JSON.stringify(cfg.toolsInUse)})`)
+    const cfg = JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')) as {
+      toolsInUse?: string[]
+    }
+    check(
+      JSON.stringify(cfg.toolsInUse) === '["claude"]',
+      `toolsInUse saved as ["claude"] (got ${JSON.stringify(cfg.toolsInUse)})`
+    )
     await shot(page, 'import')
 
     await tid('onboarding-import-claude').click()
@@ -107,17 +126,29 @@ async function firstRun(shots: string): Promise<RunResult> {
     await tid('import-close').waitFor({ timeout: 30_000 })
     await shot(page, 'import-done')
     await tid('import-close').click()
-    check(readFileSync(join(home, '.claude/rules/my-rule.md'), 'utf8') === RULE, 'original rule untouched after import')
-    check(!existsSync(join(home, '.claude/rules/illithid')), 'nothing written to Claude before apply')
+    check(
+      readFileSync(join(home, '.claude/rules/my-rule.md'), 'utf8') === RULE,
+      'original rule untouched after import'
+    )
+    check(
+      !existsSync(join(home, '.claude/rules/illithid')),
+      'nothing written to Claude before apply'
+    )
 
     await tid('onboarding-import-next').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await tid('apply-preview-claude').waitFor()
     check(
-      !(await tid('apply-preview-codex').count()) && !(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-gemini').count()) && !(await tid('apply-preview-copilot').count()),
+      !(await tid('apply-preview-codex').count()) &&
+        !(await tid('apply-preview-opencode').count()) &&
+        !(await tid('apply-preview-gemini').count()) &&
+        !(await tid('apply-preview-copilot').count()),
       'preview lists Claude Code only'
     )
-    check((await tid('apply-preview-action-replace').count()) > 0, 'preview shows the rule replacement')
+    check(
+      (await tid('apply-preview-action-replace').count()) > 0,
+      'preview shows the rule replacement'
+    )
     await shot(page, 'preview')
 
     await tid('apply-preview-apply').click()
@@ -128,11 +159,20 @@ async function firstRun(shots: string): Promise<RunResult> {
     check(!existsSync(join(home, '.config/opencode')), '~/.config/opencode not created')
     check(!existsSync(join(home, '.gemini')), '~/.gemini not created')
     check(!existsSync(join(home, '.copilot')), '~/.copilot not created')
-    check(!existsSync(join(home, '.claude/rules/my-rule.md')), 'original moved out of ~/.claude/rules')
+    check(
+      !existsSync(join(home, '.claude/rules/my-rule.md')),
+      'original moved out of ~/.claude/rules'
+    )
     const copy = join(home, '.claude/rules/illithid/my-rule.md')
-    check(existsSync(copy) && readFileSync(copy, 'utf8').includes('Keep answers short.'), 'app copy written to ~/.claude/rules/illithid')
+    check(
+      existsSync(copy) && readFileSync(copy, 'utf8').includes('Keep answers short.'),
+      'app copy written to ~/.claude/rules/illithid'
+    )
     const backups = findFiles(join(home, '.config/illithid/backups/imported'), 'my-rule.md')
-    check(backups.length === 1 && readFileSync(backups[0], 'utf8') === RULE, 'original kept in backups/imported')
+    check(
+      backups.length === 1 && readFileSync(backups[0], 'utf8') === RULE,
+      'original kept in backups/imported'
+    )
 
     await page.click('[data-menu="settings"]')
     await tid('tool-in-use-claude').waitFor()
@@ -157,18 +197,38 @@ async function firstRun(shots: string): Promise<RunResult> {
  */
 async function notInitializedRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-not-initialized'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-notinit-userdata-'))
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
-  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(
+    home,
+    `${ws}/illithid.json`,
+    JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+  )
   put(home, `${ws}/rules/my-rule.md`, RULE)
-  put(home, `${ws}/mcps/context7.json`, JSON.stringify({ transport: 'http', url: 'https://mcp.context7.com/mcp' }) + '\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n')
+  put(
+    home,
+    `${ws}/mcps/context7.json`,
+    JSON.stringify({ transport: 'http', url: 'https://mcp.context7.com/mcp' }) + '\n'
+  )
+  put(
+    home,
+    '.config/illithid/config.json',
+    JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n'
+  )
   put(home, '.claude/settings.json', '{}\n')
 
-  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: home,
+    LANG: 'en_US.UTF-8',
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: userData,
+    ILLITHID_TEST: '1'
+  }
   const failures: string[] = []
   const check = (ok: boolean, what: string): void => {
     if (!ok) failures.push(what)
@@ -201,7 +261,10 @@ async function notInitializedRun(shots: string): Promise<RunResult> {
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(600)
-    check((await tid('sync-button').getAttribute('data-state')) !== 'failed', 'sync button not red after apply')
+    check(
+      (await tid('sync-button').getAttribute('data-state')) !== 'failed',
+      'sync button not red after apply'
+    )
     check(await tid('sync-not-initialized').isVisible(), 'hint still shown after apply')
     check(!existsSync(join(home, '.claude.json')), '~/.claude.json not created')
     check(existsSync(join(home, '.claude/rules/illithid/my-rule.md')), 'rule applied')
@@ -217,20 +280,45 @@ async function notInitializedRun(shots: string): Promise<RunResult> {
 /** Scenario 3: preview details with Claude Code + OpenCode in use and auto apply off */
 async function previewDetailsRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-preview-details'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-preview-userdata-'))
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
-  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(
+    home,
+    `${ws}/illithid.json`,
+    JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+  )
   put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
-  put(home, `${ws}/skills/fmt/SKILL.md`, '---\nname: fmt\ndescription: Format code\n---\n\nFormat it.\n')
-  put(home, `${ws}/mcps/docs-mcp.json`, JSON.stringify({ transport: 'http', url: 'https://mcp.example.com/mcp' }) + '\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude', 'opencode'] }) + '\n')
+  put(
+    home,
+    `${ws}/skills/fmt/SKILL.md`,
+    '---\nname: fmt\ndescription: Format code\n---\n\nFormat it.\n'
+  )
+  put(
+    home,
+    `${ws}/mcps/docs-mcp.json`,
+    JSON.stringify({ transport: 'http', url: 'https://mcp.example.com/mcp' }) + '\n'
+  )
+  put(
+    home,
+    '.config/illithid/config.json',
+    JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude', 'opencode'] }) +
+      '\n'
+  )
   put(home, '.claude/settings.json', '{}\n')
   put(home, '.claude.json', '{}\n')
   put(home, '.config/opencode/opencode.json', '{}\n')
-  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: home,
+    LANG: 'en_US.UTF-8',
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: userData,
+    ILLITHID_TEST: '1'
+  }
   // Start from a synced state
   syncAll(home, env, { allowReal: true, approvedOnce: true })
 
@@ -256,12 +344,22 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
     await card.click()
     await tid('detail-sheet').waitFor()
     await tid('tab-edit').click()
-    await page.locator('[data-testid="detail-sheet"] textarea').fill('# Style\n\n- Match the surrounding code.\n- Keep functions small.\n')
+    await page
+      .locator('[data-testid="detail-sheet"] textarea')
+      .fill('# Style\n\n- Match the surrounding code.\n- Keep functions small.\n')
     await tid('editor-save').click()
-    const toast = page.locator('.mantine-Notification-root').filter({ hasText: 'Saved to library only' })
-    await toast.first().waitFor({ timeout: 10_000 }).catch(() => {})
+    const toast = page
+      .locator('.mantine-Notification-root')
+      .filter({ hasText: 'Saved to library only' })
+    await toast
+      .first()
+      .waitFor({ timeout: 10_000 })
+      .catch(() => {})
     check((await toast.count()) > 0, 'rule save toast says library only')
-    check(!(await page.locator('.mantine-Notification-root').filter({ hasText: 'syncing' }).count()), 'no "syncing to tools" toast')
+    check(
+      !(await page.locator('.mantine-Notification-root').filter({ hasText: 'syncing' }).count()),
+      'no "syncing to tools" toast'
+    )
 
     // 2 + 3. Preview on top of the open detail sheet; OpenCode listed as reading the library directly
     await tid('sync-button').click()
@@ -271,22 +369,39 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
     await page.screenshot({ path: join(shots, 'details-1-preview-over-sheet.png') })
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
-    check(readFileSync(join(home, '.claude/rules/illithid/style.md'), 'utf8').includes('Keep functions small.'), 'apply clicked through the sheet reached Claude')
+    check(
+      readFileSync(join(home, '.claude/rules/illithid/style.md'), 'utf8').includes(
+        'Keep functions small.'
+      ),
+      'apply clicked through the sheet reached Claude'
+    )
 
     // 4. OpenCode off for the rule → opencode.json row with the rule leaving instructions
     await page.keyboard.press('Escape')
-    await tid('detail-sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('detail-sheet')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
     await card.locator('[aria-label="OpenCode"]').click()
     await page.waitForTimeout(800)
     await tid('sync-button').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await tid('apply-preview-opencode').waitFor()
-    check((await tid('apply-preview-opencode').getByText('style.md').count()) > 0, 'rule named under opencode.json')
-    check((await tid('apply-preview-opencode').locator('[data-testid="apply-preview-action-remove"]').count()) > 0, 'rule shown as removed')
+    check(
+      (await tid('apply-preview-opencode').getByText('style.md').count()) > 0,
+      'rule named under opencode.json'
+    )
+    check(
+      (await tid('apply-preview-opencode')
+        .locator('[data-testid="apply-preview-action-remove"]')
+        .count()) > 0,
+      'rule shown as removed'
+    )
     await page.waitForTimeout(400)
     await page.screenshot({ path: join(shots, 'details-2-opencode-off.png') })
     await page.keyboard.press('Escape')
-    await tid('apply-preview').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('apply-preview')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
 
     // 5. MCP detail: turn the server off for OpenCode → preview lists it as removed under opencode.json only
     await page.click('[data-menu="mcp"]')
@@ -294,21 +409,36 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
     await mcpCard.waitFor({ timeout: 30_000 })
     await mcpCard.click()
     await tid('mcp-detail-tools').waitFor()
-    check(await tid('mcp-detail-tools').locator('[aria-label="OpenCode"]').isVisible(), 'MCP detail shows the OpenCode toggle')
-    check(!(await tid('mcp-detail-tools').locator('[aria-label="Codex"]').count()), 'MCP detail hides tools not in use')
+    check(
+      await tid('mcp-detail-tools').locator('[aria-label="OpenCode"]').isVisible(),
+      'MCP detail shows the OpenCode toggle'
+    )
+    check(
+      !(await tid('mcp-detail-tools').locator('[aria-label="Codex"]').count()),
+      'MCP detail hides tools not in use'
+    )
     await tid('mcp-detail-tools').locator('[aria-label="OpenCode"]').click()
     await page.waitForTimeout(800)
     await page.keyboard.press('Escape')
-    await tid('detail-sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('detail-sheet')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
     await tid('sync-button').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
-    await tid('apply-preview-mcp-opencode-docs-mcp-remove').waitFor({ timeout: 10_000 }).catch(() => {})
-    check((await tid('apply-preview-mcp-opencode-docs-mcp-remove').count()) > 0, 'preview lists docs-mcp removed under opencode.json')
+    await tid('apply-preview-mcp-opencode-docs-mcp-remove')
+      .waitFor({ timeout: 10_000 })
+      .catch(() => {})
+    check(
+      (await tid('apply-preview-mcp-opencode-docs-mcp-remove').count()) > 0,
+      'preview lists docs-mcp removed under opencode.json'
+    )
     check(!(await tid('apply-preview-mcp-claude-docs-mcp-remove').count()), 'no Claude server row')
     await page.waitForTimeout(400)
     await page.screenshot({ path: join(shots, 'details-3-mcp-off.png') })
     await page.keyboard.press('Escape')
-    await tid('apply-preview').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('apply-preview')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
 
     // 6 + 7. Rule and skill detail: the same "Tools" line — Claude off → preview lists the Claude copy as removed
     const detailOff = async (menu: string, name: string, row: string): Promise<void> => {
@@ -317,30 +447,46 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
       await c.waitFor({ timeout: 30_000 })
       await c.click()
       await tid(row).waitFor()
-      check(!(await tid(row).locator('[aria-label="Codex"]').count()), `${menu} detail hides tools not in use`)
+      check(
+        !(await tid(row).locator('[aria-label="Codex"]').count()),
+        `${menu} detail hides tools not in use`
+      )
       await tid(row).locator('[aria-label="Claude Code"]').click()
       await page.waitForTimeout(800)
       await page.keyboard.press('Escape')
-      await tid('detail-sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+      await tid('detail-sheet')
+        .waitFor({ state: 'detached', timeout: 5000 })
+        .catch(() => {})
       await tid('sync-button').click()
       await tid('apply-preview').waitFor({ timeout: 30_000 })
       const claude = tid('apply-preview-claude')
       await claude.waitFor({ timeout: 10_000 }).catch(() => {})
-      const listed = (await claude.getByText(name, { exact: true }).count()) > 0 && (await claude.locator('[data-testid="apply-preview-action-remove"]').count()) > 0
+      const listed =
+        (await claude.getByText(name, { exact: true }).count()) > 0 &&
+        (await claude.locator('[data-testid="apply-preview-action-remove"]').count()) > 0
       check(listed, `${menu} detail toggle → preview lists ${name} removed for Claude Code`)
       await page.waitForTimeout(400)
       await page.screenshot({ path: join(shots, `details-${menu}-off.png`) })
       await page.keyboard.press('Escape')
-      await tid('apply-preview').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+      await tid('apply-preview')
+        .waitFor({ state: 'detached', timeout: 5000 })
+        .catch(() => {})
     }
     await detailOff('rules', 'style.md', 'rule-detail-tools')
-    await tid('rule-detail-tools').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('rule-detail-tools')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
     await page.click('[data-menu="skills"]')
     await page.locator('main [data-card]').filter({ hasText: 'fmt' }).first().click()
     await tid('skill-detail-tools').waitFor()
-    check(!(await tid('skill-detail-tools').locator('[aria-label="OpenCode"]').count()), 'skill detail shows only toggleable tools (no OpenCode)')
+    check(
+      !(await tid('skill-detail-tools').locator('[aria-label="OpenCode"]').count()),
+      'skill detail shows only toggleable tools (no OpenCode)'
+    )
     await page.keyboard.press('Escape')
-    await tid('detail-sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    await tid('detail-sheet')
+      .waitFor({ state: 'detached', timeout: 5000 })
+      .catch(() => {})
     await detailOff('skills', 'fmt', 'skill-detail-tools')
     return { failures, errors }
   } finally {
@@ -357,18 +503,38 @@ async function previewDetailsRun(shots: string): Promise<RunResult> {
  */
 async function firstToolSaveRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-first-tool-save'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-toolsave-userdata-'))
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
-  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(
+    home,
+    `${ws}/illithid.json`,
+    JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+  )
   put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
-  put(home, `${ws}/mcps/context7.json`, JSON.stringify({ transport: 'http', url: 'https://mcp.context7.com/mcp' }) + '\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default' }) + '\n')
+  put(
+    home,
+    `${ws}/mcps/context7.json`,
+    JSON.stringify({ transport: 'http', url: 'https://mcp.context7.com/mcp' }) + '\n'
+  )
+  put(
+    home,
+    '.config/illithid/config.json',
+    JSON.stringify({ version: 1, activeWorkspace: 'default' }) + '\n'
+  )
   put(home, '.claude/settings.json', '{}\n')
   put(home, '.claude.json', '{}\n')
-  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: home,
+    LANG: 'en_US.UTF-8',
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: userData,
+    ILLITHID_TEST: '1'
+  }
   const failures: string[] = []
   const check = (ok: boolean, what: string): void => {
     if (!ok) failures.push(what)
@@ -389,22 +555,38 @@ async function firstToolSaveRun(shots: string): Promise<RunResult> {
     await tid('tool-in-use-claude').waitFor()
     await page.waitForTimeout(400)
     check(await tid('tool-in-use-claude').isChecked(), 'Claude Code shown on (detected)')
-    check(!(await tid('tool-in-use-opencode').isChecked()) && !(await tid('tool-in-use-codex').isChecked()), 'OpenCode and Codex shown off (not detected)')
+    check(
+      !(await tid('tool-in-use-opencode').isChecked()) &&
+        !(await tid('tool-in-use-codex').isChecked()),
+      'OpenCode and Codex shown off (not detected)'
+    )
     check(await tid('tool-not-found-opencode').isVisible(), 'OpenCode marked Not found')
     await page.screenshot({ path: join(shots, 'toolsave-1-settings.png') })
     await tid('tool-in-use-gemini').click({ force: true })
     await tid('apply-preview').waitFor({ timeout: 30_000 })
-    check(!(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-codex').count()), 'preview has no OpenCode or Codex rows')
+    check(
+      !(await tid('apply-preview-opencode').count()) && !(await tid('apply-preview-codex').count()),
+      'preview has no OpenCode or Codex rows'
+    )
     await page.waitForTimeout(400)
     await page.screenshot({ path: join(shots, 'toolsave-2-preview.png') })
-    const cfg = JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')) as { toolsInUse?: string[] }
-    check(JSON.stringify(cfg.toolsInUse) === '["claude","gemini"]', `first save = shown tools + Gemini (got ${JSON.stringify(cfg.toolsInUse)})`)
+    const cfg = JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')) as {
+      toolsInUse?: string[]
+    }
+    check(
+      JSON.stringify(cfg.toolsInUse) === '["claude","gemini"]',
+      `first save = shown tools + Gemini (got ${JSON.stringify(cfg.toolsInUse)})`
+    )
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(600)
     check(!existsSync(join(home, '.config/opencode')), '~/.config/opencode not created')
     check(!existsSync(join(home, '.codex')), '~/.codex not created')
-    check(existsSync(join(home, '.gemini/GEMINI.md')) && existsSync(join(home, '.gemini/settings.json')), 'Gemini files written')
+    check(
+      existsSync(join(home, '.gemini/GEMINI.md')) &&
+        existsSync(join(home, '.gemini/settings.json')),
+      'Gemini files written'
+    )
     return { failures, errors }
   } finally {
     await app.close()
@@ -419,25 +601,42 @@ async function firstToolSaveRun(shots: string): Promise<RunResult> {
  */
 async function toolsCancelRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-tools-cancel'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-toolscancel-userdata-'))
   const ws = '.illithid/workspaces/default'
   const cfgPath = join(home, '.config/illithid/config.json')
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
-  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(
+    home,
+    `${ws}/illithid.json`,
+    JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+  )
   put(home, `${ws}/rules/style.md`, '# Style\n\n- Match the surrounding code.\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n')
+  put(
+    home,
+    '.config/illithid/config.json',
+    JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n'
+  )
   put(home, '.claude/settings.json', '{}\n')
   put(home, '.claude.json', '{}\n')
-  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: home,
+    LANG: 'en_US.UTF-8',
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: userData,
+    ILLITHID_TEST: '1'
+  }
   syncAll(home, env, { allowReal: true, approvedOnce: true })
   const failures: string[] = []
   const check = (ok: boolean, what: string): void => {
     if (!ok) failures.push(what)
   }
   const errors: string[] = []
-  const cfg = (): { toolsInUse?: string[] } => JSON.parse(readFileSync(cfgPath, 'utf8')) as { toolsInUse?: string[] }
+  const cfg = (): { toolsInUse?: string[] } =>
+    JSON.parse(readFileSync(cfgPath, 'utf8')) as { toolsInUse?: string[] }
   const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -460,7 +659,9 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
       await tid('apply-preview').waitFor({ timeout: 30_000 })
       await page.waitForTimeout(300)
       await dismiss()
-      await tid('apply-preview').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+      await tid('apply-preview')
+        .waitFor({ state: 'detached', timeout: 10_000 })
+        .catch(() => {})
       await page.waitForTimeout(1000)
     }
     const cancel = (): Promise<void> => tid('apply-preview-cancel').click()
@@ -471,19 +672,28 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
     // 1. explicit [claude] → Gemini on → Cancel → back to [claude], switch off, ~/.gemini untouched
     await geminiOnThen(cancel)
     check(!(await tid('tool-in-use-gemini').isChecked()), 'Cancel: Gemini switch off again')
-    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `Cancel: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude"]',
+      `Cancel: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     check(!existsSync(join(home, '.gemini')), 'Cancel: ~/.gemini not created')
     // 2. same with Esc
     await geminiOnThen(esc)
     check(!(await tid('tool-in-use-gemini').isChecked()), 'Esc: Gemini switch off again')
-    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `Esc: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude"]',
+      `Esc: toolsInUse restored (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     check(!existsSync(join(home, '.gemini')), 'Esc: ~/.gemini not created')
     // 3. unset → Gemini on → close button → the key is gone again (unset)
     writeFileSync(cfgPath, JSON.stringify({ version: 1, activeWorkspace: 'default' }) + '\n')
     await page.reload()
     await openSettings()
     await geminiOnThen(closeX)
-    check(!('toolsInUse' in cfg()), `close button: toolsInUse unset again (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      !('toolsInUse' in cfg()),
+      `close button: toolsInUse unset again (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     check(!existsSync(join(home, '.gemini')), 'close button: ~/.gemini not created')
     // 4. Gemini on → Apply → kept, ~/.gemini written
     await tid('tool-in-use-gemini').click({ force: true })
@@ -491,7 +701,10 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(800)
-    check(JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]', `Apply: list kept (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]',
+      `Apply: list kept (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     check(existsSync(join(home, '.gemini/GEMINI.md')), 'Apply: ~/.gemini written')
     check(await tid('tool-in-use-gemini').isChecked(), 'Apply: Gemini switch stays on')
     // 5. a preview opened from the sidebar Sync button, cancelled → settings unchanged
@@ -499,14 +712,30 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
     await page.click('[data-menu="rules"]')
     await page.getByRole('button', { name: 'Reload' }).click()
     await tid('sync-button').waitFor()
-    await page.waitForFunction(() => !(document.querySelector('[data-testid="sync-button"]') as HTMLButtonElement | null)?.disabled, null, { timeout: 30_000 }).catch(() => {})
+    await page
+      .waitForFunction(
+        () =>
+          !(document.querySelector('[data-testid="sync-button"]') as HTMLButtonElement | null)
+            ?.disabled,
+        null,
+        { timeout: 30_000 }
+      )
+      .catch(() => {})
     await tid('sync-button').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await cancel()
-    await tid('apply-preview').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+    await tid('apply-preview')
+      .waitFor({ state: 'detached', timeout: 10_000 })
+      .catch(() => {})
     await page.waitForTimeout(1000)
-    check(JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]', `sidebar preview cancel: settings unchanged (got ${JSON.stringify(cfg().toolsInUse)})`)
-    check(!existsSync(join(home, '.claude/rules/illithid/more.md')), 'sidebar preview cancel: nothing applied')
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude","gemini"]',
+      `sidebar preview cancel: settings unchanged (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
+    check(
+      !existsSync(join(home, '.claude/rules/illithid/more.md')),
+      'sidebar preview cancel: nothing applied'
+    )
     await page.screenshot({ path: join(shots, 'toolscancel-1-after.png') })
     return { failures, errors }
   } finally {
@@ -522,24 +751,41 @@ async function toolsCancelRun(shots: string): Promise<RunResult> {
  */
 async function comboRun(shots: string): Promise<RunResult> {
   const home = '/Users/Shared/illithid-combo'
-  if (existsSync(home)) throw new Error(`${home} already exists; remove it or pick another demo path`)
+  if (existsSync(home))
+    throw new Error(`${home} already exists; remove it or pick another demo path`)
   mkdirSync(home)
   const userData = mkdtempSync(join(tmpdir(), 'illithid-combo-userdata-'))
   const ws = '.illithid/workspaces/default'
   put(home, `${ws}/workspace.json`, JSON.stringify({ name: 'default' }) + '\n')
-  put(home, `${ws}/illithid.json`, JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n')
+  put(
+    home,
+    `${ws}/illithid.json`,
+    JSON.stringify({ version: 1, rules: {}, skills: {}, mcp: {}, agents: {} }) + '\n'
+  )
   put(home, `${ws}/rules/style.md`, '# Style\n')
-  put(home, '.config/illithid/config.json', JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n')
+  put(
+    home,
+    '.config/illithid/config.json',
+    JSON.stringify({ version: 1, activeWorkspace: 'default', toolsInUse: ['claude'] }) + '\n'
+  )
   put(home, '.claude/settings.json', '{}\n')
   put(home, '.claude.json', '{}\n')
   put(home, '.grok/config.toml', '[ui]\ncompact_mode = true\n')
-  const env = { PATH: '/usr/bin:/bin', HOME: home, LANG: 'en_US.UTF-8', ILLITHID_HOME: home, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' }
+  const env = {
+    PATH: '/usr/bin:/bin',
+    HOME: home,
+    LANG: 'en_US.UTF-8',
+    ILLITHID_HOME: home,
+    ILLITHID_USER_DATA: userData,
+    ILLITHID_TEST: '1'
+  }
   const failures: string[] = []
   const check = (ok: boolean, what: string): void => {
     if (!ok) failures.push(what)
   }
   const errors: string[] = []
-  const cfg = (): { toolsInUse?: string[]; toolsRetiring?: string[] } => JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8'))
+  const cfg = (): { toolsInUse?: string[]; toolsRetiring?: string[] } =>
+    JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8'))
   const app = await electron.launch({ args: [join(ROOT, 'out/main/index.js')], cwd: ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -562,13 +808,19 @@ async function comboRun(shots: string): Promise<RunResult> {
     await page.screenshot({ path: join(shots, 'combo-1-dialog.png') })
     await tid('combo-cancel').click()
     await page.waitForTimeout(500)
-    check(JSON.stringify(cfg().toolsInUse) === '["claude"]', `cancel: unchanged (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude"]',
+      `cancel: unchanged (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     check(!(await tid('tool-in-use-grok').isChecked()), 'cancel: Grok switch off')
     // 2. turn Claude off → saved without Claude (preview opens; Apply)
     await tid('tool-in-use-grok').click({ force: true })
     await tid('combo-drop-claude').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
-    check(JSON.stringify(cfg().toolsInUse) === '["grok"]', `drop Claude: ["grok"] (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["grok"]',
+      `drop Claude: ["grok"] (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(500)
@@ -578,7 +830,10 @@ async function comboRun(shots: string): Promise<RunResult> {
     await tid('combo-both').waitFor({ timeout: 10_000 })
     await tid('combo-both').click()
     await tid('apply-preview').waitFor({ timeout: 30_000 })
-    check(JSON.stringify(cfg().toolsInUse) === '["claude","grok"]', `both: ["claude","grok"] (got ${JSON.stringify(cfg().toolsInUse)})`)
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude","grok"]',
+      `both: ["claude","grok"] (got ${JSON.stringify(cfg().toolsInUse)})`
+    )
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(500)
@@ -588,7 +843,10 @@ async function comboRun(shots: string): Promise<RunResult> {
     await page.screenshot({ path: join(shots, 'combo-1b-before-copilot.png') })
     await tid('tool-in-use-copilot').click({ force: true })
     await tid('combo-both').waitFor({ timeout: 10_000 })
-    check((await tid('tool-combo-dialog').textContent())?.includes('VS Code') ?? false, 'Copilot text in the dialog')
+    check(
+      (await tid('tool-combo-dialog').textContent())?.includes('VS Code') ?? false,
+      'Copilot text in the dialog'
+    )
     await page.screenshot({ path: join(shots, 'combo-2-copilot.png') })
     await tid('combo-cancel').click()
     await page.waitForTimeout(300)
@@ -598,14 +856,23 @@ async function comboRun(shots: string): Promise<RunResult> {
     await tid('tool-in-use-grok').click({ force: true })
     await tid('apply-preview').waitFor({ timeout: 30_000 })
     await page.waitForTimeout(400)
-    check((await tid('apply-preview-grok').textContent())?.includes('style.md') ?? false, 'off preview lists the Grok rule copy')
+    check(
+      (await tid('apply-preview-grok').textContent())?.includes('style.md') ?? false,
+      'off preview lists the Grok rule copy'
+    )
     await page.screenshot({ path: join(shots, 'combo-3-off-preview.png') })
     await tid('apply-preview-apply').click()
     await tid('apply-preview').waitFor({ state: 'detached', timeout: 30_000 })
     await page.waitForTimeout(500)
     check(!existsSync(join(home, '.grok/rules/style.md')), 'Grok off: rule copy removed')
-    check(readFileSync(join(home, '.grok/config.toml'), 'utf8').includes('compact_mode'), 'Grok off: user config kept')
-    check(JSON.stringify(cfg().toolsInUse) === '["claude"]' && cfg().toolsRetiring === undefined, `Grok off: saved and settled (got ${JSON.stringify(cfg())})`)
+    check(
+      readFileSync(join(home, '.grok/config.toml'), 'utf8').includes('compact_mode'),
+      'Grok off: user config kept'
+    )
+    check(
+      JSON.stringify(cfg().toolsInUse) === '["claude"]' && cfg().toolsRetiring === undefined,
+      `Grok off: saved and settled (got ${JSON.stringify(cfg())})`
+    )
     return { failures, errors }
   } finally {
     await app.close()
@@ -625,7 +892,21 @@ async function main(): Promise<void> {
   const d = only && only !== 'd' ? skip : await firstToolSaveRun(shots)
   const e = only && only !== 'e' ? skip : await toolsCancelRun(shots)
   const f = only && only !== 'f' ? skip : await comboRun(shots)
-  console.log(JSON.stringify({ shots, firstRun: a, notInitialized: b, previewDetails: c, firstToolSave: d, toolsCancel: e, combo: f }, null, 2))
+  console.log(
+    JSON.stringify(
+      {
+        shots,
+        firstRun: a,
+        notInitialized: b,
+        previewDetails: c,
+        firstToolSave: d,
+        toolsCancel: e,
+        combo: f
+      },
+      null,
+      2
+    )
+  )
   if ([a, b, c, d, e, f].some((r) => r.failures.length || r.errors.length)) process.exitCode = 1
 }
 

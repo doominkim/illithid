@@ -200,7 +200,11 @@ const MASK = '•••'
  * For --raw output: mask secrets (keychain values) written into tool files. Values are found via library secret: refs.
  * Refs that failed to read are skipped: that server stays in error, so no new value reached the file.
  */
-function maskSecretValues(home: string, changes: FileChange[], secrets: SecretBackend): FileChange[] {
+function maskSecretValues(
+  home: string,
+  changes: FileChange[],
+  secrets: SecretBackend
+): FileChange[] {
   const values = new Set<string>()
   for (const [, s] of mcpEntries(readSources(home).mcp))
     for (const r of secretRefsOf(s)) {
@@ -290,7 +294,9 @@ function printStatus(home: string, r: StatusReport): void {
     })
     console.log('  ' + pad(res, W0) + row.join(''))
   }
-  console.log('  (synced up to date · needsSync needs sync · error error · notApplicable not a target)')
+  console.log(
+    '  (synced up to date · needsSync needs sync · error error · notApplicable not a target)'
+  )
 
   const notable = r.cells.filter((c) => c.state !== 'synced' && c.state !== 'notApplicable')
   if (notable.length) {
@@ -339,7 +345,9 @@ function printStatus(home: string, r: StatusReport): void {
   console.log('\nDefault models')
   for (const m of r.models) {
     const vals = m.values.map((v) => `${v.key}=${v.value ?? '(unset)'}`).join('  ')
-    console.log(`  ${pad(names[m.tool], 12)}${m.error ? `error: ${m.error}` : vals}  (${t(m.path)})`)
+    console.log(
+      `  ${pad(names[m.tool], 12)}${m.error ? `error: ${m.error}` : vals}  (${t(m.path)})`
+    )
   }
 
   const { paired, partial } = rosterPairing(r.roster)
@@ -378,7 +386,8 @@ function runArtifacts(home: string, json: boolean): number {
   for (const [src, n] of countBy(items, (a) => a.source))
     console.log(`  ${String(n).padStart(5)}  ${src}`)
   console.log('\nBy tool')
-  for (const [tool, n] of countBy(items, (a) => a.tool)) console.log(`  ${String(n).padStart(5)}  ${tool}`)
+  for (const [tool, n] of countBy(items, (a) => a.tool))
+    console.log(`  ${String(n).padStart(5)}  ${tool}`)
   console.log('\nLatest 10')
   for (const a of items.slice(0, 10)) {
     console.log(`  ${localTime(a.mtime)}  ${a.title}`)
@@ -539,7 +548,9 @@ function runConfig(home: string, json: boolean): number {
   console.log(
     `  config: ${tilde(home, c.path)} ${c.exists ? (c.error ? `error(${c.error}) — using defaults` : 'present') : 'missing — defaults'}`
   )
-  console.log(`  library: ${tilde(home, lib)}${c.config.libraryPath ? ' (configured)' : ' (default)'}`)
+  console.log(
+    `  library: ${tilde(home, lib)}${c.config.libraryPath ? ' (configured)' : ' (default)'}`
+  )
   console.log(`  allow real apply: ${c.config.allowRealApply ? 'on' : 'off'}`)
   console.log(
     `  artifact sources: ${c.config.artifactSources ? `${c.config.artifactSources.length} (configured)` : 'default'}`
@@ -690,7 +701,9 @@ function runInit(
     return 1
   }
   if (library) {
-    console.error('Refused: --library is deprecated (the library is ~/.illithid/workspaces/<id>). Nothing was written.')
+    console.error(
+      'Refused: --library is deprecated (the library is ~/.illithid/workspaces/<id>). Nothing was written.'
+    )
     return 1
   }
   const r = initLibrary(home, { git })
@@ -791,7 +804,9 @@ function runRenameMigrate(
   const r = applyRename(home)
   if (json) process.stdout.write(JSON.stringify(r, null, 2) + '\n')
   else {
-    console.log(`[rename-migrate --apply] ${realHome ? '~' : home} — ${r.ok ? 'done' : `refused: ${r.reason}`}`)
+    console.log(
+      `[rename-migrate --apply] ${realHome ? '~' : home} — ${r.ok ? 'done' : `refused: ${r.reason}`}`
+    )
     if (r.ok) {
       for (const m of r.moved) console.log(`  moved ${tilde(home, m.from)} → ${tilde(home, m.to)}`)
       if (r.configUpdated) console.log('  removed config.libraryPath')

@@ -8,10 +8,22 @@
 import { homedir } from 'node:os'
 import { existsSync, readdirSync, realpathSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
-import { applyAgentSync, planAgentSync, type AgentSyncItem, type AgentSyncResult } from './agentSync'
+import {
+  applyAgentSync,
+  planAgentSync,
+  type AgentSyncItem,
+  type AgentSyncResult
+} from './agentSync'
 import { apply, type ApplyResult } from './apply'
 import { deleteSyncCandidates, type DeleteRequest, type DeleteResult } from './deleteCopies'
-import { activeWorkspaceId, clearToolsRetiring, readConfig, toolsRetiring, withActiveWorkspace, workspaceIds } from './config'
+import {
+  activeWorkspaceId,
+  clearToolsRetiring,
+  readConfig,
+  toolsRetiring,
+  withActiveWorkspace,
+  workspaceIds
+} from './config'
 import type { ToolId } from './agents'
 import { MD_MARKERS, rulesBlockItems } from './targets/codexAgents'
 import { planAll } from './plan'
@@ -137,11 +149,19 @@ export function planSyncAll(
  * inSync and skip (userOwned etc.) are excluded. Rule replaceLink (removing the shared symlink) has its own approval gate
  * and is not resolved by sync, so it is excluded. 0 if there is no library.
  */
-export function pendingSyncCount(home: string, env: Env = process.env, secrets?: SecretBackend): number {
+export function pendingSyncCount(
+  home: string,
+  env: Env = process.env,
+  secrets?: SecretBackend
+): number {
   if (!libraryExists(home)) return 0
   const p = planSyncAll(home, env, secrets)
   const change = (a: string): boolean =>
-    a === 'copy' || a === 'update' || a === 'deleteCandidate' || a === 'replaceImported' || a === 'retireImported'
+    a === 'copy' ||
+    a === 'update' ||
+    a === 'deleteCandidate' ||
+    a === 'replaceImported' ||
+    a === 'retireImported'
   return (
     p.targets.filter((c) => c.changed && !c.error).length +
     p.rules.filter((x) => change(x.action) || x.action === 'migrateLegacyDir').length +
@@ -163,11 +183,43 @@ export function planFingerprint(p: SyncPlan): string {
     if (!c.changed && !c.error) continue
     const before = c.beforeRegionHash ?? `file:${sha256(c.before)}`
     const after = c.afterRegionHash ?? `file:${sha256(c.after)}`
-    rows.push(['target', c.id, before, after, (c.owned ?? []).join(','), (c.retired ?? []).join(','), c.error ?? ''].join('|'))
+    rows.push(
+      [
+        'target',
+        c.id,
+        before,
+        after,
+        (c.owned ?? []).join(','),
+        (c.retired ?? []).join(','),
+        c.error ?? ''
+      ].join('|')
+    )
   }
-  const item = (kind: string, x: { tool?: string; name: string; action: string; path: string; reason?: string; sourceHash?: string; currentHash?: string }): void => {
+  const item = (
+    kind: string,
+    x: {
+      tool?: string
+      name: string
+      action: string
+      path: string
+      reason?: string
+      sourceHash?: string
+      currentHash?: string
+    }
+  ): void => {
     if (x.action === 'inSync' || x.action === 'skip') return
-    rows.push([kind, x.tool ?? '', x.name, x.action, x.path, x.reason ?? '', x.sourceHash ?? '', x.currentHash ?? ''].join('|'))
+    rows.push(
+      [
+        kind,
+        x.tool ?? '',
+        x.name,
+        x.action,
+        x.path,
+        x.reason ?? '',
+        x.sourceHash ?? '',
+        x.currentHash ?? ''
+      ].join('|')
+    )
   }
   for (const x of p.rules) item('rule', x)
   for (const x of p.skills) item('skill', x)
@@ -186,12 +238,22 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
   const p = planSyncAll(home, env, secrets)
   // Same actions as pendingSyncCount (items a normal sync never runs, like replaceLink, don't hold a tool back)
   const acts = (a: string): boolean =>
-    a === 'copy' || a === 'update' || a === 'deleteCandidate' || a === 'replaceImported' || a === 'retireImported'
+    a === 'copy' ||
+    a === 'update' ||
+    a === 'deleteCandidate' ||
+    a === 'replaceImported' ||
+    a === 'retireImported'
   const targetTool = new Map<string, string>(ALL_TARGETS.map((t) => [t.id, t.tool]))
   // A tool stays retiring while something is left to remove, or its copies can't be reached (a file error, COPILOT_HOME/GROK_HOME)
   const busy = new Set<string>([
     ...p.targets
-      .filter((c) => (c.changed && !c.error) || c.error || c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride')
+      .filter(
+        (c) =>
+          (c.changed && !c.error) ||
+          c.error ||
+          c.skip === 'copilotHomeOverride' ||
+          c.skip === 'grokHomeOverride'
+      )
       .map((c) => targetTool.get(c.id) ?? ''),
     ...p.rules.filter((x) => acts(x.action)).map((x) => x.tool ?? 'claude'),
     ...p.skills.filter((x) => acts(x.action)).map((x) => x.tool),
@@ -227,18 +289,26 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   }
   const plan = planSyncAll(home, env, opts.secrets)
   if (!opts.allowReal) return { libraryExists: true, plan }
-  if (!opts.approvedOnce && !realApplyAllowed(home)) return { libraryExists: true, plan, refused: 'realHomeNotAllowed' }
+  if (!opts.approvedOnce && !realApplyAllowed(home))
+    return { libraryExists: true, plan, refused: 'realHomeNotAllowed' }
   if (opts.expectFingerprint !== undefined && opts.expectFingerprint !== planFingerprint(plan))
     return { libraryExists: true, plan, refused: 'planChanged' }
   // Automatic syncs leave rules edited on the tool side (drifted copies, edited Codex/Gemini blocks) for the preview, where the
   // user keeps the tool's version or restores the library's; an approved apply restores
   const held = opts.approvedOnce ? new Set<string>() : editedBlockTargets(home, plan)
   const results: SyncResults = {
-    targets: apply(home, env, ALL_TARGET_IDS.filter((id) => !held.has(id)), opts.secrets ? { secrets: opts.secrets } : {}),
+    targets: apply(
+      home,
+      env,
+      ALL_TARGET_IDS.filter((id) => !held.has(id)),
+      opts.secrets ? { secrets: opts.secrets } : {}
+    ),
     rules: applyRuleSync(
       home,
       env,
-      opts.approvedOnce ? plan.rules : plan.rules.filter((x) => !(x.action === 'update' && x.drift)),
+      opts.approvedOnce
+        ? plan.rules
+        : plan.rules.filter((x) => !(x.action === 'update' && x.drift)),
       { allowLinkRemoval: !!opts.allowLinkRemoval }
     ),
     skills: applySkillSync(home, env, plan.skills),
@@ -255,7 +325,13 @@ function pruneGonePending(home: string): void {
   const st = readState(home)
   if (st.error || !st.state.pendingRetire?.length) return
   const state = { ...st.state }
-  if (dropPending(state, activePending(home, st.state.pendingRetire).filter((p) => retireHash(p.path) === null))) writeState(home, state)
+  if (
+    dropPending(
+      state,
+      activePending(home, st.state.pendingRetire).filter((p) => retireHash(p.path) === null)
+    )
+  )
+    writeState(home, state)
 }
 
 /** Execute delete candidates → set each result's (action deleteCandidate) status to done/refused/failed */
@@ -263,7 +339,13 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
   const reqs: DeleteRequest[] = [
     ...plan.rules
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'rule' as const, ...(x.tool ? { tool: x.tool } : {}), name: x.name, path: x.path, currentHash: x.currentHash })),
+      .map((x) => ({
+        kind: 'rule' as const,
+        ...(x.tool ? { tool: x.tool } : {}),
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash
+      })),
     ...plan.skills
       .filter((x) => x.action === 'deleteCandidate')
       .map((x) => ({
@@ -276,7 +358,13 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
       })),
     ...plan.agents
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash }))
+      .map((x) => ({
+        kind: 'agent' as const,
+        tool: x.tool,
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash
+      }))
   ]
   if (!reqs.length) return
   let del: DeleteResult[]
@@ -284,9 +372,17 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
     del = deleteSyncCandidates(home, env, reqs)
   } catch (e) {
     const reason = (e as NodeJS.ErrnoException).code ?? (e as Error).name
-    del = reqs.map((r) => ({ kind: r.kind, ...(r.tool ? { tool: r.tool } : {}), name: r.name, status: 'failed', reason }))
+    del = reqs.map((r) => ({
+      kind: r.kind,
+      ...(r.tool ? { tool: r.tool } : {}),
+      name: r.name,
+      status: 'failed',
+      reason
+    }))
   }
-  const merge = <R extends { action: string; name: string; status: string; reason?: string; backupPath?: string }>(
+  const merge = <
+    R extends { action: string; name: string; status: string; reason?: string; backupPath?: string }
+  >(
     list: R[],
     kind: DeleteRequest['kind'],
     toolOf: (r: R) => string | undefined
@@ -321,10 +417,30 @@ export interface ImportedChange {
 /** Imported originals changed since import, from a plan: rule/skill/agent skip(importedChanged) + opencode.json instructions entries */
 export function importedChangedOf(p: SyncPlan): ImportedChange[] {
   return [
-    ...p.rules.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'rule' as const, tool: x.tool ?? ('claude' as const), name: x.name, path: x.path })),
-    ...p.skills.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path })),
-    ...p.agents.filter((x) => x.action === 'skip' && x.reason === 'importedChanged').map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path })),
-    ...p.targets.flatMap((c) => (c.error ? [] : (c.importedChanged ?? []).map((r) => ({ kind: r.kind, tool: r.tool, name: r.name, path: r.path }))))
+    ...p.rules
+      .filter((x) => x.action === 'skip' && x.reason === 'importedChanged')
+      .map((x) => ({
+        kind: 'rule' as const,
+        tool: x.tool ?? ('claude' as const),
+        name: x.name,
+        path: x.path
+      })),
+    ...p.skills
+      .filter((x) => x.action === 'skip' && x.reason === 'importedChanged')
+      .map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path })),
+    ...p.agents
+      .filter((x) => x.action === 'skip' && x.reason === 'importedChanged')
+      .map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path })),
+    ...p.targets.flatMap((c) =>
+      c.error
+        ? []
+        : (c.importedChanged ?? []).map((r) => ({
+            kind: r.kind,
+            tool: r.tool,
+            name: r.name,
+            path: r.path
+          }))
+    )
   ]
 }
 
@@ -401,10 +517,12 @@ export function previewSwitch(
   const p = withActiveWorkspace(toId, () => planSyncAll(home, env, secrets))
   const out: SwitchLossItem[] = []
   const add = (kind: SwitchLossKind, tool: ToolId, name: string): void => {
-    if (!out.some((x) => x.kind === kind && x.tool === tool && x.name === name)) out.push({ kind, tool, name })
+    if (!out.some((x) => x.kind === kind && x.tool === tool && x.name === name))
+      out.push({ kind, tool, name })
   }
   for (const r of p.rules)
-    if (r.action === 'deleteCandidate') add(r.name === 'MEMORY.md' ? 'memory' : 'rule', r.tool ?? 'claude', r.name)
+    if (r.action === 'deleteCandidate')
+      add(r.name === 'MEMORY.md' ? 'memory' : 'rule', r.tool ?? 'claude', r.name)
   for (const r of p.skills) if (r.action === 'deleteCandidate') add('skill', r.tool, r.name)
   for (const r of p.agents) if (r.action === 'deleteCandidate') add('agent', r.tool, r.name)
   for (const c of p.targets) {
@@ -412,7 +530,8 @@ export function previewSwitch(
     const mcpTool = MCP_TARGET_TOOL[c.id]
     if (mcpTool) {
       const after = toolServerDefs(c.id, c.after)
-      for (const n of Object.keys(toolServerDefs(c.id, c.before))) if (!(n in after)) add('mcp', mcpTool, n)
+      for (const n of Object.keys(toolServerDefs(c.id, c.before)))
+        if (!(n in after)) add('mcp', mcpTool, n)
     } else if (c.id === 'codexAgents' || c.id === 'geminiRules') {
       const tool = c.id === 'codexAgents' ? 'codex' : 'gemini'
       const b = rulesBlockItems(c.before)
@@ -437,11 +556,16 @@ export function previewSwitch(
       }
       const a = paths(c.after)
       const keep = new Set(a.flatMap(skillNamesIn))
-      for (const x of paths(c.before)) if (!a.includes(x)) for (const n of skillNamesIn(x)) if (!keep.has(n)) add('skill', 'opencode', n)
+      for (const x of paths(c.before))
+        if (!a.includes(x))
+          for (const n of skillNamesIn(x)) if (!keep.has(n)) add('skill', 'opencode', n)
     }
   }
   const order: SwitchLossKind[] = ['rule', 'memory', 'skill', 'agent', 'mcp']
   return out.sort(
-    (x, y) => order.indexOf(x.kind) - order.indexOf(y.kind) || x.tool.localeCompare(y.tool) || x.name.localeCompare(y.name)
+    (x, y) =>
+      order.indexOf(x.kind) - order.indexOf(y.kind) ||
+      x.tool.localeCompare(y.tool) ||
+      x.name.localeCompare(y.name)
   )
 }

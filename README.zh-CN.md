@@ -56,7 +56,6 @@ brew install --cask doominkim/tap/illithid
 
 也可以从上方链接下载 DMG。
 
-
 ## 其他功能
 
 - **市场**：搜索并安装规则、技能和 MCP 服务器。

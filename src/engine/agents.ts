@@ -166,10 +166,15 @@ export function tools(home: string): ToolInfo[] {
  * GROK_HOME pointing somewhere other than ~/.grok (absolute path), else null. Same handling as COPILOT_HOME: Grok writes are
  * skipped because Grok wouldn't read ~/.grok
  */
-export function grokHomeOverride(home: string, env: Record<string, string | undefined>): string | null {
+export function grokHomeOverride(
+  home: string,
+  env: Record<string, string | undefined>
+): string | null {
   const v = env.GROK_HOME?.trim()
   if (!v) return null
-  const abs = resolve(v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v))
+  const abs = resolve(
+    v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v)
+  )
   return abs === join(home, '.grok') ? null : abs
 }
 
@@ -177,15 +182,24 @@ export function grokHomeOverride(home: string, env: Record<string, string | unde
  * COPILOT_HOME pointing somewhere other than ~/.copilot (absolute path), else null. The app only writes ~/.copilot, which Copilot
  * wouldn't read then — so Copilot writes are skipped (skip=copilotHomeOverride) instead
  */
-export function copilotHomeOverride(home: string, env: Record<string, string | undefined>): string | null {
+export function copilotHomeOverride(
+  home: string,
+  env: Record<string, string | undefined>
+): string | null {
   const v = env.COPILOT_HOME?.trim()
   if (!v) return null
-  const abs = resolve(v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v))
+  const abs = resolve(
+    v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v)
+  )
   return abs === join(home, '.copilot') ? null : abs
 }
 
 /** Home override of a tool that has one (COPILOT_HOME, GROK_HOME) pointing away from the folder the app writes, else null */
-export function toolHomeOverride(home: string, id: ToolId, env: Record<string, string | undefined>): string | null {
+export function toolHomeOverride(
+  home: string,
+  id: ToolId,
+  env: Record<string, string | undefined>
+): string | null {
   if (id === 'copilot') return copilotHomeOverride(home, env)
   if (id === 'grok') return grokHomeOverride(home, env)
   return null

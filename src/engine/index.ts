@@ -13,12 +13,36 @@ export {
 export type { LibraryPaths } from './sources'
 export { initLibrary, initLibraryAt, LIBRARY_DIRS, WORKSPACE_FILE } from './init'
 export type { InitLibraryOptions, InitLibraryResult } from './init'
-export { syncAll, planSyncAll, planFingerprint, pendingSyncCount, summarizeSync, realApplyAllowed, previewSwitch, importedChangedOf } from './sync'
+export {
+  syncAll,
+  planSyncAll,
+  planFingerprint,
+  pendingSyncCount,
+  summarizeSync,
+  realApplyAllowed,
+  previewSwitch,
+  importedChangedOf
+} from './sync'
 export { keepImportedOriginal } from './pendingRetire'
-export type { SyncAllOptions, SyncAllResult, SyncPlan, SyncResults, SwitchLossItem, SwitchLossKind } from './sync'
+export type {
+  SyncAllOptions,
+  SyncAllResult,
+  SyncPlan,
+  SyncResults,
+  SwitchLossItem,
+  SwitchLossKind
+} from './sync'
 export { mcpEntries, sha256 } from './text'
 export { geminiDisabledSkillsOf } from './targets/geminiMcp'
-export { TARGETS, EXTRA_TARGETS, ALL_TARGETS, ALL_TARGET_IDS, MCP_TARGET_OF, MCP_TARGET_TOOL, parseServerTable } from './targets'
+export {
+  TARGETS,
+  EXTRA_TARGETS,
+  ALL_TARGETS,
+  ALL_TARGET_IDS,
+  MCP_TARGET_OF,
+  MCP_TARGET_TOOL,
+  parseServerTable
+} from './targets'
 export {
   skillOverrideHits,
   SKILL_OVERRIDE_TARGET_OF,
@@ -70,10 +94,29 @@ export type {
   StatusReport,
   ChangeSummary
 } from './status'
-export { scanArtifacts, defaultArtifactSources, newManifestCache, toolOfLocation, toolOfManifestString } from './scan/artifacts'
-export type { Artifact, ArtifactKind, ArtifactSource, ArtifactTool, ManifestCache } from './scan/artifacts'
+export {
+  scanArtifacts,
+  defaultArtifactSources,
+  newManifestCache,
+  toolOfLocation,
+  toolOfManifestString
+} from './scan/artifacts'
+export type {
+  Artifact,
+  ArtifactKind,
+  ArtifactSource,
+  ArtifactTool,
+  ManifestCache
+} from './scan/artifacts'
 export { scanSessions, readSessionTranscript, cleanUserText, titleText } from './scan/sessions'
-export { indexSessions, indexStatus, searchSessions, searchIndexPath, makeSnippet, sessionTitles } from './search/sessionIndex'
+export {
+  indexSessions,
+  indexStatus,
+  searchSessions,
+  searchIndexPath,
+  makeSnippet,
+  sessionTitles
+} from './search/sessionIndex'
 export {
   indexDocs,
   indexAllDocs,
@@ -381,7 +424,13 @@ export {
   backupRetentionOf,
   SKILL_BACKUP_KEEP
 } from './backupRetention'
-export type { CleanupItem, CleanupKind, CleanupMover, CleanupPlan, CleanupResult } from './backupRetention'
+export type {
+  CleanupItem,
+  CleanupKind,
+  CleanupMover,
+  CleanupPlan,
+  CleanupResult
+} from './backupRetention'
 export { DEFAULT_BACKUP_RETENTION } from './config'
 export type { BackupRetention } from './config'
 export { marketEnabled } from './config'
@@ -428,6 +477,19 @@ export type {
 } from './market'
 export { usageOf, usageSummaries } from './search/usage'
 export type { UsageKind, UsageStats, UsageSummary } from './search/usage'
-export { modelDetail, modelList, sessionModels, MIN_REQUESTS, MIN_TOOL_CALLS } from './search/modelStats'
-export type { Dist, ModelDetail, ModelKey, ModelRange, ModelSummary, SessionRef } from './search/modelStats'
+export {
+  modelDetail,
+  modelList,
+  sessionModels,
+  MIN_REQUESTS,
+  MIN_TOOL_CALLS
+} from './search/modelStats'
+export type {
+  Dist,
+  ModelDetail,
+  ModelKey,
+  ModelRange,
+  ModelSummary,
+  SessionRef
+} from './search/modelStats'
 export { seedNewToolToggles } from './manifest'

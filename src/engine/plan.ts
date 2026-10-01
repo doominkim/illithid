@@ -42,7 +42,9 @@ export function buildContext(
   const st = readState(home).state
   const owned = st.owned
   const pendingRetire = activePending(home, st.pendingRetire)
-  const applied = Object.fromEntries(Object.entries(st.applied).map(([id, v]) => [id, v.regionHash]))
+  const applied = Object.fromEntries(
+    Object.entries(st.applied).map(([id, v]) => [id, v.regionHash])
+  )
   return {
     sources,
     env,
@@ -68,11 +70,17 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
   // A retiring tool (every item off via offTools) also loses the memory index and leaves permissions as they are
   const retiring = !!planCtx.sources.manifest?.offTools?.includes(t.tool)
   const ctx: BuildContext = retiring
-    ? { ...planCtx, retiring, sources: { ...planCtx.sources, memoryIndex: null, hasPermissions: false } }
+    ? {
+        ...planCtx,
+        retiring,
+        sources: { ...planCtx.sources, memoryIndex: null, hasPermissions: false }
+      }
     : planCtx
   const { sources } = ctx
   // Main file missing but the tool reads an alternate instead (opencode.jsonc, which OpenCode creates on first run): that file is read and written
-  const rel = existsSync(join(home, t.rel)) ? t.rel : ((t.alternates ?? []).find((r) => existsSync(join(home, r))) ?? t.rel)
+  const rel = existsSync(join(home, t.rel))
+    ? t.rel
+    : ((t.alternates ?? []).find((r) => existsSync(join(home, r))) ?? t.rel)
   const path = join(home, rel)
   const label = `~/${rel}`
   const base = { id: t.id, path, label }
@@ -114,8 +122,10 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
       afterRegionHash: null
     })
     if (!has || retiring) return absent('nothingToWrite', [`${label} absent — nothing to write`])
-    const creatable = t.optional || (!!t.createIfInUse && !!readConfig(home).config.toolsInUse?.includes(t.tool))
-    if (!creatable) return absent('toolNotInitialized', [`${label} absent — run the tool once so it creates it`])
+    const creatable =
+      t.optional || (!!t.createIfInUse && !!readConfig(home).config.toolsInUse?.includes(t.tool))
+    if (!creatable)
+      return absent('toolNotInitialized', [`${label} absent — run the tool once so it creates it`])
   }
   const before = exists ? readFileSync(path, 'utf8') : ''
   // An alternate with comments or other JSONC syntax is left alone: rewriting it as plain JSON would drop them
@@ -133,7 +143,10 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
   const beforeRegionHash = regionHash(t, before, sources, ctx)
 
   try {
-    const { after, notes, error, owned, serverErrors, retired, importedChanged } = t.build(exists ? before : seed, ctx)
+    const { after, notes, error, owned, serverErrors, retired, importedChanged } = t.build(
+      exists ? before : seed,
+      ctx
+    )
     const change: FileChange = {
       ...base,
       before,
@@ -183,12 +196,18 @@ export function plan(
   const sources = readPlanSources(home)
   const ctx = buildContext(home, sources, env, secrets)
   const inUse = syncTools(home)
-  const targets = (ids ? ALL_TARGETS.filter((t) => ids.includes(t.id)) : TARGETS).filter((t) => inUse.includes(t.tool))
+  const targets = (ids ? ALL_TARGETS.filter((t) => ids.includes(t.id)) : TARGETS).filter((t) =>
+    inUse.includes(t.tool)
+  )
   return targets.map((t) => planTarget(home, t, ctx))
 }
 
 /** Plan for all targets (ALL_TARGETS) */
-export function planAll(home: string, env: Env = process.env, secrets?: SecretBackend): FileChange[] {
+export function planAll(
+  home: string,
+  env: Env = process.env,
+  secrets?: SecretBackend
+): FileChange[] {
   return plan(
     home,
     env,

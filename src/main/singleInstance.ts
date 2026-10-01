@@ -28,7 +28,10 @@ interface Clock {
 const realClock: Clock = { now: Date.now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }
 
 /** Retry the lock until it frees or LOCK_TIMEOUT_MS passes */
-export async function waitForLock(tryLock: () => boolean, clock: Clock = realClock): Promise<boolean> {
+export async function waitForLock(
+  tryLock: () => boolean,
+  clock: Clock = realClock
+): Promise<boolean> {
   const end = clock.now() + LOCK_TIMEOUT_MS
   while (clock.now() < end) {
     await clock.sleep(LOCK_INTERVAL_MS)
@@ -39,7 +42,9 @@ export async function waitForLock(tryLock: () => boolean, clock: Clock = realClo
 
 export function readRunningVersion(userData: string): string | undefined {
   try {
-    const v = (JSON.parse(readFileSync(join(userData, INSTANCE_FILE), 'utf8')) as { version?: unknown }).version
+    const v = (
+      JSON.parse(readFileSync(join(userData, INSTANCE_FILE), 'utf8')) as { version?: unknown }
+    ).version
     return typeof v === 'string' ? v : undefined
   } catch {
     return undefined
@@ -48,7 +53,10 @@ export function readRunningVersion(userData: string): string | undefined {
 
 export function writeRunningVersion(userData: string, version: string): void {
   try {
-    writeFileSync(join(userData, INSTANCE_FILE), JSON.stringify({ version, pid: process.pid }) + '\n')
+    writeFileSync(
+      join(userData, INSTANCE_FILE),
+      JSON.stringify({ version, pid: process.pid }) + '\n'
+    )
   } catch {
     // Without the file a later instance just waits for the lock (shouldWaitForLock treats unknown as older)
   }

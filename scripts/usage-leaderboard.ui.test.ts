@@ -48,30 +48,32 @@ const base = (
     reasoning: 3000
   },
   cost: null,
-  pricing: withMedian(convertedCost(
-    model,
-    tool,
-    {
-      input: 1e6,
-      cacheRead: 2e6,
-      cacheWrite: tool === 'claude' ? 10000 : 0,
-      output: 100000,
-      reasoning: 3000
-    },
-    requests,
-    null,
-    {
-      ...readPriceBook('/fixture-no-cache'),
-      providers: {
-        ...readPriceBook('/fixture-no-cache').providers,
-        openai: {
-          models: {
-            'gpt-6.1-sol': { cost: { input: 2, output: 10, cache_read: 0.1, cache_write: 2.5 } }
+  pricing: withMedian(
+    convertedCost(
+      model,
+      tool,
+      {
+        input: 1e6,
+        cacheRead: 2e6,
+        cacheWrite: tool === 'claude' ? 10000 : 0,
+        output: 100000,
+        reasoning: 3000
+      },
+      requests,
+      null,
+      {
+        ...readPriceBook('/fixture-no-cache'),
+        providers: {
+          ...readPriceBook('/fixture-no-cache').providers,
+          openai: {
+            models: {
+              'gpt-6.1-sol': { cost: { input: 2, output: 10, cache_read: 0.1, cache_write: 2.5 } }
+            }
           }
         }
       }
-    }
-  )),
+    )
+  ),
   median: {
     responseSec: requests >= 30 ? response : null,
     toolsPerRequest: 2,
@@ -405,13 +407,22 @@ test(
       assert.equal(await page.getByTestId('stats-guide-context').textContent(), '컨텍스트 9K / 턴')
       // REQ-STATS-MEDIAN-COST-1: the point sits at the median cost per request, not the period mean
       const claudeFixture = fixtures.find((m) => m.model === 'claude-fable-5-1')!
-      assert.ok((await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.medianPerRequest)))
-      assert.ok(!(await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.perRequest)))
-      // REQ-STATS-MEDIAN-COST-3: the per-request column shows the same median
       assert.ok(
-        (await page.locator('[data-testid="stats-row"][data-model="claude-fable-5-1"] td').last().innerText()).includes(
+        (await claude.getAttribute('aria-label'))!.includes(
           usd(claudeFixture.pricing!.medianPerRequest)
         )
+      )
+      assert.ok(
+        !(await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.perRequest))
+      )
+      // REQ-STATS-MEDIAN-COST-3: the per-request column shows the same median
+      assert.ok(
+        (
+          await page
+            .locator('[data-testid="stats-row"][data-model="claude-fable-5-1"] td')
+            .last()
+            .innerText()
+        ).includes(usd(claudeFixture.pricing!.medianPerRequest))
       )
       assert.equal(await page.getByTestId('stats-point-tooltip').count(), 0) // REQ-MODEL-EFFICIENCY-6
       assert.equal(await gpt.locator('.lb-dot').getAttribute('fill'), 'var(--ac-text-muted)')
@@ -487,44 +498,99 @@ test(
       await points.first().waitFor()
       await page.screenshot({ path: '/tmp/illithid-leaderboard-dark.png', fullPage: true })
       // HAR-41 REQ-1/2/3: responsive controls and independently bounded memory panes.
-      await app.evaluate(({ ipcMain }, data) => {
-        ipcMain.removeHandler('api:toolMemoryScan')
-        ipcMain.handle('api:toolMemoryScan', () => data)
-        ipcMain.removeHandler('api:toolMemoryRead')
-        ipcMain.handle('api:toolMemoryRead', () => ({ ok: true, value: '# Memory\n'.repeat(100) }))
-      }, {
-        claude: { projects: [{ slug: 'fixture', cwd: '/fixture/project', missing: false, temp: false,
-          files: [{ file: 'project.md', title: 'Project memory', inIndex: true, inShared: false, mtime: '2026-09-30' }],
-          index: { exists: true, lines: 5, bytes: 50, broken: [] }, updatedAt: '2026-09-30' }],
-          shared: null, limits: { lines: 200, bytes: 25600 } }, codex: []
-      })
+      await app.evaluate(
+        ({ ipcMain }, data) => {
+          ipcMain.removeHandler('api:toolMemoryScan')
+          ipcMain.handle('api:toolMemoryScan', () => data)
+          ipcMain.removeHandler('api:toolMemoryRead')
+          ipcMain.handle('api:toolMemoryRead', () => ({
+            ok: true,
+            value: '# Memory\n'.repeat(100)
+          }))
+        },
+        {
+          claude: {
+            projects: [
+              {
+                slug: 'fixture',
+                cwd: '/fixture/project',
+                missing: false,
+                temp: false,
+                files: [
+                  {
+                    file: 'project.md',
+                    title: 'Project memory',
+                    inIndex: true,
+                    inShared: false,
+                    mtime: '2026-09-30'
+                  }
+                ],
+                index: { exists: true, lines: 5, bytes: 50, broken: [] },
+                updatedAt: '2026-09-30'
+              }
+            ],
+            shared: null,
+            limits: { lines: 200, bytes: 25600 }
+          },
+          codex: []
+        }
+      )
       for (const width of [1280, 900]) {
-        await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size, 800), width)
+        await app.evaluate(
+          ({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(size, 800),
+          width
+        )
         await page.locator('[data-menu="stats"]').click()
         await page.locator('[data-testid="stats-tool"]').waitFor()
-        assert.equal(await page.locator('.ac-stats-filters').evaluate(el => el.scrollWidth <= el.clientWidth), true)
+        assert.equal(
+          await page
+            .locator('.ac-stats-filters')
+            .evaluate((el) => el.scrollWidth <= el.clientWidth),
+          true
+        )
         await page.locator('[data-menu="memory"]').click()
         await page.locator('[data-testid="memory-tab-claude"]').click()
         await page.locator('[data-testid="tm-project"]').click()
         await page.locator('[data-testid="tm-index"]').click()
         await page.locator('[data-testid="tm-preview"] h1').first().waitFor()
-        assert.equal(await page.locator('[data-testid="tm-preview"]').evaluate(el => el.scrollHeight > el.clientHeight), true)
-        const panes = await page.locator('.ac-memory-panes').evaluate(el => {
+        assert.equal(
+          await page
+            .locator('[data-testid="tm-preview"]')
+            .evaluate((el) => el.scrollHeight > el.clientHeight),
+          true
+        )
+        const panes = await page.locator('.ac-memory-panes').evaluate((el) => {
           const root = el.getBoundingClientRect()
-          return { overflow: el.scrollWidth > el.clientWidth, height: root.height,
-            children: [...el.children].filter(e => e.classList.contains('ac-card')).map(e => {
-              const r = e.getBoundingClientRect()
-              return { bottom: r.bottom, right: r.right }
-            }), bottom: root.bottom, right: root.right }
+          return {
+            overflow: el.scrollWidth > el.clientWidth,
+            height: root.height,
+            children: [...el.children]
+              .filter((e) => e.classList.contains('ac-card'))
+              .map((e) => {
+                const r = e.getBoundingClientRect()
+                return { bottom: r.bottom, right: r.right }
+              }),
+            bottom: root.bottom,
+            right: root.right
+          }
         })
         assert.equal(panes.overflow, false)
         assert.ok(panes.height > 300)
-        assert.ok(panes.children.every(p => p.bottom <= panes.bottom + 1 && p.right <= panes.right + 1))
+        assert.ok(
+          panes.children.every((p) => p.bottom <= panes.bottom + 1 && p.right <= panes.right + 1)
+        )
         await page.screenshot({ path: `/tmp/illithid-consistency-memory-${width}.png` })
         await page.locator('[data-menu="artifacts"]').click()
-        await page.getByRole('radio', { name: /Grid view|격자 보기/, exact: true }).waitFor({ state: 'attached' })
-        await page.getByRole('radio', { name: /List view|목록 보기/, exact: true }).waitFor({ state: 'attached' })
-        assert.equal(await page.locator('.ac-toolbar').evaluate(el => el.scrollWidth <= el.clientWidth), true)
+        await page
+          .getByRole('radio', { name: /Grid view|격자 보기/, exact: true })
+          .waitFor({ state: 'attached' })
+        await page
+          .getByRole('radio', { name: /List view|목록 보기/, exact: true })
+          .waitFor({ state: 'attached' })
+        assert.equal(
+          await page.locator('.ac-toolbar').evaluate((el) => el.scrollWidth <= el.clientWidth),
+          true
+        )
       }
       assert.deepEqual(errors, [])
     } finally {

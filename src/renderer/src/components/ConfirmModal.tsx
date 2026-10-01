@@ -35,7 +35,12 @@ export function ConfirmModal({
           <Button variant="default" onClick={onClose} disabled={loading}>
             {t('common.cancel')}
           </Button>
-          <Button color={danger ? 'red' : 'accent'} onClick={() => void onConfirm()} loading={loading} data-testid="confirm-ok">
+          <Button
+            color={danger ? 'red' : 'accent'}
+            onClick={() => void onConfirm()}
+            loading={loading}
+            data-testid="confirm-ok"
+          >
             {confirmLabel ?? t('common.confirm')}
           </Button>
         </Group>

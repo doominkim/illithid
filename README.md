@@ -56,7 +56,6 @@ brew install --cask doominkim/tap/illithid
 
 Or download the DMG above.
 
-
 ## Also included
 
 - **Market**: discover and install rules, skills, and MCP servers.

@@ -3,7 +3,13 @@ import { Badge, Box, Button, Code, Group, Stack, Tabs } from '@mantine/core'
 import { Download, Globe, Plus, Terminal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
-import { MASK, type McpEditView, type McpServer, type McpServerView, type ToolId } from '../../../shared/api'
+import {
+  MASK,
+  type McpEditView,
+  type McpServer,
+  type McpServerView,
+  type ToolId
+} from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
@@ -64,20 +70,34 @@ function Mcp(): React.JSX.Element {
         if (!enabled(s.name, tool))
           return [
             tool,
-            tool === 'grok' && grokReadsFromClaude(inUse, (x) => enabled(s.name, x), data.grokReadsClaude !== false)
+            tool === 'grok' &&
+            grokReadsFromClaude(inUse, (x) => enabled(s.name, x), data.grokReadsClaude !== false)
               ? { on: false, pending: st === 'needsSync', via: true, hint: t('combo.readsClaude') }
               : { on: false, pending: st === 'needsSync' }
           ]
-        return [tool, { ...pillFromCellState(st), on: true, na: false, ...(st === 'error' ? { hint: problemText(t, s.reasons?.[tool]) } : {}) }]
+        return [
+          tool,
+          {
+            ...pillFromCellState(st),
+            on: true,
+            na: false,
+            ...(st === 'error' ? { hint: problemText(t, s.reasons?.[tool]) } : {})
+          }
+        ]
       })
     ) as PillMap
 
   const toggle = async (s: McpServerView, tool: ToolId): Promise<void> => {
-    await pending.run(s.name, tool, () => runWrite(window.api.toggle('mcp', s.name, tool, !enabled(s.name, tool)), { success: t('toggles.saved') }))
+    await pending.run(s.name, tool, () =>
+      runWrite(window.api.toggle('mcp', s.name, tool, !enabled(s.name, tool)), {
+        success: t('toggles.saved')
+      })
+    )
     reload()
   }
   const toggleAll = async (s: McpServerView, on: boolean): Promise<void> => {
-    for (const tool of cardTools) if (enabled(s.name, tool) !== on) await runWrite(window.api.toggle('mcp', s.name, tool, on))
+    for (const tool of cardTools)
+      if (enabled(s.name, tool) !== on) await runWrite(window.api.toggle('mcp', s.name, tool, on))
     reload()
   }
   const save = async (name: string, def: McpServer): Promise<{ warnings: string[] } | null> => {
@@ -100,15 +120,24 @@ function Mcp(): React.JSX.Element {
 
   const q = query.trim().toLowerCase()
   const servers = sortByUsage(
-    data.servers.filter((s) => !q || includesCI(s.name, q) || includesCI(s.url, q) || includesCI(s.command, q)),
+    data.servers.filter(
+      (s) => !q || includesCI(s.name, q) || includesCI(s.url, q) || includesCI(s.command, q)
+    ),
     sort,
     usage
   )
   const current = data.servers.find((s) => s.name === selected)
-  const endpoint = (s: McpServerView): string => s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ')
+  const endpoint = (s: McpServerView): string =>
+    s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ')
   const none = t('common.none')
   const transportTag = (s: McpServerView): React.ReactNode => (
-    <Badge variant="default" size="xs" fw={500} c="dimmed" leftSection={s.transport === 'stdio' ? <Terminal size={10} /> : <Globe size={10} />}>
+    <Badge
+      variant="default"
+      size="xs"
+      fw={500}
+      c="dimmed"
+      leftSection={s.transport === 'stdio' ? <Terminal size={10} /> : <Globe size={10} />}
+    >
       {s.transport ?? '-'}
     </Badge>
   )
@@ -120,10 +149,21 @@ function Mcp(): React.JSX.Element {
         count={data.servers.length}
         actions={
           <>
-            <Button size="xs" leftSection={<Plus size={13} />} onClick={() => setSelected(NEW)} data-testid="mcp-new">
+            <Button
+              size="xs"
+              leftSection={<Plus size={13} />}
+              onClick={() => setSelected(NEW)}
+              data-testid="mcp-new"
+            >
               {t('mcp.new')}
             </Button>
-            <Button size="xs" variant="default" leftSection={<Download size={13} />} onClick={() => setImportOpen(true)} data-testid="mcp-import">
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Download size={13} />}
+              onClick={() => setImportOpen(true)}
+              data-testid="mcp-import"
+            >
               {t('common.import')}
             </Button>
             <ReloadButton />
@@ -158,11 +198,20 @@ function Mcp(): React.JSX.Element {
                 name={s.name}
                 badges={transportTag(s)}
                 description={endpoint(s) || none}
-                switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))}
+                switchChecked={
+                  cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))
+                }
                 switchIndeterminate={cardTools.some((tool) => enabled(s.name, tool))}
                 onSwitch={(v) => void toggleAll(s, v)}
                 footerLeft={<UsageSpark summary={usage?.[s.name]} />}
-                footerRight={<ToolPills pills={p} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />}
+                footerRight={
+                  <ToolPills
+                    pills={p}
+                    size={18}
+                    onToggle={(tool) => void toggle(s, tool)}
+                    busy={pending.of(s.name)}
+                  />
+                }
                 selected={s.name === selected}
                 onClick={() => setSelected(s.name)}
               />
@@ -181,7 +230,12 @@ function Mcp(): React.JSX.Element {
               right={
                 <Group gap="md" wrap="nowrap">
                   <UsageSpark summary={usage?.[s.name]} />
-                  <ToolPills pills={pillsOf(s)} size={18} onToggle={(tool) => void toggle(s, tool)} busy={pending.of(s.name)} />
+                  <ToolPills
+                    pills={pillsOf(s)}
+                    size={18}
+                    onToggle={(tool) => void toggle(s, tool)}
+                    busy={pending.of(s.name)}
+                  />
                 </Group>
               }
               active={s.name === selected}
@@ -191,7 +245,12 @@ function Mcp(): React.JSX.Element {
         </ListCard>
       )}
 
-      <ImportModal opened={importOpen} onClose={() => setImportOpen(false)} onImported={reload} kind="mcp" />
+      <ImportModal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={reload}
+        kind="mcp"
+      />
       {/* New server */}
       <DetailSheet opened={selected === NEW} onClose={() => setSelected(null)} title={t('mcp.new')}>
         <McpForm onSave={save} onCancel={() => setSelected(null)} />
@@ -202,7 +261,13 @@ function Mcp(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
         tags={current && transportTag(current)}
-        meta={current && <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>{endpoint(current) || none}</MetaItem>}
+        meta={
+          current && (
+            <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>
+              {endpoint(current) || none}
+            </MetaItem>
+          )
+        }
         copyPath={current && data.dir ? `${data.dir}/${current.name}.json` : undefined}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="mcp-delete"
@@ -230,10 +295,20 @@ function Mcp(): React.JSX.Element {
                       [t('mcp.transport'), current.transport ?? '-'],
                       [t('mcp.url'), current.url ?? '-'],
                       [t('mcp.command'), current.command ?? '-'],
-                      [t('mcp.args'), current.args?.length ? <Code>{current.args.join(' ')}</Code> : none],
+                      [
+                        t('mcp.args'),
+                        current.args?.length ? <Code>{current.args.join(' ')}</Code> : none
+                      ],
                       [t('mcp.headers'), current.headerKeys.join(', ') || none],
                       [t('mcp.env'), current.envKeys.join(', ') || none],
-                      [t('mcp.bearer'), current.bearerEnv ? '${' + current.bearerEnv + '}' : current.bearerToken ? MASK : none]
+                      [
+                        t('mcp.bearer'),
+                        current.bearerEnv
+                          ? '${' + current.bearerEnv + '}'
+                          : current.bearerToken
+                            ? MASK
+                            : none
+                      ]
                     ]}
                   />
                 </Box>
@@ -260,7 +335,13 @@ function Mcp(): React.JSX.Element {
 }
 
 /** Edit form: filled with the masked definition from main */
-function McpEdit({ name, onSave }: { name: string; onSave: (name: string, def: McpServer) => Promise<{ warnings: string[] } | null> }): React.JSX.Element {
+function McpEdit({
+  name,
+  onSave
+}: {
+  name: string
+  onSave: (name: string, def: McpServer) => Promise<{ warnings: string[] } | null>
+}): React.JSX.Element {
   const [view, setView] = useState<McpEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => {

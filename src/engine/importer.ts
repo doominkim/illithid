@@ -63,7 +63,13 @@ import {
 import { secretRefsOf, type SecretBackend } from './secrets'
 import { canonicalSkills, dirContentHash } from './skills'
 import { MANIFEST_TOOLS, setToggle, type ManifestKind } from './manifest'
-import { addPending, importedBackupRoot, retireHash, UNREADABLE_HASH, type PendingRetire } from './pendingRetire'
+import {
+  addPending,
+  importedBackupRoot,
+  retireHash,
+  UNREADABLE_HASH,
+  type PendingRetire
+} from './pendingRetire'
 import { readState, writeState } from './state'
 import { libraryPaths, readMcp } from './sources'
 import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
@@ -121,7 +127,10 @@ export function listImportSources(home: string): ImportSource[] {
   const legacy = join(home, LEGACY_LIBRARY_DIR)
   const legacyIsLibrary = isDir(legacy) && sameDir(legacy, lib)
   const legacyHas = ['rules', 'skills', 'sync', 'memory'].some((d) => existsSync(join(legacy, d)))
-  const toolSources: Record<ToolId, Pick<ImportSource, 'label' | 'path' | 'available' | 'kinds'>> = {
+  const toolSources: Record<
+    ToolId,
+    Pick<ImportSource, 'label' | 'path' | 'available' | 'kinds'>
+  > = {
     claude: {
       label: 'Claude Code (~/.claude, ~/.claude.json)',
       path: join(home, '.claude'),
@@ -169,7 +178,11 @@ export function listImportSources(home: string): ImportSource[] {
       kinds: ['rule', 'memory', 'permissions', 'mcp', 'skill'],
       ...(legacyIsLibrary ? { note: 'Same path as the current library, so not a source' } : {})
     },
-    ...TOOL_IDS.map((tool): ImportSource => ({ id: `tool:${tool}`, kind: 'tool', ...toolSources[tool] }))
+    ...TOOL_IDS.map((tool): ImportSource => ({
+      id: `tool:${tool}`,
+      kind: 'tool',
+      ...toolSources[tool]
+    }))
   ]
   for (const { id, rel } of OTHER_APP_SKILL_DIRS) {
     const p = join(home, rel)
@@ -187,7 +200,12 @@ export function listImportSources(home: string): ImportSource[] {
 
 // ---------------------------------------------------------------- Tool detection
 
-export { detectTools, TOOL_EXECUTABLES, type DetectToolsOptions, type ToolDetection } from './detect'
+export {
+  detectTools,
+  TOOL_EXECUTABLES,
+  type DetectToolsOptions,
+  type ToolDetection
+} from './detect'
 
 // ---------------------------------------------------------------- Candidate types
 
@@ -589,7 +607,10 @@ const RANK: Record<Portability, number> = { ok: 0, warn: 1, toolOnly: 2 }
 /** Candidate verdict: based on the most portable variant, reasons are the union */
 function aggregate(variants: PortabilityInfo[]): PortabilityInfo {
   if (!variants.length) return OK
-  const best = variants.reduce((a, v) => (RANK[v.portability] < RANK[a] ? v.portability : a), 'toolOnly' as Portability)
+  const best = variants.reduce(
+    (a, v) => (RANK[v.portability] < RANK[a] ? v.portability : a),
+    'toolOnly' as Portability
+  )
   const all = judge(variants.flatMap((v) => v.reasons))
   return { portability: best, reasons: all.reasons }
 }
@@ -602,7 +623,14 @@ function mergeInto(target: PortabilityInfo, add: PortabilityInfo): void {
 }
 
 /** Tool config directories (relative to HOME) */
-const TOOL_DIRS = ['.codex', '.claude', '.config/opencode', '.local/share/opencode', '.gemini', '.copilot'] as const
+const TOOL_DIRS = [
+  '.codex',
+  '.claude',
+  '.config/opencode',
+  '.local/share/opencode',
+  '.gemini',
+  '.copilot'
+] as const
 /** Tool plugin paths */
 const TOOL_PLUGIN_DIRS = [
   '.codex/plugins',
@@ -621,7 +649,8 @@ function inAny(home: string, rels: readonly string[], abs: string): boolean {
 }
 
 /** Machine-specific absolute paths (user home, local install paths) */
-const LOCAL_PATH_RE = /(?:^|[\s"'=:,])(?:\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/|\/opt\/homebrew\/|\/usr\/local\/|\/opt\/local\/)/
+const LOCAL_PATH_RE =
+  /(?:^|[\s"'=:,])(?:\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/|\/opt\/homebrew\/|\/usr\/local\/|\/opt\/local\/)/
 
 function isLocalPath(home: string, v: string): boolean {
   return LOCAL_PATH_RE.test(v) || (home.length > 1 && v.includes(home + '/'))
@@ -656,7 +685,9 @@ export function mcpPortability(
   slots: readonly Slot[] = []
 ): PortabilityInfo {
   const { home } = ctx
-  const args = (server.args ?? []).map((a, i) => slots.find((s) => s.at === `args[${i}]`)?.raw ?? String(a))
+  const args = (server.args ?? []).map(
+    (a, i) => slots.find((s) => s.at === `args[${i}]`)?.raw ?? String(a)
+  )
   const r: PortabilityReason[] = []
   if (tool === 'codex' && ctx.codexPlugins.has(name)) r.push('pluginManaged')
   if (server.transport === 'stdio' && typeof server.command === 'string') {
@@ -668,15 +699,14 @@ export function mcpPortability(
     } else {
       if (
         /^\/Applications\/[^/]+\.app\//.test(abs) ||
-        within(join(home, 'Applications'), abs) && /\.app\//.test(abs) ||
+        (within(join(home, 'Applications'), abs) && /\.app\//.test(abs)) ||
         /\.app\/Contents\//.test(abs)
       )
         r.push('appBundle')
       if (inAny(home, TOOL_PLUGIN_DIRS, abs)) r.push('pluginManaged')
       else if (inAny(home, TOOL_DIRS, abs)) r.push('toolConfigDir')
     }
-    if (isLocalPath(home, cmd) || args.some((a) => isLocalPath(home, a)))
-      r.push('localPath')
+    if (isLocalPath(home, cmd) || args.some((a) => isLocalPath(home, a))) r.push('localPath')
   }
   return judge(r)
 }
@@ -716,7 +746,11 @@ export function skillPortability(
   const allSegs = [...segs(path), ...segs(resolved)]
   if (name.startsWith('.')) r.push('hiddenDir')
   if (allSegs.some((x) => SKILL_INTERNAL_DIRS.has(x))) r.push('toolInternalDir')
-  if (name.includes(':') || inAny(home, TOOL_PLUGIN_DIRS, path) || inAny(home, TOOL_PLUGIN_DIRS, resolved))
+  if (
+    name.includes(':') ||
+    inAny(home, TOOL_PLUGIN_DIRS, path) ||
+    inAny(home, TOOL_PLUGIN_DIRS, resolved)
+  )
     r.push('pluginSkill')
   try {
     if (TOOL_SPECIFIC_TOOL_RE.test(readFileSync(join(resolved, 'SKILL.md'), 'utf8')))
@@ -737,14 +771,20 @@ export const COPILOT_MD_RULE = 'copilot-instructions.md'
 const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([GEMINI_MD_RULE, COPILOT_MD_RULE])
 
 /** Rule file verdict. name is the candidate name, path is the source file */
-export function rulePortability(ctx: PortabilityContext, name: string, path: string): PortabilityInfo {
+export function rulePortability(
+  ctx: PortabilityContext,
+  name: string,
+  path: string
+): PortabilityInfo {
   const { home } = ctx
   const r: PortabilityReason[] = []
   const base = path.split('/').pop() ?? ''
-  if (name === 'codex-agents.md' && path === join(home, '.codex/AGENTS.md')) r.push('toolInstructions')
+  if (name === 'codex-agents.md' && path === join(home, '.codex/AGENTS.md'))
+    r.push('toolInstructions')
   // GEMINI.md outside the markers: global instructions and Gemini memory-tool notes — importable, but review before sharing
   else if (name === GEMINI_MD_RULE && path === join(home, '.gemini/GEMINI.md')) r.push('toolNotes')
-  else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md')) r.push('toolNotes')
+  else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md'))
+    r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
@@ -821,7 +861,6 @@ function scanSkillDir(
   }
 }
 
-
 // ---------------------------------------------------------------- Agent scan
 
 const noEvalAgent = (): never => {
@@ -832,19 +871,37 @@ const AGENT_MATTER = { engines: { js: noEvalAgent, javascript: noEvalAgent } }
 /** Keys carried into library format (per tool agent file). Other keys are dropped (toolSpecificKeys) */
 const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   claude: new Set(['name', 'description', 'model', 'effort']),
-  codex: new Set(['name', 'description', 'model', 'model_reasoning_effort', 'developer_instructions']),
+  codex: new Set([
+    'name',
+    'description',
+    'model',
+    'model_reasoning_effort',
+    'developer_instructions'
+  ]),
   opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
   gemini: new Set(['name', 'description', 'model', 'kind']),
   copilot: new Set(['name', 'description', 'model', 'reasoning-effort']),
   grok: new Set(['name', 'description', 'model'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
-const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set(['description', 'mode', 'model', 'reasoningEffort', 'prompt'])
+const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set([
+  'description',
+  'mode',
+  'model',
+  'reasoningEffort',
+  'prompt'
+])
 /** OpenCode built-in agent names (opencode.json agent.<name> is an override) */
 const OPENCODE_BUILTIN_AGENTS = new Set(['build', 'plan', 'general', 'explore'])
 
 const strOf = (v: unknown): string | undefined =>
-  typeof v === 'string' ? (v.trim() ? v.trim() : undefined) : typeof v === 'number' ? String(v) : undefined
+  typeof v === 'string'
+    ? v.trim()
+      ? v.trim()
+      : undefined
+    : typeof v === 'number'
+      ? String(v)
+      : undefined
 
 interface AgentRaw {
   description: string
@@ -855,7 +912,13 @@ interface AgentRaw {
   reasons: PortabilityReason[]
 }
 
-function addAgent(found: Found, tool: ToolId, name: string, raw: AgentRaw, ref: ImportSourceRef): void {
+function addAgent(
+  found: Found,
+  tool: ToolId,
+  name: string,
+  raw: AgentRaw,
+  ref: ImportSourceRef
+): void {
   const settings: AgentToolSettings = {
     ...(raw.model ? { model: raw.model } : {}),
     ...(raw.effort ? { effort: raw.effort } : {})
@@ -911,7 +974,12 @@ function droppedKeys(data: Json, kept: ReadonlySet<string>): string[] {
 }
 
 /** One tool agent file → library fields. Throws on parse failure */
-function agentRaw(tool: ToolId, name: string, text: string, reasons: PortabilityReason[]): AgentRaw {
+function agentRaw(
+  tool: ToolId,
+  name: string,
+  text: string,
+  reasons: PortabilityReason[]
+): AgentRaw {
   switch (tool) {
     case 'codex': {
       const d = parseToml(text) as Json
@@ -919,7 +987,9 @@ function agentRaw(tool: ToolId, name: string, text: string, reasons: Portability
         description: strOf(d.description) ?? '',
         model: strOf(d.model),
         effort: strOf(d.model_reasoning_effort),
-        body: agentBody(typeof d.developer_instructions === 'string' ? d.developer_instructions : ''),
+        body: agentBody(
+          typeof d.developer_instructions === 'string' ? d.developer_instructions : ''
+        ),
         dropped: droppedKeys(d, AGENT_KEPT.codex),
         reasons
       }
@@ -946,7 +1016,8 @@ function agentRaw(tool: ToolId, name: string, text: string, reasons: Portability
       const m = matter(text, AGENT_MATTER)
       const d = structuredClone(m.data) as Json
       // Tool and MCP limits can't be carried by the library — importing would widen what the agent may do
-      if (d.tools !== undefined || d['mcp-servers'] !== undefined || d.mcpServers !== undefined) reasons.push('restrictedAgent')
+      if (d.tools !== undefined || d['mcp-servers'] !== undefined || d.mcpServers !== undefined)
+        reasons.push('restrictedAgent')
       const own = strOf(d.name)
       if (own !== undefined && own !== name) reasons.push('nameMismatch')
       return {
@@ -997,7 +1068,9 @@ function scanAgentDir(
   try {
     files = readdirSync(dir).sort()
   } catch (e) {
-    found.notes.push(`${tilde(home, dir)} read failed (${(e as NodeJS.ErrnoException).code ?? 'unknown'})`)
+    found.notes.push(
+      `${tilde(home, dir)} read failed (${(e as NodeJS.ErrnoException).code ?? 'unknown'})`
+    )
     return
   }
   const libReal = realOrNull(libraryPaths(home).agentsDir)
@@ -1040,7 +1113,11 @@ function scanAgentDir(
 }
 
 /** OpenCode prompt `{file:./x.txt}` → file content relative to the config file. null if unreadable */
-function opencodePrompt(home: string, configPath: string, v: unknown): { body: string; unresolved: boolean } {
+function opencodePrompt(
+  home: string,
+  configPath: string,
+  v: unknown
+): { body: string; unresolved: boolean } {
   if (typeof v !== 'string') return { body: '', unresolved: false }
   const m = /^\{file:(.+)\}$/.exec(v.trim())
   if (!m) return { body: agentBody(v), unresolved: false }
@@ -1058,7 +1135,8 @@ function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: st
   const base = { origin: 'tool' as const, sourceId, label: tool }
   // Only the folder the app writes holds app copies (managed); other source folders are all user files
   const slot = agentToolDir(home, tool).dir
-  for (const dir of agentSourceDirs(home, tool)) scanAgentDir(found, home, tool, dir, base, dir === slot ? managed : {})
+  for (const dir of agentSourceDirs(home, tool))
+    scanAgentDir(found, home, tool, dir, base, dir === slot ? managed : {})
   if (tool === 'opencode') {
     const cp = join(home, '.config/opencode/opencode.json')
     if (!existsSync(cp)) return
@@ -1097,9 +1175,25 @@ function agentSourceDirs(home: string, tool: ToolId): string[] {
   return tools(home).find((t) => t.id === tool)!.roster.dirs
 }
 
-function pendingEntry(home: string, kind: PendingRetire['kind'], tool: ToolId, name: string, path: string): PendingRetire | null {
+function pendingEntry(
+  home: string,
+  kind: PendingRetire['kind'],
+  tool: ToolId,
+  name: string,
+  path: string
+): PendingRetire | null {
   const hash = retireHash(path)
-  return hash === null || hash === UNREADABLE_HASH ? null : { kind, tool, name, path, hash, at: new Date().toISOString(), workspace: activeWorkspaceId(home) }
+  return hash === null || hash === UNREADABLE_HASH
+    ? null
+    : {
+        kind,
+        tool,
+        name,
+        path,
+        hash,
+        at: new Date().toISOString(),
+        workspace: activeWorkspaceId(home)
+      }
 }
 
 /**
@@ -1107,7 +1201,11 @@ function pendingEntry(home: string, kind: PendingRetire['kind'], tool: ToolId, n
  * never permanently deleted). Files already byte-identical to the rendered output at the sync location are adopted instead (adoptAgentFiles).
  * opencode.json inline definitions are left alone.
  */
-function agentRetirements(home: string, name: string, v: AgentVariant): { pending: PendingRetire[]; converted: ToolId[]; inline: boolean } {
+function agentRetirements(
+  home: string,
+  name: string,
+  v: AgentVariant
+): { pending: PendingRetire[]; converted: ToolId[]; inline: boolean } {
   const out = { pending: [] as PendingRetire[], converted: [] as ToolId[], inline: false }
   const doc = readAgentDoc(home, name)
   for (const src of v.sources) {
@@ -1118,7 +1216,11 @@ function agentRetirements(home: string, name: string, v: AgentVariant): { pendin
     const tool = src.label as ToolId
     if (!TOOL_IDS.includes(tool)) continue
     const dir = dirname(src.path)
-    if (!agentSourceDirs(home, tool).includes(dir) || agentNameOfFile(tool, basename(src.path)) !== name) continue
+    if (
+      !agentSourceDirs(home, tool).includes(dir) ||
+      agentNameOfFile(tool, basename(src.path)) !== name
+    )
+      continue
     let st: ReturnType<typeof lstatSync>
     try {
       st = lstatSync(src.path)
@@ -1154,21 +1256,32 @@ function adoptGrokRule(home: string, name: string, path: string): void {
     const st = readState(home)
     if (st.error) return
     const state = { ...st.state, toolRules: { ...(st.state.toolRules ?? {}) } }
-    state.toolRules.grok = { ...(state.toolRules.grok ?? {}), [name]: { contentHash: sha256(bytes), at: new Date().toISOString() } }
+    state.toolRules.grok = {
+      ...(state.toolRules.grok ?? {}),
+      [name]: { contentHash: sha256(bytes), at: new Date().toISOString() }
+    }
     writeState(home, state)
   } catch {
     // not adopted: the next sync reports it as the user's file
   }
 }
 
-function ruleRetirements(home: string, name: string, v: FileVariant): { pending: PendingRetire[]; converted: ToolId[] } {
+function ruleRetirements(
+  home: string,
+  name: string,
+  v: FileVariant
+): { pending: PendingRetire[]; converted: ToolId[] } {
   const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
   const claudeRule = join(home, '.claude/rules', name)
   for (const src of v.sources) {
     if (src.origin !== 'tool') continue
     let e: PendingRetire | null = null
     if (src.label === 'opencode') e = pendingEntry(home, 'instruction', 'opencode', name, src.path)
-    else if (src.label === 'copilot' && src.path.endsWith('.instructions.md') && within(join(home, '.copilot/instructions'), src.path)) {
+    else if (
+      src.label === 'copilot' &&
+      src.path.endsWith('.instructions.md') &&
+      within(join(home, '.copilot/instructions'), src.path)
+    ) {
       try {
         if (!lstatSync(src.path).isFile()) continue
       } catch {
@@ -1221,7 +1334,11 @@ function copiesSkills(home: string, tool: ToolId): boolean {
  * same content as the library copy are adopted instead (adoptSkillCopies); symlinks there are replaced by sync (replaceLink — the
  * link target is untouched), so they need no record.
  */
-function skillRetirements(home: string, name: string, v: SkillVariant): { pending: PendingRetire[]; converted: ToolId[] } {
+function skillRetirements(
+  home: string,
+  name: string,
+  v: SkillVariant
+): { pending: PendingRetire[]; converted: ToolId[] } {
   const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
   let libHash: string | null = null
   try {
@@ -1264,7 +1381,12 @@ function skillRetirements(home: string, name: string, v: SkillVariant): { pendin
 }
 
 /** enableOnlySourceTools that never fails the import (false = toggles could not be saved, the item stays on for all tools) */
-function sourceToggles(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): boolean {
+function sourceToggles(
+  home: string,
+  kind: ManifestKind,
+  name: string,
+  sources: ImportSourceRef[]
+): boolean {
   try {
     enableOnlySourceTools(home, kind, name, sources)
     return true
@@ -1303,7 +1425,12 @@ function recordRetirements(home: string, pending: PendingRetire[]): void {
  * all-on default). Tools the kind can't toggle (MANIFEST_TOOLS) are left alone. OpenCode skills keep their default too:
  * OpenCode already found them in ~/.claude/skills or ~/.agents/skills, so an import must not start hiding them
  */
-function enableOnlySourceTools(home: string, kind: ManifestKind, name: string, sources: ImportSourceRef[]): void {
+function enableOnlySourceTools(
+  home: string,
+  kind: ManifestKind,
+  name: string,
+  sources: ImportSourceRef[]
+): void {
   const from = new Set(sources.filter((s) => s.origin === 'tool').map((s) => s.label))
   if (!from.size) return
   for (const tool of MANIFEST_TOOLS[kind]) {
@@ -1423,7 +1550,9 @@ function convertClaude(name: string, s: Json): Conv {
   }
   if (type === 'http' || type === 'sse') {
     if (type === 'sse')
-      c.warnings.push('moved sse transport to http — check that the server supports streamable http')
+      c.warnings.push(
+        'moved sse transport to http — check that the server supports streamable http'
+      )
     const server: McpServer = { transport: 'http', url: c.url(s.url) }
     if (isObj(s.headers) && Object.keys(s.headers).length)
       server.headers = Object.fromEntries(
@@ -1463,7 +1592,9 @@ function convertOpencode(name: string, s: Json): Conv {
 
 /** Gemini `$VAR` → `${VAR}` (Gemini expands both in settings.json strings) */
 function fromGeminiRef(v: unknown): unknown {
-  return typeof v === 'string' ? v.replace(/\$([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_{])/g, '${$1}') : v
+  return typeof v === 'string'
+    ? v.replace(/\$([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_{])/g, '${$1}')
+    : v
 }
 
 /**
@@ -1476,10 +1607,14 @@ function convertGemini(name: string, s: Json): Conv {
   if (typeof s.command === 'string') {
     server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
     if (isObj(s.env) && Object.keys(s.env).length)
-      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))]))
+      server.env = Object.fromEntries(
+        Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))])
+      )
   } else if (typeof s.httpUrl === 'string' || typeof s.url === 'string') {
     if (typeof s.httpUrl !== 'string')
-      c.warnings.push('moved sse transport (url) to http — check that the server supports streamable http')
+      c.warnings.push(
+        'moved sse transport (url) to http — check that the server supports streamable http'
+      )
     server = { transport: 'http', url: c.url(s.httpUrl ?? s.url) }
     if (isObj(s.headers) && Object.keys(s.headers).length)
       server.headers = Object.fromEntries(
@@ -1503,14 +1638,31 @@ function convertCopilot(name: string, s: Json): Conv {
   if ((type === 'stdio' || type === 'local') && typeof s.command === 'string') {
     server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
     if (isObj(s.env) && Object.keys(s.env).length)
-      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))]))
+      server.env = Object.fromEntries(
+        Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, fromGeminiRef(v))])
+      )
   } else if ((type === 'http' || type === 'sse') && typeof s.url === 'string') {
-    if (type === 'sse') c.warnings.push('moved sse transport to http — check that the server supports streamable http')
+    if (type === 'sse')
+      c.warnings.push(
+        'moved sse transport to http — check that the server supports streamable http'
+      )
     server = { transport: 'http', url: c.url(s.url) }
     if (isObj(s.headers) && Object.keys(s.headers).length)
-      server.headers = Object.fromEntries(Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, fromGeminiRef(v))]))
+      server.headers = Object.fromEntries(
+        Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, fromGeminiRef(v))])
+      )
   } else return null
-  for (const k of ['cwd', 'tools', 'deferTools', 'oauthClientId', 'oauthClientSecret', 'auth', 'timeout', 'taskSupport', 'slowConnectionThresholdMs'])
+  for (const k of [
+    'cwd',
+    'tools',
+    'deferTools',
+    'oauthClientId',
+    'oauthClientSecret',
+    'auth',
+    'timeout',
+    'taskSupport',
+    'slowConnectionThresholdMs'
+  ])
     if (s[k] !== undefined) c.warnings.push(`dropped ${k} (no library equivalent)`)
   return { server, c }
 }
@@ -1573,7 +1725,9 @@ function convertGrok(name: string, s: Json): Conv {
   } else if (typeof s.url === 'string') {
     server = { transport: 'http', url: c.url(s.url) }
     if (isObj(s.headers) && Object.keys(s.headers).length)
-      server.headers = Object.fromEntries(Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, v)]))
+      server.headers = Object.fromEntries(
+        Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, v)])
+      )
   } else return null
   if (s.enabled === false) c.warnings.push('was disabled in grok (enabled=false)')
   return { server, c }
@@ -1805,7 +1959,8 @@ function scanLegacy(found: Found, home: string, src: ImportSource): void {
       found.notes.push(`${tilde(home, mcpPath)} parse failed or has no servers`)
     else {
       const meta = Object.keys(o).filter((k) => k.startsWith('_')).length
-      if (meta) found.notes.push(`${meta} top-level meta keys (_ …) in mcp.json are not carried over`)
+      if (meta)
+        found.notes.push(`${meta} top-level meta keys (_ …) in mcp.json are not carried over`)
       for (const [n, s] of mcpEntries(o as unknown as McpSource)) {
         const r = convertLibraryFormat(n, s as unknown as Json)
         if (!r) continue
@@ -1971,7 +2126,9 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
               addFile(found.rules, n, abs, ref(abs), rulePortability(found.ctx, n, abs))
             }
             if (globs)
-              found.notes.push(`${globs} glob entries in opencode instructions are not turned into candidates`)
+              found.notes.push(
+                `${globs} glob entries in opencode instructions are not turned into candidates`
+              )
           }
         }
       }
@@ -2042,20 +2199,35 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
             let scoped = false
             try {
               const at = (matter(readFileSync(p, 'utf8'), AGENT_MATTER).data as Json).applyTo
-              scoped = at !== undefined && !(typeof at === 'string' && ['**', '**/*'].includes(at.trim()))
+              scoped =
+                at !== undefined && !(typeof at === 'string' && ['**', '**/*'].includes(at.trim()))
             } catch {
               scoped = true
             }
             const info = rulePortability(found.ctx, name, p)
-            addFile(found.rules, name, p, ref(p), scoped ? judge([...info.reasons, 'projectScoped']) : info)
+            addFile(
+              found.rules,
+              name,
+              p,
+              ref(p),
+              scoped ? judge([...info.reasons, 'projectScoped']) : info
+            )
           }
         }
       }
       walk(ir)
       const cp = join(home, '.copilot/copilot-instructions.md')
       if (existsSync(cp) && lstatSync(cp).isFile()) {
-        addFile(found.rules, COPILOT_MD_RULE, cp, ref(cp), rulePortability(found.ctx, COPILOT_MD_RULE, cp))
-        found.notes.push(`${COPILOT_MD_RULE} is ~/.copilot/copilot-instructions.md — copied, the original stays`)
+        addFile(
+          found.rules,
+          COPILOT_MD_RULE,
+          cp,
+          ref(cp),
+          rulePortability(found.ctx, COPILOT_MD_RULE, cp)
+        )
+        found.notes.push(
+          `${COPILOT_MD_RULE} is ~/.copilot/copilot-instructions.md — copied, the original stays`
+        )
       }
       const mp = join(home, '.copilot/mcp-config.json')
       if (existsSync(mp)) {
@@ -2079,7 +2251,13 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       if (isDir(rd))
         for (const f of readdirSync(rd).sort()) {
           const p = join(rd, f)
-          if (f.endsWith('.md') && !f.startsWith('.') && !owned[f] && f !== GROK_MEMORY_RULE_FILE && lstatSync(p).isFile())
+          if (
+            f.endsWith('.md') &&
+            !f.startsWith('.') &&
+            !owned[f] &&
+            f !== GROK_MEMORY_RULE_FILE &&
+            lstatSync(p).isFile()
+          )
             addFile(found.rules, f, p, ref(p), rulePortability(found.ctx, f, p))
         }
       const tp = join(home, '.grok/config.toml')
@@ -2200,7 +2378,9 @@ function scan(home: string, sources: ImportSource[]): InternalPlan {
       if (e instanceof LibraryError && e.code === 'libraryMissing') cur = null
       else {
         libBroken = true
-        found.notes.push('could not read library permissions.json — building candidates without comparison')
+        found.notes.push(
+          'could not read library permissions.json — building candidates without comparison'
+        )
       }
     }
     const byId = new Map<string, PermissionsVariant>()
@@ -2460,7 +2640,10 @@ export function applyImport(
         createRule(home, cand.name, content)
         const togglesOk =
           exists ||
-          (TOOL_NOTES_RULES.has(cand.name) && v.sources.some((x) => x.origin === 'tool' && (x.label === 'gemini' || x.label === 'copilot'))
+          (TOOL_NOTES_RULES.has(cand.name) &&
+          v.sources.some(
+            (x) => x.origin === 'tool' && (x.label === 'gemini' || x.label === 'copilot')
+          )
             ? toolNotesToggles(home, cand.name, v.sources)
             : sourceToggles(home, 'rules', cand.name, v.sources))
         const moved = ruleRetirements(home, cand.name, v)
@@ -2538,7 +2721,13 @@ export function applyImport(
           status: 'imported',
           ...(trashPath ? { trashPath } : {}),
           ...(v.warnings.length || moved.converted.length || !togglesOk
-            ? { warnings: [...v.warnings, ...(moved.converted.length ? ['agentRenderDiffers'] : []), ...(togglesOk ? [] : ['togglesNotSet'])] }
+            ? {
+                warnings: [
+                  ...v.warnings,
+                  ...(moved.converted.length ? ['agentRenderDiffers'] : []),
+                  ...(togglesOk ? [] : ['togglesNotSet'])
+                ]
+              }
             : {}),
           ...(moved.converted.length ? { converted: moved.converted } : {}),
           ...(own.adopted.length ? { adopted: own.adopted } : {}),

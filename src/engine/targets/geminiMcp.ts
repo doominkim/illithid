@@ -103,7 +103,11 @@ export function parsePlainJsonConfig(text: string, file: string): Json {
 }
 
 /** Keep same-name entries' tool-only keys (listed in keys) in the rendered servers. Returns server name → kept keys */
-export function keepToolOnlyKeys(servers: Record<string, Json>, prev: Json, keys: readonly string[]): Record<string, string[]> {
+export function keepToolOnlyKeys(
+  servers: Record<string, Json>,
+  prev: Json,
+  keys: readonly string[]
+): Record<string, string[]> {
   const kept: Record<string, string[]> = {}
   for (const [name, server] of Object.entries(servers)) {
     const old = prev[name]
@@ -119,20 +123,32 @@ export function keepToolOnlyKeys(servers: Record<string, Json>, prev: Json, keys
  * Library skills on for Gemini that Gemini's own settings turn off — all of them if skills.enabled is false, else those in
  * skills.disabled. Warned about, never changed
  */
-export function geminiDisabledSkills(settings: Json, sources: Sources): { allOff: boolean; names: string[] } {
+export function geminiDisabledSkills(
+  settings: Json,
+  sources: Sources
+): { allOff: boolean; names: string[] } {
   const sk = settings.skills
   if (!sk || typeof sk !== 'object' || Array.isArray(sk)) return { allOff: false, names: [] }
   const s = sk as Json
-  const on = librarySkillNames(sources).filter((n) => isEnabled(sources.manifest, 'skills', n, 'gemini'))
+  const on = librarySkillNames(sources).filter((n) =>
+    isEnabled(sources.manifest, 'skills', n, 'gemini')
+  )
   if (s.enabled === false) return { allOff: true, names: on }
-  return { allOff: false, names: Array.isArray(s.disabled) ? on.filter((n) => (s.disabled as unknown[]).includes(n)) : [] }
+  return {
+    allOff: false,
+    names: Array.isArray(s.disabled) ? on.filter((n) => (s.disabled as unknown[]).includes(n)) : []
+  }
 }
 
 /** geminiDisabledSkills from ~/.gemini/settings.json (read with comments allowed, like Gemini). Empty if missing or unreadable */
 export function geminiDisabledSkillsOf(home: string, sources: Sources): string[] {
   try {
-    const v = JSON.parse(stripJsonComments(readFileSync(join(home, '.gemini/settings.json'), 'utf8'))) as unknown
-    return v && typeof v === 'object' && !Array.isArray(v) ? geminiDisabledSkills(v as Json, sources).names : []
+    const v = JSON.parse(
+      stripJsonComments(readFileSync(join(home, '.gemini/settings.json'), 'utf8'))
+    ) as unknown
+    return v && typeof v === 'object' && !Array.isArray(v)
+      ? geminiDisabledSkills(v as Json, sources).names
+      : []
   } catch {
     return []
   }
@@ -141,8 +157,13 @@ export function geminiDisabledSkillsOf(home: string, sources: Sources): string[]
 function disabledSkillNotes(settings: Json, sources: Sources): string[] {
   const { allOff, names } = geminiDisabledSkills(settings, sources)
   if (!names.length) return []
-  if (allOff) return ['skills.enabled is false in settings.json — Gemini loads no skills, including library ones']
-  return [`library skills disabled by skills.disabled in settings.json (left as-is): ${names.join(', ')}`]
+  if (allOff)
+    return [
+      'skills.enabled is false in settings.json — Gemini loads no skills, including library ones'
+    ]
+  return [
+    `library skills disabled by skills.disabled in settings.json (left as-is): ${names.join(', ')}`
+  ]
 }
 
 /** Serialize keeping the file's indentation and trailing newline */
@@ -167,19 +188,30 @@ export const geminiMcp: TargetDef = {
     const settings = parsePlainJsonConfig(before, 'settings.json')
     const serverErrors: Record<string, string> = {}
     const kept: Record<string, string[]> = {}
-    const next = buildGeminiMcp(mcpForTool(sources, 'gemini'), settings, env, ctx.secrets, serverErrors, kept)
+    const next = buildGeminiMcp(
+      mcpForTool(sources, 'gemini'),
+      settings,
+      env,
+      ctx.secrets,
+      serverErrors,
+      kept
+    )
     const stale = staleServerNames(sources, 'gemini', ctx, 'geminiMcp')
     removeServers(next, 'mcpServers', stale)
-    const after = JSON.stringify(next) === JSON.stringify(settings) ? before : toSettingsText(before, next)
+    const after =
+      JSON.stringify(next) === JSON.stringify(settings) ? before : toSettingsText(before, next)
     const { count, same } = untouchedKeysSame(settings, next, 'mcpServers')
     const notes = [`${count} keys other than mcpServers unchanged: ${same ? 'OK' : 'broken!'}`]
     notes.push(...toggleNotes(stale, disabledUnownedServers(sources, 'gemini', ctx, 'geminiMcp')))
-    for (const [n, keys] of Object.entries(kept)) notes.push(`kept Gemini-only settings of ${n}: ${keys.join(', ')}`)
+    for (const [n, keys] of Object.entries(kept))
+      notes.push(`kept Gemini-only settings of ${n}: ${keys.join(', ')}`)
     notes.push(...disabledSkillNotes(settings, sources))
     // Gemini's policy engine splits MCP tool names (mcp_<server>_<tool>) at `_`, so such a server name may be misread
     const underscored = enabledServerNames(sources, 'gemini').filter((n) => n.includes('_'))
     if (underscored.length)
-      notes.push(`server names with "_" may be misread by Gemini's tool policy rules (mcp_<server>_<tool>): ${underscored.join(', ')}`)
+      notes.push(
+        `server names with "_" may be misread by Gemini's tool policy rules (mcp_<server>_<tool>): ${underscored.join(', ')}`
+      )
     const owned = enabledServerNames(sources, 'gemini')
     const errs = Object.keys(serverErrors).length ? { serverErrors } : {}
     return same
