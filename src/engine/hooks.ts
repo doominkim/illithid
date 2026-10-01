@@ -197,10 +197,11 @@ export function hookTriggers(doc: HookDoc): Partial<Record<HookTool, HookTrigger
     const event = s.event ?? defaultHookEvent(tool, doc.when)!
     const takesMatcher = !!hookEventInfo(tool, event)?.matcher
     const matcher = s.matcher ?? actionMatcher(doc.action, tool, doc.when)
+    const timeout = s.timeout ?? HOOK_ACTION_INFO[doc.action].timeout
     out[tool] = {
       event,
       ...(takesMatcher && matcher ? { matcher } : {}),
-      ...(s.timeout !== undefined ? { timeout: s.timeout } : {})
+      ...(timeout !== undefined ? { timeout } : {})
     }
   }
   return out

@@ -261,3 +261,139 @@ test('REQ-HOOKS-ACTIONS-5 ask wraps the instruction with the event and the reply
   })
   assert.equal(raw, 'Original prompt $ARGUMENTS')
 })
+
+/** A project folder with package.json and a fake npm whose test fails while FAIL is set */
+function nodeProject(testScript = 'vitest run'): { dir: string; bin: ReturnType<typeof fakeBin> } {
+  const dir = mkdtempSync(join(tmpdir(), 'illithid-verify-'))
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: testScript } }))
+  const bin = fakeBin('npm')
+  // The fake npm also prints a failure and exits 1 when FAIL is set
+  const npm = join(bin.path.split(':')[0], 'npm')
+  writeFileSync(
+    npm,
+    readFileSync(npm, 'utf8') +
+      'if [ -n "$FAIL" ]; then echo "  1 failing: adds numbers"; exit 1; fi\n'
+  )
+  return { dir, bin }
+}
+
+test('REQ-HOOKS-ACTIONS-10 check before finishing: failing tests send the agent back with the output, then give up after 3 tries', () => {
+  const { dir, bin } = nodeProject()
+  const script = renderActionScript('claude', 'verify', doc('verify', 'stop'))
+  const env = { PATH: bin.path, FAIL: '1', TMPDIR: mkdtempSync(join(tmpdir(), 'illithid-tmp-')) }
+  const input = { session_id: 's1', stop_hook_active: false }
+  for (let i = 1; i <= 3; i++) {
+    const r = run(script, 'claude', input, { env, cwd: dir })
+    assert.equal(r.code, 2, `try ${i}`)
+    assert.match(r.err, /npm test/)
+    assert.match(r.err, /1 failing: adds numbers/)
+  }
+  // Fourth time in the same session: let it finish
+  assert.equal(run(script, 'claude', input, { env, cwd: dir }).code, 0)
+  assert.equal(bin.calls('npm').length, 3)
+  // Already continuing because of a stop hook: never block again
+  const again = run(
+    script,
+    'claude',
+    { session_id: 's2', stop_hook_active: true },
+    { env, cwd: dir }
+  )
+  assert.equal(again.code, 0)
+  assert.equal(bin.calls('npm').length, 3)
+  // Passing tests: finish
+  const ok = run(script, 'claude', { session_id: 's3' }, { env: { ...env, FAIL: '' }, cwd: dir })
+  assert.equal(ok.code, 0)
+})
+
+test("REQ-HOOKS-ACTIONS-11 check before finishing: Copilot gets a block decision as JSON; Grok's camelCase flag is read", () => {
+  const { dir, bin } = nodeProject()
+  const env = { PATH: bin.path, FAIL: '1', TMPDIR: mkdtempSync(join(tmpdir(), 'illithid-tmp-')) }
+  const r = run(
+    renderActionScript('copilot', 'verify', doc('verify', 'stop')),
+    'copilot',
+    { sessionId: 'c1' },
+    {
+      env,
+      cwd: dir
+    }
+  )
+  assert.equal(r.code, 0)
+  const out = JSON.parse(r.out) as { decision: string; reason: string }
+  assert.equal(out.decision, 'block')
+  assert.match(out.reason, /1 failing: adds numbers/)
+  const grok = run(
+    renderActionScript('grok', 'verify', doc('verify', 'stop')),
+    'grok',
+    { stopHookActive: true },
+    { env, cwd: dir }
+  )
+  assert.equal(grok.code, 0)
+  assert.equal(bin.calls('npm').length, 1)
+})
+
+test("REQ-HOOKS-ACTIONS-12 check before finishing picks the project's test command, skips when there is none or nothing changed", () => {
+  const env = { TMPDIR: mkdtempSync(join(tmpdir(), 'illithid-tmp-')) }
+  const script = renderActionScript('claude', 'verify', doc('verify', 'stop'))
+  // npm init's placeholder test is not a test
+  const placeholder = nodeProject('echo "Error: no test specified" && exit 1')
+  assert.equal(
+    run(
+      script,
+      'claude',
+      {},
+      { env: { ...env, PATH: placeholder.bin.path, FAIL: '1' }, cwd: placeholder.dir }
+    ).code,
+    0
+  )
+  assert.equal(placeholder.bin.calls('npm').length, 0)
+  // go.mod → go test ./...
+  const goDir = mkdtempSync(join(tmpdir(), 'illithid-go-'))
+  writeFileSync(join(goDir, 'go.mod'), 'module x\n')
+  const go = fakeBin('go')
+  run(script, 'claude', {}, { env: { ...env, PATH: go.path }, cwd: goDir })
+  assert.deepEqual(go.calls('go'), [['test', './...']])
+  // pyproject.toml but no tests (pytest exits 5), or the tool isn't installed (127): let the agent finish
+  const pyDir = mkdtempSync(join(tmpdir(), 'illithid-py-'))
+  writeFileSync(join(pyDir, 'pyproject.toml'), '[project]\nname = "x"\n')
+  const py = fakeBin('pytest')
+  const pyBin = join(py.path.split(':')[0], 'pytest')
+  writeFileSync(pyBin, readFileSync(pyBin, 'utf8') + 'exit 5\n')
+  assert.equal(run(script, 'claude', {}, { env: { ...env, PATH: py.path }, cwd: pyDir }).code, 0)
+  assert.equal(py.calls('pytest').length, 1)
+  assert.equal(
+    run(script, 'claude', {}, { env: { ...env, PATH: '/usr/bin:/bin' }, cwd: pyDir }).code,
+    0
+  )
+  // Nothing to test with
+  const empty = mkdtempSync(join(tmpdir(), 'illithid-empty-'))
+  assert.equal(run(script, 'claude', {}, { env, cwd: empty }).code, 0)
+  // A git repo with no changes: nothing to check
+  const repo = nodeProject()
+  spawnSync('git', ['init', '-q'], { cwd: repo.dir })
+  spawnSync('git', ['add', '.'], { cwd: repo.dir })
+  spawnSync('git', ['-c', 'user.email=a@b', '-c', 'user.name=a', 'commit', '-qm', 'x'], {
+    cwd: repo.dir
+  })
+  assert.equal(
+    run(script, 'claude', {}, { env: { ...env, PATH: repo.bin.path, FAIL: '1' }, cwd: repo.dir })
+      .code,
+    0
+  )
+  assert.equal(repo.bin.calls('npm').length, 0)
+  // The user's own command wins
+  const make = fakeBin('make')
+  run(
+    renderActionScript('claude', 'verify', doc('verify', 'stop', { command: 'make check' })),
+    'claude',
+    {},
+    {
+      env: { ...env, PATH: make.path },
+      cwd: empty
+    }
+  )
+  assert.deepEqual(make.calls('make'), [['check']])
+  // Every tool gets a long enough timeout (Copilot's default is 30 s, Gemini's 60 s)
+  const t = hookTriggers(doc('verify', 'stop'))
+  assert.deepEqual(t.copilot, { event: 'agentStop', timeout: 300 })
+  assert.deepEqual(t.gemini, { event: 'AfterAgent', timeout: 300 })
+})

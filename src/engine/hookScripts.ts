@@ -82,6 +82,56 @@ function notifyLines(doc: HookDoc, name: string): string[] {
   return out
 }
 
+/** Times one session may be sent back before the check lets the agent finish */
+export const VERIFY_MAX_TRIES = 3
+
+/**
+ * verify: before the agent finishes, run the project's tests and send it back with the failure if they fail.
+ * - Never twice in a row: the tools flag a stop that comes from a stop hook (stop_hook_active, stopHookActive in Grok/Copilot)
+ * - At most VERIFY_MAX_TRIES per session (a counter in $TMPDIR), then the agent may finish
+ * - Skipped when there is nothing to test with, or the git work tree has no changes (a question answered, nothing edited)
+ * - A missing command (exit 127) or pytest finding no tests (exit 5) lets the agent finish
+ * - Copilot reads a JSON decision on stdout; the others take exit 2 with the reason on stderr
+ */
+function verifyLines(tool: HookTool, name: string, doc: HookDoc): string[] {
+  const own = String(doc.options.command || '').trim()
+  const reply =
+    tool === 'copilot'
+      ? [
+          `jesc() { printf '%s' "$1" | tr -d '\\001-\\011\\013-\\037' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g' | awk 'BEGIN{ORS=""} NR>1{print "\\\\n"} {print}'; }`,
+          `printf '{"decision":"block","reason":"%s"}\\n' "$(jesc "$reason")"`,
+          'exit 0'
+        ]
+      : [`printf '%s\\n' "$reason" >&2`, 'exit 2']
+  return [
+    'active=$(field stop_hook_active); [ -n "$active" ] || active=$(field stopHookActive)',
+    '[ "$active" = "true" ] && exit 0',
+    `cmd=${q(own)}`,
+    'if [ -z "$cmd" ]; then',
+    "  if [ -f package.json ] && grep -q '\"test\"[[:space:]]*:' package.json && ! grep -q 'no test specified' package.json; then cmd='npm test --silent'",
+    "  elif [ -f pytest.ini ] || [ -f pyproject.toml ] || [ -f setup.cfg ]; then cmd='pytest -q'",
+    "  elif [ -f go.mod ]; then cmd='go test ./...'",
+    "  elif [ -f Cargo.toml ]; then cmd='cargo test --quiet'",
+    '  fi',
+    'fi',
+    '[ -n "$cmd" ] || exit 0',
+    '# Nothing changed in the work tree: nothing to check',
+    'if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ -z "$(git status --porcelain 2>/dev/null)" ]; then exit 0; fi',
+    'sid=$(field session_id); [ -n "$sid" ] || sid=$(field sessionId); [ -n "$sid" ] || sid=$PPID',
+    `count="\${TMPDIR:-/tmp}/illithid-verify-$(printf '%s' ${q(name)}"-$sid" | cksum | cut -d' ' -f1)"`,
+    'tries=$(cat "$count" 2>/dev/null || echo 0)',
+    `if [ "$tries" -ge ${VERIFY_MAX_TRIES} ]; then rm -f "$count"; exit 0; fi`,
+    'log=$(sh -c "$cmd" 2>&1)',
+    'code=$?',
+    '# 127: the command is not installed; 5: pytest found no tests — nothing to hold the agent back for',
+    'if [ $code -eq 0 ] || [ $code -eq 127 ] || [ $code -eq 5 ]; then rm -f "$count"; exit 0; fi',
+    'echo $((tries + 1)) > "$count"',
+    'reason="The check before finishing failed ($cmd). Fix it before you finish:',
+    '$(printf \'%s\\n\' "$log" | tail -n 40)"',
+    ...reply
+  ]
+}
+
 /** Script a built-in action runs in one tool */
 export function renderActionScript(tool: HookTool, name: string, doc: HookDoc): string {
   const o = doc.options
@@ -89,6 +139,9 @@ export function renderActionScript(tool: HookTool, name: string, doc: HookDoc): 
   switch (doc.action) {
     case 'notify':
       out.push(...notifyLines(doc, name))
+      break
+    case 'verify':
+      out.push(...verifyLines(tool, name, doc))
       break
     case 'guard': {
       out.push(...argGetter(tool), 'cmd=$(arg command)', 'case "$cmd" in')

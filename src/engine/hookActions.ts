@@ -11,7 +11,7 @@
  */
 import { defaultHookEvent, type HookTiming, type HookTool } from './hookEvents'
 
-export const HOOK_ACTIONS = ['notify', 'guard', 'format', 'log', 'ask', 'script'] as const
+export const HOOK_ACTIONS = ['notify', 'verify', 'guard', 'format', 'log', 'ask', 'script'] as const
 export type HookAction = (typeof HOOK_ACTIONS)[number]
 
 /** Why a tool can't run an action at a timing */
@@ -28,6 +28,8 @@ export interface HookActionInfo {
   matcherAt?: Partial<Record<HookTiming, Partial<Record<HookTool, string>>>>
   /** Options that take one of a few values */
   choices?: Record<string, readonly string[]>
+  /** Timeout written for every tool unless the hook sets one (seconds) — when tool defaults are too short */
+  timeout?: number
   /** Option defaults; options the user leaves out get these */
   defaults: Record<string, string | boolean | string[]>
 }
@@ -95,6 +97,8 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
       project: true
     }
   },
+  // command: '' = pick the project's test command (npm test, pytest, go test, cargo test)
+  verify: { timings: ['stop'], timeout: 300, defaults: { command: '' } },
   guard: {
     timings: ['before-tool'],
     matcher: SHELL,
