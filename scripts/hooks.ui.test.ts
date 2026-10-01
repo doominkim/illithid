@@ -198,3 +198,59 @@ test(
     }
   }
 )
+
+test(
+  "REQ-HOOKS-UI-4 recipes: check before finishing gets a long timeout everywhere, protect files says where it can't run, phone notifications ask for a variable",
+  { timeout: 180000 },
+  async () => {
+    const { home, app } = await launch(['claude', 'codex', 'copilot'], 'illithid-hooks-ui-recipes-')
+    try {
+      const page = await app.firstWindow()
+      const synced = (): Promise<void> =>
+        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
+      await page.locator('[data-menu="hooks"]').click()
+
+      await page.getByTestId('hook-new').click()
+      await page.locator('[data-card="hook-action-verify"]').click()
+      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'verify-stop')
+      await page.getByTestId('hook-create').click()
+      await page.getByTestId('hook-summary').getByText('Check before finishing').waitFor()
+      await synced()
+      const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: Record<string, { matcher?: string; hooks: { timeout?: number }[] }[]>
+      }
+      assert.equal(claude.hooks.Stop[0].hooks[0].timeout, 300)
+      const copilot = JSON.parse(
+        readFileSync(join(home, '.copilot/hooks/illithid.json'), 'utf8')
+      ) as { hooks: { agentStop: { timeoutSec: number }[] } }
+      assert.equal(copilot.hooks.agentStop[0].timeoutSec, 300)
+      await page.keyboard.press('Escape')
+
+      await page.getByTestId('hook-new').click()
+      await page.locator('[data-card="hook-action-protect"]').click()
+      await page
+        .getByTestId('hook-new-unsupported-noFilePath')
+        .getByText(/Codex, GitHub Copilot/)
+        .waitFor()
+      await page.getByTestId('hook-create').click()
+      await page.getByTestId('hook-summary').waitFor()
+      await synced()
+      const after = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: Record<string, { matcher?: string }[]>
+      }
+      assert.equal(after.hooks.PreToolUse[0].matcher, 'Write|Edit')
+      await page.keyboard.press('Escape')
+
+      await page.getByTestId('hook-new').click()
+      await page.locator('[data-card="hook-action-notify"]').click()
+      await page.getByTestId('hook-option-channel').getByText('ntfy', { exact: true }).click()
+      await page.getByTestId('hook-option-urlenv').waitFor()
+      assert.equal(
+        await page.getByTestId('hook-option-urlenv').getAttribute('placeholder'),
+        'ILLITHID_NTFY_URL'
+      )
+    } finally {
+      await app.close()
+    }
+  }
+)

@@ -800,7 +800,7 @@
       "stop": "応答完了",
       "session-start": "セッション開始",
       "session-end": "セッション終了",
-      "notification": "通知"
+      "notification": "入力待ち"
     },
     "timingHint": {
       "before-tool": "コマンドや編集の実行直前。ここで止められるツールもあります。",
@@ -809,7 +809,7 @@
       "stop": "エージェントが応答を終えたとき。通知に。",
       "session-start": "セッションが開いたとき。環境確認や記録に。",
       "session-end": "セッションが閉じたとき。",
-      "notification": "許可を求めるときや入力待ちのとき。"
+      "notification": "ツールが許可や入力を待っているとき。"
     },
     "triggersHint": "ツールごとにイベント名とオプションが異なります。同じオプションでも動作が同じとは限りません。",
     "event": "イベント",
@@ -858,8 +858,8 @@
     "pickAction": "何をしますか?",
     "actions": {
       "notify": {
-        "title": "通知する",
-        "desc": "macOS の通知を出します。音も鳴らせます"
+        "title": "通知を受け取る",
+        "desc": "応答が終わったときやエージェントが待っているときに、この Mac かスマホ (ntfy, Slack) に知らせます"
       },
       "guard": {
         "title": "危険なコマンドを止める",
@@ -867,7 +867,7 @@
       },
       "format": {
         "title": "編集したファイルを整形",
-        "desc": "エージェントが編集したファイルごとに Prettier などを実行します"
+        "desc": "編集したファイルに整形ツールを実行します。編集ごと、または応答の最後に 1 回"
       },
       "log": {
         "title": "ログを残す",
@@ -880,6 +880,18 @@
       "script": {
         "title": "自分で書く",
         "desc": "ツールの入力をそのまま受け取るシェルスクリプトを書きます"
+      },
+      "verify": {
+        "title": "終える前に確認",
+        "desc": "エージェントが完了と言ったらテストを実行し、失敗したら直させます"
+      },
+      "protect": {
+        "title": "重要なファイルを保護",
+        "desc": ".env、鍵、lock ファイル、.git の編集を止めます"
+      },
+      "context": {
+        "title": "セッション開始時に伝える",
+        "desc": "現在のブランチ、未コミットの変更、メモを先に伝えます"
       }
     },
     "claudeOnly": "Claude Code 専用",
@@ -893,7 +905,28 @@
       "patternsHint": "1 行に 1 つ。どれかを含むコマンドを止めます。",
       "command": "整形コマンド",
       "commandHint": "末尾に編集したファイルのパスを付けて実行します。",
-      "path": "ログファイル"
+      "path": "ログファイル",
+      "channel": "送り先",
+      "channels": {
+        "mac": "この Mac",
+        "ntfy": "ntfy",
+        "slack": "Slack"
+      },
+      "urlEnv": "アドレスを入れた環境変数",
+      "urlEnvHint": {
+        "ntfy": "ntfy トピックの URL (https://ntfy.sh/…) をこの環境変数に入れてください (例: Bitwarden)。Illithid はアドレスを保存しません。",
+        "slack": "Slack Webhook の URL をこの環境変数に入れてください (例: Bitwarden)。Illithid はアドレスを保存しません。"
+      },
+      "urlEnvInvalid": "英字・数字・_ のみ",
+      "messageFromTool": "ツールのメッセージ",
+      "project": "タイトルにプロジェクトフォルダ名を付ける",
+      "testCommand": "確認コマンド",
+      "testCommandHint": "空ならプロジェクトから選びます: npm test, pytest, go test, cargo test。",
+      "testCommandAuto": "自動",
+      "protectPatterns": "保護するファイル",
+      "protectPatternsHint": "1 行に 1 つのファイルパターン (* と ? が使えます)。/ を含むとパスで照合します。",
+      "git": "git ブランチと未コミットの変更を含める",
+      "commandHintStop": "応答の最後に 1 回、変更されたファイルをすべて末尾に付けて実行します。"
     },
     "instruction": "指示",
     "instructionHint": "Claude Code がこの指示とイベントを読んで、続けるかどうかを判断します。",
@@ -906,7 +939,8 @@
       "wrongTiming": "{{tool}} はこのタイミングでこの動作を実行できません",
       "noEvent": "{{tool}} にはこのタイミングのイベントがありません",
       "noFilePath": "{{tool}} は編集したファイルのパスをフックに渡しません",
-      "claudeOnly": "{{tool}} には判断フックがありません (Claude Code 専用)"
+      "claudeOnly": "{{tool}} には判断フックがありません (Claude Code 専用)",
+      "noContext": "{{tool}} はセッション開始フックの出力を無視します"
     },
     "pending": "まだツールに反映されていません",
     "pendingHint": "同期するとこのフックがツールの設定に入ります。",
@@ -930,7 +964,10 @@
     "openScript": "スクリプトメニューで開く",
     "convertOwn": "このフック専用のスクリプト",
     "convertLibrary": "スクリプトライブラリに保存",
-    "scriptName": "スクリプト名"
+    "scriptName": "スクリプト名",
+    "contextNote": "伝える内容",
+    "contextNoteHint": "セッション開始時に一緒に伝えます。プロジェクトのルールや最初に見る場所など。",
+    "contextNoteExample": "終える前に npm test を実行して。生成ファイルは編集しないで。"
   },
   "permissions": {
     "new": "新しいルール",

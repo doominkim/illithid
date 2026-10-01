@@ -800,7 +800,7 @@
       "stop": "Reply finished",
       "session-start": "Session starts",
       "session-end": "Session ends",
-      "notification": "Notification"
+      "notification": "Waiting for you"
     },
     "timingHint": {
       "before-tool": "Right before a command or edit runs. Some tools can stop it here.",
@@ -809,7 +809,7 @@
       "stop": "When the agent finishes a reply. For notifications.",
       "session-start": "When a session opens. Check the environment or log it.",
       "session-end": "When a session closes.",
-      "notification": "When the tool asks for permission or waits for input."
+      "notification": "When the tool waits for your permission or input."
     },
     "triggersHint": "Each tool has its own event names and options. The same option is not guaranteed to behave the same in every tool.",
     "event": "Event",
@@ -859,7 +859,7 @@
     "actions": {
       "notify": {
         "title": "Notify me",
-        "desc": "Show a macOS notification, with an optional sound"
+        "desc": "When a reply ends or the agent waits for you: on this Mac or on your phone (ntfy, Slack)"
       },
       "guard": {
         "title": "Block dangerous commands",
@@ -867,7 +867,7 @@
       },
       "format": {
         "title": "Format edited files",
-        "desc": "Run a formatter such as Prettier on each file the agent edits"
+        "desc": "Run a formatter on edited files, after each edit or once at the end"
       },
       "log": {
         "title": "Keep a log",
@@ -880,6 +880,18 @@
       "script": {
         "title": "Write your own",
         "desc": "Run your own shell script with the tool's raw input"
+      },
+      "verify": {
+        "title": "Check before finishing",
+        "desc": "Run the project's tests when the agent says it's done, and send it back if they fail"
+      },
+      "protect": {
+        "title": "Protect files",
+        "desc": "Stop edits to .env, keys, lock files and .git"
+      },
+      "context": {
+        "title": "Brief the agent at session start",
+        "desc": "Tell it the current branch, uncommitted changes and your notes"
       }
     },
     "claudeOnly": "Claude Code only",
@@ -893,7 +905,28 @@
       "patternsHint": "One per line. A command that contains any of these is stopped.",
       "command": "Formatter command",
       "commandHint": "Runs with the edited file's path added at the end.",
-      "path": "Log file"
+      "path": "Log file",
+      "channel": "Send to",
+      "channels": {
+        "mac": "This Mac",
+        "ntfy": "ntfy",
+        "slack": "Slack"
+      },
+      "urlEnv": "Environment variable with the address",
+      "urlEnvHint": {
+        "ntfy": "Put your ntfy topic URL (https://ntfy.sh/…) in this variable, e.g. through Bitwarden. Illithid never stores the address.",
+        "slack": "Put your Slack incoming webhook URL in this variable, e.g. through Bitwarden. Illithid never stores the address."
+      },
+      "urlEnvInvalid": "Letters, digits and _ only",
+      "messageFromTool": "The tool's own message",
+      "project": "Add the project folder name to the title",
+      "testCommand": "Check command",
+      "testCommandHint": "Leave empty to pick it from the project: npm test, pytest, go test, cargo test.",
+      "testCommandAuto": "Automatic",
+      "protectPatterns": "Protected files",
+      "protectPatternsHint": "One file pattern per line (* and ? work). Patterns with / match the path.",
+      "git": "Include the git branch and uncommitted changes",
+      "commandHintStop": "Runs once at the end of a reply, with every changed file at the end."
     },
     "instruction": "Instruction",
     "instructionHint": "Claude Code reads the event with this instruction and decides whether to let it go on.",
@@ -906,7 +939,8 @@
       "wrongTiming": "Not at this timing in {{tool}}",
       "noEvent": "No event for this timing in {{tool}}",
       "noFilePath": "Not in {{tool}}: its hooks aren't told which file was edited",
-      "claudeOnly": "Not in {{tool}}: no judgment hooks (Claude Code only)"
+      "claudeOnly": "Not in {{tool}}: no judgment hooks (Claude Code only)",
+      "noContext": "Not in {{tool}}: it ignores what a session start hook says"
     },
     "pending": "Not in the tools yet",
     "pendingHint": "Sync to write this hook into the tools.",
@@ -930,7 +964,10 @@
     "openScript": "Open in Scripts",
     "convertOwn": "This hook's own script",
     "convertLibrary": "Save to Scripts",
-    "scriptName": "Script name"
+    "scriptName": "Script name",
+    "contextNote": "What to tell the agent",
+    "contextNoteHint": "Added to the session start, e.g. house rules or where to look first.",
+    "contextNoteExample": "Run npm test before you finish. Never edit generated files."
   },
   "permissions": {
     "new": "New rule",

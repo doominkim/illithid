@@ -800,7 +800,7 @@
       "stop": "回复完成",
       "session-start": "会话开始",
       "session-end": "会话结束",
-      "notification": "通知"
+      "notification": "等待你时"
     },
     "timingHint": {
       "before-tool": "命令或编辑执行之前。部分工具可在此阻止。",
@@ -809,7 +809,7 @@
       "stop": "代理完成回复时。用于通知。",
       "session-start": "会话打开时。检查环境或记录。",
       "session-end": "会话关闭时。",
-      "notification": "请求权限或等待输入时。"
+      "notification": "工具等待你的许可或输入时。"
     },
     "triggersHint": "每个工具的事件名称和选项都不同。相同的选项不保证在各工具中行为一致。",
     "event": "事件",
@@ -858,8 +858,8 @@
     "pickAction": "要做什么?",
     "actions": {
       "notify": {
-        "title": "发送通知",
-        "desc": "显示 macOS 通知，可选播放声音"
+        "title": "接收通知",
+        "desc": "回复结束或代理等待你时，通知到这台 Mac 或手机 (ntfy, Slack)"
       },
       "guard": {
         "title": "阻止危险命令",
@@ -867,7 +867,7 @@
       },
       "format": {
         "title": "格式化编辑的文件",
-        "desc": "对代理编辑的每个文件运行 Prettier 等格式化工具"
+        "desc": "对编辑的文件运行格式化工具，每次编辑后或回复结束时一次"
       },
       "log": {
         "title": "记录日志",
@@ -880,6 +880,18 @@
       "script": {
         "title": "自己编写",
         "desc": "编写直接接收工具原始输入的 shell 脚本"
+      },
+      "verify": {
+        "title": "结束前检查",
+        "desc": "代理说完成时运行测试，失败就让它继续修复"
+      },
+      "protect": {
+        "title": "保护敏感文件",
+        "desc": "阻止编辑 .env、密钥、lock 文件和 .git"
+      },
+      "context": {
+        "title": "会话开始时告知",
+        "desc": "先告诉代理当前分支、未提交的更改和你的备注"
       }
     },
     "claudeOnly": "仅 Claude Code",
@@ -893,7 +905,28 @@
       "patternsHint": "每行一个。包含其中任一项的命令会被阻止。",
       "command": "格式化命令",
       "commandHint": "运行时会在末尾加上编辑的文件路径。",
-      "path": "日志文件"
+      "path": "日志文件",
+      "channel": "发送到",
+      "channels": {
+        "mac": "这台 Mac",
+        "ntfy": "ntfy",
+        "slack": "Slack"
+      },
+      "urlEnv": "存放地址的环境变量",
+      "urlEnvHint": {
+        "ntfy": "把 ntfy 主题地址 (https://ntfy.sh/…) 放到这个环境变量里 (例如通过 Bitwarden)。Illithid 不保存地址。",
+        "slack": "把 Slack Webhook 地址放到这个环境变量里 (例如通过 Bitwarden)。Illithid 不保存地址。"
+      },
+      "urlEnvInvalid": "只能用字母、数字和 _",
+      "messageFromTool": "工具自己的消息",
+      "project": "在标题中加上项目文件夹名",
+      "testCommand": "检查命令",
+      "testCommandHint": "留空则根据项目选择: npm test, pytest, go test, cargo test。",
+      "testCommandAuto": "自动",
+      "protectPatterns": "要保护的文件",
+      "protectPatternsHint": "每行一个文件模式 (可用 * 和 ?)。含 / 的模式按路径匹配。",
+      "git": "包含 git 分支和未提交的更改",
+      "commandHintStop": "在回复结束时运行一次，所有更改的文件附在末尾。"
     },
     "instruction": "指令",
     "instructionHint": "Claude Code 会读取此指令和事件，判断是否继续。",
@@ -906,7 +939,8 @@
       "wrongTiming": "{{tool}} 不能在此时机运行此动作",
       "noEvent": "{{tool}} 没有此时机的事件",
       "noFilePath": "{{tool}} 不会把编辑的文件路径传给钩子",
-      "claudeOnly": "{{tool}} 没有判断钩子 (仅 Claude Code)"
+      "claudeOnly": "{{tool}} 没有判断钩子 (仅 Claude Code)",
+      "noContext": "{{tool}} 会忽略会话开始钩子的输出"
     },
     "pending": "尚未写入工具",
     "pendingHint": "同步后此钩子会写入工具设置。",
@@ -930,7 +964,10 @@
     "openScript": "在脚本菜单中打开",
     "convertOwn": "此钩子专用脚本",
     "convertLibrary": "保存到脚本库",
-    "scriptName": "脚本名称"
+    "scriptName": "脚本名称",
+    "contextNote": "要告知的内容",
+    "contextNoteHint": "在会话开始时一并告知，例如项目规则或先看哪里。",
+    "contextNoteExample": "结束前运行 npm test。不要编辑生成的文件。"
   },
   "permissions": {
     "new": "新建规则",

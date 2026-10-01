@@ -20,9 +20,14 @@ import { ArrowLeft, Download, FolderOpen, Layers, Plus, RefreshCw, Undo2 } from 
 import { useTranslation } from 'react-i18next'
 import {
   actionMatcher,
+  ENV_NAME_RE,
   HOOK_ACTION_INFO,
   HOOK_ACTIONS,
   hookSupport,
+  NOTIFY_CHANNELS,
+  NOTIFY_URL_ENV,
+  PROTECT_PATTERN_RE,
+  type NotifyChannel,
   type HookAction,
   type HookSupport
 } from '../../../engine/hookActions'
@@ -80,6 +85,8 @@ import { LIBRARY_SCRIPT_RE } from '../../../engine/scriptNames'
 import { useViewMode } from '../lib/viewMode'
 
 const NEW = '__new__'
+/** Actions a new hook can start from (log stays readable for existing hooks but is not offered) */
+const NEW_HOOK_ACTIONS = HOOK_ACTIONS.filter((a) => a !== 'log')
 const ALL = 'all'
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
@@ -100,20 +107,24 @@ function useSummary(): (h: {
   const { t } = useTranslation()
   return (h) => {
     const o = h.options
-    const detail =
-      h.action === 'notify'
-        ? String(o.message || h.description || h.name)
-        : h.action === 'guard'
-          ? (o.patterns as string[]).join(', ')
-          : h.action === 'format'
-            ? String(o.command)
-            : h.action === 'log'
-              ? String(o.path)
-              : h.action === 'ask'
-                ? (h.body ?? '').trim().split('\n')[0]
-                : String(o.use || '')
+    const firstLine = (h.body ?? '').trim().split('\n')[0]
+    const detail: Record<HookAction, string> = {
+      notify:
+        o.channel && o.channel !== 'mac'
+          ? t(`hooks.opt.channels.${String(o.channel)}`)
+          : String(o.message || h.description || h.name),
+      verify: String(o.command || t('hooks.opt.testCommandAuto')),
+      protect: ((o.patterns as string[]) ?? []).join(', '),
+      context: firstLine,
+      guard: ((o.patterns as string[]) ?? []).join(', '),
+      ask: firstLine,
+      format: String(o.command),
+      log: String(o.path),
+      script: String(o.use || '')
+    }
     const head = `${t(`hooks.timing.${h.when}`)} → ${t(`hooks.actions.${h.action}.title`)}`
-    return detail ? `${head}: ${detail}` : head
+    const d = detail[h.action]
+    return d ? `${head}: ${d}` : head
   }
 }
 
@@ -463,11 +474,13 @@ function Unsupported({
 /** The action's options (notify texts, guard patterns, format command, log path) */
 function OptionFields({
   action,
+  when,
   value,
   onChange,
   placeholderMessage
 }: {
   action: HookAction
+  when: HookTiming
   value: Options
   onChange: (next: Options) => void
   placeholderMessage?: string
@@ -475,10 +488,55 @@ function OptionFields({
   const { t } = useTranslation()
   const set = (k: string, v: HookOptionValue): void => onChange({ ...value, [k]: v })
   const mono = { input: { fontFamily: 'var(--mantine-font-family-monospace)' } }
+  const lines = (k: string, label: string, hint: string, testId: string): React.JSX.Element => (
+    <Textarea
+      label={label}
+      description={hint}
+      value={((value[k] as string[]) ?? []).join('\n')}
+      onChange={(e) =>
+        set(
+          k,
+          e.currentTarget.value.split('\n').filter((x, i, all) => x.trim() || i === all.length - 1)
+        )
+      }
+      autosize
+      minRows={3}
+      styles={mono}
+      data-testid={testId}
+    />
+  )
   switch (action) {
-    case 'notify':
+    case 'notify': {
+      const channel = String(value.channel || 'mac') as NotifyChannel
       return (
         <Stack gap="sm">
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              {t('hooks.opt.channel')}
+            </Text>
+            <SegmentedControl
+              value={channel}
+              onChange={(v) => set('channel', v)}
+              data={NOTIFY_CHANNELS.map((c) => ({ value: c, label: t(`hooks.opt.channels.${c}`) }))}
+              data-testid="hook-option-channel"
+            />
+          </Stack>
+          {channel !== 'mac' && (
+            <TextInput
+              label={t('hooks.opt.urlEnv')}
+              description={t(`hooks.opt.urlEnvHint.${channel}`)}
+              placeholder={NOTIFY_URL_ENV[channel]}
+              value={String(value.urlEnv ?? '')}
+              onChange={(e) => set('urlEnv', e.currentTarget.value.trim())}
+              error={
+                value.urlEnv && !ENV_NAME_RE.test(String(value.urlEnv))
+                  ? t('hooks.opt.urlEnvInvalid')
+                  : undefined
+              }
+              styles={mono}
+              data-testid="hook-option-urlenv"
+            />
+          )}
           <TextInput
             label={t('hooks.opt.title')}
             value={String(value.title ?? '')}
@@ -488,43 +546,71 @@ function OptionFields({
           <TextInput
             label={t('hooks.opt.message')}
             value={String(value.message ?? '')}
-            placeholder={placeholderMessage}
+            placeholder={
+              when === 'notification' ? t('hooks.opt.messageFromTool') : placeholderMessage
+            }
             onChange={(e) => set('message', e.currentTarget.value)}
             data-testid="hook-option-message"
           />
           <Checkbox
-            label={t('hooks.opt.sound')}
-            checked={value.sound === true}
-            onChange={(e) => set('sound', e.currentTarget.checked)}
-            data-testid="hook-option-sound"
+            label={t('hooks.opt.project')}
+            checked={value.project !== false}
+            onChange={(e) => set('project', e.currentTarget.checked)}
+            data-testid="hook-option-project"
           />
+          {channel === 'mac' && (
+            <Checkbox
+              label={t('hooks.opt.sound')}
+              checked={value.sound === true}
+              onChange={(e) => set('sound', e.currentTarget.checked)}
+              data-testid="hook-option-sound"
+            />
+          )}
         </Stack>
       )
-    case 'guard':
+    }
+    case 'verify':
       return (
-        <Textarea
-          label={t('hooks.opt.patterns')}
-          description={t('hooks.opt.patternsHint')}
-          value={((value.patterns as string[]) ?? []).join('\n')}
-          onChange={(e) =>
-            set(
-              'patterns',
-              e.currentTarget.value
-                .split('\n')
-                .filter((x, i, all) => x.trim() || i === all.length - 1)
-            )
-          }
-          autosize
-          minRows={3}
+        <TextInput
+          label={t('hooks.opt.testCommand')}
+          description={t('hooks.opt.testCommandHint')}
+          placeholder={t('hooks.opt.testCommandAuto')}
+          value={String(value.command ?? '')}
+          onChange={(e) => set('command', e.currentTarget.value)}
           styles={mono}
-          data-testid="hook-option-patterns"
+          data-testid="hook-option-command"
         />
+      )
+    case 'protect':
+      return lines(
+        'patterns',
+        t('hooks.opt.protectPatterns'),
+        t('hooks.opt.protectPatternsHint'),
+        'hook-option-patterns'
+      )
+    case 'context':
+      return (
+        <Checkbox
+          label={t('hooks.opt.git')}
+          checked={value.git !== false}
+          onChange={(e) => set('git', e.currentTarget.checked)}
+          data-testid="hook-option-git"
+        />
+      )
+    case 'guard':
+      return lines(
+        'patterns',
+        t('hooks.opt.patterns'),
+        t('hooks.opt.patternsHint'),
+        'hook-option-patterns'
       )
     case 'format':
       return (
         <TextInput
           label={t('hooks.opt.command')}
-          description={t('hooks.opt.commandHint')}
+          description={
+            when === 'stop' ? t('hooks.opt.commandHintStop') : t('hooks.opt.commandHint')
+          }
           value={String(value.command ?? '')}
           onChange={(e) => set('command', e.currentTarget.value)}
           styles={mono}
@@ -548,13 +634,38 @@ function OptionFields({
 
 /** Guard patterns without blank lines; null when an option is left empty that must not be */
 function cleanOptions(action: HookAction, o: Options): Options | null {
-  if (action === 'guard') {
+  if (action === 'guard' || action === 'protect') {
     const patterns = ((o.patterns as string[]) ?? []).map((x) => x.trim()).filter(Boolean)
+    if (action === 'protect' && !patterns.every((p) => PROTECT_PATTERN_RE.test(p))) return null
     return patterns.length ? { ...o, patterns } : null
   }
+  if (action === 'notify' && o.urlEnv && !ENV_NAME_RE.test(String(o.urlEnv))) return null
   if (action === 'format' && !String(o.command ?? '').trim()) return null
   if (action === 'log' && !String(o.path ?? '').trim()) return null
   return o
+}
+
+function ContextNoteField({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (v: string) => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Textarea
+      label={t('hooks.contextNote')}
+      description={t('hooks.contextNoteHint')}
+      placeholder={t('hooks.contextNoteExample')}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      autosize
+      minRows={3}
+      maxRows={14}
+      data-testid="hook-context-note"
+    />
+  )
 }
 
 function InstructionField({
@@ -748,9 +859,20 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
       [t('hooks.opt.message'), String(o.message || doc.description || edit.name)],
       [t('hooks.opt.sound'), yesNo(o.sound === true)]
     )
-  if (doc.action === 'guard')
+  if (doc.action === 'notify' && o.channel !== 'mac')
     rows.push([
-      t('hooks.opt.patterns'),
+      t('hooks.opt.channel'),
+      `${t(`hooks.opt.channels.${String(o.channel)}`)} · $${String(o.urlEnv || NOTIFY_URL_ENV[o.channel as 'ntfy' | 'slack'])}`
+    ])
+  if (doc.action === 'verify')
+    rows.push([
+      t('hooks.opt.testCommand'),
+      o.command ? <Code key="v">{String(o.command)}</Code> : t('hooks.opt.testCommandAuto')
+    ])
+  if (doc.action === 'context') rows.push([t('hooks.opt.git'), yesNo(o.git !== false)])
+  if (doc.action === 'guard' || doc.action === 'protect')
+    rows.push([
+      doc.action === 'protect' ? t('hooks.opt.protectPatterns') : t('hooks.opt.patterns'),
       <Group key="p" gap={4}>
         {(o.patterns as string[]).map((p) => (
           <Code key={p}>{p}</Code>
@@ -773,7 +895,11 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
       {doc.body.trim() && (
         <Stack gap={6}>
           <SectionLabel>
-            {doc.action === 'ask' ? t('hooks.instruction') : t('hooks.notes')}
+            {doc.action === 'ask'
+              ? t('hooks.instruction')
+              : doc.action === 'context'
+                ? t('hooks.contextNote')
+                : t('hooks.notes')}
           </SectionLabel>
           <Box className="ac-card" p="md">
             <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
@@ -846,12 +972,15 @@ function HookEditForm({
           />
           <OptionFields
             action={doc.action}
+            when={when}
             value={options}
             onChange={setOptions}
             placeholderMessage={description || name}
           />
           {doc.action === 'ask' ? (
             <InstructionField value={body} onChange={setBody} />
+          ) : doc.action === 'context' ? (
+            <ContextNoteField value={body} onChange={setBody} />
           ) : (
             <Textarea
               label={t('hooks.notes')}
@@ -1384,7 +1513,7 @@ function NewHookForm({
           {t('hooks.pickAction')}
         </Text>
         <CardGrid>
-          {HOOK_ACTIONS.map((a) => (
+          {NEW_HOOK_ACTIONS.map((a) => (
             <ItemCard
               key={a}
               testId={`hook-action-${a}`}
@@ -1395,7 +1524,7 @@ function NewHookForm({
                   <Badge variant="light" size="xs" fw={500} color="orange">
                     {t('hooks.claudeOnly')}
                   </Badge>
-                ) : a === 'script' ? (
+                ) : a === 'script' || a === 'format' ? (
                   <Badge variant="default" size="xs" fw={500} c="dimmed">
                     {t('hooks.advanced')}
                   </Badge>
@@ -1465,11 +1594,13 @@ function NewHookForm({
       />
       <OptionFields
         action={action}
+        when={when}
         value={options}
         onChange={setOptions}
         placeholderMessage={description || name}
       />
       {action === 'ask' && <InstructionField value={body} onChange={setBody} />}
+      {action === 'context' && <ContextNoteField value={body} onChange={setBody} />}
       {action === 'script' && (
         <Select
           label={t('hooks.useLabel')}
