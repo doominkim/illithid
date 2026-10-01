@@ -1,7 +1,8 @@
 /**
  * ~/.grok/config.toml — Grok's Claude Code compatibility switches. Grok also scans ~/.claude/skills (and commands) and
  * ~/.claude.json for MCP servers, so an item off for Grok but on for Claude still reaches Grok. With config.grokReadsClaude = false
- * the app writes `[compat.claude] skills = false, mcps = false` in its own marker block and Grok gets only the app's copies.
+ * the app writes `[compat.claude] skills = false, mcps = false, hooks = false` in its own marker block and Grok gets only the app's
+ * copies (it also runs the hooks in ~/.claude/settings.json by default).
  * ~/.claude/agents has no switch in Grok (1.0.41) — Claude agents keep reaching Grok either way.
  * A [compat.claude] table the user wrote outside the block wins: the block is not written (and is removed if it was).
  */
@@ -25,7 +26,7 @@ export const GROK_COMPAT_MARKERS: MarkerPair = [
   '# END illithid compat'
 ]
 
-const BODY = '[compat.claude]\nskills = false\nmcps = false'
+const BODY = '[compat.claude]\nskills = false\nmcps = false\nhooks = false'
 
 type Json = Record<string, unknown>
 const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -47,13 +48,17 @@ function withBlock(text: string): string {
  * What Grok actually does per ~/.grok/config.toml (written by the app or by the user): false where compat.claude.<surface> = false.
  * Env overrides (GROK_CLAUDE_*_ENABLED) live in Grok's own environment and aren't visible here
  */
-export function grokClaudeReading(home: string): { skills: boolean; mcps: boolean } {
+export function grokClaudeReading(home: string): {
+  skills: boolean
+  mcps: boolean
+  hooks: boolean
+} {
   try {
     const t = parseToml(readFileSync(join(home, '.grok/config.toml'), 'utf8')) as Json
     const c = isObj(t.compat) && isObj(t.compat.claude) ? t.compat.claude : {}
-    return { skills: c.skills !== false, mcps: c.mcps !== false }
+    return { skills: c.skills !== false, mcps: c.mcps !== false, hooks: c.hooks !== false }
   } catch {
-    return { skills: true, mcps: true }
+    return { skills: true, mcps: true, hooks: true }
   }
 }
 
@@ -107,7 +112,7 @@ export const grokCompat: TargetDef = {
       after,
       notes: [
         off
-          ? '[compat.claude] skills = false, mcps = false — Grok reads only the app copies of skills and MCP servers (Claude agents still reach Grok)'
+          ? '[compat.claude] skills = false, mcps = false, hooks = false — Grok reads only the app copies of skills, MCP servers and hooks (Claude agents still reach Grok)'
           : 'Grok reads Claude Code skills and MCP servers (default) — no compat block'
       ]
     }

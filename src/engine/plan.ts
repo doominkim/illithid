@@ -7,6 +7,7 @@ import { defaultSecretBackend, memoSecretBackend, type SecretBackend } from './s
 import { readPlanSources } from './sources'
 import { readState } from './state'
 import { ALL_TARGETS, MCP_TARGET_TOOL, serverChanges, TARGETS } from './targets'
+import { HOOK_TARGET_TOOL, hookChanges } from './targets/hooks'
 import { sha256 } from './text'
 import {
   TargetError,
@@ -160,6 +161,10 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
     if (change.changed && MCP_TARGET_TOOL[t.id]) {
       const servers = serverChanges(t.id, before, after)
       if (servers.length) change.servers = servers
+    }
+    if (change.changed && HOOK_TARGET_TOOL[t.id]) {
+      const hooks = hookChanges(t.id, before, after)
+      if (hooks.length) change.hooks = hooks
     }
     if (retired?.length) change.retired = retired
     if (importedChanged?.length) change.importedChanged = importedChanged

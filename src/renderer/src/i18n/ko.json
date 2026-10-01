@@ -481,7 +481,9 @@
       "agent": "에이전트",
       "config": "설정 파일",
       "instruction": "instructions 항목",
-      "mcp": "MCP 서버"
+      "mcp": "MCP 서버",
+      "hook": "훅",
+      "hookScript": "훅 스크립트"
     },
     "libraryDirect": "라이브러리를 직접 읽음",
     "planChanged": "열어 둔 사이에 변경 사항이 바뀌었습니다. 다시 확인한 뒤 반영하세요.",

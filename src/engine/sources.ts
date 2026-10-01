@@ -15,6 +15,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { libraryRoot, toolsRetiring } from './config'
 import { manifestFileIn, readManifest, MANIFEST_FILE } from './manifest'
+import { readHooks } from './hooks'
 import type { Allowlist, McpServer, McpSource, RuleFile, Sources } from './types'
 
 export interface LibraryPaths {
@@ -192,7 +193,8 @@ export function readSources(home: string): Sources {
     allowlist: permissions ?? emptyAllowlist(),
     hasPermissions: permissions !== null,
     mcp: readMcp(home),
-    manifest: m.manifest
+    manifest: m.manifest,
+    hooks: readHooks(home)
   }
 }
 

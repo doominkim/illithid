@@ -415,7 +415,7 @@ export function secretAccountsInWorkspaces(home: string, except?: string): Set<s
 // ---------------------------------------------------------------- zip export·import
 
 /** Top-level entries allowed in a zip (directories / files) */
-export const WORKSPACE_ZIP_DIRS = ['rules', 'skills', 'agents', 'mcps', 'memory'] as const
+export const WORKSPACE_ZIP_DIRS = ['rules', 'skills', 'agents', 'mcps', 'hooks', 'memory'] as const
 export const WORKSPACE_ZIP_FILES = [
   'permissions.json',
   MANIFEST_FILE,

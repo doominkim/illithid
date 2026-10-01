@@ -15,6 +15,7 @@ import {
   type AgentSyncResult
 } from './agentSync'
 import { apply, type ApplyResult } from './apply'
+import { applyHookSync, planHookSync, type HookSyncItem, type HookSyncResult } from './hookSync'
 import { deleteSyncCandidates, type DeleteRequest, type DeleteResult } from './deleteCopies'
 import {
   activeWorkspaceId,
@@ -67,6 +68,8 @@ export interface SyncPlan {
   rules: RuleSyncItem[]
   skills: SkillSyncItem[]
   agents: AgentSyncItem[]
+  /** Hook script copies (config entries are targets) */
+  hooks: HookSyncItem[]
   /** Errors raised during planning (no raw content) */
   errors: string[]
 }
@@ -76,6 +79,7 @@ export interface SyncResults {
   rules: RuleSyncResult[]
   skills: SkillSyncResult[]
   agents: AgentSyncResult[]
+  hooks: HookSyncResult[]
 }
 
 export interface SyncAllResult {
@@ -117,6 +121,7 @@ export function planSyncAll(
   let rules: RuleSyncItem[] = []
   let skills: SkillSyncItem[] = []
   let agents: AgentSyncItem[] = []
+  let hooks: HookSyncItem[] = []
   try {
     targets = planAll(home, env, secrets)
   } catch (e) {
@@ -137,7 +142,12 @@ export function planSyncAll(
   } catch (e) {
     errors.push(`agents: ${(e as Error).message}`)
   }
-  return { targets, rules, skills, agents, errors }
+  try {
+    hooks = planHookSync(home, env)
+  } catch (e) {
+    errors.push(`hooks: ${(e as Error).message}`)
+  }
+  return { targets, rules, skills, agents, hooks, errors }
 }
 
 /**
@@ -166,7 +176,8 @@ export function pendingSyncCount(
     p.targets.filter((c) => c.changed && !c.error).length +
     p.rules.filter((x) => change(x.action) || x.action === 'migrateLegacyDir').length +
     p.skills.filter((x) => change(x.action) || x.action === 'replaceLink').length +
-    p.agents.filter((x) => change(x.action)).length
+    p.agents.filter((x) => change(x.action)).length +
+    p.hooks.filter((x) => change(x.action)).length
   )
 }
 
@@ -224,6 +235,7 @@ export function planFingerprint(p: SyncPlan): string {
   for (const x of p.rules) item('rule', x)
   for (const x of p.skills) item('skill', x)
   for (const x of p.agents) item('agent', x)
+  for (const x of p.hooks) item('hook', x)
   for (const e of p.errors) rows.push(`error|${e}`)
   return sha256(rows.sort().join('\n'))
 }
@@ -257,7 +269,8 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
       .map((c) => targetTool.get(c.id) ?? ''),
     ...p.rules.filter((x) => acts(x.action)).map((x) => x.tool ?? 'claude'),
     ...p.skills.filter((x) => acts(x.action)).map((x) => x.tool),
-    ...p.agents.filter((x) => acts(x.action)).map((x) => x.tool)
+    ...p.agents.filter((x) => acts(x.action)).map((x) => x.tool),
+    ...p.hooks.filter((x) => acts(x.action)).map((x) => x.tool)
   ])
   const done = retiring.filter((t) => !busy.has(t))
   if (done.length) clearToolsRetiring(home, done)
@@ -283,7 +296,7 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   if (!libraryExists(home)) {
     return {
       libraryExists: false,
-      plan: { targets: [], rules: [], skills: [], agents: [], errors: [] },
+      plan: { targets: [], rules: [], skills: [], agents: [], hooks: [], errors: [] },
       refused: 'libraryMissing'
     }
   }
@@ -296,6 +309,8 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   // Automatic syncs leave rules edited on the tool side (drifted copies, edited Codex/Gemini blocks) for the preview, where the
   // user keeps the tool's version or restores the library's; an approved apply restores
   const held = opts.approvedOnce ? new Set<string>() : editedBlockTargets(home, plan)
+  // Script copies go first so a hook entry never points at a script that isn't there yet
+  const hookResults = applyHookSync(home, env, plan.hooks)
   const results: SyncResults = {
     targets: apply(
       home,
@@ -312,7 +327,8 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
       { allowLinkRemoval: !!opts.allowLinkRemoval }
     ),
     skills: applySkillSync(home, env, plan.skills),
-    agents: applyAgentSync(home, env, plan.agents)
+    agents: applyAgentSync(home, env, plan.agents),
+    hooks: hookResults
   }
   applyDeletes(home, env, plan, results)
   pruneGonePending(home)
@@ -364,6 +380,15 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
         name: x.name,
         path: x.path,
         currentHash: x.currentHash
+      })),
+    ...plan.hooks
+      .filter((x) => x.action === 'deleteCandidate')
+      .map((x) => ({
+        kind: 'hook' as const,
+        tool: x.tool,
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash
       }))
   ]
   if (!reqs.length) return
@@ -403,6 +428,7 @@ function applyDeletes(home: string, env: Env, plan: SyncPlan, results: SyncResul
   results.rules = merge(results.rules, 'rule', (r) => r.tool)
   results.skills = merge(results.skills, 'skill', (r) => r.tool)
   results.agents = merge(results.agents, 'agent', (r) => r.tool)
+  results.hooks = merge(results.hooks, 'hook', (r) => r.tool)
 }
 
 /** An imported original kept in place because it changed since import (sync reports it instead of replacing it) */

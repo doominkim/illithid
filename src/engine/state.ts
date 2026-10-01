@@ -52,6 +52,8 @@ export interface AppState {
   agents?: Partial<Record<ToolId, Record<string, RuleCopyEntry>>>
   /** Imported tool-side originals the next approved sync replaces with the app copy (pendingRetire.ts) */
   pendingRetire?: PendingRetire[]
+  /** App-owned hook script copies per tool (`<hook>/<file>` -> record, hash = file content) */
+  hookScripts?: Partial<Record<ToolId, Record<string, RuleCopyEntry>>>
 }
 
 export interface StateRead {
@@ -135,6 +137,7 @@ export function readState(home: string): StateRead {
     return out
   }
   const toolRules = byTool(o.toolRules)
+  const hookScripts = byTool(o.hookScripts)
   const agents: NonNullable<AppState['agents']> = {}
   for (const [tool, byName] of Object.entries((o.agents ?? {}) as Record<string, unknown>)) {
     if (!byName || typeof byName !== 'object') continue
@@ -181,7 +184,8 @@ export function readState(home: string): StateRead {
       ...(Object.keys(rules).length ? { rules } : {}),
       ...(Object.keys(toolRules).length ? { toolRules } : {}),
       ...(Object.keys(agents).length ? { agents } : {}),
-      ...(pendingRetire.length ? { pendingRetire } : {})
+      ...(pendingRetire.length ? { pendingRetire } : {}),
+      ...(Object.keys(hookScripts).length ? { hookScripts } : {})
     }
   }
 }

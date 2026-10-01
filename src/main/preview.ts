@@ -32,7 +32,7 @@ import { notInitializedOf } from './writes'
 const TARGET_TOOL = new Map(ALL_TARGETS.map((t) => [t.id, t.tool]))
 
 type PlanItem = {
-  kind: 'rule' | 'skill' | 'agent'
+  kind: 'rule' | 'skill' | 'agent' | 'hookScript'
   tool: ToolId
   name: string
   action: string
@@ -60,6 +60,14 @@ function planItems(p: SyncPlan): PlanItem[] {
     })),
     ...p.agents.map((x) => ({
       kind: 'agent' as const,
+      tool: x.tool,
+      name: x.name,
+      action: x.action,
+      path: x.path,
+      reason: x.reason
+    })),
+    ...p.hooks.map((x) => ({
+      kind: 'hookScript' as const,
       tool: x.tool,
       name: x.name,
       action: x.action,
@@ -127,6 +135,20 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
           name: s.name,
           path: s.name,
           parent: f.path
+        })
+    // Hooks entering, changing or leaving the file (names only)
+    for (const m of p.targets.filter(
+      (x) => x.path === abs && x.changed && !x.error && x.hooks?.length
+    ))
+      for (const h of m.hooks!)
+        items.push({
+          tool: f.tool,
+          kind: 'hook',
+          action: h.action,
+          name: h.name,
+          path: h.name,
+          parent: f.path,
+          ...(f.tool === 'codex' && h.action !== 'remove' ? { codexTrust: true } : {})
         })
   }
 

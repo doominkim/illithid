@@ -24,6 +24,7 @@ export const BACKUP_INCLUDES = [
   'skills',
   'agents',
   'mcps',
+  'hooks',
   'memory',
   'permissions.json',
   MANIFEST_FILE

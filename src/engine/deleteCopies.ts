@@ -11,6 +11,9 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import { tools, type ToolId } from './agents'
 import { agentToolDir } from './agentRender'
 import { planAgentSync } from './agentSync'
+import { isHookTool } from './hookEvents'
+import { hookCopyRoot } from './hookRender'
+import { planHookSync } from './hookSync'
 import { appConfigDir } from './config'
 import { claudeRulesPaths, copyRuleFile, copyRulesDir, planRuleSync } from './ruleSync'
 import { dirContentHash } from './skills'
@@ -20,7 +23,7 @@ import type { Env } from './types'
 import { fileHash } from './write'
 
 export interface DeleteRequest {
-  kind: 'skill' | 'rule' | 'agent'
+  kind: 'skill' | 'rule' | 'agent' | 'hook'
   tool?: ToolId
   name: string
   /** Absolute path from the plan */
@@ -30,7 +33,7 @@ export interface DeleteRequest {
 }
 
 export interface DeleteResult {
-  kind: 'skill' | 'rule' | 'agent'
+  kind: 'skill' | 'rule' | 'agent' | 'hook'
   tool?: ToolId
   name: string
   status: 'deleted' | 'refused' | 'failed'
@@ -93,6 +96,7 @@ export function deleteSyncCandidates(
   let skillPlan: ReturnType<typeof planSkillSync> | null = null
   let rulePlan: ReturnType<typeof planRuleSync> | null = null
   let agentPlan: ReturnType<typeof planAgentSync> | null = null
+  let hookPlan: ReturnType<typeof planHookSync> | null = null
   let stateDirty = false
 
   for (const req of Array.isArray(reqs) ? reqs : []) {
@@ -197,6 +201,46 @@ export function deleteSyncCandidates(
         results.push({ ...base, status: 'deleted', backupPath: backup })
         if (state.agents?.[req.tool]?.[it.name]) {
           delete state.agents[req.tool]![it.name]
+          stateDirty = true
+        }
+      } else if (req.kind === 'hook') {
+        if (!req.tool || !isHookTool(req.tool)) {
+          refuse('toolMissing')
+          continue
+        }
+        hookPlan ??= planHookSync(home, env)
+        const it = hookPlan.find(
+          (x) =>
+            x.action === 'deleteCandidate' &&
+            x.tool === req.tool &&
+            x.name === req.name &&
+            x.path === req.path
+        )
+        if (!it) {
+          refuse('notACandidate')
+          continue
+        }
+        const root = hookCopyRoot(home, it.tool)
+        if (!inside(root, it.path) || resolve(it.path) !== join(root, it.hook, it.file)) {
+          refuse('outOfScope')
+          continue
+        }
+        const cur = lstatSync(it.path, { throwIfNoEntry: false })
+        if (
+          !cur ||
+          cur.isSymbolicLink() ||
+          !cur.isFile() ||
+          fileHash(it.path) !== it.currentHash ||
+          req.currentHash !== it.currentHash
+        ) {
+          refuse('changedSinceCheck')
+          continue
+        }
+        const backup = join(backupRoot, 'hooks', it.tool, it.hook, it.file)
+        moveDir(it.path, backup)
+        results.push({ ...base, status: 'deleted', backupPath: backup })
+        if (state.hookScripts?.[it.tool]?.[it.name]) {
+          delete state.hookScripts[it.tool]![it.name]
           stateDirty = true
         }
       } else if (req.kind === 'rule') {

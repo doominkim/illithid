@@ -434,7 +434,7 @@ export interface DeleteCandidateRequest {
 }
 
 export interface DeleteCandidateResult {
-  kind: 'skill' | 'rule' | 'agent'
+  kind: 'skill' | 'rule' | 'agent' | 'hook'
   name: string
   status: 'deleted' | 'refused' | 'failed'
   reason?: string
@@ -838,7 +838,7 @@ export type ApplyPreviewAction = 'add' | 'update' | 'replace' | 'retire' | 'remo
 
 export interface ApplyPreviewItem {
   tool: ToolId
-  kind: 'rule' | 'skill' | 'agent' | 'config' | 'mcp'
+  kind: 'rule' | 'skill' | 'agent' | 'config' | 'mcp' | 'hook' | 'hookScript'
   action: ApplyPreviewAction
   /** Item name (config: the file) */
   name: string
@@ -846,6 +846,8 @@ export interface ApplyPreviewItem {
   path: string
   /** Detail of a config file row (its path): a rule entering or leaving opencode.json, an MCP server in a tool config — not counted separately */
   parent?: string
+  /** A Codex hook entry that is new or changed: Codex runs it only after it is trusted again in /hooks */
+  codexTrust?: boolean
 }
 
 /** Changed library item a tool reads straight from the library (OpenCode rules and skills) — nothing to write for it */

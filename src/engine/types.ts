@@ -1,4 +1,5 @@
 import type { ToolId } from './agents'
+import type { LibraryHook } from './hooks'
 import type { Manifest } from './manifest'
 import type { PendingRetire } from './pendingRetire'
 import type { SecretBackend } from './secrets'
@@ -68,6 +69,8 @@ export interface Sources {
   mcp: McpSource
   /** Library illithid.json (on/off). Everything is on if missing */
   manifest?: Manifest
+  /** hooks/<name>/ (hook.json + scripts). Absent = no hooks */
+  hooks?: LibraryHook[]
 }
 
 /** The 6 base targets */
@@ -86,6 +89,11 @@ export type ExtraTargetId =
   | 'copilotMcp'
   | 'grokMcp'
   | 'grokCompat'
+  | 'claudeHooks'
+  | 'codexHooks'
+  | 'geminiHooks'
+  | 'copilotHooks'
+  | 'grokHooks'
 
 export type TargetId = LegacyTargetId | ExtraTargetId
 
@@ -136,6 +144,8 @@ export interface FileChange {
   importedChanged?: PendingRetire[]
   /** MCP targets: servers this change adds, updates or removes (names only) */
   servers?: ServerChange[]
+  /** Hook targets: hooks this change adds, updates or removes (names only) */
+  hooks?: ServerChange[]
 }
 
 /** One MCP server entering, changing in or leaving a tool config file */

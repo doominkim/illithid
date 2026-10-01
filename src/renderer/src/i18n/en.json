@@ -481,7 +481,9 @@
       "agent": "agent",
       "config": "config file",
       "instruction": "instructions entry",
-      "mcp": "MCP server"
+      "mcp": "MCP server",
+      "hook": "Hook",
+      "hookScript": "Hook script"
     },
     "libraryDirect": "Reads the library directly",
     "planChanged": "The changes were updated since you opened this. Review them again, then apply.",
