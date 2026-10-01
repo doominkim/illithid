@@ -540,11 +540,15 @@ export {
 } from './hookActions'
 export type { HookAction, HookActionInfo, HookSupport } from './hookActions'
 export {
+  isScriptRecipe,
+  recipeDoc,
   renderActionScript,
   renderAskPrompt,
   renderUniversalScript,
+  SCRIPT_RECIPES,
   toolScript
 } from './hookScripts'
+export type { ScriptRecipe } from './hookScripts'
 export {
   createHook,
   saveHookDoc,

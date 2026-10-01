@@ -5,6 +5,7 @@
  */
 import type {
   PermissionRules,
+  ScriptRecipe,
   AgentDoc,
   AgentDocInput,
   HookAction,
@@ -297,10 +298,21 @@ export interface ScriptView {
   users: string[]
 }
 
+/** One of Illithid's recipe scripts (read-only), with the hooks using that recipe */
+export interface ScriptBuiltinView {
+  action: ScriptRecipe
+  users: string[]
+  /** The all-tools version (what "copy to edit" saves) */
+  universal: string
+  /** What each tool runs, for the tools the recipe works in */
+  perTool: Partial<Record<HookTool, string>>
+}
+
 export interface ScriptsData {
   /** Library scripts directory (display ~/...) */
   dir: string
   scripts: ScriptView[]
+  builtins: ScriptBuiltinView[]
   error?: string
 }
 
@@ -890,6 +902,11 @@ export interface Api {
   hookSave(name: string, doc: HookDoc): Promise<WriteResult<{ name: string }> | Refused>
   permissionsSave(rules: PermissionRules): Promise<WriteResult<{ path: string }> | Refused>
   scriptCreate(name: string, content?: string): Promise<WriteResult<{ name: string }> | Refused>
+  /** A library script from one of Illithid's recipes (its all-tools version) */
+  scriptFromRecipe(
+    action: ScriptRecipe,
+    name: string
+  ): Promise<WriteResult<{ name: string }> | Refused>
   scriptSave(name: string, content: string): Promise<WriteResult<{ name: string }> | Refused>
   /** Hooks using it get their own copy first */
   scriptDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
@@ -1122,6 +1139,7 @@ export const CHANNELS = [
   'hookSave',
   'permissionsSave',
   'scriptCreate',
+  'scriptFromRecipe',
   'scriptSave',
   'scriptDelete',
   'hookConvert',

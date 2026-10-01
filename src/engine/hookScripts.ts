@@ -7,8 +7,14 @@
  * - script → the hook's own run.sh (or the tool's run.<tool>.sh)
  */
 import { HOOK_TOOLS, type HookTool } from './hookEvents'
-import { hookSupport, NOTIFY_URL_ENV, type NotifyChannel } from './hookActions'
-import { scriptForTool, type HookDoc, type LibraryHook } from './hooks'
+import {
+  HOOK_ACTION_INFO,
+  hookSupport,
+  NOTIFY_URL_ENV,
+  type HookAction,
+  type NotifyChannel
+} from './hookActions'
+import { hookOptions, scriptForTool, type HookDoc, type LibraryHook } from './hooks'
 
 const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 
@@ -374,4 +380,31 @@ export function toolScript(
     return { file, content: hook.scripts[file] ?? '' }
   }
   return { file: 'run.sh', content: renderActionScript(tool, hook.name, doc) }
+}
+
+/** Recipes the scripts menu shows as Illithid's own scripts (built-in actions with a script; not ask, log or script) */
+export const SCRIPT_RECIPES = [
+  'notify',
+  'verify',
+  'format',
+  'protect',
+  'context',
+  'checkpoint',
+  'guard'
+] as const satisfies readonly HookAction[]
+export type ScriptRecipe = (typeof SCRIPT_RECIPES)[number]
+
+export function isScriptRecipe(v: unknown): v is ScriptRecipe {
+  return (SCRIPT_RECIPES as readonly unknown[]).includes(v)
+}
+
+/** A recipe with its default options at its default timing */
+export function recipeDoc(action: ScriptRecipe): HookDoc {
+  return {
+    description: '',
+    when: HOOK_ACTION_INFO[action].timings[0],
+    action,
+    options: hookOptions(action, {}),
+    body: ''
+  }
 }

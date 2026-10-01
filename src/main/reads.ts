@@ -69,6 +69,10 @@ import {
   permissionRules,
   readScripts,
   scriptsDir,
+  SCRIPT_RECIPES,
+  recipeDoc,
+  renderActionScript,
+  renderUniversalScript,
   hookNames,
   readHook,
   type HookDoc,
@@ -813,16 +817,30 @@ export function scripts(home: string): ScriptsData {
   const dir = tilde(home, scriptsDir(home))
   try {
     const users = new Map<string, string[]>()
-    for (const h of readHooksLenient(home)) {
+    const hooksWith = readHooksLenient(home)
+    for (const h of hooksWith) {
       const use = usedScript(h)
       if (use) users.set(use, [...(users.get(use) ?? []), h.name])
     }
     return {
       dir,
-      scripts: readScripts(home).map((s) => ({ ...s, users: users.get(s.name) ?? [] }))
+      scripts: readScripts(home).map((s) => ({ ...s, users: users.get(s.name) ?? [] })),
+      builtins: SCRIPT_RECIPES.map((action) => {
+        const doc = recipeDoc(action)
+        const perTool: Partial<Record<(typeof HOOK_TOOLS)[number], string>> = {}
+        for (const tool of HOOK_TOOLS)
+          if (hookSupport(action, doc.when, tool) === 'ok')
+            perTool[tool] = renderActionScript(tool, action, doc)
+        return {
+          action,
+          users: hooksWith.filter((h) => h.action === action).map((h) => h.name),
+          universal: renderUniversalScript(action, doc),
+          perTool
+        }
+      })
     }
   } catch (e) {
-    return { dir, scripts: [], error: `${dir} read failed: ${(e as Error).message}` }
+    return { dir, scripts: [], builtins: [], error: `${dir} read failed: ${(e as Error).message}` }
   }
 }
 

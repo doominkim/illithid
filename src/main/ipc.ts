@@ -599,6 +599,8 @@ export function registerIpc(): void {
       libWrite(() =>
         W.lib.scriptCreate(home, str(name), typeof content === 'string' ? content : undefined)
       ),
+    scriptFromRecipe: async (action, name) =>
+      libWrite(() => W.lib.scriptFromRecipe(home, str(action), str(name))),
     scriptSave: async (name, content) =>
       libWrite(() => W.lib.scriptSave(home, str(name), str(content))),
     scriptDelete: async (name) => libWrite(() => W.lib.scriptDelete(home, str(name))),
