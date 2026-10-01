@@ -524,7 +524,8 @@
     "tab": {
       "skill": "技能",
       "mcp": "MCP",
-      "rule": "规则"
+      "rule": "规则",
+      "hook": "钩子"
     },
     "search": "搜索",
     "installs": "{{n}} 次安装",
@@ -565,6 +566,16 @@
       "network": "网络错误",
       "tooLarge": "过大",
       "changed": "已变更"
+    },
+    "hookCount": "{{n}} 个钩子",
+    "hookNone": "无法安装",
+    "hookCopilotOnly": "这些钩子是为 GitHub Copilot CLI 编写的 (读取其输入格式)，因此安装后只在 Copilot 中启用。检查脚本后可在钩子菜单中为其他工具启用。",
+    "hookCreates": "将添加的钩子",
+    "hookProblem": {
+      "noBash": "仅限 Windows (PowerShell)",
+      "unknownEvent": "未知事件",
+      "notInPack": "包中没有该脚本",
+      "needsOtherFiles": "会加载包中的其他文件"
     }
   },
   "usage": {

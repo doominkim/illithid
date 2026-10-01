@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Code,
   Group,
   PasswordInput,
   SegmentedControl,
@@ -19,6 +20,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   MarketDetailView,
+  MarketHookPack,
   MarketInstallChoice,
   MarketKind,
   MarketMcpItem,
@@ -91,7 +93,7 @@ function Market(): React.JSX.Element {
     setMcpMore([])
     setCursor(undefined)
     setLoading(true)
-    const r = await window.api.marketSearch(kind, kind === 'rule' ? '' : q)
+    const r = await window.api.marketSearch(kind, kind === 'rule' || kind === 'hook' ? '' : q)
     if (my !== seq.current) return
     setLoading(false)
     if (r.ok) {
@@ -108,7 +110,7 @@ function Market(): React.JSX.Element {
     void search()
     // Rules load once per tab switch; skills and MCP follow the query
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, kind === 'rule' ? '' : q])
+  }, [kind, kind === 'rule' || kind === 'hook' ? '' : q])
 
   const loadMore = async (): Promise<void> => {
     if (!cursor) return
@@ -150,6 +152,17 @@ function Market(): React.JSX.Element {
       ),
     [result, query]
   )
+  const hooks = useMemo(
+    () =>
+      (result?.hooks ?? []).filter(
+        (h) =>
+          !query.trim() ||
+          includesCI(h.name, query.trim()) ||
+          includesCI(h.id, query.trim()) ||
+          includesCI(h.description, query.trim())
+      ),
+    [result, query]
+  )
   const servers = [...(result?.mcp ?? []), ...mcpMore]
 
   // Selectable = shown and not installed yet (MCP: installable here)
@@ -158,7 +171,9 @@ function Market(): React.JSX.Element {
       ? (result?.skills ?? []).filter((x) => !installed[`skill:${x.id}`]).map((x) => x.id)
       : kind === 'mcp'
         ? servers.filter((x) => x.installable && !installed[`mcp:${x.name}`]).map((x) => x.name)
-        : rules.filter((x) => !installed[`rule:${x.id}`]).map((x) => x.id)
+        : kind === 'hook'
+          ? hooks.filter((x) => x.installable && !installed[`hook:${x.id}`]).map((x) => x.id)
+          : rules.filter((x) => !installed[`rule:${x.id}`]).map((x) => x.id)
   const pickedVisible = selectable.filter((id) => picked.has(id))
   const allPicked = selectable.length > 0 && pickedVisible.length === selectable.length
   const togglePick = (id: string): void =>
@@ -287,6 +302,42 @@ function Market(): React.JSX.Element {
         </Stack>
       )
     }
+    if (kind === 'hook') {
+      if (!hooks.length) return <EmptyState title={t('common.noResults')} />
+      return (
+        <ListCard>
+          {hooks.map((h: MarketHookPack) => (
+            <ListRow
+              key={h.id}
+              leading={pickBox(h.id, `hook:${h.id}`, h.installable)}
+              avatar={<Initial text={h.name} />}
+              title={h.name}
+              tags={
+                <>
+                  {[...new Set(h.entries.map((e) => e.timing))].map((w) => (
+                    <Badge key={w} variant="default" size="xs" fw={500} c="dimmed">
+                      {t(`hooks.timing.${w}`)}
+                    </Badge>
+                  ))}
+                  {badgeInstalled(`hook:${h.id}`)}
+                </>
+              }
+              subtitle={h.description}
+              right={
+                <Text size="sm" c="dimmed">
+                  {h.installable
+                    ? t('market.hookCount', { n: h.entries.filter((e) => !e.problem).length })
+                    : t('market.hookNone')}
+                </Text>
+              }
+              active={selected === h.id}
+              onClick={() => setSelected(h.id)}
+              style={h.installable ? undefined : { opacity: 0.6 }}
+            />
+          ))}
+        </ListCard>
+      )
+    }
     if (!rules.length) return <EmptyState title={t('common.noResults')} />
     return (
       <ListCard>
@@ -317,7 +368,7 @@ function Market(): React.JSX.Element {
     <Stack gap={0} style={{ flex: 1 }}>
       <PageHeader
         title={t('nav.market')}
-        count={kind === 'rule' ? rules.length : undefined}
+        count={kind === 'rule' ? rules.length : kind === 'hook' ? hooks.length : undefined}
         actions={
           <Button
             size="xs"
@@ -376,7 +427,7 @@ function Market(): React.JSX.Element {
                 setSelected(null)
                 setResult(null)
               }}
-              data={(['skill', 'mcp', 'rule'] as const).map((k) => ({
+              data={(['skill', 'mcp', 'rule', 'hook'] as const).map((k) => ({
                 value: k,
                 label: t(`market.tab.${k}`)
               }))}
@@ -456,7 +507,7 @@ function MarketDetail({
       if (!alive) return
       if (!r.ok) return setErr(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
       setView(r.value)
-      setName(r.value.name)
+      setName(r.value.kind === 'hook' ? r.value.id : r.value.name)
       if (r.value.kind === 'mcp') {
         const first = r.value.choices.find((c) => c.supported)
         setChoice(first?.id ?? null)
@@ -475,7 +526,10 @@ function MarketDetail({
   const missing =
     !!current &&
     current.inputs.some((i) => i.required && !(values[i.key] ?? '').trim() && !i.default)
-  const canInstall = !!name.trim() && (view.kind !== 'mcp' || (!!current?.supported && !missing))
+  const canInstall =
+    !!name.trim() &&
+    (view.kind !== 'mcp' || (!!current?.supported && !missing)) &&
+    (view.kind !== 'hook' || view.hooks.some((h) => !h.problem))
 
   const install = async (): Promise<void> => {
     setBusy(true)
@@ -566,6 +620,72 @@ function MarketDetail({
         <Box className="ac-card" p="lg">
           <Markdown text={stripFrontmatter(view.skillMd)} />
         </Box>
+      </Stack>
+    )
+
+  if (view.kind === 'hook')
+    return (
+      <Stack gap="lg">
+        {view.description && <Text c="var(--ac-text-2)">{view.description}</Text>}
+        <Group gap="lg">{link(view.url, 'github/awesome-copilot')}</Group>
+        <Alert variant="light" color="gray" radius="lg" data-testid="market-hook-copilot">
+          {t('market.hookCopilotOnly')}
+        </Alert>
+        {view.installedAs ? (
+          installBox
+        ) : (
+          <Group>
+            <Button
+              onClick={() => void install()}
+              loading={busy}
+              disabled={!canInstall}
+              data-testid="market-install"
+            >
+              {t('market.install')}
+            </Button>
+          </Group>
+        )}
+        <Stack gap={8} data-testid="market-hook-entries">
+          <SectionTitle>{t('market.hookCreates')}</SectionTitle>
+          {view.hooks.map((h) => (
+            <Box
+              key={h.name}
+              className="ac-card"
+              p="md"
+              style={h.problem ? { opacity: 0.6 } : undefined}
+            >
+              <Group gap={8} mb={h.content ? 'xs' : 0}>
+                <Text fw={600} size="sm" ff="monospace">
+                  {h.name}
+                </Text>
+                <Badge variant="default" size="xs" fw={500} c="dimmed">
+                  {t(`hooks.timing.${h.when}`)}
+                </Badge>
+                <Text size="xs" c="dimmed" ff="monospace">
+                  {h.event}
+                </Text>
+                {h.problem && (
+                  <Text size="xs" c="orange">
+                    {t(`market.hookProblem.${h.problem}`)}
+                  </Text>
+                )}
+              </Group>
+              {h.content && (
+                <Code
+                  block
+                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 280 }}
+                >
+                  {h.content}
+                </Code>
+              )}
+            </Box>
+          ))}
+        </Stack>
+        {view.readme && (
+          <Box className="ac-card" p="lg">
+            <Markdown text={stripFrontmatter(view.readme)} />
+          </Box>
+        )}
       </Stack>
     )
 

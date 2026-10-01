@@ -524,7 +524,8 @@
     "tab": {
       "skill": "スキル",
       "mcp": "MCP",
-      "rule": "ルール"
+      "rule": "ルール",
+      "hook": "フック"
     },
     "search": "検索",
     "installs": "{{n}} インストール",
@@ -565,6 +566,16 @@
       "network": "ネットワークエラー",
       "tooLarge": "大きすぎます",
       "changed": "変更あり"
+    },
+    "hookCount": "フック {{n}} 件",
+    "hookNone": "インストール不可",
+    "hookCopilotOnly": "GitHub Copilot CLI 向けのフックのため (Copilot の入力形式を読みます)、Copilot だけで有効にした状態でインストールします。他のツールはスクリプトを確認してからフックメニューで有効にしてください。",
+    "hookCreates": "追加されるフック",
+    "hookProblem": {
+      "noBash": "Windows 専用 (PowerShell)",
+      "unknownEvent": "不明なイベント",
+      "notInPack": "パックにスクリプトがない",
+      "needsOtherFiles": "パックの他のファイルを読み込む"
     }
   },
   "usage": {

@@ -524,7 +524,8 @@
     "tab": {
       "skill": "Skills",
       "mcp": "MCP",
-      "rule": "Rules"
+      "rule": "Rules",
+      "hook": "Hooks"
     },
     "search": "Search",
     "installs": "{{n}} installs",
@@ -565,6 +566,16 @@
       "network": "network error",
       "tooLarge": "too large",
       "changed": "changed"
+    },
+    "hookCount": "{{n}} hooks",
+    "hookNone": "Can't install",
+    "hookCopilotOnly": "These hooks are written for GitHub Copilot CLI (they read its input format), so they are installed turned on for Copilot only. Turn them on for other tools in Hooks after checking the script.",
+    "hookCreates": "Hooks it adds",
+    "hookProblem": {
+      "noBash": "Windows only (PowerShell)",
+      "unknownEvent": "Unknown event",
+      "notInPack": "Script not found in the pack",
+      "needsOtherFiles": "Loads other files of the pack"
     }
   },
   "usage": {

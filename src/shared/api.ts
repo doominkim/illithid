@@ -61,6 +61,8 @@ import type {
 } from '../engine'
 import type {
   AuditPartner,
+  HookEntryProblem,
+  MarketHookPack,
   MarketInstallChoice,
   MarketKind,
   MarketMcpItem,
@@ -70,6 +72,8 @@ import type {
 } from '../engine'
 export type {
   AuditPartner,
+  HookEntryProblem,
+  MarketHookPack,
   MarketInputSpec,
   MarketInstallChoice,
   MarketKind,
@@ -634,6 +638,7 @@ export interface MarketSearchView {
   skills?: MarketSkillItem[]
   mcp?: MarketMcpItem[]
   rules?: MarketRuleItem[]
+  hooks?: MarketHookPack[]
   /** MCP registry paging */
   nextCursor?: string
   /** `<kind>:<source id>` → library name, for items installed from the marketplace */
@@ -678,6 +683,26 @@ export type MarketDetailView =
       body: string
       name: string
       url: string
+      ref: string
+      installedAs?: string
+    }
+  | {
+      kind: 'hook'
+      id: string
+      title: string
+      description: string
+      tags: string[]
+      readme: string
+      url: string
+      /** Library hooks the pack becomes; entries with a problem are skipped */
+      hooks: {
+        name: string
+        when: HookTiming
+        event: string
+        content: string
+        problem?: HookEntryProblem
+      }[]
+      /** Pack folder tree SHA */
       ref: string
       installedAs?: string
     }

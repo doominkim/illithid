@@ -9,6 +9,9 @@ import {
   marketCheckUpdates,
   marketCommitMcp,
   marketCommitMcpUpdate,
+  marketCommitHookPack,
+  marketListHookPacks,
+  marketPrepareHookPack,
   marketCommitRule,
   marketCommitSkill,
   marketEnabled,
@@ -28,6 +31,7 @@ import {
   readOrigins,
   type FetchFn,
   type MarketKind,
+  type PreparedHookPack,
   type PreparedRule,
   type PreparedSkill,
   type RegistryServer,
@@ -44,7 +48,7 @@ import type {
 } from '../shared/api'
 
 const CACHE_MS = 10 * 60 * 1000
-const KINDS: readonly MarketKind[] = ['skill', 'mcp', 'rule']
+const KINDS: readonly MarketKind[] = ['skill', 'mcp', 'rule', 'hook']
 
 type LibWrite = <T>(fn: () => T) => Promise<WriteResult<T> | Refused>
 
@@ -110,19 +114,25 @@ const prepServer = (id: string): Promise<RegistryServer> =>
   prepared(`prep:mcp:${id}`, () => marketServerDetail(fetchFn, id))
 const prepRule = (home: string, id: string): Promise<PreparedRule> =>
   prepared(`prep:rule:${id}`, () => marketPrepareRule(fetchFn, home, id))
+const prepHook = (home: string, id: string, force = false): Promise<PreparedHookPack> =>
+  prepared(`prep:hook:${id}`, () => marketPrepareHookPack(fetchFn, home, id, { force }))
+
+/** Commit a hook pack; the first hook's name stands for the install */
+function commitHooks(home: string, p: PreparedHookPack, update = false): { name: string } {
+  return { name: marketCommitHookPack(home, p, { update }).names[0] }
+}
+
+type Prepared = PreparedSkill | RegistryServer | PreparedRule | PreparedHookPack
 
 /** What the detail view showed: install refuses if the source moved on since (reopen to review the new version) */
-function refOf(kind: MarketKind, p: PreparedSkill | RegistryServer | PreparedRule): string {
+function refOf(kind: MarketKind, p: Prepared): string {
   if (kind === 'skill') return (p as PreparedSkill).sha
   if (kind === 'mcp') return (p as RegistryServer).version
+  if (kind === 'hook') return (p as PreparedHookPack).pack.treeSha
   return (p as PreparedRule).item.lastUpdated ?? ''
 }
 
-function assertRef(
-  kind: MarketKind,
-  p: PreparedSkill | RegistryServer | PreparedRule,
-  expected: unknown
-): void {
+function assertRef(kind: MarketKind, p: Prepared, expected: unknown): void {
   if (typeof expected === 'string' && expected !== refOf(kind, p))
     throw new MarketError(
       'changed',
@@ -161,6 +171,7 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
           return { skills, installed }
         }
         if (k === 'rule') return { rules: await marketListRules(fetchFn, home), installed }
+        if (k === 'hook') return { hooks: await marketListHookPacks(fetchFn, home), installed }
         const c = typeof cursor === 'string' && cursor ? cursor : undefined
         if (!query && !c) return { mcp: marketPopularServers(), installed }
         const r = await cached(`search:mcp:${query}:${c ?? ''}`, async () => {
@@ -210,6 +221,27 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
             installedAs
           }
         }
+        if (k === 'hook') {
+          const h = await prepHook(home, sid)
+          return {
+            kind: 'hook',
+            id: sid,
+            title: h.pack.name,
+            description: h.pack.description,
+            tags: h.pack.tags,
+            readme: h.readme,
+            url: `${AWESOME_COPILOT_REPO}/tree/main/hooks/${h.pack.id}`,
+            hooks: h.hooks.map((x) => ({
+              name: x.name,
+              when: x.when,
+              event: x.event,
+              content: x.content,
+              ...(x.problem ? { problem: x.problem } : {})
+            })),
+            ref: h.pack.treeSha,
+            installedAs
+          }
+        }
         const r = await prepRule(home, sid)
         return {
           kind: 'rule',
@@ -255,6 +287,11 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
           return libWrite(() =>
             marketCommitMcp(home, s, String(o.choice ?? ''), values, name, defaultSecretBackend())
           )
+        }
+        if (k === 'hook') {
+          const h = await prepHook(home, sid)
+          assertRef(k, h, o.ref)
+          return libWrite(() => commitHooks(home, h))
         }
         const r = await prepRule(home, sid)
         assertRef(k, r, o.ref)
@@ -309,6 +346,9 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
               id,
               commit: () => marketCommitMcp(home, s, choice.id, {}, name, defaultSecretBackend())
             })
+          } else if (k === 'hook') {
+            const h = await prepHook(home, id)
+            ready.push({ id, commit: () => commitHooks(home, h) })
           } else {
             const r = await prepRule(home, id)
             ready.push({ id, commit: () => marketCommitRule(home, r, r.name) })
@@ -361,6 +401,13 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
         if (k === 'mcp') {
           const s = await prepServer(origin.id)
           return libWrite(() => marketCommitMcpUpdate(home, n, s))
+        }
+        if (k === 'hook') {
+          const h = await prepHook(home, origin.id, true)
+          return libWrite(() => {
+            commitHooks(home, h, true)
+            return { name: n }
+          })
         }
         await marketListRules(fetchFn, home, { force: true })
         const r = await prepRule(home, origin.id)

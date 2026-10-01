@@ -524,7 +524,8 @@
     "tab": {
       "skill": "스킬",
       "mcp": "MCP",
-      "rule": "룰"
+      "rule": "룰",
+      "hook": "훅"
     },
     "search": "검색",
     "installs": "설치 {{n}}",
@@ -565,6 +566,16 @@
       "network": "네트워크 오류",
       "tooLarge": "너무 큼",
       "changed": "변경됨"
+    },
+    "hookCount": "훅 {{n}}개",
+    "hookNone": "설치 불가",
+    "hookCopilotOnly": "GitHub Copilot CLI 용으로 만든 훅이라 (Copilot 입력 형식을 읽음) Copilot 에서만 켜진 채로 설치됩니다. 다른 툴은 스크립트를 확인한 뒤 훅 메뉴에서 켜세요.",
+    "hookCreates": "추가되는 훅",
+    "hookProblem": {
+      "noBash": "Windows 전용 (PowerShell)",
+      "unknownEvent": "알 수 없는 이벤트",
+      "notInPack": "묶음에 스크립트가 없음",
+      "needsOtherFiles": "묶음의 다른 파일을 불러옴"
     }
   },
   "usage": {
