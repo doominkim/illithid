@@ -7,6 +7,7 @@
  * - script → the hook's own run.sh (or the tool's run.<tool>.sh)
  */
 import type { HookTool } from './hookEvents'
+import { NOTIFY_URL_ENV, type NotifyChannel } from './hookActions'
 import { scriptForTool, type HookDoc, type LibraryHook } from './hooks'
 
 const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
@@ -45,21 +46,50 @@ const FILE_ARG: Record<HookTool, string> = {
   grok: 'file_path'
 }
 
+/**
+ * notify: macOS notification (osascript, the texts as arguments), or a phone notification posted with curl to an address read
+ * from an environment variable at run time (the address is a secret: never written into the hook or the script). The title
+ * gets the project folder name so notifications from several sessions can be told apart. At the notification timing an empty
+ * message means the tool's own text (its `message` field)
+ */
+function notifyLines(doc: HookDoc, name: string): string[] {
+  const o = doc.options
+  const fallback = String(o.message || doc.description || name)
+  const out = [`title=${q(String(o.title || 'Illithid'))}`]
+  if (o.project !== false) out.push('title="$title · $(basename "$PWD")"')
+  out.push(`msg=${q(fallback)}`)
+  if (!o.message && doc.when === 'notification')
+    out.push(`m=$(field message); [ -n "$m" ] && msg="$m"`)
+  const channel = String(o.channel || 'mac') as NotifyChannel
+  if (channel === 'mac') {
+    out.push(
+      `osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' -e 'end run' "$title" "$msg" >/dev/null 2>&1`
+    )
+    if (o.sound === true) out.push('afplay /System/Library/Sounds/Glass.aiff >/dev/null 2>&1 &')
+    return out
+  }
+  const envName = String(o.urlEnv || NOTIFY_URL_ENV[channel])
+  out.push(`url="\${${envName}:-}"`, '[ -n "$url" ] || exit 0')
+  if (channel === 'ntfy')
+    out.push(`curl -fsS -m 10 -H "Title: $title" -d "$msg" "$url" >/dev/null 2>&1`)
+  else
+    out.push(
+      // JSON string escaping: backslash, quote; line breaks become spaces
+      `esc() { printf '%s' "$1" | tr '\\n' ' ' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g'; }`,
+      `body=$(printf '{"text":"*%s*\\\\n%s"}' "$(esc "$title")" "$(esc "$msg")")`,
+      `curl -fsS -m 10 -H 'Content-Type: application/json' -d "$body" "$url" >/dev/null 2>&1`
+    )
+  return out
+}
+
 /** Script a built-in action runs in one tool */
 export function renderActionScript(tool: HookTool, name: string, doc: HookDoc): string {
   const o = doc.options
   const out = HEADER(tool, name)
   switch (doc.action) {
-    case 'notify': {
-      const title = String(o.title || 'Illithid')
-      const message = String(o.message || doc.description || name)
-      out.push(
-        `/usr/bin/osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' -e 'end run' ${q(title)} ${q(message)} >/dev/null 2>&1`
-      )
-      if (o.sound === true)
-        out.push('/usr/bin/afplay /System/Library/Sounds/Glass.aiff >/dev/null 2>&1 &')
+    case 'notify':
+      out.push(...notifyLines(doc, name))
       break
-    }
     case 'guard': {
       out.push(...argGetter(tool), 'cmd=$(arg command)', 'case "$cmd" in')
       for (const p of o.patterns as string[])

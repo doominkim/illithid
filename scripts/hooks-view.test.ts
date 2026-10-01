@@ -33,7 +33,14 @@ test('REQ-HOOKS-VIEW-1 the hooks list shows each tool that can run the hook as w
   assert.equal(h.description, 'Ping me')
   assert.equal(h.when, 'stop')
   assert.equal(h.action, 'notify')
-  assert.deepEqual(h.options, { title: 'Illithid', message: 'Done', sound: false })
+  assert.deepEqual(h.options, {
+    title: 'Illithid',
+    message: 'Done',
+    sound: false,
+    channel: 'mac',
+    urlEnv: '',
+    project: true
+  })
   assert.equal(h.unsupported, undefined)
   assert.deepEqual(h.tools, { claude: 'needsSync', codex: 'needsSync', gemini: 'needsSync' })
   syncAll(home, baseEnv(home), { allowReal: true })

@@ -108,11 +108,16 @@ export const HOOK_CATALOG: Readonly<Record<HookTool, HookToolInfo>> = {
       ev('AfterTool', 'after-tool', true, false),
       ev('BeforeAgent', 'prompt', false, true),
       ev('AfterAgent', 'stop', false, true),
-      ev('SessionStart', 'session-start', false, false),
+      // matcher: the start source as an exact string (startup, resume, clear)
+      ev('SessionStart', 'session-start', true, false),
       ev('SessionEnd', 'session-end', false, false),
+      // Only tool permission notifications (notification_type ToolPermission)
       ev('Notification', 'notification', false, false)
     ],
-    sources: ['https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/index.md']
+    sources: [
+      'https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/index.md',
+      'https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md'
+    ]
   },
   copilot: {
     timeoutUnit: 's',
@@ -123,7 +128,7 @@ export const HOOK_CATALOG: Readonly<Record<HookTool, HookToolInfo>> = {
       ev('postToolUse', 'after-tool', true, false),
       ev('userPromptSubmitted', 'prompt', false, false),
       ev('agentStop', 'stop', false, true),
-      ev('subagentStop', 'stop', false, false),
+      ev('subagentStop', 'stop', false, true),
       ev('sessionStart', 'session-start', false, false),
       ev('sessionEnd', 'session-end', false, false),
       ev('notification', 'notification', true, false)
@@ -140,9 +145,10 @@ export const HOOK_CATALOG: Readonly<Record<HookTool, HookToolInfo>> = {
       ev('UserPromptSubmit', 'prompt', false, true),
       ev('Stop', 'stop', false, true),
       ev('SubagentStop', 'stop', false, true),
-      ev('SessionStart', 'session-start', false, false),
+      ev('SessionStart', 'session-start', true, false),
       ev('SessionEnd', 'session-end', false, false),
-      ev('Notification', 'notification', false, false)
+      // matcher: idle_prompt (every turn end), permission_prompt, task_complete
+      ev('Notification', 'notification', true, false)
     ],
     sources: [
       'https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/10-hooks.md'

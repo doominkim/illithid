@@ -21,6 +21,7 @@ import { join } from 'node:path'
 import matter from 'gray-matter'
 import {
   actionMatcher,
+  ENV_NAME_RE,
   HOOK_ACTION_INFO,
   hookSupport,
   isHookAction,
@@ -130,6 +131,10 @@ export function validateHookDoc(v: unknown): string[] {
       if (d === undefined) errors.push(`options.${k}: not an option of ${v.action}`)
       else if (!sameType(val, d))
         errors.push(`options.${k} must be ${Array.isArray(d) ? 'a list of texts' : typeof d}`)
+      else if (info.choices?.[k] && !info.choices[k].includes(val as string))
+        errors.push(`options.${k} must be one of ${info.choices[k].join(', ')}`)
+      else if (k === 'urlEnv' && val && !ENV_NAME_RE.test(val as string))
+        errors.push('options.urlEnv must be an environment variable name')
     }
   if (
     v.action === 'script' &&
@@ -191,7 +196,7 @@ export function hookTriggers(doc: HookDoc): Partial<Record<HookTool, HookTrigger
     const s = doc.tools?.[tool] ?? {}
     const event = s.event ?? defaultHookEvent(tool, doc.when)!
     const takesMatcher = !!hookEventInfo(tool, event)?.matcher
-    const matcher = s.matcher ?? actionMatcher(doc.action, tool)
+    const matcher = s.matcher ?? actionMatcher(doc.action, tool, doc.when)
     out[tool] = {
       event,
       ...(takesMatcher && matcher ? { matcher } : {}),

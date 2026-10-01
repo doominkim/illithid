@@ -75,7 +75,14 @@ test('REQ-HOOKS-LIB-3 a new hook is one HOOK.md with when, action and options; n
   assert.equal(h.doc.when, 'stop')
   assert.equal(h.doc.action, 'notify')
   // Missing options get the action defaults
-  assert.deepEqual(h.doc.options, { title: 'Illithid', message: 'Done', sound: false })
+  assert.deepEqual(h.doc.options, {
+    title: 'Illithid',
+    message: 'Done',
+    sound: false,
+    channel: 'mac',
+    urlEnv: '',
+    project: true
+  })
 })
 
 test('REQ-HOOKS-LIB-4 triggers come from the action: the shell tool of each tool for guard, nothing where unsupported', () => {

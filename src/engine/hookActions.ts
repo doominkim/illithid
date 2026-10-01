@@ -24,6 +24,10 @@ export interface HookActionInfo {
   unsupported?: Partial<Record<HookTool, Exclude<HookSupport, 'ok' | 'wrongTiming' | 'noEvent'>>>
   /** Matcher per tool (tool name pattern) */
   matcher?: Partial<Record<HookTool, string>>
+  /** Matcher per tool at one timing (overrides matcher) */
+  matcherAt?: Partial<Record<HookTiming, Partial<Record<HookTool, string>>>>
+  /** Options that take one of a few values */
+  choices?: Record<string, readonly string[]>
   /** Option defaults; options the user leaves out get these */
   defaults: Record<string, string | boolean | string[]>
 }
@@ -55,8 +59,42 @@ const EDIT: Partial<Record<HookTool, string>> = {
 
 export const DEFAULT_GUARD_PATTERNS = ['rm -rf /', 'git push --force', 'git reset --hard']
 
+/** "Waiting for you" notifications per tool (notification type filters). Codex has no notification event */
+const WAITING: Partial<Record<HookTool, string>> = {
+  claude: 'permission_prompt|idle_prompt',
+  copilot: 'permission_prompt',
+  grok: 'permission_prompt|idle_prompt'
+}
+
+export const NOTIFY_CHANNELS = ['mac', 'ntfy', 'slack'] as const
+export type NotifyChannel = (typeof NOTIFY_CHANNELS)[number]
+
+/** Environment variable a phone channel reads its address from when the hook names none */
+export const NOTIFY_URL_ENV: Record<Exclude<NotifyChannel, 'mac'>, string> = {
+  ntfy: 'ILLITHID_NTFY_URL',
+  slack: 'ILLITHID_SLACK_WEBHOOK'
+}
+export const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
+
 export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
-  notify: { timings: ALL_TIMINGS, defaults: { title: 'Illithid', message: '', sound: false } },
+  notify: {
+    timings: [
+      'stop',
+      'notification',
+      ...ALL_TIMINGS.filter((t) => t !== 'stop' && t !== 'notification')
+    ],
+    matcherAt: { notification: WAITING },
+    choices: { channel: NOTIFY_CHANNELS },
+    // urlEnv: environment variable with the ntfy / Slack address ('' = the channel's default name). project: add the folder name
+    defaults: {
+      title: 'Illithid',
+      message: '',
+      sound: false,
+      channel: 'mac',
+      urlEnv: '',
+      project: true
+    }
+  },
   guard: {
     timings: ['before-tool'],
     matcher: SHELL,
@@ -100,7 +138,12 @@ export function hookSupport(action: HookAction, when: HookTiming, tool: HookTool
   return defaultHookEvent(tool, when) ? 'ok' : 'noEvent'
 }
 
-/** The action's matcher for a tool (only tool-call timings use one) */
-export function actionMatcher(action: HookAction, tool: HookTool): string | undefined {
-  return HOOK_ACTION_INFO[action].matcher?.[tool]
+/** The action's matcher for a tool at a timing (tool calls: tool names; notifications: notification types) */
+export function actionMatcher(
+  action: HookAction,
+  tool: HookTool,
+  when?: HookTiming
+): string | undefined {
+  const info = HOOK_ACTION_INFO[action]
+  return (when && info.matcherAt?.[when]?.[tool]) ?? info.matcher?.[tool]
 }
