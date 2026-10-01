@@ -114,7 +114,8 @@ export function ImportModal({
       ...plan.permissions,
       ...plan.skills,
       ...plan.mcp,
-      ...(plan.agents ?? [])
+      ...(plan.agents ?? []),
+      ...(plan.hooks ?? [])
     ]
     return kind ? all.filter((c) => c.kind === kind) : all
   }, [plan, kind])
@@ -247,14 +248,53 @@ export function ImportModal({
                 </Badge>
               ))
             )}
-            {pv.portability !== 'toolOnly' && v && 'warnings' in v && v.warnings.length > 0 && (
-              <Badge variant="light" color="yellow" size="xs" fw={500}>
-                {t('mcp.warnings')} {v.warnings.length}
-              </Badge>
-            )}
+            {c.kind === 'hook' &&
+              c.variants
+                .filter((x) => x.id === variantOf(c))
+                .flatMap((x) => [
+                  ...(x.joins
+                    ? [
+                        <Badge key="joins" variant="light" color="blue" size="xs" fw={500}>
+                          {t('import.hookWarn.joins', { name: x.joins })}
+                        </Badge>
+                      ]
+                    : []),
+                  ...x.warnings.map((w) => (
+                    <Badge
+                      key={w}
+                      variant="light"
+                      color={w === 'originalKept' ? 'yellow' : 'gray'}
+                      size="xs"
+                      fw={500}
+                      data-testid={`import-hook-${c.name}-${w}`}
+                    >
+                      {t(`import.hookWarn.${w}`)}
+                    </Badge>
+                  ))
+                ])}
+            {c.kind !== 'hook' &&
+              pv.portability !== 'toolOnly' &&
+              v &&
+              'warnings' in v &&
+              v.warnings.length > 0 && (
+                <Badge variant="light" color="yellow" size="xs" fw={500}>
+                  {t('mcp.warnings')} {v.warnings.length}
+                </Badge>
+              )}
           </>
         }
-        subtitle={v ? variantLabel(c, v.id) : undefined}
+        subtitle={
+          c.kind === 'hook'
+            ? c.variants
+                .filter((x) => x.id === variantOf(c))
+                .map(
+                  (x) =>
+                    `${x.trigger.event}${x.trigger.matcher ? ` · ${x.trigger.matcher}` : ''} · ${x.command}`
+                )[0]
+            : v
+              ? variantLabel(c, v.id)
+              : undefined
+        }
         right={
           c.variants.length > 1 ? (
             <Select

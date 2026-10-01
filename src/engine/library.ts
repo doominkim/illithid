@@ -1380,3 +1380,14 @@ export function dropHookToolScript(home: string, name: string, tool: HookTool): 
 export function deleteHook(home: string, name: string): TrashResult {
   return moveToTrash(home, hookDirPath(home, name))
 }
+
+/** New hook folder with a given hook.json and shared script (import). exists if the folder is there */
+export function writeNewHook(home: string, name: string, def: HookDef, script: string): string {
+  const dir = hookDirPath(home, name)
+  if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
+    throw new LibraryError('exists', 'a hook with the same name exists')
+  const errors = validateHookDef(def)
+  if (errors.length) throw new LibraryError('invalidSchema', errors.join('; '))
+  writeLibFile(home, join(dir, def.script), script, HOOK_SCRIPT_MODE)
+  return writeHookDef(home, name, def)
+}

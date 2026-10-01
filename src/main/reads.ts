@@ -654,7 +654,11 @@ export function hooks(home: string, env: Env): HooksData {
             ? 'needsSync'
             : 'synced'
     }
+    const edited: Partial<Record<ToolId, string>> = {}
+    for (const x of copies)
+      if (x.hook === h.name && x.action === 'update' && x.drift) edited[x.tool] = x.file
     return {
+      ...(Object.keys(edited).length ? { edited } : {}),
       name: h.name,
       description: h.def.description,
       timing: h.def.timing,

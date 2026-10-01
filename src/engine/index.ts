@@ -523,11 +523,12 @@ export {
   saveHookScript,
   createHookToolScript,
   dropHookToolScript,
-  deleteHook
+  deleteHook,
+  writeNewHook
 } from './library'
 export type { NewHookInput } from './library'
 export { HOOK_TARGETS, HOOK_TARGET_OF, hookTable, appHookName } from './targets/hooks'
-export { planHookSync, applyHookSync, hookBackupPath } from './hookSync'
+export { planHookSync, applyHookSync, hookBackupPath, keepHookCopy } from './hookSync'
 export type { HookSyncItem, HookSyncResult, HookSyncAction } from './hookSync'
 export {
   hookCopyPath,

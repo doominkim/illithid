@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -13,7 +14,7 @@ import {
   Text,
   TextInput
 } from '@mantine/core'
-import { FolderOpen, Layers, Plus, Undo2 } from 'lucide-react'
+import { Download, FolderOpen, Layers, Plus, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   HOOK_CATALOG,
@@ -27,8 +28,10 @@ import {
 import type { HookDef, HookEditView, HookTrigger, HookView, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
+import { EmptyLibrary } from '../components/EmptyState'
 import { EmptyState } from '../components/EmptyState'
 import { CardGrid, ItemCard } from '../components/ItemCard'
+import { ImportModal } from '../components/ImportModal'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { MarkdownEditor } from '../components/MarkdownEditor'
@@ -87,6 +90,7 @@ function Hooks(): React.JSX.Element {
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
   const pending = useToggleBusy()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
 
   if (error) return <ErrorAlert message={error} />
@@ -185,6 +189,15 @@ function Hooks(): React.JSX.Element {
             >
               {t('hooks.new')}
             </Button>
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Download size={13} />}
+              onClick={() => setImportOpen(true)}
+              data-testid="hook-import"
+            >
+              {t('common.import')}
+            </Button>
             <ReloadButton />
           </>
         }
@@ -232,7 +245,7 @@ function Hooks(): React.JSX.Element {
         right={<ViewToggle value={view} onChange={setView} />}
       />
       {data.hooks.length === 0 ? (
-        <EmptyState title={t('hooks.emptyTitle')} hint={t('hooks.emptyHint')} />
+        <EmptyLibrary onImport={() => setImportOpen(true)} />
       ) : list.length === 0 ? (
         <EmptyState title={t('common.noResults')} />
       ) : view === 'grid' ? (
@@ -285,6 +298,12 @@ function Hooks(): React.JSX.Element {
         </ListCard>
       )}
 
+      <ImportModal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={reload}
+        kind="hook"
+      />
       <DetailSheet
         opened={selected === NEW}
         onClose={() => setSelected(null)}
@@ -436,8 +455,39 @@ function HookDetail({
   ]
   const activeTab = scriptTabs.some((x) => x.value === tab) ? tab! : 'shared'
 
+  const keepCopy = async (tool: HookTool, file: string): Promise<void> => {
+    const r = await runWrite(window.api.hookKeepCopy(hook.name, tool, file), {
+      success: t('hooks.kept', { tool: TOOL_NAME[tool] })
+    })
+    if (r) onChanged()
+  }
+  const edited = (Object.entries(hook.edited ?? {}) as [ToolId, string][]).filter(([tool]) =>
+    isHookTool(tool)
+  ) as [HookTool, string][]
+
   return (
     <Stack gap="lg">
+      {edited.map(([tool, file]) => (
+        <Alert
+          key={tool}
+          color="yellow"
+          variant="light"
+          title={t('hooks.edited', { tool: TOOL_NAME[tool] })}
+          data-testid={`hook-edited-${tool}`}
+        >
+          <Group justify="space-between" wrap="nowrap" gap="md">
+            <Text size="sm">{t('hooks.editedHint')}</Text>
+            <Button
+              size="xs"
+              variant="default"
+              onClick={() => void keepCopy(tool, file)}
+              data-testid={`hook-keep-${tool}`}
+            >
+              {t('preview.keepEdited')}
+            </Button>
+          </Group>
+        </Alert>
+      ))}
       <ToolToggleRow
         pills={pills}
         tools={connectedTools}

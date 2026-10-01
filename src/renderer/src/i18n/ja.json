@@ -330,7 +330,8 @@
       "permissions": "権限",
       "skill": "スキル",
       "mcp": "MCP",
-      "agent": "エージェント"
+      "agent": "エージェント",
+      "hook": "フック"
     },
     "sourceKind": {
       "tool": "ツール",
@@ -353,6 +354,12 @@
     "warn": {
       "agentRenderDiffers": "レンダー結果が元のバイトと異なります (元ファイルは次回の反映時にバックアップされます)",
       "togglesNotSet": "他のツールをオフにできませんでした (項目のツールスイッチを確認)"
+    },
+    "hookWarn": {
+      "inlineCommand": "インラインのコマンド → スクリプトファイル",
+      "originalKept": "元のまま · 元を消すまでこのツールではオフ",
+      "toolVariable": "ツール固有の変数を使用",
+      "joins": "{{name}} に接続"
     }
   },
   "rel": {
@@ -784,8 +791,6 @@
     "deleteTitle": "フックを削除",
     "deleteBody": "{{name}} とスクリプトを .trash に移動します。ツール設定の項目は次の同期で削除されます。",
     "allTools": "すべてのツール",
-    "emptyTitle": "フックはまだありません",
-    "emptyHint": "ツールがコマンドを実行する前、応答を終えたとき、セッションを開始したときにスクリプトを実行します。",
     "timing": {
       "before-tool": "ツール実行前",
       "after-tool": "ツール実行後",
@@ -861,6 +866,9 @@
       "log": "ファイルに記録"
     },
     "timingLabel": "実行タイミング",
-    "timingPick": "いつ実行するか選んでください"
+    "timingPick": "いつ実行するか選んでください",
+    "edited": "{{tool}} でスクリプトが編集されました",
+    "editedHint": "同期するとライブラリの版に戻します (編集されたコピーはバックアップ)。",
+    "kept": "{{tool}} の版をライブラリに保存しました"
   }
 }

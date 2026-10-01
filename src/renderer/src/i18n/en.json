@@ -330,7 +330,8 @@
       "permissions": "permissions",
       "skill": "skill",
       "mcp": "MCP",
-      "agent": "Agent"
+      "agent": "Agent",
+      "hook": "Hook"
     },
     "sourceKind": {
       "tool": "tool",
@@ -353,6 +354,12 @@
     "warn": {
       "agentRenderDiffers": "Rendered file differs from the original bytes (the original is backed up at the next apply)",
       "togglesNotSet": "Could not turn off the other tools for this item (check its tool switches)"
+    },
+    "hookWarn": {
+      "inlineCommand": "Inline command → script file",
+      "originalKept": "Original stays · off for this tool until you remove it",
+      "toolVariable": "Uses a tool-specific variable",
+      "joins": "Joins {{name}}"
     }
   },
   "rel": {
@@ -784,8 +791,6 @@
     "deleteTitle": "Delete hook",
     "deleteBody": "Moves {{name}} and its scripts to .trash. Its entries leave the tools on the next sync.",
     "allTools": "All tools",
-    "emptyTitle": "No hooks yet",
-    "emptyHint": "Run a script when a tool is about to run a command, finishes a reply or starts a session.",
     "timing": {
       "before-tool": "Before a tool runs",
       "after-tool": "After a tool runs",
@@ -861,6 +866,9 @@
       "log": "Log to a file"
     },
     "timingLabel": "When",
-    "timingPick": "Pick when it runs"
+    "timingPick": "Pick when it runs",
+    "edited": "The script was edited in {{tool}}",
+    "editedHint": "Syncing restores the library version (the edited copy is backed up).",
+    "kept": "Saved {{tool}}'s version to the library"
   }
 }

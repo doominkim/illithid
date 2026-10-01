@@ -598,6 +598,8 @@ export function registerIpc(): void {
       libWrite(() => W.lib.hookToolScriptCreate(home, str(name), str(tool))),
     hookToolScriptDrop: async (name, tool) =>
       libWrite(() => W.lib.hookToolScriptDrop(home, str(name), str(tool))),
+    hookKeepCopy: async (name, tool, file) =>
+      libWrite(() => W.lib.hookKeepCopy(home, str(name), str(tool), str(file))),
     memoryFiles: async () => W.wrap(() => W.lib.memoryFiles(home)),
     memoryRead: async (rel) => W.wrap(() => W.lib.memoryRead(home, str(rel))),
     memorySave: async (rel, content) =>

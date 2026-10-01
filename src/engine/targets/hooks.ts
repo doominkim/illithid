@@ -8,6 +8,7 @@
  * - copilotHooks  ~/.copilot/hooks/illithid.json  the whole file: { version: 1, hooks: { <event>: [{ type, bash, matcher?, timeoutSec? }] } }
  * - grokHooks     ~/.grok/hooks/illithid.json     the whole file: { hooks: { <Event>: [{ matcher?, hooks: [...] }] } }
  */
+import { createHash } from 'node:crypto'
 import { parse as parseToml } from 'smol-toml'
 import { HOOK_CATALOG, type HookTool } from '../hookEvents'
 import { hookCommand, hooksForTool, toolTimeout, type ToolHook } from '../hookRender'
@@ -42,6 +43,54 @@ const APP_COMMAND: Readonly<Record<HookTool, RegExp>> = {
   gemini: /\/\.gemini\/hooks\/illithid\/([^/']+)\/[^/']+' gemini$/,
   copilot: /\/\.copilot\/hooks\/illithid\/([^/']+)\/[^/']+' copilot$/,
   grok: /\/\.grok\/hooks\/illithid\/([^/']+)\/[^/']+' grok$/
+}
+
+/** Identity of one original handler (event + matcher + handler) — stays the same as long as the user doesn't edit it */
+export function hookEntryHash(
+  event: string,
+  matcher: string | undefined,
+  handler: unknown
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify([event, matcher ?? null, handler]))
+    .digest('hex')
+}
+
+/**
+ * Imported originals (pendingRetire kind hook) whose library hook goes in now: their handlers leave the user's groups (a group
+ * left with no handler goes too). Returns the table and the hashes still present afterwards
+ */
+function dropImported(
+  table: unknown,
+  hashes: ReadonlySet<string>
+): { table: unknown; present: Set<string> } {
+  const present = new Set<string>()
+  if (!isObj(table)) return { table, present }
+  const next: Json = {}
+  for (const [event, groups] of Object.entries(table)) {
+    if (!Array.isArray(groups)) {
+      next[event] = groups
+      continue
+    }
+    const kept: unknown[] = []
+    for (const g of groups) {
+      if (!isObj(g) || !Array.isArray(g.hooks)) {
+        kept.push(g)
+        continue
+      }
+      const matcher = typeof g.matcher === 'string' && g.matcher ? g.matcher : undefined
+      const handlers = g.hooks.filter((h) => {
+        const hash = hookEntryHash(event, matcher, h)
+        if (hashes.has(hash)) return false
+        present.add(hash)
+        return true
+      })
+      if (handlers.length === g.hooks.length) kept.push(g)
+      else if (handlers.length) kept.push({ ...g, hooks: handlers })
+    }
+    if (kept.length || !groups.length) next[event] = kept
+  }
+  return { table: next, present }
 }
 
 /** Hook name an app command belongs to, or null for the user's commands */
@@ -172,21 +221,27 @@ function settingsHooksTarget(id: TargetId, tool: 'claude' | 'gemini', rel: strin
       const settings = parse(before)
       if (!hooks.length && !appEntries(tool, settings.hooks).size)
         return { after: before, notes: ['no app hooks — left untouched'], owned: [] }
-      const table = mergeHooksTable(ctx.home ?? '', tool, settings.hooks, hooks)
+      // Imported originals go out as their library hook comes in
+      const records = (ctx.pendingRetire ?? []).filter((p) => p.kind === 'hook' && p.tool === tool)
+      const names = new Set(hooks.map((h) => h.hook.name))
+      const replacing = new Set(records.filter((p) => names.has(p.name)).map((p) => p.hash))
+      const cleaned = dropImported(settings.hooks, replacing)
+      const retired = records.filter((p) => !cleaned.present.has(p.hash)).map((p) => p.path)
+      const table = mergeHooksTable(ctx.home ?? '', tool, cleaned.table, hooks)
       const next: Json = { ...settings }
       if (table && Object.keys(table).length) next.hooks = table
       else delete next.hooks
       const after = tool === 'gemini' ? toSettingsText(before, next) : toJsonText(next, before)
       const others = untouchedKeysSame(settings, next, 'hooks')
-      const same =
-        others.same && userEntries(tool, settings.hooks) === userEntries(tool, next.hooks)
+      const same = others.same && userEntries(tool, cleaned.table) === userEntries(tool, next.hooks)
       const notes = [
-        `${hooks.length} app hooks, user hooks and other keys unchanged: ${same ? 'OK' : 'broken!'}`
+        `${hooks.length} app hooks${retired.length ? `, ${retired.length} imported originals replaced` : ''}, user hooks and other keys unchanged: ${same ? 'OK' : 'broken!'}`
       ]
       const owned = hooks.map((h) => h.hook.name)
+      const extra = retired.length ? { retired } : {}
       return same
-        ? { after, notes, owned }
-        : { after, notes, owned, error: 'entries other than app hooks changed' }
+        ? { after, notes, owned, ...extra }
+        : { after, notes, owned, ...extra, error: 'entries other than app hooks changed' }
     }
   }
 }

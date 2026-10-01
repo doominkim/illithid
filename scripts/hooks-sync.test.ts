@@ -198,7 +198,7 @@ test('REQ-HOOKS-SYNC-5 Grok runs Claude Code hooks by default, so it gets its ow
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
 })
 
-test('REQ-HOOKS-SYNC-6 the apply preview lists hook entries and script copies; a copy edited in the tool is restored after a backup', () => {
+test('REQ-HOOKS-SYNC-6 the apply preview lists hook entries and script copies; an approved apply restores a copy edited in the tool after a backup', () => {
   const home = demoHome()
   createHook(home, 'guard', {
     description: '',
@@ -217,7 +217,10 @@ test('REQ-HOOKS-SYNC-6 the apply preview lists hook entries and script copies; a
   writeFileSync(copy, 'edited in the tool\n')
   view = applyPreview(home, baseEnv(home))
   assert.ok(rows('claude').includes('hookScript:update:guard/run.sh'), rows('claude').join(' '))
+  // Automatic syncs leave the edited copy for the preview; an approved apply restores the library version
   sync(home)
+  assert.equal(readFileSync(copy, 'utf8'), 'edited in the tool\n')
+  syncAll(home, baseEnv(home), { allowReal: true, approvedOnce: true })
   assert.equal(readFileSync(copy, 'utf8'), 'v1\n')
   assert.equal(
     readFileSync(join(home, '.config/illithid/backups/hooks/claude/guard/run.sh'), 'utf8'),

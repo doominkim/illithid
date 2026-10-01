@@ -268,6 +268,8 @@ export interface HookView {
   tools: Partial<Record<ToolId, HookToolState>>
   /** Why a tool is in error: a reason code (configUnreadable) or the generator's message */
   reasons?: Partial<Record<ToolId, string>>
+  /** Script copies edited in a tool since the last sync: tool → file */
+  edited?: Partial<Record<ToolId, string>>
 }
 
 export interface HooksData {
@@ -819,6 +821,7 @@ export interface Api {
     tool: HookTool
   ): Promise<WriteResult<{ file: string }> | Refused>
   hookToolScriptDrop(name: string, tool: HookTool): Promise<WriteResult<TrashResult> | Refused>
+  hookKeepCopy(name: string, tool: HookTool, file: string): Promise<WriteResult | Refused>
   memoryFiles(): Promise<WriteResult<string[]>>
   memoryRead(rel: string): Promise<WriteResult<string>>
   memorySave(rel: string, content: string): Promise<WriteResult | Refused>
@@ -1026,6 +1029,7 @@ export const CHANNELS = [
   'hookScriptSave',
   'hookToolScriptCreate',
   'hookToolScriptDrop',
+  'hookKeepCopy',
   'memoryFiles',
   'memoryRead',
   'memorySave',

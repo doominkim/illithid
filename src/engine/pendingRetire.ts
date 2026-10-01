@@ -9,6 +9,8 @@
  *                original elsewhere (e.g. `~/.config/opencode/skills/<name>`, `~/.config/opencode/agent/<name>.md`) → moved (retireImported)
  * - instruction  opencode.json instructions entry pointing at the original rule file → removed by the opencodeRules target
  *                (the referenced file itself is never touched)
+ * - hook         a hook handler in Claude Code / Gemini CLI settings.json (path = `<file>#<entry hash>`) → removed by that tool's
+ *                hooks target as the library hook goes in (the script file it ran is never touched)
  * An original is moved only if its current hash still equals the recorded one; otherwise it is left alone and reported (importedChanged).
  * Moves go to backups/imported/<ts>/<tool>/<folder>/<name> — never deleted permanently, and backup retention never cleans that folder.
  * Records belong to the workspace that was active at import: sync only acts on (and plans) the active workspace's records, so
@@ -33,7 +35,7 @@ import { dirContentHash } from './skills'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
 
-export type RetireKind = 'rule' | 'skill' | 'agent' | 'instruction'
+export type RetireKind = 'rule' | 'skill' | 'agent' | 'instruction' | 'hook'
 
 export interface PendingRetire {
   kind: RetireKind

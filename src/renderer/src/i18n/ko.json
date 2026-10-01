@@ -330,7 +330,8 @@
       "permissions": "권한",
       "skill": "스킬",
       "mcp": "MCP",
-      "agent": "에이전트"
+      "agent": "에이전트",
+      "hook": "훅"
     },
     "sourceKind": {
       "tool": "툴",
@@ -353,6 +354,12 @@
     "warn": {
       "agentRenderDiffers": "렌더 결과가 원본 바이트와 다름 (원본은 다음 반영 때 백업됨)",
       "togglesNotSet": "다른 툴 끄기에 실패함 (항목의 툴 스위치를 확인)"
+    },
+    "hookWarn": {
+      "inlineCommand": "인라인 명령 → 스크립트 파일",
+      "originalKept": "원본 유지 · 원본을 지우기 전까지 이 툴에서는 꺼짐",
+      "toolVariable": "툴 전용 변수 사용",
+      "joins": "{{name}} 에 연결"
     }
   },
   "rel": {
@@ -784,8 +791,6 @@
     "deleteTitle": "훅 삭제",
     "deleteBody": "{{name}} 과 스크립트를 .trash 로 옮깁니다. 툴 설정의 항목은 다음 동기화 때 제거됩니다.",
     "allTools": "전체 툴",
-    "emptyTitle": "아직 훅이 없습니다",
-    "emptyHint": "툴이 명령을 실행하기 전, 응답을 마쳤을 때, 세션을 시작할 때 스크립트를 실행합니다.",
     "timing": {
       "before-tool": "툴 실행 전",
       "after-tool": "툴 실행 후",
@@ -861,6 +866,9 @@
       "log": "파일에 기록"
     },
     "timingLabel": "실행 시점",
-    "timingPick": "언제 실행할지 고르세요"
+    "timingPick": "언제 실행할지 고르세요",
+    "edited": "{{tool}} 에서 스크립트를 고쳤습니다",
+    "editedHint": "동기화하면 라이브러리 버전으로 되돌립니다 (고친 사본은 백업).",
+    "kept": "{{tool}} 의 버전을 라이브러리에 저장했습니다"
   }
 }

@@ -37,6 +37,9 @@ import {
   agentLibraryText,
   agentNormalizedText,
   deleteAgent,
+  deleteHook,
+  saveHookDef,
+  writeNewHook,
   listAgents,
   readAgentDoc,
   writeNewAgentText,
@@ -64,6 +67,12 @@ import { secretRefsOf, type SecretBackend } from './secrets'
 import { canonicalSkills, dirContentHash } from './skills'
 import { MANIFEST_TOOLS, setToggle, type ManifestKind } from './manifest'
 import {
+  applyHookCandidate,
+  hookImportCandidates,
+  type HookImportCandidate,
+  type HookImportVariant
+} from './hookImport'
+import {
   addPending,
   importedBackupRoot,
   retireHash,
@@ -82,7 +91,7 @@ import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource }
 // ---------------------------------------------------------------- Sources
 
 export type ImportSourceKind = 'legacyLibrary' | 'tool' | 'managerLibrary'
-export type ImportKind = 'rule' | 'memory' | 'permissions' | 'skill' | 'mcp' | 'agent'
+export type ImportKind = 'rule' | 'memory' | 'permissions' | 'skill' | 'mcp' | 'agent' | 'hook'
 
 export interface ImportSource {
   /** legacy | tool:<tool id> | manager:skills-manager | manager:cc-switch */
@@ -135,13 +144,13 @@ export function listImportSources(home: string): ImportSource[] {
       label: 'Claude Code (~/.claude, ~/.claude.json)',
       path: join(home, '.claude'),
       available: toolConfigFound(home, 'claude'),
-      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent', 'hook']
     },
     codex: {
       label: 'Codex (~/.codex)',
       path: join(home, '.codex'),
       available: toolConfigFound(home, 'codex'),
-      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent', 'hook']
     },
     opencode: {
       label: 'OpenCode (~/.config/opencode)',
@@ -153,19 +162,19 @@ export function listImportSources(home: string): ImportSource[] {
       label: 'Gemini CLI (~/.gemini)',
       path: join(home, '.gemini'),
       available: toolConfigFound(home, 'gemini'),
-      kinds: ['rule', 'mcp', 'skill', 'agent']
+      kinds: ['rule', 'mcp', 'skill', 'agent', 'hook']
     },
     copilot: {
       label: 'GitHub Copilot (~/.copilot)',
       path: join(home, '.copilot'),
       available: toolConfigFound(home, 'copilot'),
-      kinds: ['rule', 'mcp', 'skill', 'agent']
+      kinds: ['rule', 'mcp', 'skill', 'agent', 'hook']
     },
     grok: {
       label: 'Grok CLI (~/.grok)',
       path: join(home, '.grok'),
       available: toolConfigFound(home, 'grok'),
-      kinds: ['rule', 'mcp', 'skill', 'agent']
+      kinds: ['rule', 'mcp', 'skill', 'agent', 'hook']
     }
   }
   const out: ImportSource[] = [
@@ -413,6 +422,7 @@ export type ImportCandidate =
   | SkillImportCandidate
   | McpImportCandidate
   | AgentImportCandidate
+  | HookImportCandidate
 
 export interface ImportPlan {
   /** Scanned sources */
@@ -424,6 +434,8 @@ export interface ImportPlan {
   skills: SkillImportCandidate[]
   mcp: McpImportCandidate[]
   agents: AgentImportCandidate[]
+  /** Hooks a tool runs (user-level config) */
+  hooks: HookImportCandidate[]
   /** Unreadable sources, etc. (no raw content) */
   notes: string[]
 }
@@ -461,6 +473,8 @@ export interface ImportResult {
   /** agent: the opencode.json inline definition stays, so OpenCode ends up with two definitions of the same name */
   inlineRemains?: boolean
 }
+
+export type { HookImportCandidate, HookImportVariant, HookImportWarning } from './hookImport'
 
 // ---------------------------------------------------------------- Internal (scan results holding raw values)
 
@@ -2515,7 +2529,14 @@ function scan(home: string, sources: ImportSource[]): InternalPlan {
     })
   }
 
-  return { sources, rules, memory, permissions, skills, mcp, agents, notes: found.notes }
+  // Hooks a tool runs (read straight from its config; nothing to merge across sources)
+  const hooks: HookImportCandidate[] = sources
+    .filter((s) => s.kind === 'tool' && s.available && s.kinds.includes('hook'))
+    .flatMap((s) =>
+      hookImportCandidates(home, s.id.slice('tool:'.length) as ToolId, s.id, found.notes)
+    )
+
+  return { sources, rules, memory, permissions, skills, mcp, agents, hooks, notes: found.notes }
 }
 
 /** Public plan without raw values (slots) */
@@ -2593,7 +2614,9 @@ export function applyImport(
               ? plan.skills
               : sel.kind === 'agent'
                 ? plan.agents
-                : plan.mcp
+                : sel.kind === 'hook'
+                  ? plan.hooks
+                  : plan.mcp
     const cand = (list as { name: string }[]).find((c) => c.name === sel.name) as
       ImportCandidate | InternalPlan['mcp'][number] | undefined
     if (!cand) {
@@ -2733,6 +2756,19 @@ export function applyImport(
           ...(own.adopted.length ? { adopted: own.adopted } : {}),
           ...(own.userOwned.length ? { userOwned: own.userOwned } : {}),
           ...(moved.inline ? { inlineRemains: true } : {})
+        })
+      } else if (cand.kind === 'hook') {
+        const v = variant as unknown as HookImportVariant
+        const r = applyHookCandidate(home, cand, v, !!sel.overwrite, {
+          createHookFiles: (name, def, script) => void writeNewHook(home, name, def, script),
+          saveDef: (name, def) => void saveHookDef(home, name, def),
+          trashHook: (name) => deleteHook(home, name).trashPath
+        })
+        results.push({
+          ...base,
+          status: 'imported',
+          ...(r.trashPath ? { trashPath: r.trashPath } : {}),
+          ...(v.warnings.length ? { warnings: [...v.warnings] } : {})
         })
       } else {
         const v = variant as McpVariantInternal

@@ -67,6 +67,7 @@ import {
   saveHookDef,
   saveHookScript,
   isHookTool,
+  keepHookCopy,
   type HookDef,
   type NewHookInput
 } from '../engine'
@@ -668,6 +669,10 @@ export const lib = {
   hookToolScriptDrop: (home: string, name: string, tool: string) => {
     if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
     return dropHookToolScript(home, name, tool)
+  },
+  hookKeepCopy: (home: string, name: string, tool: string, file: string) => {
+    if (!isHookTool(tool)) throw new LibraryError('invalidSchema', 'not a hook tool')
+    keepHookCopy(home, tool, name, file)
   }
 }
 

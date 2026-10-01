@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
@@ -37,7 +37,7 @@ test(
     try {
       const page = await app.firstWindow()
       await page.locator('[data-menu="hooks"]').click()
-      await page.getByText('No hooks yet').waitFor()
+      await page.getByTestId('empty-import').waitFor()
 
       // New hook: timing, name, template; every tool in use that has a matching event is connected
       await page.getByTestId('hook-new').click()
@@ -84,6 +84,74 @@ test(
       )
       assert.equal(readFileSync(copy, 'utf8'), '#!/bin/sh\necho done\n')
       assert.ok(existsSync(join(home, '.gemini/hooks/illithid/notify/run.sh')))
+    } finally {
+      await app.close()
+    }
+  }
+)
+
+test(
+  'REQ-HOOKS-UI-2 import a Claude Code hook: it joins the library and its original entry is replaced',
+  { timeout: 180000 },
+  async () => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-hooks-ui-import-'))
+    buildDemoHome(home, { tools: 'all' })
+    const config = join(home, '.config/illithid/config.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(config, 'utf8')),
+        toolsInUse: ['claude'],
+        updateCheck: false,
+        marketEnabled: false,
+        ui: { language: 'en', views: { hooks: 'list' } }
+      })
+    )
+    mkdirSync(join(home, 'bin'), { recursive: true })
+    writeFileSync(join(home, 'bin/guard.sh'), '#!/bin/sh\nexit 0\n')
+    const settingsPath = join(home, '.claude/settings.json')
+    mkdirSync(join(home, '.claude'), { recursive: true })
+    const prev = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {}
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        ...prev,
+        hooks: {
+          PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: '~/bin/guard.sh' }] }]
+        }
+      })
+    )
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-hooks-ud-')),
+      ILLITHID_TEST: '1'
+    } as Record<string, string>
+    delete env.ELECTRON_RUN_AS_NODE
+    delete env.ELECTRON_RENDERER_URL
+    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    try {
+      const page = await app.firstWindow()
+      await page.locator('[data-menu="hooks"]').click()
+      await page.getByTestId('hook-import').click()
+      await page.getByTestId('import-source-tool:claude').click()
+      await page.getByTestId('import-hook-guard').check()
+      await page.getByTestId('import-apply').click()
+      await page.getByText('Imported into the library').waitFor()
+      await page.keyboard.press('Escape')
+      await page
+        .locator('main [data-card="guard"], main')
+        .getByText('guard', { exact: true })
+        .first()
+        .waitFor()
+      await page
+        .locator('[data-testid="sync-button"][data-state="synced"]')
+        .waitFor({ timeout: 30000 })
+      const s = JSON.parse(readFileSync(settingsPath, 'utf8')) as {
+        hooks: { PreToolUse: { hooks: { command: string }[] }[] }
+      }
+      assert.equal(s.hooks.PreToolUse.length, 1)
+      assert.match(s.hooks.PreToolUse[0].hooks[0].command, /illithid\/guard\/run\.sh' claude$/)
     } finally {
       await app.close()
     }

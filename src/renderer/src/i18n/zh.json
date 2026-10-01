@@ -330,7 +330,8 @@
       "permissions": "权限",
       "skill": "技能",
       "mcp": "MCP",
-      "agent": "代理"
+      "agent": "代理",
+      "hook": "钩子"
     },
     "sourceKind": {
       "tool": "工具",
@@ -353,6 +354,12 @@
     "warn": {
       "agentRenderDiffers": "渲染结果与原文件字节不同 (原文件将在下次应用时备份)",
       "togglesNotSet": "无法关闭其他工具 (请检查该项的工具开关)"
+    },
+    "hookWarn": {
+      "inlineCommand": "内联命令 → 脚本文件",
+      "originalKept": "保留原有 · 删除原有之前此工具中关闭",
+      "toolVariable": "使用工具专用变量",
+      "joins": "加入 {{name}}"
     }
   },
   "rel": {
@@ -784,8 +791,6 @@
     "deleteTitle": "删除钩子",
     "deleteBody": "将 {{name}} 及其脚本移到 .trash。工具配置中的条目会在下次同步时移除。",
     "allTools": "全部工具",
-    "emptyTitle": "还没有钩子",
-    "emptyHint": "在工具执行命令前、完成回复时或开始会话时运行脚本。",
     "timing": {
       "before-tool": "工具运行前",
       "after-tool": "工具运行后",
@@ -861,6 +866,9 @@
       "log": "记录到文件"
     },
     "timingLabel": "运行时机",
-    "timingPick": "选择运行时机"
+    "timingPick": "选择运行时机",
+    "edited": "脚本在 {{tool}} 中被修改",
+    "editedHint": "同步会恢复为库中的版本 (修改过的副本会备份)。",
+    "kept": "已将 {{tool}} 的版本保存到库"
   }
 }

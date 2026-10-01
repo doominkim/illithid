@@ -309,8 +309,13 @@ export function syncAll(home: string, env: Env, opts: SyncAllOptions): SyncAllRe
   // Automatic syncs leave rules edited on the tool side (drifted copies, edited Codex/Gemini blocks) for the preview, where the
   // user keeps the tool's version or restores the library's; an approved apply restores
   const held = opts.approvedOnce ? new Set<string>() : editedBlockTargets(home, plan)
-  // Script copies go first so a hook entry never points at a script that isn't there yet
-  const hookResults = applyHookSync(home, env, plan.hooks)
+  // Script copies go first so a hook entry never points at a script that isn't there yet. Like rules, copies edited in a tool
+  // wait for the preview on automatic syncs (keep the tool's version or restore the library's)
+  const hookResults = applyHookSync(
+    home,
+    env,
+    opts.approvedOnce ? plan.hooks : plan.hooks.filter((x) => !(x.action === 'update' && x.drift))
+  )
   const results: SyncResults = {
     targets: apply(
       home,
@@ -344,7 +349,10 @@ function pruneGonePending(home: string): void {
   if (
     dropPending(
       state,
-      activePending(home, st.state.pendingRetire).filter((p) => retireHash(p.path) === null)
+      // Hook records point inside a config file (`<file>#<hash>`); their target clears them
+      activePending(home, st.state.pendingRetire).filter(
+        (p) => p.kind !== 'hook' && retireHash(p.path) === null
+      )
     )
   )
     writeState(home, state)

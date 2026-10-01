@@ -19,6 +19,8 @@ import {
   type ToolId
 } from '../engine'
 import { editedRules } from '../engine/editedRules'
+import { activePending } from '../engine/pendingRetire'
+import { readState } from '../engine/state'
 import { toolsInUse } from '../engine/config'
 import { parseJsonObject } from '../engine/text'
 import type {
@@ -91,6 +93,12 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
       inUse
     }
   const p = planSyncAll(home, env)
+  // Imported hook originals (pendingRetire kind hook) a change removes → their hook names
+  const hookRecords = activePending(home, readState(home).state.pendingRetire).filter(
+    (r) => r.kind === 'hook'
+  )
+  const replacedHooks = (c: (typeof p.targets)[number]): Set<string> =>
+    new Set(hookRecords.filter((r) => c.retired?.includes(r.path)).map((r) => r.name))
   const items: ApplyPreviewItem[] = []
 
   // Config files: several targets can write one file (opencode.json) — one row per file
@@ -144,7 +152,8 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
         items.push({
           tool: f.tool,
           kind: 'hook',
-          action: h.action,
+          // An imported original leaves the file as the library hook goes in
+          action: h.action === 'add' && replacedHooks(m).has(h.name) ? 'replace' : h.action,
           name: h.name,
           path: h.name,
           parent: f.path,

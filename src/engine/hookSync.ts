@@ -9,14 +9,16 @@
  * - skip            not a regular file (notRegularFile)
  * - deleteCandidate a recorded copy whose hook was removed, turned off or no longer runs this file → moved to backups/deleted
  */
-import { copyFileSync, lstatSync, mkdirSync, type Stats } from 'node:fs'
+import { copyFileSync, lstatSync, mkdirSync, readFileSync, type Stats } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { toolHomeOverride } from './agents'
 import { appConfigDir, syncTools } from './config'
 import { deliverFile } from './deliver'
 import { HOOK_TOOLS, isHookTool, type HookTool } from './hookEvents'
 import { hookCopyPath, hookCopyRoot, hooksForTool } from './hookRender'
-import { hooksDir, readHooks } from './hooks'
+import { hooksDir, readHooks, scriptForTool } from './hooks'
+import { LibraryError } from './libpath'
+import { saveHookScript } from './library'
 import { MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
@@ -231,4 +233,19 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
     }
   }
   return results
+}
+
+/**
+ * Keep a tool's edited script copy: it becomes the library script (and reaches the other tools on the next sync).
+ * notFound unless the file is the script this tool runs for the hook
+ */
+export function keepHookCopy(home: string, tool: HookTool, hook: string, file: string): string {
+  const h = readHooks(home).find((x) => x.name === hook)
+  if (!h || !h.def.triggers[tool] || scriptForTool(h.def, tool) !== file)
+    throw new LibraryError('notFound', 'not a script this tool runs')
+  const path = hookCopyPath(home, tool, hook, file)
+  const st = lstatOrNull(path)
+  if (!st?.isFile() || st.isSymbolicLink())
+    throw new LibraryError('notFound', 'no copy in the tool')
+  return saveHookScript(home, hook, file, readFileSync(path, 'utf8'))
 }

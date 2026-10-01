@@ -155,7 +155,7 @@ export function readState(home: string): StateRead {
       const e = v as Record<string, unknown> | null
       if (
         e &&
-        ['rule', 'skill', 'agent', 'instruction'].includes(e.kind as string) &&
+        ['rule', 'skill', 'agent', 'instruction', 'hook'].includes(e.kind as string) &&
         (TOOL_IDS as readonly unknown[]).includes(e.tool) &&
         typeof e.name === 'string' &&
         typeof e.path === 'string' &&
