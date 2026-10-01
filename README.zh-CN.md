@@ -3,10 +3,8 @@
 <div align="center">
   <img src="build/icon.png" width="160" alt="Illithid 图标">
   <h1>Illithid</h1>
-  <p><b>一个库，管理所有 AI 编程智能体。</b><br>
-  规则、技能、子智能体和 MCP 服务器只需写一次。Illithid 会把它们同步到 Claude Code、Codex、OpenCode、Gemini CLI 等工具。</p>
-
-  <p><sub>支持: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
+  <p><b>继续使用你的智能体。统一管理配置。</b><br>
+  继续使用 Claude Code、Codex、OpenCode 等现有工具，在一个地方管理规则、技能、子智能体和 MCP 服务器。</p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="下载"></a>
@@ -21,7 +19,34 @@
   </p>
 </div>
 
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/agents/claude.svg" width="40" height="40" alt="Claude Code"><br>Claude Code</td>
+    <td align="center"><img src="docs/agents/codex.svg" width="40" height="40" alt="Codex"><br>Codex</td>
+    <td align="center"><img src="docs/agents/opencode.svg" width="40" height="40" alt="OpenCode"><br>OpenCode</td>
+    <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
+    <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
+    <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+  </tr>
+</table>
+
+## 配置一次，同步到各个智能体
+
+编辑共享配置，预览改动，然后应用到你使用的工具。可以为每个工具选择启用哪些规则、技能、子智能体和 MCP 服务器。
+
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="演示: 编辑规则并预览后应用到 5 个工具"></p>
+
+## 导入现有配置
+
+导入你已在使用的配置，并选择需要管理的工具。应用前可以查看所有改动，原始文件会在交由 Illithid 管理前备份。
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="与 Claude Code 一起开启 Grok CLI，再预览关闭 Codex 时会清理的项目"></p>
+
+## 根据使用记录比较模型
+
+根据本地会话记录比较各模型的请求数、令牌用量和响应时间中位数。费用按公开的 API 令牌单价换算，与订阅账单不同。按工具和日期范围筛选，比较模型与 effort 的组合。
+
+<p align="center"><img src="docs/demo/stats.gif" width="960" alt="按模型比较每个请求的成本和响应时间，工具筛选与时间范围列表，以及一个模型的成本明细"></p>
 
 ## 安装
 
@@ -31,76 +56,14 @@ brew install --cask doominkim/tap/illithid
 
 也可以从上方链接下载 DMG。
 
-## 为什么需要它
 
-**每出一个新模型或编程智能体，就要重写一遍规则?**<br>
-**每改一条规则，就要把所有智能体的配置挨个改一遍?**
+## 其他功能
 
-每个工具的配置都放在不同位置: `~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`、`~/.grok/`。所以每次修改都要在好几个地方改同样的内容，还很容易有哪一处没跟上。
-
-Illithid 把这一切集中在一个地方管理。规则改一次，所有工具同步生效；新增工具时，也能直接沿用你现有的配置。
-
-Illithid 不运行模型，也不介入你和智能体之间。它只负责写配置文件，各工具照常工作。
-
-## 功能
-
-### 规则和技能，全工具生效
-
-规则改一次，你使用的所有工具都会生效。也可以一键只在某个工具中关闭。
-
-<p align="center"><img src="docs/demo/skills.gif" width="960" alt="只在 Gemini CLI 中关闭一个技能"></p>
-
-### 子智能体，每个工具用合适的模型
-
-一个子智能体定义，生成 Claude 的 `.md`、Codex 的 `.toml`、OpenCode 的 `.md`、Gemini CLI 的 `.md`、GitHub Copilot 的 `.agent.md` 和 Grok CLI 的 `.md`。各工具的模型和 effort 从列表中选择，无需手动输入 ID。
-
-<p align="center"><img src="docs/demo/agents.gif" width="960" alt="子智能体在各工具中的模型，以及按工具选择模型"></p>
-
-### 不泄露密钥的 MCP 服务器
-
-无论 HTTP 还是 stdio，MCP 服务器只需添加一次。API 密钥保存在 macOS 钥匙串中，库里只保留引用。
-
-打开技能或服务器，可查看最近 30 天智能体调用它的次数，按模型和工具统计。数据来自本地会话记录。
-
-<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="只在 GitHub Copilot 中关闭 MCP 服务器，并查看按模型统计的调用"></p>
-
-### 市场
-
-搜索 skills.sh 技能、MCP 注册表服务器和 awesome-copilot 规则，勾选需要的项目并安装到库中。安装的项目会带有市场标签。
-
-<p align="center"><img src="docs/demo/market.gif" width="960" alt="从市场安装两个技能"></p>
-
-### 所有会话，均可搜索
-
-在一个列表中浏览 Claude Code、Codex、OpenCode、Gemini CLI、Grok CLI 的历史对话。可搜索标题或全文，跳转到任意消息，一键继续会话。
-
-<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="浏览过去会话中的请求"></p>
-
-### 按成本和速度比较模型
-
-看看同样的花费下，哪个模型和 effort 完成请求最快。每个请求的 token 按 API 标价折算（不是订阅账单），并与响应时间中位数一起画成图表。数据来自本地会话记录。可按工具或时间范围筛选，打开模型即可查看成本明细。
-
-<p align="center"><img src="docs/demo/stats.gif" width="960" alt="按模型比较每个请求的成本和响应时间，工具筛选与时间范围列表，以及一个模型的成本明细"></p>
-
-### 选择要用的工具
-
-在 **设置 → 使用中的工具** 中开关工具。关闭某个工具时，确认预览后 Illithid 会从该工具中清理它放入的副本，你自己的文件保持不变。Grok CLI 和 GitHub Copilot 也会读取 Claude Code 的文件，因此同时开启时会先询问是否两者都用。
-
-<p align="center"><img src="docs/demo/tools.gif" width="960" alt="与 Claude Code 一起开启 Grok CLI，再预览关闭 Codex 时会清理的项目"></p>
-
-### 产出物集中管理
-
-智能体生成的报告、文档和图片，按生成它们的工具分类展示。
-
-<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="多个工具的产出物列表、工具筛选和全文搜索"></p>
-
-### 更多
-
-- **工作区**: 把工作和个人等配置分开，一键切换。支持导出和导入 zip。
-- **记忆**: 审阅 Claude 的自动记忆，有用的条目提升到共享库，其余移到废纸篓。
-- **Git 备份**: 把库推送到私有仓库，并可恢复到任意快照。
-- **导入**: 导入你已在使用的规则、技能、子智能体和 MCP 服务器。
-- **设置不丢失**: 语言、主题以及网格和列表视图保存在 `~/.config/illithid/config.json`，更新后不会被重置。
+- **市场**：搜索并安装规则、技能和 MCP 服务器。
+- **会话**：搜索过去的对话并继续工作。
+- **记忆**：审阅智能体记忆，并提升到共享库。
+- **产物**：集中查看智能体生成的报告、文档和图片。
+- **工作区与备份**：分开管理配置，导出或导入，并通过 Git 备份配置库。
 
 ## 默认安全
 

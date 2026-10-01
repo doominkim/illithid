@@ -3,10 +3,8 @@
 <div align="center">
   <img src="build/icon.png" width="160" alt="Illithid アイコン">
   <h1>Illithid</h1>
-  <p><b>すべての AI コーディングエージェントのための、ひとつのライブラリ。</b><br>
-  ルール、スキル、サブエージェント、MCP サーバーは一度書くだけ。Claude Code、Codex、OpenCode、Gemini CLI などへ Illithid が同期します。</p>
-
-  <p><sub>対応: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
+  <p><b>エージェントはそのまま。設定はひとつに。</b><br>
+  Claude Code、Codex、OpenCode など、今使っているツールを使い続けながら、ルール、スキル、サブエージェント、MCP サーバーを一か所で管理できます。</p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="ダウンロード"></a>
@@ -21,7 +19,34 @@
   </p>
 </div>
 
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/agents/claude.svg" width="40" height="40" alt="Claude Code"><br>Claude Code</td>
+    <td align="center"><img src="docs/agents/codex.svg" width="40" height="40" alt="Codex"><br>Codex</td>
+    <td align="center"><img src="docs/agents/opencode.svg" width="40" height="40" alt="OpenCode"><br>OpenCode</td>
+    <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
+    <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
+    <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+  </tr>
+</table>
+
+## 一度設定して、各エージェントに同期
+
+共有設定を一度編集し、変更をプレビューしてから使用するツールに反映できます。各ツールに適用するルール、スキル、サブエージェント、MCP サーバーを選べます。
+
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="デモ: ルールを編集して 5 つのツールにプレビュー・反映"></p>
+
+## 今の設定をそのままインポート
+
+既存の設定を取り込み、使用するツールを選べます。適用前にすべての変更を確認でき、元のファイルは Illithid が管理を始める前にバックアップされます。
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Claude Code と一緒に Grok CLI をオンにし、Codex をオフにするときに片付く項目をプレビュー"></p>
+
+## 使用履歴からモデルを比較
+
+ローカルのセッションログから、モデル別のリクエスト数、トークン使用量、応答時間の中央値を比較できます。費用は公開 API のトークン単価で換算した値で、サブスクリプションの請求額とは異なります。ツールと期間で絞り込み、モデルと effort の組み合わせを比較できます。
+
+<p align="center"><img src="docs/demo/stats.gif" width="960" alt="モデルごとの依頼あたりコストと応答時間、ツールの絞り込みと期間の一覧、1 つのモデルのコスト内訳"></p>
 
 ## インストール
 
@@ -31,76 +56,14 @@ brew install --cask doominkim/tap/illithid
 
 または上のリンクから DMG をダウンロードしてください。
 
-## なぜ Illithid か
 
-**新しいモデルやコーディングエージェントが出るたびに、ルールを作り直していませんか?**<br>
-**ルールを変えるたびに、すべてのエージェントの設定を手作業で直していませんか?**
+## その他の機能
 
-ツールごとに設定の置き場所が違います。`~/.claude/`、`~/.codex/AGENTS.md`、`opencode.json`、`~/.gemini/`、`~/.copilot/`、`~/.grok/`。そのため変更のたびに同じ内容を何か所も直すことになり、どこかがずれていきます。
-
-Illithid はそれをすべて 1 か所で管理します。ルールを一度変えればすべてのツールに反映され、新しいツールも今の設定のまま始められます。
-
-Illithid はモデルを実行せず、あなたとエージェントの間にも入りません。設定ファイルを書くだけで、各ツールはこれまでどおり動きます。
-
-## 機能
-
-### ルールとスキルを全ツールに
-
-ルールを一度編集すれば、使っているすべてのツールに反映されます。特定のツールだけで無効にするのもワンクリックです。
-
-<p align="center"><img src="docs/demo/skills.gif" width="960" alt="スキルを Gemini CLI だけで無効化"></p>
-
-### ツールごとに最適なモデルを使うサブエージェント
-
-ひとつのサブエージェント定義から、Claude の `.md`、Codex の `.toml`、OpenCode の `.md`、Gemini CLI の `.md`、GitHub Copilot の `.agent.md`、Grok CLI の `.md` を生成します。ツールごとのモデルと effort は、ID を入力せずリストから選べます。
-
-<p align="center"><img src="docs/demo/agents.gif" width="960" alt="サブエージェントのツールごとのモデルと、ツールごとのモデル選択"></p>
-
-### キーを漏らさない MCP サーバー
-
-HTTP でも stdio でも、MCP サーバーの追加は一度だけ。API キーは macOS キーチェーンに保存され、ライブラリには参照だけが残ります。
-
-スキルやサーバーを開くと、直近 30 日にエージェントが呼び出した回数をモデル別・ツール別に表示します。ローカルのセッションログから数えます。
-
-<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="MCP サーバーを GitHub Copilot だけで無効化し、モデル別の利用状況を表示"></p>
-
-### マーケット
-
-skills.sh のスキル、MCP レジストリのサーバー、awesome-copilot のルールを検索し、チェックした項目をライブラリにインストールします。インストールした項目にはマーケットのタグが付きます。
-
-<p align="center"><img src="docs/demo/market.gif" width="960" alt="マーケットからスキルを 2 つインストール"></p>
-
-### すべてのセッションを検索
-
-Claude Code、Codex、OpenCode、Gemini CLI、Grok CLI の過去の会話をひとつのリストで表示します。タイトルや本文全体を検索し、任意のメッセージへ移動し、ワンクリックで再開できます。
-
-<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="過去のセッションの依頼をたどる"></p>
-
-### モデルごとのコストと速度を比較
-
-同じ予算でどのモデルと effort がいちばん速く依頼を終えるかを確認できます。依頼ごとのトークンを API 定価で換算し（サブスクリプションの請求額とは別です）、応答時間の中央値と並べてグラフにします。ローカルのセッションログから数えます。ツールや期間で絞り込み、モデルを開くとコストの内訳を表示します。
-
-<p align="center"><img src="docs/demo/stats.gif" width="960" alt="モデルごとの依頼あたりコストと応答時間、ツールの絞り込みと期間の一覧、1 つのモデルのコスト内訳"></p>
-
-### 使うツールを選ぶ
-
-**設定 → 使用中のツール** でツールをオン・オフします。オフにすると、プレビューを確認したあと Illithid が置いたコピーをそのツールから片付けます。自分で作ったファイルはそのままです。Grok CLI と GitHub Copilot は Claude Code のファイルも読むため、一緒にオンにするときは両方使うか先に確認します。
-
-<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Claude Code と一緒に Grok CLI をオンにし、Codex をオフにするときに片付く項目をプレビュー"></p>
-
-### 成果物をひとまとめに
-
-エージェントが作ったレポート、ドキュメント、画像を、作成したツールごとに整理して表示します。
-
-<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="複数ツールの成果物の一覧、ツールでの絞り込みと本文検索"></p>
-
-### そのほか
-
-- **ワークスペース**: 仕事用と個人用のように設定を分け、ワンクリックで切り替えます。zip でエクスポート、インポートできます。
-- **メモリ**: Claude の自動メモリを見直し、役立つ項目は共有ライブラリへ、残りはゴミ箱へ。
-- **Git バックアップ**: ライブラリを非公開リポジトリに push し、任意のスナップショットに戻せます。
-- **インポート**: すでに使っているルール、スキル、サブエージェント、MCP サーバーを取り込みます。
-- **設定を保持**: 言語、テーマ、グリッドとリストの表示は `~/.config/illithid/config.json` に保存され、アップデートしてもリセットされません。
+- **マーケット**: ルール、スキル、MCP サーバーを検索してインストールできます。
+- **セッション**: 過去の会話を検索し、作業を再開できます。
+- **メモリ**: エージェントのメモリを見直し、共有ライブラリへ取り込めます。
+- **成果物**: エージェントが作成したレポート、文書、画像をまとめて閲覧できます。
+- **ワークスペースとバックアップ**: 設定を分けて管理し、エクスポートやインポート、Git バックアップを利用できます。
 
 ## 安全なデフォルト
 

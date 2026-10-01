@@ -3,10 +3,8 @@
 <div align="center">
   <img src="build/icon.png" width="160" alt="Illithid icon">
   <h1>Illithid</h1>
-  <p><b>One library for every AI coding agent.</b><br>
-  Write your rules, skills, subagents and MCP servers once. Illithid keeps them in sync across Claude Code, Codex, OpenCode, Gemini CLI and more.</p>
-
-  <p><sub>Supported: Claude Code · Codex · OpenCode · Gemini CLI · GitHub Copilot · Grok CLI</sub></p>
+  <p><b>Your agents. One shared setup.</b><br>
+  Keep using Claude Code, Codex, OpenCode, and more. Manage their rules, skills, subagents, and MCP servers in one place.</p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="Download"></a>
@@ -21,7 +19,34 @@
   </p>
 </div>
 
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/agents/claude.svg" width="40" height="40" alt="Claude Code"><br>Claude Code</td>
+    <td align="center"><img src="docs/agents/codex.svg" width="40" height="40" alt="Codex"><br>Codex</td>
+    <td align="center"><img src="docs/agents/opencode.svg" width="40" height="40" alt="OpenCode"><br>OpenCode</td>
+    <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
+    <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
+    <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+  </tr>
+</table>
+
+## Configure once. Keep your agents in sync.
+
+Edit your shared setup once, preview the changes, and apply them to the tools you use. Choose which rules, skills, subagents, and MCP servers each tool receives.
+
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="Demo: edit a rule, preview the change and apply it to five tools"></p>
+
+## Bring your existing setup.
+
+Import the configuration you already use. Choose your tools and review every change before applying it. Imported originals are backed up before Illithid starts managing them.
+
+<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Turning Grok CLI on next to Claude Code, then previewing what leaves Codex when it is turned off"></p>
+
+## Understand your model usage.
+
+Compare request counts, token usage, and median response time from local session logs. See API-equivalent costs calculated from published token rates, separate from your subscription bill. Filter by tool and date range to compare model and effort combinations.
+
+<p align="center"><img src="docs/demo/stats.gif" width="960" alt="Cost per request against response time by model, a tool filter, the period list and one model's cost breakdown"></p>
 
 ## Install
 
@@ -31,76 +56,14 @@ brew install --cask doominkim/tap/illithid
 
 Or download the DMG above.
 
-## Why
 
-**Rewriting your rules every time a new model or coding agent comes out?**<br>
-**Updating every agent by hand whenever a rule changes?**
+## Also included
 
-Each tool keeps its settings somewhere different: `~/.claude/`, `~/.codex/AGENTS.md`, `opencode.json`, `~/.gemini/`, `~/.copilot/`, `~/.grok/`. So every change means editing the same thing in several places and hoping none of them drift.
-
-Illithid manages it all from one place. Change a rule once and every tool gets it. Add a new tool and it starts with the setup you already have.
-
-Illithid doesn't run models or sit between you and your agents. It only writes their config files, and each tool works as it always has.
-
-## Features
-
-### Rules and skills, everywhere
-
-Edit a rule once and it lands in every tool you use. Turn any rule or skill off for a single tool with one click.
-
-<p align="center"><img src="docs/demo/skills.gif" width="960" alt="Turning a skill off for Gemini CLI only"></p>
-
-### Subagents with the right model per tool
-
-One subagent definition, rendered as a Claude `.md`, a Codex `.toml`, an OpenCode `.md`, a Gemini CLI `.md`, a GitHub Copilot `.agent.md` and a Grok CLI `.md`. Pick the model and effort for each tool from a list instead of typing IDs.
-
-<p align="center"><img src="docs/demo/agents.gif" width="960" alt="A subagent's model for each tool, then the per-tool model picker"></p>
-
-### MCP servers without leaking keys
-
-Add an MCP server once, over HTTP or stdio. API keys go into the macOS Keychain; the library only stores a reference.
-
-Open a skill or server to see how often your agents called it in the last 30 days, by model and by tool. Counted from local session logs.
-
-<p align="center"><img src="docs/demo/mcp.gif" width="960" alt="Turning an MCP server off for GitHub Copilot, then its usage by model"></p>
-
-### Market
-
-Search skills.sh skills, MCP registry servers and awesome-copilot rules, check the ones you want and install them into the library. Installed items carry a Market tag.
-
-<p align="center"><img src="docs/demo/market.gif" width="960" alt="Installing two skills from the Market"></p>
-
-### Every session, searchable
-
-Browse past Claude Code, Codex, OpenCode, Gemini CLI and Grok CLI conversations in one list. Search titles or full content, jump to any message, and resume with one click.
-
-<p align="center"><img src="docs/demo/sessions.gif" width="960" alt="Walking through the requests of a past session"></p>
-
-### Compare models by cost and speed
-
-See which model and effort level gets your requests done fastest for the money. Illithid prices each request's tokens at API list rates (not your subscription bill) and plots that against median response time, counted from local session logs. Filter by tool or pick any date range, then open a model for its cost breakdown.
-
-<p align="center"><img src="docs/demo/stats.gif" width="960" alt="Cost per request against response time by model, a tool filter, the period list and one model's cost breakdown"></p>
-
-### Pick your tools
-
-Turn tools on or off in **Settings → Tools in use**. Turning one off removes Illithid's copies from it once you confirm the preview; your own files stay. Grok CLI and GitHub Copilot also read Claude Code's files, so Illithid asks whether to use both before turning them on together.
-
-<p align="center"><img src="docs/demo/tools.gif" width="960" alt="Turning Grok CLI on next to Claude Code, then previewing what leaves Codex when it is turned off"></p>
-
-### Artifacts in one place
-
-Reports, docs and images your agents produce, tagged by the tool that made them.
-
-<p align="center"><img src="docs/demo/artifacts.gif" width="960" alt="Artifacts from several tools in one list, the tool filter and a full-text search"></p>
-
-### And more
-
-- **Workspaces**: keep separate setups (work, personal) and switch in one click. Export and import as a zip.
-- **Memory**: review Claude's auto-memory, promote useful entries to the shared library, trash the rest.
-- **Git backup**: push the library to a private repo and restore any snapshot.
-- **Import**: bring in the rules, skills, subagents and MCP servers you already have.
-- **Settings that stick**: language, theme and grid or list views live in `~/.config/illithid/config.json`, so updates don't reset them.
+- **Market**: discover and install rules, skills, and MCP servers.
+- **Sessions**: search and resume past conversations.
+- **Memory**: review and promote agent memories to the shared library.
+- **Artifacts**: browse reports, documents, and images produced by your agents.
+- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git.
 
 ## Safe by default
 
