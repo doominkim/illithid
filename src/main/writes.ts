@@ -799,8 +799,8 @@ export function workspaceSwitch(home: string, id: string): WorkspaceView {
 /** Default export file name `<name>.illithid.zip` (path separators and control chars removed) */
 export function workspaceExportFileName(home: string): string {
   const cur = listWorkspaces(home).find((w) => w.active)
-  // eslint-disable-next-line no-control-regex
   const base =
+    // eslint-disable-next-line no-control-regex
     (cur?.name ?? 'workspace').replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, '-').trim() ||
     'workspace'
   return base + WORKSPACE_ZIP_EXT
