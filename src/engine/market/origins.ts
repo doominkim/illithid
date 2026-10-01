@@ -58,7 +58,11 @@ export function readOrigins(home: string): Record<string, MarketOrigin> {
 export function recordOrigin(home: string, o: MarketOrigin): void {
   const items = { ...readOrigins(home), [originKey(o.kind, o.name)]: o }
   const sorted = Object.fromEntries(Object.entries(items).sort(([a], [b]) => a.localeCompare(b)))
-  atomicWrite(assertInsideLibrary(home, filePath(home)), JSON.stringify({ version: 1, items: sorted }, null, 2) + '\n', { mode: 0o644 })
+  atomicWrite(
+    assertInsideLibrary(home, filePath(home)),
+    JSON.stringify({ version: 1, items: sorted }, null, 2) + '\n',
+    { mode: 0o644 }
+  )
 }
 
 /** Library path of an item (for existence checks) */
@@ -93,5 +97,7 @@ function validOrigin(o: unknown): o is MarketOrigin {
 
 /** Origins whose library item still exists */
 export function liveOrigins(home: string): MarketOrigin[] {
-  return Object.values(readOrigins(home)).filter((o) => validOrigin(o) && itemExists(home, o.kind, o.name))
+  return Object.values(readOrigins(home)).filter(
+    (o) => validOrigin(o) && itemExists(home, o.kind, o.name)
+  )
 }

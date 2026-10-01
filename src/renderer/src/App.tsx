@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
 import { clearApiCache, RefreshContext, useApi } from './lib/useApi'
-import { ReloadContext } from './components/ReloadButton'
+import { ReloadContext } from './lib/reload'
 import { ConfigContext } from './lib/config'
 import { type Menu, NavContext, type NavRequest, PRIMARY, SECONDARY } from './lib/nav'
 import { Sidebar } from './components/Sidebar'
@@ -38,7 +38,12 @@ import Onboarding from './views/Onboarding'
 import { ApplyPreviewModal } from './components/ApplyPreviewModal'
 import { UpdateDialog } from './components/UpdateDialog'
 import { SyncContext } from './lib/sync'
-import { LIBRARY_CHANGED, notifySync, UPDATE_NOTICE_REQUEST, WORKSPACE_SWITCH_REQUEST } from './lib/mutate'
+import {
+  LIBRARY_CHANGED,
+  notifySync,
+  UPDATE_NOTICE_REQUEST,
+  WORKSPACE_SWITCH_REQUEST
+} from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
 
 export type { Menu }
@@ -57,7 +62,6 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
   settings: <SettingsIcon size={16} />
 }
 
-
 /** Screens where list and preview scroll independently: pin page height to the window so the list does not stretch the page */
 const FILL_MENUS = new Set<string>(['artifacts', 'sessions', 'memory'])
 function App(): React.JSX.Element {
@@ -71,13 +75,20 @@ function App(): React.JSX.Element {
   const [config, setConfig] = useState<ConfigView | undefined>()
   useEffect(() => {
     let alive = true
-    window.api.configGet().then((c) => alive && setConfig(c), () => {})
+    window.api.configGet().then(
+      (c) => alive && setConfig(c),
+      () => {}
+    )
     return () => {
       alive = false
     }
   }, [cfgTick, tick])
   const configCtx = useMemo(
-    () => ({ config, allowRealApply: !!config?.config.allowRealApply, refresh: () => setCfgTick((n) => n + 1) }),
+    () => ({
+      config,
+      allowRealApply: !!config?.config.allowRealApply,
+      refresh: () => setCfgTick((n) => n + 1)
+    }),
     [config]
   )
 
@@ -108,9 +119,21 @@ function App(): React.JSX.Element {
       clearApiCache()
       setTick((n) => n + 1)
       if (s.wrote) {
-        const n = s.targets.filter((x) => x.status === 'written').length + [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'done').length
-        if (s.errorCount) notifications.show({ color: 'red', title: t('sync.syncedWithErrors', { n: s.errorCount }), message: s.errors.join(' · ') })
-        else notifications.show({ color: 'accent', message: t('sync.watchSynced', { n }), autoClose: 2500 })
+        const n =
+          s.targets.filter((x) => x.status === 'written').length +
+          [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'done').length
+        if (s.errorCount)
+          notifications.show({
+            color: 'red',
+            title: t('sync.syncedWithErrors', { n: s.errorCount }),
+            message: s.errors.join(' · ')
+          })
+        else
+          notifications.show({
+            color: 'accent',
+            message: t('sync.watchSynced', { n }),
+            autoClose: 2500
+          })
       }
     })
     return off
@@ -119,7 +142,11 @@ function App(): React.JSX.Element {
     () =>
       // Automatic backup cleanup only reports failures
       window.api.onBackupCleanupEvent((r) =>
-        notifications.show({ color: 'red', title: t('settings.cleanupFailed', { count: r.failed.length }), message: r.failed.map((f) => `${f.path} (${f.reason})`).join(' · ') })
+        notifications.show({
+          color: 'red',
+          title: t('settings.cleanupFailed', { count: r.failed.length }),
+          message: r.failed.map((f) => `${f.path} (${f.reason})`).join(' · ')
+        })
       ),
     [t]
   )
@@ -143,7 +170,10 @@ function App(): React.JSX.Element {
   const pendingSeq = useRef(0)
   const refreshPending = useCallback(() => {
     const seq = ++pendingSeq.current
-    window.api.syncPending().then((p) => seq === pendingSeq.current && setPending(p), () => {})
+    window.api.syncPending().then(
+      (p) => seq === pendingSeq.current && setPending(p),
+      () => {}
+    )
   }, [])
   useEffect(() => {
     refreshPending()
@@ -190,7 +220,11 @@ function App(): React.JSX.Element {
     window.api.workspaces().then(
       (workspaces) => {
         if (!alive) return
-        void window.api.traySet({ pending: pending?.pending ?? 0, failed: pending?.failed ?? 0, workspaces })
+        void window.api.traySet({
+          pending: pending?.pending ?? 0,
+          failed: pending?.failed ?? 0,
+          workspaces
+        })
       },
       () => {}
     )
@@ -199,7 +233,15 @@ function App(): React.JSX.Element {
     }
   }, [pending, syncStatus, cfgTick])
   const syncCtx = useMemo(
-    () => ({ status: syncStatus, refresh: refreshSync, syncNow, busy: syncBusy, pending, applyOnce, openPreview }),
+    () => ({
+      status: syncStatus,
+      refresh: refreshSync,
+      syncNow,
+      busy: syncBusy,
+      pending,
+      applyOnce,
+      openPreview
+    }),
     [syncStatus, refreshSync, syncNow, syncBusy, pending, applyOnce, openPreview]
   )
 
@@ -274,13 +316,15 @@ function App(): React.JSX.Element {
   }
 
   const actions = useMemo<SpotlightActionData[]>(() => {
-    const nav: SpotlightActionData[] = [...PRIMARY, ...SECONDARY].filter((m) => m !== 'market' || config?.config.marketEnabled !== false).map((m) => ({
-      id: `nav:${m}`,
-      group: t('spotlight.screens'),
-      label: t(`nav.${m}`),
-      leftSection: MENU_ICON[m],
-      onClick: () => navigate(m, { tool: null })
-    }))
+    const nav: SpotlightActionData[] = [...PRIMARY, ...SECONDARY]
+      .filter((m) => m !== 'market' || config?.config.marketEnabled !== false)
+      .map((m) => ({
+        id: `nav:${m}`,
+        group: t('spotlight.screens'),
+        label: t(`nav.${m}`),
+        leftSection: MENU_ICON[m],
+        onClick: () => navigate(m, { tool: null })
+      }))
     const skills: SpotlightActionData[] = (status.data?.skills.canonical ?? []).map((name) => ({
       id: `skill:${name}`,
       group: t('nav.skills'),
@@ -331,39 +375,70 @@ function App(): React.JSX.Element {
   return (
     <NavContext.Provider value={{ request, navigate }}>
       <ConfigContext.Provider value={configCtx}>
-       <SyncContext.Provider value={syncCtx}>
-        {/* Drag region for the macOS hiddenInset title bar */}
-        <div className="ac-dragbar" />
-        {onboarding === null ? null : onboarding ? (
-          <Onboarding
-            onDone={(menu) => {
-              setOnboarding(false)
-              onWorkspaceChange()
-              if (menu) navigate(menu, { tool: null })
-            }}
-          />
-        ) : (
-        <Box style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-          <Sidebar onWorkspaceChange={onWorkspaceChange} />
-          <Box component="main" style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'auto', position: 'relative' }}>
-            <Box mx="auto" maw={1200} px={20} pt={48} pb={24} style={{ ...(FILL_MENUS.has(request.menu) ? { height: '100%' } : { minHeight: '100%' }), display: 'flex', flexDirection: 'column' }}>
-              <RefreshContext.Provider value={tick}>
-                <ReloadContext.Provider value={reload}>
-                  {startError && (
-                    <Alert color="red" variant="light" radius="lg" mb="md" title={t(`library.${startError.code}`)}>
-                      {startError.detail}
-                    </Alert>
-                  )}
-                  {view[request.menu]}
-                </ReloadContext.Provider>
-              </RefreshContext.Provider>
+        <SyncContext.Provider value={syncCtx}>
+          {/* Drag region for the macOS hiddenInset title bar */}
+          <div className="ac-dragbar" />
+          {onboarding === null ? null : onboarding ? (
+            <Onboarding
+              onDone={(menu) => {
+                setOnboarding(false)
+                onWorkspaceChange()
+                if (menu) navigate(menu, { tool: null })
+              }}
+            />
+          ) : (
+            <Box style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+              <Sidebar onWorkspaceChange={onWorkspaceChange} />
+              <Box
+                component="main"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: '100%',
+                  overflow: 'auto',
+                  position: 'relative'
+                }}
+              >
+                <Box
+                  mx="auto"
+                  maw={1200}
+                  px={20}
+                  pt={48}
+                  pb={24}
+                  style={{
+                    ...(FILL_MENUS.has(request.menu) ? { height: '100%' } : { minHeight: '100%' }),
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  <RefreshContext.Provider value={tick}>
+                    <ReloadContext.Provider value={reload}>
+                      {startError && (
+                        <Alert
+                          color="red"
+                          variant="light"
+                          radius="lg"
+                          mb="md"
+                          title={t(`library.${startError.code}`)}
+                        >
+                          {startError.detail}
+                        </Alert>
+                      )}
+                      {view[request.menu]}
+                    </ReloadContext.Provider>
+                  </RefreshContext.Provider>
+                </Box>
+              </Box>
             </Box>
-          </Box>
-        </Box>
-        )}
-        <ApplyPreviewModal opened={previewOpen} onCancel={cancelPreview} onDone={finishPreview} />
-        <UpdateDialog update={update} opened={updateOpen} onLater={() => setUpdateOpen(false)} onSkip={(v) => void skipUpdate(v)} />
-       </SyncContext.Provider>
+          )}
+          <ApplyPreviewModal opened={previewOpen} onCancel={cancelPreview} onDone={finishPreview} />
+          <UpdateDialog
+            update={update}
+            opened={updateOpen}
+            onLater={() => setUpdateOpen(false)}
+            onSkip={(v) => void skipUpdate(v)}
+          />
+        </SyncContext.Provider>
       </ConfigContext.Provider>
       <Spotlight
         actions={actions}
@@ -379,4 +454,3 @@ function App(): React.JSX.Element {
 }
 
 export default App
-

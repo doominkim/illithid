@@ -23,7 +23,11 @@ export interface BackupRetention {
   keepRollback: number
 }
 
-export const DEFAULT_BACKUP_RETENTION: BackupRetention = { enabled: true, days: 30, keepRollback: 3 }
+export const DEFAULT_BACKUP_RETENTION: BackupRetention = {
+  enabled: true,
+  days: 30,
+  keepRollback: 3
+}
 export const RETENTION_DAYS_MAX = 3650
 export const RETENTION_KEEP_MAX = 100
 
@@ -71,7 +75,10 @@ export interface AppConfig {
 export const CONFIG_TOOL_IDS: readonly ToolId[] = TOOL_IDS
 
 function isToolList(v: unknown): v is ToolId[] {
-  return Array.isArray(v) && v.every((x) => typeof x === 'string' && (CONFIG_TOOL_IDS as readonly string[]).includes(x))
+  return (
+    Array.isArray(v) &&
+    v.every((x) => typeof x === 'string' && (CONFIG_TOOL_IDS as readonly string[]).includes(x))
+  )
 }
 
 export interface ConfigRead {
@@ -102,12 +109,26 @@ export const APP_CONFIG_DIR = '.config/illithid'
  * - agent-console: the library itself is the root — moved into the default workspace
  */
 export const LEGACY_APP_GENERATIONS = [
-  { name: 'harnesssync', libraryDir: '.harnesssync', configDir: '.config/harnesssync', layout: 'root' },
-  { name: 'agent-console', libraryDir: '.agent-console', configDir: '.config/agent-console', layout: 'library' }
+  {
+    name: 'harnesssync',
+    libraryDir: '.harnesssync',
+    configDir: '.config/harnesssync',
+    layout: 'root'
+  },
+  {
+    name: 'agent-console',
+    libraryDir: '.agent-console',
+    configDir: '.config/agent-console',
+    layout: 'library'
+  }
 ] as const
 export type LegacyAppGeneration = (typeof LEGACY_APP_GENERATIONS)[number]
-export const LEGACY_APP_LIBRARY_DIRS: readonly string[] = LEGACY_APP_GENERATIONS.map((g) => g.libraryDir)
-export const LEGACY_APP_CONFIG_DIRS: readonly string[] = LEGACY_APP_GENERATIONS.map((g) => g.configDir)
+export const LEGACY_APP_LIBRARY_DIRS: readonly string[] = LEGACY_APP_GENERATIONS.map(
+  (g) => g.libraryDir
+)
+export const LEGACY_APP_CONFIG_DIRS: readonly string[] = LEGACY_APP_GENERATIONS.map(
+  (g) => g.configDir
+)
 
 /** `<home>/.config/illithid` */
 export function appConfigDir(home: string): string {
@@ -136,7 +157,8 @@ export function validateConfig(v: unknown): string[] {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return ['Top level is not an object']
   if (o.version !== 1) errs.push('version must be 1')
   if (o.libraryPath !== undefined) {
-    if (typeof o.libraryPath !== 'string' || !o.libraryPath) errs.push('libraryPath must be a string')
+    if (typeof o.libraryPath !== 'string' || !o.libraryPath)
+      errs.push('libraryPath must be a string')
     else if (!o.libraryPath.startsWith('~') && !isAbsolute(o.libraryPath))
       errs.push('libraryPath must be an absolute or ~/ path')
   }
@@ -147,23 +169,31 @@ export function validateConfig(v: unknown): string[] {
     errs.push('activeWorkspace must be a workspace id (lowercase letters, digits, -)')
   if (o.allowRealApply !== undefined && typeof o.allowRealApply !== 'boolean')
     errs.push('allowRealApply must be a boolean')
-  if (o.toolsRetiring !== undefined && !isToolList(o.toolsRetiring)) errs.push(`toolsRetiring must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
+  if (o.toolsRetiring !== undefined && !isToolList(o.toolsRetiring))
+    errs.push(`toolsRetiring must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   if (o.marketEnabled !== undefined && typeof o.marketEnabled !== 'boolean')
     errs.push('marketEnabled must be a boolean')
-  if (o.updateCheck !== undefined && typeof o.updateCheck !== 'boolean') errs.push('updateCheck must be a boolean')
+  if (o.updateCheck !== undefined && typeof o.updateCheck !== 'boolean')
+    errs.push('updateCheck must be a boolean')
   if (o.grokReadsClaude !== undefined && typeof o.grokReadsClaude !== 'boolean')
     errs.push('grokReadsClaude must be a boolean')
-  if (o.updateSkip !== undefined && (typeof o.updateSkip !== 'string' || !/^\d+\.\d+\.\d+/.test(o.updateSkip)))
+  if (
+    o.updateSkip !== undefined &&
+    (typeof o.updateSkip !== 'string' || !/^\d+\.\d+\.\d+/.test(o.updateSkip))
+  )
     errs.push('updateSkip must be a version')
   if (o.deviceName !== undefined && (typeof o.deviceName !== 'string' || !o.deviceName.trim()))
     errs.push('deviceName must be a non-empty string')
   if (o.backupRetention !== undefined) {
     const r = o.backupRetention as Record<string, unknown> | null
-    if (!r || typeof r !== 'object' || Array.isArray(r)) errs.push('backupRetention must be an object')
+    if (!r || typeof r !== 'object' || Array.isArray(r))
+      errs.push('backupRetention must be an object')
     else {
       if (typeof r.enabled !== 'boolean') errs.push('backupRetention.enabled must be a boolean')
-      const int = (x: unknown, max: number): boolean => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= max
-      if (!int(r.days, RETENTION_DAYS_MAX)) errs.push(`backupRetention.days must be an integer 1-${RETENTION_DAYS_MAX}`)
+      const int = (x: unknown, max: number): boolean =>
+        Number.isInteger(x) && (x as number) >= 1 && (x as number) <= max
+      if (!int(r.days, RETENTION_DAYS_MAX))
+        errs.push(`backupRetention.days must be an integer 1-${RETENTION_DAYS_MAX}`)
       if (!int(r.keepRollback, RETENTION_KEEP_MAX))
         errs.push(`backupRetention.keepRollback must be an integer 1-${RETENTION_KEEP_MAX}`)
     }
@@ -205,19 +235,37 @@ export function readConfig(home: string): ConfigRead {
   }
   // A malformed toolsInUse never resets the whole config: unknown ids are dropped (a newer app's tool, a typo); if nothing known
   // is left of a non-empty list, or it isn't a list, the field alone is ignored (= DEFAULT_TOOLS_IN_USE)
-  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'toolsInUse' in raw && !isToolList((raw as Record<string, unknown>).toolsInUse)) {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    'toolsInUse' in raw &&
+    !isToolList((raw as Record<string, unknown>).toolsInUse)
+  ) {
     const { toolsInUse: bad, ...rest } = raw as Record<string, unknown>
     const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
     raw = known.length ? { ...rest, toolsInUse: known } : rest
   }
   // Same for toolsRetiring: unknown ids (a newer app's tool) are dropped instead of resetting the config
-  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'toolsRetiring' in raw && !isToolList((raw as Record<string, unknown>).toolsRetiring)) {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    'toolsRetiring' in raw &&
+    !isToolList((raw as Record<string, unknown>).toolsRetiring)
+  ) {
     const { toolsRetiring: bad, ...rest } = raw as Record<string, unknown>
     const known = Array.isArray(bad) ? CONFIG_TOOL_IDS.filter((t) => bad.includes(t)) : []
     raw = known.length ? { ...rest, toolsRetiring: known } : rest
   }
   // A malformed ui (hand edit, a newer app's value) only drops the preferences, never the rest of the config
-  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'ui' in raw && uiPrefsErrors((raw as Record<string, unknown>).ui).length) {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    'ui' in raw &&
+    uiPrefsErrors((raw as Record<string, unknown>).ui).length
+  ) {
     const rest = { ...(raw as Record<string, unknown>) }
     delete rest.ui
     raw = rest
@@ -273,11 +321,19 @@ export function clearToolsRetiring(home: string, tools: ToolId[]): void {
  * the list is unset only `wrote` (tools the app has written to — computed defaults alone never retire). `retiring` sets the list
  * exactly instead (undoing a change whose preview was cancelled)
  */
-export function setToolsInUse(home: string, list: ToolId[] | undefined, opts: { wrote?: ToolId[]; retiring?: ToolId[] } = {}): ToolId[] {
-  if (list !== undefined && !isToolList(list)) throw new ConfigError(`toolsInUse must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
+export function setToolsInUse(
+  home: string,
+  list: ToolId[] | undefined,
+  opts: { wrote?: ToolId[]; retiring?: ToolId[] } = {}
+): ToolId[] {
+  if (list !== undefined && !isToolList(list))
+    throw new ConfigError(`toolsInUse must be an array of ${CONFIG_TOOL_IDS.join(' | ')}`)
   const cur = readConfig(home)
   if (cur.error) throw new ConfigError(`config.json: ${cur.error}`)
-  const prev = cur.config.toolsInUse !== undefined ? toolsInUse(home) : toolsInUse(home).filter((t) => opts.wrote?.includes(t))
+  const prev =
+    cur.config.toolsInUse !== undefined
+      ? toolsInUse(home)
+      : toolsInUse(home).filter((t) => opts.wrote?.includes(t))
   const { toolsInUse: _old, toolsRetiring: _ret, ...rest } = cur.config
   void _old
   const chosen = list === undefined ? undefined : CONFIG_TOOL_IDS.filter((t) => list.includes(t))
@@ -286,7 +342,9 @@ export function setToolsInUse(home: string, list: ToolId[] | undefined, opts: { 
   const next = chosen ?? DEFAULT_TOOLS_IN_USE.filter((t) => toolConfigFound(home, t))
   const retiring = opts.retiring
     ? CONFIG_TOOL_IDS.filter((t) => opts.retiring?.includes(t) && !next.includes(t))
-    : CONFIG_TOOL_IDS.filter((t) => ((_ret ?? []).includes(t) || prev.includes(t)) && !next.includes(t))
+    : CONFIG_TOOL_IDS.filter(
+        (t) => ((_ret ?? []).includes(t) || prev.includes(t)) && !next.includes(t)
+      )
   writeConfig(home, retiring.length ? { ...base, toolsRetiring: retiring } : base)
   return toolsInUse(home)
 }
@@ -332,7 +390,9 @@ export function workspaceIds(home: string): string[] {
   }
   return names
     .filter((n) => WORKSPACE_ID_RE.test(n) && isDirPath(join(root, n)))
-    .sort((a, b) => (a === DEFAULT_WORKSPACE ? -1 : b === DEFAULT_WORKSPACE ? 1 : a.localeCompare(b)))
+    .sort((a, b) =>
+      a === DEFAULT_WORKSPACE ? -1 : b === DEFAULT_WORKSPACE ? 1 : a.localeCompare(b)
+    )
 }
 
 /** Marker entries of a pre-workspace (root-form) library — if any sits directly under `~/.illithid/`, it needs migration */
@@ -388,7 +448,9 @@ export function withActiveWorkspace<T>(id: string, fn: () => T): T {
 export function activeWorkspaceId(home: string): string {
   if (activeOverride && isDirPath(workspaceRoot(home, activeOverride))) return activeOverride
   const id = readConfig(home).config.activeWorkspace
-  return id && WORKSPACE_ID_RE.test(id) && isDirPath(workspaceRoot(home, id)) ? id : DEFAULT_WORKSPACE
+  return id && WORKSPACE_ID_RE.test(id) && isDirPath(workspaceRoot(home, id))
+    ? id
+    : DEFAULT_WORKSPACE
 }
 
 /** Library root (absolute path) = active workspace folder. config.libraryPath is ignored */

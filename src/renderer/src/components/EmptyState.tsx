@@ -46,14 +46,26 @@ export function EmptyState({
 }
 
 /** Empty library list: title + Import button */
-export function EmptyLibrary({ onImport, icon }: { onImport: () => void; icon?: React.ReactNode }): React.JSX.Element {
+export function EmptyLibrary({
+  onImport,
+  icon
+}: {
+  onImport: () => void
+  icon?: React.ReactNode
+}): React.JSX.Element {
   const { t } = useTranslation()
   return (
     <EmptyState
       title={t('common.empty')}
       icon={icon}
       action={
-        <Button size="xs" variant="default" leftSection={<Download size={13} />} onClick={onImport} data-testid="empty-import">
+        <Button
+          size="xs"
+          variant="default"
+          leftSection={<Download size={13} />}
+          onClick={onImport}
+          data-testid="empty-import"
+        >
           {t('common.import')}
         </Button>
       }

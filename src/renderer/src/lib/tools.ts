@@ -73,5 +73,7 @@ export function grokReadsFromClaude(
   onFor: (tool: ToolId) => boolean,
   reads = true
 ): boolean {
-  return reads && inUse.includes('grok') && inUse.includes('claude') && !onFor('grok') && onFor('claude')
+  return (
+    reads && inUse.includes('grok') && inUse.includes('claude') && !onFor('grok') && onFor('claude')
+  )
 }

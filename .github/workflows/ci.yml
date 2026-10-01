@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # The app ships for macOS only (Keychain secrets), so check on the same platform
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # The minimum the README asks for
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      # Unit tests and fixtures that build their own temp HOME. Fixtures that copy the real library
+      # (npm run test:local) and the Electron UI tests (npm run test:ui) stay local
+      - run: npm test

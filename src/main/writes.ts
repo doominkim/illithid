@@ -66,7 +66,12 @@ import { mergeUiPrefs, type UiPrefs, type UiPrefsPatch } from '../engine/uiPrefs
 import { initLibrary } from '../engine/init'
 import { renamePendingPaths } from '../engine/rename'
 import { ensureLibrary } from '../engine/startup'
-import { detectTools, importAllFromLegacy, listImportSources, type ImportSource } from '../engine/importer'
+import {
+  detectTools,
+  importAllFromLegacy,
+  listImportSources,
+  type ImportSource
+} from '../engine/importer'
 import { setToolsInUse, toolsInUse } from '../engine/config'
 import { libraryExists } from '../engine/sources'
 import { syncAll, type SyncAllResult } from '../engine/sync'
@@ -163,7 +168,12 @@ function maskServer(def: Json, prefix = ''): string[] {
 // ---------------------------------------------------------------- Library readiness and sync
 
 /** Library state: writable only if it exists and is not legacy (~/.agents) */
-export function libraryState(home: string): { root: string; exists: boolean; legacy: boolean; ready: boolean } {
+export function libraryState(home: string): {
+  root: string
+  exists: boolean
+  legacy: boolean
+  ready: boolean
+} {
   const root = libraryRoot(home)
   const legacy = resolve(root) === resolve(join(home, LEGACY_LIBRARY_DIR))
   const exists = libraryExists(home)
@@ -218,7 +228,11 @@ export function ensureLibraryOnStart(home: string): void {
 }
 
 /** path is retired (workspace layout) — accepted but ignored */
-export function libraryInitRun(home: string, _path?: string, importLegacy = false): LibraryInitResult {
+export function libraryInitRun(
+  home: string,
+  _path?: string,
+  importLegacy = false
+): LibraryInitResult {
   void _path
   const r = initLibrary(home)
   const out: LibraryInitResult = { root: tilde(home, r.root), created: r.created }
@@ -274,7 +288,12 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
         return {
           id: t.id,
           label: t.label,
-          status: se || (t.status === 'skipped' && (t.reason === 'error' || t.reason === 'writeFailed' || t.reason === 'stateError')) ? 'error' : t.status,
+          status:
+            se ||
+            (t.status === 'skipped' &&
+              (t.reason === 'error' || t.reason === 'writeFailed' || t.reason === 'stateError'))
+              ? 'error'
+              : t.status,
           ...(t.reason ? { reason: t.reason } : se ? { reason: 'serverError' } : {}),
           ...(t.detail || se ? { detail: [t.detail, se].filter(Boolean).join(' · ') } : {})
         }
@@ -294,21 +313,43 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
   const planned = r.results
     ? 0
     : r.plan.targets.filter((c) => c.changed && !c.error).length +
-      r.plan.rules.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'retireImported').length +
-      r.plan.skills.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'replaceLink' || x.action === 'replaceImported' || x.action === 'retireImported').length +
-      r.plan.agents.filter((x) => x.action === 'copy' || x.action === 'update' || x.action === 'replaceImported' || x.action === 'retireImported').length
-  const skipped = targets.filter((t) => t.status === 'skipped').length + [...rules, ...skills, ...agents].filter((x) => x.status === 'skipped' || x.status === 'refused').length
+      r.plan.rules.filter(
+        (x) => x.action === 'copy' || x.action === 'update' || x.action === 'retireImported'
+      ).length +
+      r.plan.skills.filter(
+        (x) =>
+          x.action === 'copy' ||
+          x.action === 'update' ||
+          x.action === 'replaceLink' ||
+          x.action === 'replaceImported' ||
+          x.action === 'retireImported'
+      ).length +
+      r.plan.agents.filter(
+        (x) =>
+          x.action === 'copy' ||
+          x.action === 'update' ||
+          x.action === 'replaceImported' ||
+          x.action === 'retireImported'
+      ).length
+  const skipped =
+    targets.filter((t) => t.status === 'skipped').length +
+    [...rules, ...skills, ...agents].filter((x) => x.status === 'skipped' || x.status === 'refused')
+      .length
   // Error list: plan errors + target file errors + copy/delete failures (no contents — names and reasons only)
   const itemLabel = (kind: string, x: { name: string; tool?: string }): string =>
     `${kind} ${x.tool ? `${x.tool}/` : ''}${x.name}`
   const errors = [
     ...r.plan.errors,
-    ...targets.filter((t) => t.status === 'error').map((t) => `${t.label}${t.detail ? `: ${t.detail}` : ''}`),
-    ...([
-      ...rules.map((x) => ['rule', x] as const),
-      ...skills.map((x) => ['skill', x] as const),
-      ...agents.map((x) => ['agent', x] as const)
-    ] as const)
+    ...targets
+      .filter((t) => t.status === 'error')
+      .map((t) => `${t.label}${t.detail ? `: ${t.detail}` : ''}`),
+    ...(
+      [
+        ...rules.map((x) => ['rule', x] as const),
+        ...skills.map((x) => ['skill', x] as const),
+        ...agents.map((x) => ['agent', x] as const)
+      ] as const
+    )
       .filter(([, x]) => x.status === 'failed')
       .map(([k, x]) => `${itemLabel(k, x)}: ${x.reason ?? 'failed'}`)
   ]
@@ -320,17 +361,43 @@ function toView(home: string, r: SyncAllResult, at: string): SyncStatusView {
       ...r.results.rules.map((x) => ({ k: 'rule', t: x.tool as string | undefined, x })),
       ...r.results.skills.map((x) => ({ k: 'skill', t: x.tool as string | undefined, x })),
       ...r.results.agents.map((x) => ({ k: 'agent', t: x.tool as string | undefined, x }))
-    ].some((e) => e.k === kind && e.t === tool && e.x.name === name && e.x.action === 'deleteCandidate' && e.x.status === 'done')
+    ].some(
+      (e) =>
+        e.k === kind &&
+        e.t === tool &&
+        e.x.name === name &&
+        e.x.action === 'deleteCandidate' &&
+        e.x.status === 'done'
+    )
   const allCandidates: DeleteCandidateRequest[] = [
     ...r.plan.skills
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'skill' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash, currentLink: x.currentLink })),
+      .map((x) => ({
+        kind: 'skill' as const,
+        tool: x.tool,
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash,
+        currentLink: x.currentLink
+      })),
     ...r.plan.rules
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'rule' as const, ...(x.tool ? { tool: x.tool } : {}), name: x.name, path: x.path, currentHash: x.currentHash })),
+      .map((x) => ({
+        kind: 'rule' as const,
+        ...(x.tool ? { tool: x.tool } : {}),
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash
+      })),
     ...r.plan.agents
       .filter((x) => x.action === 'deleteCandidate')
-      .map((x) => ({ kind: 'agent' as const, tool: x.tool, name: x.name, path: x.path, currentHash: x.currentHash }))
+      .map((x) => ({
+        kind: 'agent' as const,
+        tool: x.tool,
+        name: x.name,
+        path: x.path,
+        currentHash: x.currentHash
+      }))
   ]
   const deleteCandidates = allCandidates.filter((d) => !doneDelete(d.kind, d.tool, d.name))
   const notInitialized = notInitializedOf(r.plan.targets)
@@ -359,7 +426,12 @@ export function notInitializedOf(changes: SyncAllResult['plan']['targets']): Not
     const tool = TARGET_TOOL.get(c.id)
     if (!tool || out.has(c.path)) continue
     if (c.skip === 'toolNotInitialized') out.set(c.path, { tool, label: c.label })
-    else if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride' || c.skip === 'jsoncUnsupported') out.set(c.path, { tool, label: c.label, reason: c.skip })
+    else if (
+      c.skip === 'copilotHomeOverride' ||
+      c.skip === 'grokHomeOverride' ||
+      c.skip === 'jsoncUnsupported'
+    )
+      out.set(c.path, { tool, label: c.label, reason: c.skip })
   }
   return [...out.values()]
 }
@@ -373,14 +445,29 @@ export function syncFailedCount(): number {
  * Source → tool sync. approvedOnce = user explicitly approved this one run (ignores allowRealApply, settings unchanged). Writes for real if allowRealApply (or fixture HOME), otherwise plans only.
  * The source always wins, so drift is ignored (forced here until the engine defaults to force).
  */
-export function syncNow(home: string, env: Env, approvedOnce = false, expectFingerprint?: string): SyncStatusView {
+export function syncNow(
+  home: string,
+  env: Env,
+  approvedOnce = false,
+  expectFingerprint?: string
+): SyncStatusView {
   const at = new Date().toISOString()
   try {
     const allowReal = approvedOnce || !!readConfig(home).config.allowRealApply
-    const r = syncAll(home, env, { allowReal, approvedOnce, ...(expectFingerprint !== undefined ? { expectFingerprint } : {}) })
+    const r = syncAll(home, env, {
+      allowReal,
+      approvedOnce,
+      ...(expectFingerprint !== undefined ? { expectFingerprint } : {})
+    })
     lastSync = toView(home, r, at)
   } catch (e) {
-    lastSync = { ...lastSync, at, wrote: false, errors: [(e as Error).message], errorCount: lastSync.errorCount + 1 }
+    lastSync = {
+      ...lastSync,
+      at,
+      wrote: false,
+      errors: [(e as Error).message],
+      errorCount: lastSync.errorCount + 1
+    }
   }
   return lastSync
 }
@@ -403,7 +490,8 @@ export function configView(home: string, fixture: boolean): ConfigView {
     libraryLegacy: st.legacy,
     libraryEmpty: st.ready && libraryIsEmpty(home),
     inUse: toolsInUse(home),
-    ...(libraryStartError && !(libraryStartError.code === 'renamePending' && !renamePendingPaths(home).length)
+    ...(libraryStartError &&
+    !(libraryStartError.code === 'renamePending' && !renamePendingPaths(home).length)
       ? { libraryStartError }
       : {})
   }
@@ -457,7 +545,8 @@ function toolsWritten(home: string): ToolId[] {
   }
   if (Object.keys(st.rules ?? {}).length) out.add('claude')
   for (const rec of [st.skills, st.toolRules, st.agents])
-    for (const [t, v] of Object.entries(rec ?? {})) if (v && Object.keys(v).length) out.add(t as ToolId)
+    for (const [t, v] of Object.entries(rec ?? {}))
+      if (v && Object.keys(v).length) out.add(t as ToolId)
   return [...out]
 }
 
@@ -465,19 +554,26 @@ function toolsWritten(home: string): ToolId[] {
  * Save tools in use (null/undefined = unset → the default tools). Config only; nothing is applied to tools here.
  * `retiring` (undo after a cancelled preview) restores the retiring list exactly
  */
-export function toolsInUseSet(home: string, list: ToolId[] | null | undefined, retiring?: ToolId[]): void {
-  if (list !== null && list !== undefined && !Array.isArray(list)) throw new ConfigError('toolsInUse must be an array')
-  if (retiring !== undefined && !Array.isArray(retiring)) throw new ConfigError('toolsRetiring must be an array')
+export function toolsInUseSet(
+  home: string,
+  list: ToolId[] | null | undefined,
+  retiring?: ToolId[]
+): void {
+  if (list !== null && list !== undefined && !Array.isArray(list))
+    throw new ConfigError('toolsInUse must be an array')
+  if (retiring !== undefined && !Array.isArray(retiring))
+    throw new ConfigError('toolsRetiring must be an array')
   const before = toolsInUse(home)
   setToolsInUse(home, list ?? undefined, retiring ? { retiring } : { wrote: toolsWritten(home) })
   // Tools added to the app later (Grok CLI) don't inherit items that are explicitly off everywhere else
-  for (const t of toolsInUse(home)) if (t === 'grok' && !before.includes(t)) {
-    try {
-      seedNewToolToggles(home, t)
-    } catch {
-      // the library may not exist yet (onboarding): nothing to seed
+  for (const t of toolsInUse(home))
+    if (t === 'grok' && !before.includes(t)) {
+      try {
+        seedNewToolToggles(home, t)
+      } catch {
+        // the library may not exist yet (onboarding): nothing to seed
+      }
     }
-  }
 }
 
 // ---------------------------------------------------------------- Library
@@ -506,7 +602,10 @@ export const lib = {
   skillDoc: (home: string, name: string) => readSkillDoc(home, name),
   skillDocSave: (home: string, name: string, doc: SkillDocInput) => {
     const d = (doc ?? {}) as Partial<SkillDocInput>
-    writeSkillDoc(home, name, { description: String(d.description ?? ''), body: String(d.body ?? '') })
+    writeSkillDoc(home, name, {
+      description: String(d.description ?? ''),
+      body: String(d.body ?? '')
+    })
   },
   skillRename: (home: string, from: string, to: string) => renameSkill(home, from, to),
   agentCreate: (home: string, name: string, description: string) => {
@@ -574,7 +673,10 @@ export function mcpSave(
       if (v === MASK) {
         const prev = current && isObj(current[table]) ? (current[table] as Json)[k] : undefined
         if (typeof prev !== 'string')
-          throw new LibraryError('invalidSchema', `${table}.${k} arrived masked but there is no existing value`)
+          throw new LibraryError(
+            'invalidSchema',
+            `${table}.${k} arrived masked but there is no existing value`
+          )
         t[k] = prev
       }
     }
@@ -583,7 +685,10 @@ export function mcpSave(
   if (next.bearerToken === MASK) {
     const prev = current?.bearerToken
     if (typeof prev !== 'string')
-      throw new LibraryError('invalidSchema', 'bearerToken arrived masked but there is no existing value')
+      throw new LibraryError(
+        'invalidSchema',
+        'bearerToken arrived masked but there is no existing value'
+      )
     next.bearerToken = prev
   }
   return upsertMcpServer(home, name, next as unknown as McpServer, { secrets })
@@ -598,10 +703,19 @@ export function importSources(home: string): ImportSource[] {
 export function importPlanView(home: string, sourceId: string): ImportPlanView {
   const plan = planImport(home, sourceId || undefined)
   for (const c of plan.mcp) for (const v of c.variants) maskServer(v.server as unknown as Json)
-  return { ...plan, sources: plan.sources.map((x) => ({ ...x, path: tilde(home, x.path) })), masked: true, sourceId }
+  return {
+    ...plan,
+    sources: plan.sources.map((x) => ({ ...x, path: tilde(home, x.path) })),
+    masked: true,
+    sourceId
+  }
 }
 
-export function importApplyRun(home: string, sourceId: string, selections: ImportSelection[]): ReturnType<typeof applyImport> {
+export function importApplyRun(
+  home: string,
+  sourceId: string,
+  selections: ImportSelection[]
+): ReturnType<typeof applyImport> {
   return applyImport(home, Array.isArray(selections) ? selections : [], sourceId || undefined, {
     secrets: defaultSecretBackend()
   })
@@ -634,7 +748,12 @@ export function toggles(home: string, kind: ManifestKind): Record<string, Record
 
 // ---------------------------------------------------------------- Tool file writes
 
-export function modelSet(home: string, tool: ToolId, key: string, value: string): ReturnType<typeof setModel> {
+export function modelSet(
+  home: string,
+  tool: ToolId,
+  key: string,
+  value: string
+): ReturnType<typeof setModel> {
   return setModel(home, tool, key, value)
 }
 
@@ -659,7 +778,11 @@ export function workspaces(home: string): WorkspaceView[] {
   return listWorkspaces(home)
 }
 
-export function workspaceCreate(home: string, name: string, from: 'empty' | 'current'): WorkspaceView {
+export function workspaceCreate(
+  home: string,
+  name: string,
+  from: 'empty' | 'current'
+): WorkspaceView {
   return createWorkspace(home, name, { from })
 }
 
@@ -676,12 +799,17 @@ export function workspaceSwitch(home: string, id: string): WorkspaceView {
 /** Default export file name `<name>.illithid.zip` (path separators and control chars removed) */
 export function workspaceExportFileName(home: string): string {
   const cur = listWorkspaces(home).find((w) => w.active)
-  // eslint-disable-next-line no-control-regex
-  const base = (cur?.name ?? 'workspace').replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, '-').trim() || 'workspace'
+  const base =
+    // eslint-disable-next-line no-control-regex
+    (cur?.name ?? 'workspace').replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, '-').trim() ||
+    'workspace'
   return base + WORKSPACE_ZIP_EXT
 }
 
-export function workspaceExportData(home: string, appVersion: string): ReturnType<typeof exportWorkspace> {
+export function workspaceExportData(
+  home: string,
+  appVersion: string
+): ReturnType<typeof exportWorkspace> {
   return exportWorkspace(home, { appVersion })
 }
 

@@ -28,7 +28,8 @@ function cachePath(home: string): string {
 }
 
 function parseIndex(body: unknown): MarketRuleItem[] {
-  if (!isObj(body) || !Array.isArray(body.items)) throw new MarketError('invalid', 'unexpected rule index')
+  if (!isObj(body) || !Array.isArray(body.items))
+    throw new MarketError('invalid', 'unexpected rule index')
   const out: MarketRuleItem[] = []
   for (const x of body.items) {
     if (!isObj(x)) continue
@@ -48,13 +49,18 @@ function parseIndex(body: unknown): MarketRuleItem[] {
 }
 
 /** The rule list, from cache when younger than a day (force = refetch) */
-export async function listInstructions(fetchFn: FetchFn, home: string, opts: { force?: boolean; now?: number } = {}): Promise<MarketRuleItem[]> {
+export async function listInstructions(
+  fetchFn: FetchFn,
+  home: string,
+  opts: { force?: boolean; now?: number } = {}
+): Promise<MarketRuleItem[]> {
   const now = opts.now ?? Date.now()
   const p = cachePath(home)
   if (!opts.force && existsSync(p)) {
     try {
       const c = JSON.parse(readFileSync(p, 'utf8')) as { fetchedAt?: number; body?: unknown }
-      if (typeof c.fetchedAt === 'number' && now - c.fetchedAt < INDEX_TTL_MS) return parseIndex(c.body)
+      if (typeof c.fetchedAt === 'number' && now - c.fetchedAt < INDEX_TTL_MS)
+        return parseIndex(c.body)
     } catch {
       // broken cache: refetch
     }

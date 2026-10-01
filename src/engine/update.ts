@@ -41,7 +41,9 @@ export function compareVersions(a: string, b: string): number {
 
 /** The latest release if it is newer than `current`, otherwise null. Drafts and pre-releases never count */
 export async function latestUpdate(fetchFn: FetchFn, current: string): Promise<UpdateInfo | null> {
-  const r = await getJson(fetchFn, RELEASES_API, 1024 * 1024, { Accept: 'application/vnd.github+json' })
+  const r = await getJson(fetchFn, RELEASES_API, 1024 * 1024, {
+    Accept: 'application/vnd.github+json'
+  })
   if (!isObj(r) || r.draft === true || r.prerelease === true) return null
   const tag = str(r.tag_name)
   if (!tag || !/^v?\d+\.\d+\.\d+/.test(tag)) return null

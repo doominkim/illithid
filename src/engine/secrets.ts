@@ -149,7 +149,10 @@ export interface KeychainOptions {
  */
 export function macKeychainBackend(opts: KeychainOptions = {}): SecretBackend {
   if (process.platform !== 'darwin')
-    throw new SecretError('unsupportedPlatform', 'Secret storage is only supported via the macOS Keychain')
+    throw new SecretError(
+      'unsupportedPlatform',
+      'Secret storage is only supported via the macOS Keychain'
+    )
   const service = opts.service ?? SECRET_SERVICE
   const bin = opts.bin ?? '/usr/bin/security'
   const run = (args: string[]): { code: number; out: string } => {
@@ -196,7 +199,10 @@ export function macKeychainBackend(opts: KeychainOptions = {}): SecretBackend {
       const r = run(['delete-generic-password', '-s', service, '-a', account])
       if (r.code === SEC_NOT_FOUND) return false
       if (r.code !== 0)
-        throw new SecretError('backendFailed', `Keychain delete failed (${account}, exit ${r.code})`)
+        throw new SecretError(
+          'backendFailed',
+          `Keychain delete failed (${account}, exit ${r.code})`
+        )
       return true
     }
   }
@@ -205,7 +211,10 @@ export function macKeychainBackend(opts: KeychainOptions = {}): SecretBackend {
 /** Backend that errors on use (default on non-macOS platforms). Never called if there are no references */
 export function unsupportedSecretBackend(): SecretBackend {
   const fail = (): never => {
-    throw new SecretError('unsupportedPlatform', 'Secret storage is only supported via the macOS Keychain')
+    throw new SecretError(
+      'unsupportedPlatform',
+      'Secret storage is only supported via the macOS Keychain'
+    )
   }
   return { get: fail, set: fail, delete: fail }
 }

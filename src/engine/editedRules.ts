@@ -51,7 +51,13 @@ export function blockSections(body: string): Map<string, string> {
     const start = m.index! + m[0].length
     const end = i + 1 < marks.length ? marks[i + 1].index! : body.length
     // Sections are joined with a `---` line between blank lines
-    out.set(m[1], body.slice(start, end).replace(/\s*\n---\s*$/, '').trim())
+    out.set(
+      m[1],
+      body
+        .slice(start, end)
+        .replace(/\s*\n---\s*$/, '')
+        .trim()
+    )
   })
   return out
 }
@@ -63,7 +69,12 @@ export function editedRules(home: string, env: Env = process.env): EditedRule[] 
   const out: EditedRule[] = []
   for (const it of plan.rules) {
     if (it.action !== 'update' || !it.drift) continue
-    if (it.name === CLAUDE_MEMORY_RULE || it.name === GROK_MEMORY_RULE_FILE || !it.source?.startsWith(rulesDir + '/')) continue
+    if (
+      it.name === CLAUDE_MEMORY_RULE ||
+      it.name === GROK_MEMORY_RULE_FILE ||
+      !it.source?.startsWith(rulesDir + '/')
+    )
+      continue
     const source = library.get(it.name)
     if (source === undefined) continue
     let text: string

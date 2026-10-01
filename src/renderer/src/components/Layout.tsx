@@ -25,7 +25,16 @@ export function SplitPane({
 }): React.JSX.Element {
   return (
     <Box style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
-      <Box className="ac-card" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box
+        className="ac-card"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         {listScroll ? (
           <ScrollArea style={{ flex: 1 }} type="auto">
             {list}
@@ -34,7 +43,10 @@ export function SplitPane({
           list
         )}
       </Box>
-      <Box className="ac-card" style={{ width: detailWidth, minWidth: 0, display: 'flex', overflow: 'hidden' }}>
+      <Box
+        className="ac-card"
+        style={{ width: detailWidth, minWidth: 0, display: 'flex', overflow: 'hidden' }}
+      >
         <ScrollArea style={{ flex: 1 }} type="auto">
           <Box p="lg">{detail}</Box>
         </ScrollArea>

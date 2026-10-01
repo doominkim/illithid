@@ -81,6 +81,11 @@ export function detectTools(
   return TOOL_IDS.map((tool) => {
     const configFound = toolConfigFound(home, tool)
     const executable = dirs.map((d) => join(d, TOOL_EXECUTABLES[tool])).find((p) => isExec(p))
-    return { tool, configFound, ...(executable ? { executable } : {}), detected: configFound || !!executable }
+    return {
+      tool,
+      configFound,
+      ...(executable ? { executable } : {}),
+      detected: configFound || !!executable
+    }
   })
 }

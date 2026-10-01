@@ -14,7 +14,10 @@ import type { ToolId } from './agents'
 import { yamlValueLines, type AgentDoc } from './library'
 
 /** Per-tool agent folder and extension */
-export function agentToolDir(home: string, tool: ToolId): { dir: string; ext: '.md' | '.toml' | '.agent.md' } {
+export function agentToolDir(
+  home: string,
+  tool: ToolId
+): { dir: string; ext: '.md' | '.toml' | '.agent.md' } {
   switch (tool) {
     case 'claude':
       return { dir: join(home, '.claude/agents'), ext: '.md' }
@@ -105,7 +108,8 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
         doc.body
       )
     case 'gemini':
-      if (!agentNameOk(tool, doc.name)) throw new Error(`${doc.name} is not a valid Gemini CLI agent name`)
+      if (!agentNameOk(tool, doc.name))
+        throw new Error(`${doc.name} is not a valid Gemini CLI agent name`)
       // Without model Gemini uses the session model (inherit)
       return mdDoc(
         [
@@ -116,7 +120,8 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
         doc.body
       )
     case 'copilot':
-      if (!agentNameOk(tool, doc.name)) throw new Error(`${doc.name} is not a valid Copilot agent name`)
+      if (!agentNameOk(tool, doc.name))
+        throw new Error(`${doc.name} is not a valid Copilot agent name`)
       return mdDoc(
         [
           ['name', doc.name],

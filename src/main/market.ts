@@ -34,6 +34,7 @@ import {
   type RepoTrees
 } from '../engine'
 import type {
+  Api,
   MarketBulkResult,
   MarketDetailView,
   MarketInstallOptions,
@@ -69,8 +70,10 @@ function cachedIn<T>(c: Cache, max: number, key: string, load: () => Promise<T>)
   return value
 }
 
-const cached = <T>(key: string, load: () => Promise<T>): Promise<T> => cachedIn(cache, 200, key, load)
-const prepared = <T>(key: string, load: () => Promise<T>): Promise<T> => cachedIn(prepCache, 5, key, load)
+const cached = <T>(key: string, load: () => Promise<T>): Promise<T> =>
+  cachedIn(cache, 200, key, load)
+const prepared = <T>(key: string, load: () => Promise<T>): Promise<T> =>
+  cachedIn(prepCache, 5, key, load)
 
 function fail(e: unknown): WriteResult<never> {
   if (e instanceof MarketError) return { ok: false, code: e.code, message: e.message }
@@ -79,7 +82,8 @@ function fail(e: unknown): WriteResult<never> {
 }
 
 async function run<T>(home: string, fn: () => Promise<T>): Promise<WriteResult<T>> {
-  if (!marketEnabled(home)) return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+  if (!marketEnabled(home))
+    return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
   try {
     return { ok: true, value: await fn() }
   } catch (e) {
@@ -102,7 +106,8 @@ const prepSkill = (id: string): Promise<PreparedSkill> => {
   const { source, skillId } = splitSkillId(id)
   return prepared(`prep:skill:${id}`, () => marketPrepareSkill(fetchFn, source, skillId))
 }
-const prepServer = (id: string): Promise<RegistryServer> => prepared(`prep:mcp:${id}`, () => marketServerDetail(fetchFn, id))
+const prepServer = (id: string): Promise<RegistryServer> =>
+  prepared(`prep:mcp:${id}`, () => marketServerDetail(fetchFn, id))
 const prepRule = (home: string, id: string): Promise<PreparedRule> =>
   prepared(`prep:rule:${id}`, () => marketPrepareRule(fetchFn, home, id))
 
@@ -113,14 +118,36 @@ function refOf(kind: MarketKind, p: PreparedSkill | RegistryServer | PreparedRul
   return (p as PreparedRule).item.lastUpdated ?? ''
 }
 
-function assertRef(kind: MarketKind, p: PreparedSkill | RegistryServer | PreparedRule, expected: unknown): void {
+function assertRef(
+  kind: MarketKind,
+  p: PreparedSkill | RegistryServer | PreparedRule,
+  expected: unknown
+): void {
   if (typeof expected === 'string' && expected !== refOf(kind, p))
-    throw new MarketError('changed', 'the source changed since you opened it — reopen to review the new version')
+    throw new MarketError(
+      'changed',
+      'the source changed since you opened it — reopen to review the new version'
+    )
 }
 
-export function marketHandlers(home: string, libWrite: LibWrite) {
+type MarketChannel =
+  | 'marketSearch'
+  | 'marketDetail'
+  | 'marketInstall'
+  | 'marketInstallMany'
+  | 'marketUpdates'
+  | 'marketUpdate'
+
+/** IPC handlers take unchecked arguments and resolve to what the renderer API declares */
+type MarketHandlers = { [K in MarketChannel]: (...args: unknown[]) => ReturnType<Api[K]> }
+
+export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers {
   return {
-    marketSearch: async (kind: unknown, q: unknown, cursor?: unknown): Promise<WriteResult<MarketSearchView>> =>
+    marketSearch: async (
+      kind: unknown,
+      q: unknown,
+      cursor?: unknown
+    ): Promise<WriteResult<MarketSearchView>> =>
       run(home, async () => {
         const k = kindOf(kind)
         const query = typeof q === 'string' ? q.trim() : ''
@@ -198,8 +225,13 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
         }
       }),
 
-    marketInstall: async (kind: unknown, id: unknown, opts: unknown): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused> => {
-      if (!marketEnabled(home)) return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+    marketInstall: async (
+      kind: unknown,
+      id: unknown,
+      opts: unknown
+    ): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused> => {
+      if (!marketEnabled(home))
+        return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
       const o = (opts ?? {}) as MarketInstallOptions
       const name = typeof o.name === 'string' ? o.name.trim() : ''
       let k: MarketKind
@@ -218,8 +250,11 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
         if (k === 'mcp') {
           const s = await prepServer(sid)
           assertRef(k, s, o.ref)
-          const values = o.values && typeof o.values === 'object' ? (o.values as Record<string, string>) : {}
-          return libWrite(() => marketCommitMcp(home, s, String(o.choice ?? ''), values, name, defaultSecretBackend()))
+          const values =
+            o.values && typeof o.values === 'object' ? (o.values as Record<string, string>) : {}
+          return libWrite(() =>
+            marketCommitMcp(home, s, String(o.choice ?? ''), values, name, defaultSecretBackend())
+          )
         }
         const r = await prepRule(home, sid)
         assertRef(k, r, o.ref)
@@ -233,15 +268,21 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
      * Install several items with default names and options. Already installed, name clashes, MCP servers that need input
      * and anything past a GitHub rate limit are skipped and reported; the library syncs once at the end
      */
-    marketInstallMany: async (kind: unknown, ids: unknown): Promise<WriteResult<MarketBulkResult> | Refused> => {
-      if (!marketEnabled(home)) return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+    marketInstallMany: async (
+      kind: unknown,
+      ids: unknown
+    ): Promise<WriteResult<MarketBulkResult> | Refused> => {
+      if (!marketEnabled(home))
+        return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
       let k: MarketKind
       try {
         k = kindOf(kind)
       } catch (e) {
         return fail(e)
       }
-      const list = [...new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [])].slice(0, 500)
+      const list = [
+        ...new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [])
+      ].slice(0, 500)
       const installedIdx = marketInstalledIndex(home)
       const skipped: MarketBulkResult['skipped'] = []
       const todo = list.filter((id) => {
@@ -264,7 +305,10 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
             const choice = marketInstallChoices(s).find((c) => c.supported)
             if (!choice) return void skipped.push({ id, reason: 'unsupported' })
             const name = marketSuggestMcpName(s.name)
-            ready.push({ id, commit: () => marketCommitMcp(home, s, choice.id, {}, name, defaultSecretBackend()) })
+            ready.push({
+              id,
+              commit: () => marketCommitMcp(home, s, choice.id, {}, name, defaultSecretBackend())
+            })
           } else {
             const r = await prepRule(home, id)
             ready.push({ id, commit: () => marketCommitRule(home, r, r.name) })
@@ -285,7 +329,11 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
           } catch (e) {
             const code = (e as { code?: string }).code
             // A required value with no default: needs the install form
-            skipped.push({ id: r.id, reason: e instanceof MarketError && code === 'invalid' ? 'needsInput' : (code ?? 'error') })
+            skipped.push({
+              id: r.id,
+              reason:
+                e instanceof MarketError && code === 'invalid' ? 'needsInput' : (code ?? 'error')
+            })
           }
         }
         return { installed, skipped }
@@ -294,8 +342,12 @@ export function marketHandlers(home: string, libWrite: LibWrite) {
 
     marketUpdates: async () => run(home, () => marketCheckUpdates(fetchFn, home)),
 
-    marketUpdate: async (kind: unknown, name: unknown): Promise<WriteResult<{ name: string }> | Refused> => {
-      if (!marketEnabled(home)) return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+    marketUpdate: async (
+      kind: unknown,
+      name: unknown
+    ): Promise<WriteResult<{ name: string }> | Refused> => {
+      if (!marketEnabled(home))
+        return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
       try {
         const k = kindOf(kind)
         const n = String(name ?? '')

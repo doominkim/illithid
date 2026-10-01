@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Badge, Box, Button, Group, Textarea, Text } from '@mantine/core'
 import { Save, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -20,11 +20,25 @@ interface Props {
 }
 
 /** Lightweight raw editor: monospace Textarea + save/revert. Clears dirty on successful save */
-export function MarkdownEditor({ value, onSave, disabledHint, minRows = 16, placeholder, title, extraDirty = false, onRevert }: Props): React.JSX.Element {
+export function MarkdownEditor({
+  value,
+  onSave,
+  disabledHint,
+  minRows = 16,
+  placeholder,
+  title,
+  extraDirty = false,
+  onRevert
+}: Props): React.JSX.Element {
   const { t } = useTranslation()
   const [text, setText] = useState(value)
   const [saving, setSaving] = useState(false)
-  useEffect(() => setText(value), [value])
+  // Take a new outside value (state from the previous render)
+  const [shown, setShown] = useState(value)
+  if (value !== shown) {
+    setShown(value)
+    setText(value)
+  }
   const dirty = text !== value || extraDirty
   const save = async (): Promise<void> => {
     setSaving(true)
@@ -53,10 +67,16 @@ export function MarkdownEditor({ value, onSave, disabledHint, minRows = 16, plac
           )}
         </Group>
         <Group gap="xs">
-          <Button size="xs" variant="default" leftSection={<Undo2 size={12} />} disabled={!dirty} onClick={() => {
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<Undo2 size={12} />}
+            disabled={!dirty}
+            onClick={() => {
               setText(value)
               onRevert?.()
-            }}>
+            }}
+          >
             {t('editor.revert')}
           </Button>
           <Button
@@ -80,7 +100,13 @@ export function MarkdownEditor({ value, onSave, disabledHint, minRows = 16, plac
         maxRows={40}
         placeholder={placeholder}
         spellCheck={false}
-        styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 12.5, lineHeight: 1.55 } }}
+        styles={{
+          input: {
+            fontFamily: 'var(--mantine-font-family-monospace)',
+            fontSize: 12.5,
+            lineHeight: 1.55
+          }
+        }}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 's') {
             e.preventDefault()

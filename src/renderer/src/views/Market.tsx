@@ -40,7 +40,13 @@ import type { Menu } from '../lib/nav'
 import { useNav } from '../lib/nav'
 
 const MENU: Record<MarketKind, Menu> = { skill: 'skills', mcp: 'mcp', rule: 'rules' }
-const RISK_COLOR: Record<string, string> = { safe: 'green', low: 'green', medium: 'yellow', high: 'red', critical: 'red' }
+const RISK_COLOR: Record<string, string> = {
+  safe: 'green',
+  low: 'green',
+  medium: 'yellow',
+  high: 'red',
+  critical: 'red'
+}
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value)
@@ -93,6 +99,7 @@ function Market(): React.JSX.Element {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- search again when the tab or query changes
     void search()
     // Rules load once per tab switch; skills and MCP follow the query
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,13 +127,22 @@ function Market(): React.JSX.Element {
   }
 
   const runUpdate = async (u: MarketUpdate): Promise<void> => {
-    const r = await runWrite(window.api.marketUpdate(u.kind, u.name), { success: t('market.updated', { name: u.name }) })
+    const r = await runWrite(window.api.marketUpdate(u.kind, u.name), {
+      success: t('market.updated', { name: u.name })
+    })
     if (r && updates) setUpdates({ ...updates, updates: updates.updates.filter((x) => x !== u) })
   }
 
   const installed = result?.installed ?? {}
   const rules = useMemo(
-    () => (result?.rules ?? []).filter((r) => !query.trim() || includesCI(r.title, query.trim()) || includesCI(r.id, query.trim()) || includesCI(r.description, query.trim())),
+    () =>
+      (result?.rules ?? []).filter(
+        (r) =>
+          !query.trim() ||
+          includesCI(r.title, query.trim()) ||
+          includesCI(r.id, query.trim()) ||
+          includesCI(r.description, query.trim())
+      ),
     [result, query]
   )
   const servers = [...(result?.mcp ?? []), ...mcpMore]
@@ -169,7 +185,9 @@ function Market(): React.JSX.Element {
       color: r.skipped.length ? 'yellow' : 'accent',
       title: t('market.bulkDone', { n: r.installed.length }),
       message: r.skipped.length
-        ? r.skipped.map((x) => `${x.id}: ${t(`market.skip.${x.reason}`, { defaultValue: x.reason })}`).join(' · ')
+        ? r.skipped
+            .map((x) => `${x.id}: ${t(`market.skip.${x.reason}`, { defaultValue: x.reason })}`)
+            .join(' · ')
         : undefined,
       autoClose: r.skipped.length ? false : 3000
     })
@@ -237,7 +255,9 @@ function Market(): React.JSX.Element {
                 subtitle={s.description || s.name}
                 right={
                   <Text size="sm" c="dimmed">
-                    {s.downloads !== undefined ? t('market.weekly', { n: s.downloads.toLocaleString() }) : s.version}
+                    {s.downloads !== undefined
+                      ? t('market.weekly', { n: s.downloads.toLocaleString() })
+                      : s.version}
                   </Text>
                 }
                 active={selected === s.name}
@@ -248,7 +268,13 @@ function Market(): React.JSX.Element {
           </ListCard>
           {cursor && (
             <Group justify="center">
-              <Button size="xs" variant="default" loading={loading} onClick={() => void loadMore()} data-testid="market-more">
+              <Button
+                size="xs"
+                variant="default"
+                loading={loading}
+                onClick={() => void loadMore()}
+                data-testid="market-more"
+              >
                 {t('market.more')}
               </Button>
             </Group>
@@ -288,7 +314,14 @@ function Market(): React.JSX.Element {
         title={t('nav.market')}
         count={kind === 'rule' ? rules.length : undefined}
         actions={
-          <Button size="xs" variant="default" leftSection={<RefreshCw size={13} />} loading={checking} onClick={() => void checkUpdates()} data-testid="market-updates">
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<RefreshCw size={13} />}
+            loading={checking}
+            onClick={() => void checkUpdates()}
+            data-testid="market-updates"
+          >
             {t('market.checkUpdates')}
           </Button>
         }
@@ -338,7 +371,10 @@ function Market(): React.JSX.Element {
                 setSelected(null)
                 setResult(null)
               }}
-              data={(['skill', 'mcp', 'rule'] as const).map((k) => ({ value: k, label: t(`market.tab.${k}`) }))}
+              data={(['skill', 'mcp', 'rule'] as const).map((k) => ({
+                value: k,
+                label: t(`market.tab.${k}`)
+              }))}
               data-testid="market-tabs"
             />
             <SearchInput value={query} onChange={setQuery} placeholder={t('market.search')} />
@@ -355,7 +391,13 @@ function Market(): React.JSX.Element {
               onChange={() => setPicked(allPicked ? new Set() : new Set(selectable))}
               data-testid="market-pick-all"
             />
-            <Button size="xs" disabled={!pickedVisible.length} loading={bulkBusy} onClick={() => void installPicked()} data-testid="market-install-picked">
+            <Button
+              size="xs"
+              disabled={!pickedVisible.length}
+              loading={bulkBusy}
+              onClick={() => void installPicked()}
+              data-testid="market-install-picked"
+            >
               {t('market.installPicked', { n: pickedVisible.length })}
             </Button>
           </>
@@ -363,7 +405,12 @@ function Market(): React.JSX.Element {
       />
       {list()}
 
-      <DetailSheet opened={!!selected} onClose={() => setSelected(null)} title={selected ?? ''} maw={1200}>
+      <DetailSheet
+        opened={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected ?? ''}
+        maw={1200}
+      >
         {selected && (
           <MarketDetail
             key={`${kind}:${selected}`}
@@ -380,7 +427,15 @@ function Market(): React.JSX.Element {
   )
 }
 
-function MarketDetail({ kind, id, onInstalled }: { kind: MarketKind; id: string; onInstalled: (name: string) => void }): React.JSX.Element {
+function MarketDetail({
+  kind,
+  id,
+  onInstalled
+}: {
+  kind: MarketKind
+  id: string
+  onInstalled: (name: string) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const { navigate } = useNav()
   const [view, setView] = useState<MarketDetailView | null>(null)
@@ -410,14 +465,22 @@ function MarketDetail({ kind, id, onInstalled }: { kind: MarketKind; id: string;
   if (err) return <ErrorAlert message={err} />
   if (!view) return <Loading />
 
-  const current: MarketInstallChoice | undefined = view.kind === 'mcp' ? view.choices.find((c) => c.id === choice) : undefined
-  const missing = !!current && current.inputs.some((i) => i.required && !(values[i.key] ?? '').trim() && !i.default)
+  const current: MarketInstallChoice | undefined =
+    view.kind === 'mcp' ? view.choices.find((c) => c.id === choice) : undefined
+  const missing =
+    !!current &&
+    current.inputs.some((i) => i.required && !(values[i.key] ?? '').trim() && !i.default)
   const canInstall = !!name.trim() && (view.kind !== 'mcp' || (!!current?.supported && !missing))
 
   const install = async (): Promise<void> => {
     setBusy(true)
     const r = await runWrite(
-      window.api.marketInstall(kind, id, { name: name.trim(), choice: choice ?? undefined, values, ref: view.ref }),
+      window.api.marketInstall(kind, id, {
+        name: name.trim(),
+        choice: choice ?? undefined,
+        values,
+        ref: view.ref
+      }),
       { success: t('market.installedToast', { name: name.trim() }) }
     )
     setBusy(false)
@@ -431,14 +494,29 @@ function MarketDetail({ kind, id, onInstalled }: { kind: MarketKind; id: string;
       <Badge variant="light" fw={500}>
         {t('market.installedAs', { name: view.installedAs })}
       </Badge>
-      <Button size="xs" variant="default" onClick={() => navigate(MENU[kind], { select: view.installedAs, tool: null })}>
+      <Button
+        size="xs"
+        variant="default"
+        onClick={() => navigate(MENU[kind], { select: view.installedAs, tool: null })}
+      >
         {t('market.open')}
       </Button>
     </Group>
   ) : (
     <Group gap="sm" align="flex-end">
-      <TextInput label={t('market.name')} value={name} onChange={(e) => setName(e.currentTarget.value)} w={280} data-testid="market-name" />
-      <Button onClick={() => void install()} loading={busy} disabled={!canInstall} data-testid="market-install">
+      <TextInput
+        label={t('market.name')}
+        value={name}
+        onChange={(e) => setName(e.currentTarget.value)}
+        w={280}
+        data-testid="market-name"
+      />
+      <Button
+        onClick={() => void install()}
+        loading={busy}
+        disabled={!canInstall}
+        data-testid="market-install"
+      >
         {t('market.install')}
       </Button>
     </Group>
@@ -545,7 +623,11 @@ function MarketDetail({ kind, id, onInstalled }: { kind: MarketKind; id: string;
                   setValues((prev) => ({ ...prev, [i.key]: v }))
                 }
               }
-              return i.secret ? <PasswordInput key={i.key} {...common} /> : <TextInput key={i.key} {...common} />
+              return i.secret ? (
+                <PasswordInput key={i.key} {...common} />
+              ) : (
+                <TextInput key={i.key} {...common} />
+              )
             })}
           </Stack>
         )

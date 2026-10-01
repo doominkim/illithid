@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Box, Button, Group, Modal, Select, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
+import {
+  Badge,
+  Box,
+  Button,
+  Group,
+  Modal,
+  Select,
+  Stack,
+  Tabs,
+  Text,
+  Textarea,
+  TextInput
+} from '@mantine/core'
 import { Download, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
@@ -14,7 +26,8 @@ import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
-import { ReloadButton, useReload } from '../components/ReloadButton'
+import { ReloadButton } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
@@ -24,7 +37,13 @@ import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { useSyncFailures } from '../lib/sync'
-import { grokReadsFromClaude, pillFromCellState, type PillMap, SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS, TOOLS } from '../lib/tools'
+import {
+  grokReadsFromClaude,
+  pillFromCellState,
+  type PillMap,
+  SKILL_TOGGLE_TOOLS as TOGGLE_TOOLS,
+  TOOLS
+} from '../lib/tools'
 import { useToggleBusy } from '../lib/toggleBusy'
 import { useApi } from '../lib/useApi'
 import { useViewMode } from '../lib/viewMode'
@@ -32,7 +51,6 @@ import { lastSyncFailedText, problemText } from '../lib/problemReason'
 import { SortToggle, UsageSpark } from '../components/UsageSpark'
 import { sortByUsage, useListSort } from '../lib/listSort'
 import { useUsageSummary } from '../lib/useUsageSummary'
-
 
 interface Row {
   name: string
@@ -76,15 +94,29 @@ function Skills(): React.JSX.Element {
           if (!on)
             return [
               tool,
-              tool === 'grok' && grokReadsFromClaude(inUse, (x) => data.toggles[name]?.[x] !== false, data.grokReadsClaude !== false)
+              tool === 'grok' &&
+              grokReadsFromClaude(
+                inUse,
+                (x) => data.toggles[name]?.[x] !== false,
+                data.grokReadsClaude !== false
+              )
                 ? { on: false, via: true, hint: t('combo.readsClaude') }
                 : { on: false }
             ]
           const failure = failedIn('skill', name, tool)
-          if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
-          if (data.toolDisabled?.[tool]?.includes(name)) return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
+          if (failure)
+            return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
+          if (data.toolDisabled?.[tool]?.includes(name))
+            return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
-          return [tool, { ...pillFromCellState(st ?? 'synced'), on: true, ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {}) }]
+          return [
+            tool,
+            {
+              ...pillFromCellState(st ?? 'synced'),
+              on: true,
+              ...(st === 'error' ? { hint: problemText(t, data.reasons?.[name]?.[tool]) } : {})
+            }
+          ]
         })
       ) as PillMap
       return { name, description: data.descriptions[name] ?? '', pills }
@@ -106,20 +138,26 @@ function Skills(): React.JSX.Element {
     sort,
     usage
   )
-  const prev = renamed && renamed.to === selected ? rows.find((r) => r.name === renamed.from) : undefined
+  const prev =
+    renamed && renamed.to === selected ? rows.find((r) => r.name === renamed.from) : undefined
   const current = rows.find((r) => r.name === selected) ?? (prev && { ...prev, name: renamed!.to })
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
     if (!TOGGLE_TOOLS.includes(tool)) return
-    await pending.run(name, tool, () => runWrite(window.api.toggle('skills', name, tool, on), { success: t('toggles.saved') }))
+    await pending.run(name, tool, () =>
+      runWrite(window.api.toggle('skills', name, tool, on), { success: t('toggles.saved') })
+    )
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
-    for (const tool of cardTools) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('skills', name, tool, on))
+    for (const tool of cardTools)
+      if (enabled(name, tool) !== on) await runWrite(window.api.toggle('skills', name, tool, on))
     reload()
   }
   const create = async (): Promise<void> => {
-    const r = await runWrite(window.api.skillCreate(newName.trim(), newDesc.trim()), { success: t('skills.created') })
+    const r = await runWrite(window.api.skillCreate(newName.trim(), newDesc.trim()), {
+      success: t('skills.created')
+    })
     if (r !== null) {
       setCreating(false)
       setSelected(newName.trim())
@@ -149,10 +187,21 @@ function Skills(): React.JSX.Element {
         count={rows.length}
         actions={
           <>
-            <Button size="xs" leftSection={<Plus size={13} />} onClick={() => setCreating(true)} data-testid="skill-new">
+            <Button
+              size="xs"
+              leftSection={<Plus size={13} />}
+              onClick={() => setCreating(true)}
+              data-testid="skill-new"
+            >
               {t('skills.new')}
             </Button>
-            <Button size="xs" variant="default" leftSection={<Download size={13} />} onClick={() => setImportOpen(true)} data-testid="skill-import">
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Download size={13} />}
+              onClick={() => setImportOpen(true)}
+              data-testid="skill-import"
+            >
               {t('common.import')}
             </Button>
             <ReloadButton />
@@ -189,11 +238,20 @@ function Skills(): React.JSX.Element {
               name={r.name}
               badges={marketTag(r.name)}
               description={r.description}
-              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))}
+              switchChecked={
+                cardTools.length > 0 && cardTools.every((tool) => enabled(r.name, tool))
+              }
               switchIndeterminate={cardTools.some((tool) => enabled(r.name, tool))}
               onSwitch={(v) => void toggleAll(r.name, v)}
               footerLeft={<UsageSpark summary={usage?.[r.name]} />}
-              footerRight={<ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />}
+              footerRight={
+                <ToolPills
+                  pills={r.pills}
+                  size={18}
+                  onToggle={pillToggle(r)}
+                  busy={pending.of(r.name)}
+                />
+              }
               selected={r.name === selected}
               onClick={() => setSelected(r.name)}
             />
@@ -211,7 +269,12 @@ function Skills(): React.JSX.Element {
               right={
                 <Group gap="md" wrap="nowrap">
                   <UsageSpark summary={usage?.[r.name]} />
-                  <ToolPills pills={r.pills} size={18} onToggle={pillToggle(r)} busy={pending.of(r.name)} />
+                  <ToolPills
+                    pills={r.pills}
+                    size={18}
+                    onToggle={pillToggle(r)}
+                    busy={pending.of(r.name)}
+                  />
                 </Group>
               }
               active={r.name === selected}
@@ -227,7 +290,11 @@ function Skills(): React.JSX.Element {
         title={current?.name ?? ''}
         description={current?.description || undefined}
         tags={current && marketTag(current.name)}
-        meta={current && <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}`}</MetaItem>}
+        meta={
+          current && (
+            <MetaItem icon={<FolderOpen size={14} />}>{`${data.dir}/${current.name}`}</MetaItem>
+          )
+        }
         copyPath={current ? `${data.dir}/${current.name}` : undefined}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="skill-delete"
@@ -256,11 +323,35 @@ function Skills(): React.JSX.Element {
         )}
       </DetailSheet>
 
-      <ImportModal opened={importOpen} onClose={() => setImportOpen(false)} onImported={reload} kind="skill" />
-      <Modal opened={creating} onClose={() => setCreating(false)} title={t('skills.new')} centered radius="lg">
+      <ImportModal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={reload}
+        kind="skill"
+      />
+      <Modal
+        opened={creating}
+        onClose={() => setCreating(false)}
+        title={t('skills.new')}
+        centered
+        radius="lg"
+      >
         <Stack gap="md">
-          <TextInput label={t('common.name')} description={t('skills.nameHint')} placeholder="my-skill" value={newName} onChange={(e) => setNewName(e.currentTarget.value)} data-autofocus />
-          <Textarea label={t('agents.description')} value={newDesc} onChange={(e) => setNewDesc(e.currentTarget.value)} autosize minRows={2} />
+          <TextInput
+            label={t('common.name')}
+            description={t('skills.nameHint')}
+            placeholder="my-skill"
+            value={newName}
+            onChange={(e) => setNewName(e.currentTarget.value)}
+            data-autofocus
+          />
+          <Textarea
+            label={t('agents.description')}
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.currentTarget.value)}
+            autosize
+            minRows={2}
+          />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
@@ -340,7 +431,9 @@ function SkillEditor({
   }
 
   const saveDoc = async (body: string): Promise<boolean> => {
-    const r = await runWrite(window.api.skillDocSave(name, { description: desc, body }), { success: t('editor.saved') })
+    const r = await runWrite(window.api.skillDocSave(name, { description: desc, body }), {
+      success: t('editor.saved')
+    })
     if (r === null) return false
     setDoc((d) => (d ? { ...d, description: desc, body } : d))
     onSaved()
@@ -355,7 +448,9 @@ function SkillEditor({
         <Tabs.Tab value="doc" data-testid="tab-edit">
           {t('detail.edit')}
         </Tabs.Tab>
-        {others.length > 0 && <Tabs.Tab value="files">{`${t('skills.files')} ${others.length}`}</Tabs.Tab>}
+        {others.length > 0 && (
+          <Tabs.Tab value="files">{`${t('skills.files')} ${others.length}`}</Tabs.Tab>
+        )}
       </Tabs.List>
       <Tabs.Panel value="preview">
         {docErr ? (
@@ -440,7 +535,15 @@ function SkillEditor({
 }
 
 /** Extra file picker + raw editor */
-function SkillFileEditor({ name, files, onSaved }: { name: string; files: string[]; onSaved: () => void }): React.JSX.Element {
+function SkillFileEditor({
+  name,
+  files,
+  onSaved
+}: {
+  name: string
+  files: string[]
+  onSaved: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [rel, setRel] = useState<string>(files[0])
   const [text, setText] = useState<string | null>(null)
@@ -448,6 +551,7 @@ function SkillFileEditor({ name, files, onSaved }: { name: string; files: string
 
   useEffect(() => {
     let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the previous file before loading another
     setText(null)
     setErr(null)
     window.api.skillFileRead(name, rel).then((r) => {
@@ -462,7 +566,14 @@ function SkillFileEditor({ name, files, onSaved }: { name: string; files: string
 
   return (
     <Stack gap="sm">
-      <Select data={files} value={rel} onChange={(v) => v && setRel(v)} allowDeselect={false} w={320} leftSection={<FolderOpen size={14} />} />
+      <Select
+        data={files}
+        value={rel}
+        onChange={(v) => v && setRel(v)}
+        allowDeselect={false}
+        w={320}
+        leftSection={<FolderOpen size={14} />}
+      />
       {err ? (
         <ErrorAlert message={err} />
       ) : text === null ? (
@@ -472,7 +583,9 @@ function SkillFileEditor({ name, files, onSaved }: { name: string; files: string
           key={`${name}/${rel}`}
           value={text}
           onSave={async (next) => {
-            const r = await runWrite(window.api.skillFileSave(name, rel, next), { success: t('editor.saved') })
+            const r = await runWrite(window.api.skillFileSave(name, rel, next), {
+              success: t('editor.saved')
+            })
             if (r !== null) {
               setText(next)
               onSaved()

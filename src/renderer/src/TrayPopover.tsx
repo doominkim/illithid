@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Box, Button, CopyButton, Divider, Group, ScrollArea, Select, Stack, Text, UnstyledButton } from '@mantine/core'
+import {
+  Box,
+  Button,
+  CopyButton,
+  Divider,
+  Group,
+  ScrollArea,
+  Select,
+  Stack,
+  Text,
+  UnstyledButton
+} from '@mantine/core'
 import type { TraySession, UpdateView, WorkspaceView } from '../../shared/api'
 import { ToolIcon } from './components/ToolIcon'
 
-const TOOL_SHORT: Record<string, string> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', gemini: 'Gemini', copilot: 'Copilot', grok: 'Grok' }
+const TOOL_SHORT: Record<string, string> = {
+  claude: 'Claude',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+  gemini: 'Gemini',
+  copilot: 'Copilot',
+  grok: 'Grok'
+}
 
 function ago(iso?: string): string {
   const t = iso ? Date.parse(iso) : NaN
@@ -27,6 +45,7 @@ export function TrayPopover(): React.JSX.Element {
     setNow(Date.now())
   }, [])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount; load also refreshes the relative times
     load()
     window.addEventListener('focus', load)
     const offSessions = window.api.onTraySessions(setSessions)
@@ -43,7 +62,12 @@ export function TrayPopover(): React.JSX.Element {
     <Stack gap={0} h="100vh" style={{ overflow: 'hidden' }} data-testid="tray-popover">
       {update && (
         <Box px="sm" pt="sm">
-          <Button fullWidth size="xs" variant="light" onClick={() => void window.api.trayCommand({ kind: 'update' })}>
+          <Button
+            fullWidth
+            size="xs"
+            variant="light"
+            onClick={() => void window.api.trayCommand({ kind: 'update' })}
+          >
             Update to {update.version}…
           </Button>
         </Box>
@@ -58,7 +82,14 @@ export function TrayPopover(): React.JSX.Element {
           </Text>
         ) : (
           sessions.map((s) => (
-            <Group key={s.resumeCommand} gap={8} wrap="nowrap" px={6} py={5} className="ac-tray-row">
+            <Group
+              key={s.resumeCommand}
+              gap={8}
+              wrap="nowrap"
+              px={6}
+              py={5}
+              className="ac-tray-row"
+            >
               <ToolIcon tool={s.tool} size={16} />
               <Box style={{ flex: 1, minWidth: 0 }}>
                 <Text size="sm" truncate="end" title={s.title}>
@@ -70,7 +101,13 @@ export function TrayPopover(): React.JSX.Element {
               </Box>
               <CopyButton value={s.resumeCommand}>
                 {({ copied, copy }) => (
-                  <Button size="compact-xs" variant={copied ? 'light' : 'default'} color={copied ? 'accent' : undefined} onClick={copy} title={s.resumeCommand}>
+                  <Button
+                    size="compact-xs"
+                    variant={copied ? 'light' : 'default'}
+                    color={copied ? 'accent' : undefined}
+                    onClick={copy}
+                    title={s.resumeCommand}
+                  >
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
                 )}
@@ -99,14 +136,23 @@ export function TrayPopover(): React.JSX.Element {
       <Divider />
       <Group px={6} py={6} gap={0} justify="space-between">
         <Group gap={0}>
-          <UnstyledButton className="ac-tray-action" onClick={() => void window.api.trayCommand({ kind: 'open' })}>
+          <UnstyledButton
+            className="ac-tray-action"
+            onClick={() => void window.api.trayCommand({ kind: 'open' })}
+          >
             Open Illithid
           </UnstyledButton>
-          <UnstyledButton className="ac-tray-action" onClick={() => void window.api.trayCommand({ kind: 'settings' })}>
+          <UnstyledButton
+            className="ac-tray-action"
+            onClick={() => void window.api.trayCommand({ kind: 'settings' })}
+          >
             Settings
           </UnstyledButton>
         </Group>
-        <UnstyledButton className="ac-tray-action" onClick={() => void window.api.trayCommand({ kind: 'quit' })}>
+        <UnstyledButton
+          className="ac-tray-action"
+          onClick={() => void window.api.trayCommand({ kind: 'quit' })}
+        >
           Quit
         </UnstyledButton>
       </Group>

@@ -9,7 +9,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { readConfig } from '../config'
-import { blockBodyMulti, outsideBlockMulti, presentMarkers, removeBlockMulti, spliceBlockMulti, type MarkerPair } from '../text'
+import {
+  blockBodyMulti,
+  outsideBlockMulti,
+  presentMarkers,
+  removeBlockMulti,
+  spliceBlockMulti,
+  type MarkerPair
+} from '../text'
 import type { TargetDef } from '../types'
 import { LEGACY_TOML_MCP_MARKERS, TOML_MCP_MARKERS } from './codexMcp'
 
@@ -28,7 +35,8 @@ const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.
  * compat block appended after it would swap places on the next sync
  */
 function withBlock(text: string): string {
-  if (presentMarkers(text, [GROK_COMPAT_MARKERS])) return spliceBlockMulti(text, GROK_COMPAT_MARKERS, [], BODY)
+  if (presentMarkers(text, [GROK_COMPAT_MARKERS]))
+    return spliceBlockMulti(text, GROK_COMPAT_MARKERS, [], BODY)
   const mcp = presentMarkers(text, [TOML_MCP_MARKERS, ...LEGACY_TOML_MCP_MARKERS])
   if (!mcp) return spliceBlockMulti(text, GROK_COMPAT_MARKERS, [], BODY)
   const i = text.indexOf(mcp[0])
@@ -70,12 +78,17 @@ export const grokCompat: TargetDef = {
     const off = !ctx.retiring && !!ctx.home && readConfig(ctx.home).config.grokReadsClaude === false
     // Default with no block: nothing to do (and nothing to validate — grokMcp reports a broken file on its own)
     if (!off && !presentMarkers(before, [GROK_COMPAT_MARKERS]))
-      return { after: before, notes: ['Grok reads Claude Code skills and MCP servers (default) — no compat block'] }
+      return {
+        after: before,
+        notes: ['Grok reads Claude Code skills and MCP servers (default) — no compat block']
+      }
     const outside = outsideBlockMulti(before, [GROK_COMPAT_MARKERS])
     if (off && userCompat(outside)) {
       return {
         after: removeBlockMulti(before, [GROK_COMPAT_MARKERS]),
-        notes: ['[compat.claude] is set outside the app block — your values are kept, the app writes none']
+        notes: [
+          '[compat.claude] is set outside the app block — your values are kept, the app writes none'
+        ]
       }
     }
     const after = off ? withBlock(before) : removeBlockMulti(before, [GROK_COMPAT_MARKERS])
@@ -84,7 +97,9 @@ export const grokCompat: TargetDef = {
     } catch {
       return {
         after: before,
-        notes: ['config.toml would not be valid TOML after the change — a compat table outside the app block clashes with [compat.claude]'],
+        notes: [
+          'config.toml would not be valid TOML after the change — a compat table outside the app block clashes with [compat.claude]'
+        ],
         error: 'invalid TOML result'
       }
     }

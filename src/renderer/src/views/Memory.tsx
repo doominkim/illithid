@@ -11,7 +11,8 @@ import { ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
-import { ReloadButton, useReload } from '../components/ReloadButton'
+import { ReloadButton } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
 import { ToolIcon } from '../components/ToolIcon'
 import { includesCI } from '../lib/format'
@@ -26,7 +27,12 @@ import { ClaudeMemory, CodexMemory, IndexMeters } from './ToolMemory'
 function firstHeading(text: string): string {
   const m = /^#{1,3}\s+(.+)$/m.exec(text)
   if (m) return m[1].trim()
-  return text.split('\n').find((l) => l.trim())?.trim() ?? ''
+  return (
+    text
+      .split('\n')
+      .find((l) => l.trim())
+      ?.trim() ?? ''
+  )
 }
 
 async function loadFiles(): Promise<string[]> {
@@ -36,7 +42,13 @@ async function loadFiles(): Promise<string[]> {
 }
 
 /** Shared memory (memory/*.md): file list + markdown editor. MEMORY.md is the index */
-function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: IndexStat }): React.JSX.Element {
+function SharedMemory({
+  shared,
+  limits
+}: {
+  shared: IndexStat | null
+  limits: IndexStat
+}): React.JSX.Element {
   const { t } = useTranslation()
   const { request } = useNav()
   const { config } = useConfig()
@@ -72,7 +84,9 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
     const rel = newRel
     if (!rel || newErr) return
     const title = rel.split('/').pop()!.replace(/\.md$/, '')
-    const r = await runWrite(window.api.memorySave(rel, `# ${title}\n\n`), { success: t('memory.created') })
+    const r = await runWrite(window.api.memorySave(rel, `# ${title}\n\n`), {
+      success: t('memory.created')
+    })
     if (r !== null) {
       setCreating(false)
       setNewName('')
@@ -101,7 +115,12 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
         }
         right={
           <>
-            <Button size="xs" leftSection={<Plus size={13} />} onClick={() => setCreating(true)} data-testid="memory-new">
+            <Button
+              size="xs"
+              leftSection={<Plus size={13} />}
+              onClick={() => setCreating(true)}
+              data-testid="memory-new"
+            >
               {t('memory.new')}
             </Button>
           </>
@@ -124,7 +143,9 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
             return (
               <ListRow
                 key={f}
-                avatar={<FileText size={16} style={{ color: 'var(--ac-text-muted)', flexShrink: 0 }} />}
+                avatar={
+                  <FileText size={16} style={{ color: 'var(--ac-text-muted)', flexShrink: 0 }} />
+                }
                 title={f}
                 right={
                   folder && (
@@ -161,7 +182,13 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
         {current && <MemoryFile key={current} rel={current} onSaved={reload} />}
       </DetailSheet>
 
-      <Modal opened={creating} onClose={() => setCreating(false)} title={t('memory.new')} centered radius="lg">
+      <Modal
+        opened={creating}
+        onClose={() => setCreating(false)}
+        title={t('memory.new')}
+        centered
+        radius="lg"
+      >
         <Stack gap="md">
           <TextInput
             label={t('common.name')}
@@ -178,13 +205,25 @@ function SharedMemory({ shared, limits }: { shared: IndexStat | null; limits: In
             <Button variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim() || !!newErr} onClick={() => void create()} data-testid="memory-new-ok">
+            <Button
+              disabled={!newName.trim() || !!newErr}
+              onClick={() => void create()}
+              data-testid="memory-new-ok"
+            >
               {t('common.create')}
             </Button>
           </Group>
         </Stack>
       </Modal>
-      <ConfirmModal opened={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={remove} danger title={t('memory.deleteTitle')} confirmLabel={t('common.delete')} message={t('memory.deleteBody', { name: current ?? '' })} />
+      <ConfirmModal
+        opened={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={remove}
+        danger
+        title={t('memory.deleteTitle')}
+        confirmLabel={t('common.delete')}
+        message={t('memory.deleteBody', { name: current ?? '' })}
+      />
     </Stack>
   )
 }
@@ -227,7 +266,9 @@ function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): Rea
           <MarkdownEditor
             value={text}
             onSave={async (next) => {
-              const r = await runWrite(window.api.memorySave(rel, next), { success: t('editor.saved') })
+              const r = await runWrite(window.api.memorySave(rel, next), {
+                success: t('editor.saved')
+              })
               if (r !== null) {
                 setText(next)
                 onSaved()
@@ -252,19 +293,40 @@ function Memory(): React.JSX.Element {
       <PageHeader title={t('nav.memory')} actions={<ReloadButton />} />
       <Tabs value={tab} onChange={setTab} mb="md" keepMounted={false}>
         <Tabs.List>
-          <Tabs.Tab value="shared" data-testid="memory-tab-shared" leftSection={<Layers size={14} />}>
+          <Tabs.Tab
+            value="shared"
+            data-testid="memory-tab-shared"
+            leftSection={<Layers size={14} />}
+          >
             {t('memory.tabShared')}
           </Tabs.Tab>
-          <Tabs.Tab value="claude" data-testid="memory-tab-claude" leftSection={<ToolIcon tool="claude" size={14} />}>
+          <Tabs.Tab
+            value="claude"
+            data-testid="memory-tab-claude"
+            leftSection={<ToolIcon tool="claude" size={14} />}
+          >
             {t('memory.tabClaude')}
           </Tabs.Tab>
-          <Tabs.Tab value="codex" data-testid="memory-tab-codex" leftSection={<ToolIcon tool="codex" size={14} />}>
+          <Tabs.Tab
+            value="codex"
+            data-testid="memory-tab-codex"
+            leftSection={<ToolIcon tool="codex" size={14} />}
+          >
             {t('memory.tabCodex')}
           </Tabs.Tab>
         </Tabs.List>
       </Tabs>
       {tab === 'shared' && <SharedMemory shared={tm.data?.claude.shared ?? null} limits={limits} />}
-      {tab !== 'shared' && (tm.error ? <ErrorAlert message={tm.error} /> : !tm.data ? <Loading /> : tab === 'claude' ? <ClaudeMemory view={tm.data} /> : <CodexMemory entries={tm.data.codex} />)}
+      {tab !== 'shared' &&
+        (tm.error ? (
+          <ErrorAlert message={tm.error} />
+        ) : !tm.data ? (
+          <Loading />
+        ) : tab === 'claude' ? (
+          <ClaudeMemory view={tm.data} />
+        ) : (
+          <CodexMemory entries={tm.data.codex} />
+        ))}
     </Stack>
   )
 }

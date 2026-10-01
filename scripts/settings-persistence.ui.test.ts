@@ -15,12 +15,29 @@ function makeHome(): string {
   mkdirSync(join(home, '.config/illithid'), { recursive: true })
   writeFileSync(
     join(home, '.config/illithid/config.json'),
-    JSON.stringify({ version: 1, toolsInUse: [], marketEnabled: false, updateCheck: false, backupRetention: { enabled: false, days: 30, keepRollback: 3 } })
+    JSON.stringify({
+      version: 1,
+      toolsInUse: [],
+      marketEnabled: false,
+      updateCheck: false,
+      backupRetention: { enabled: false, days: 30, keepRollback: 3 }
+    })
   )
   return home
 }
-const envFor = (home: string, userData: string, extra: Record<string, string> = {}): Record<string, string> => {
-  const env = { ...process.env, HOME: home, ILLITHID_HOME: home, ILLITHID_TEST: '1', ILLITHID_USER_DATA: userData, ...extra } as Record<string, string>
+const envFor = (
+  home: string,
+  userData: string,
+  extra: Record<string, string> = {}
+): Record<string, string> => {
+  const env = {
+    ...process.env,
+    HOME: home,
+    ILLITHID_HOME: home,
+    ILLITHID_TEST: '1',
+    ILLITHID_USER_DATA: userData,
+    ...extra
+  } as Record<string, string>
   delete env.ELECTRON_RUN_AS_NODE
   delete env.ELECTRON_RENDERER_URL
   return env
@@ -30,7 +47,11 @@ const launch = (env: Record<string, string>): Promise<ElectronApplication> =>
   electron.launch({ args: [MAIN], env, timeout: 60000 })
 const uiOf = (home: string): Record<string, unknown> | undefined =>
   JSON.parse(readFileSync(join(home, '.config/illithid/config.json'), 'utf8')).ui
-async function until(check: () => boolean | Promise<boolean>, what: string, ms = 15000): Promise<void> {
+async function until(
+  check: () => boolean | Promise<boolean>,
+  what: string,
+  ms = 15000
+): Promise<void> {
   const end = Date.now() + ms
   while (Date.now() < end) {
     if (await check()) return
@@ -61,7 +82,10 @@ test(
       await until(() => uiOf(home)?.colorScheme === 'dark', 'ui.colorScheme saved')
       await page.locator('[data-menu="skills"]').click()
       await pickSegment(page, 'view-toggle', 'grid')
-      await until(() => (uiOf(home)?.views as Record<string, string> | undefined)?.skills === 'grid', 'ui.views.skills saved')
+      await until(
+        () => (uiOf(home)?.views as Record<string, string> | undefined)?.skills === 'grid',
+        'ui.views.skills saved'
+      )
     } finally {
       await first.close()
     }
@@ -71,42 +95,60 @@ test(
       const page = await second.firstWindow()
       await page.locator('[data-menu="skills"]').click()
       assert.equal(await page.evaluate(() => document.documentElement.lang), 'en')
-      assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-mantine-color-scheme')), 'dark')
-      assert.equal(await page.getByTestId('view-toggle').locator('input[value="grid"]').isChecked(), true)
+      assert.equal(
+        await page.evaluate(() =>
+          document.documentElement.getAttribute('data-mantine-color-scheme')
+        ),
+        'dark'
+      )
+      assert.equal(
+        await page.getByTestId('view-toggle').locator('input[value="grid"]').isChecked(),
+        true
+      )
     } finally {
       await second.close()
     }
   }
 )
 
-test('REQ-SETTINGS-PERSISTENCE-5 values left in localStorage move to config.json once', { timeout: 120000 }, async () => {
-  const home = makeHome()
-  const userData = newUserData()
-  const seed = await launch(envFor(home, userData))
-  try {
-    const page = await seed.firstWindow()
-    await page.locator('[data-menu="settings"]').waitFor()
-    await page.evaluate(() => {
-      localStorage.setItem('illithid-language', 'ja')
-      localStorage.setItem('illithid-color-scheme', 'light')
-      localStorage.setItem('illithid-view:mcp', 'grid')
-    })
-    // Remove what this launch itself may have written, so the next start sees an old-format install
-    writeFileSync(join(home, '.config/illithid/config.json'), JSON.stringify({ version: 1, toolsInUse: [], marketEnabled: false, updateCheck: false }))
-  } finally {
-    await seed.close()
+test(
+  'REQ-SETTINGS-PERSISTENCE-5 values left in localStorage move to config.json once',
+  { timeout: 120000 },
+  async () => {
+    const home = makeHome()
+    const userData = newUserData()
+    const seed = await launch(envFor(home, userData))
+    try {
+      const page = await seed.firstWindow()
+      await page.locator('[data-menu="settings"]').waitFor()
+      await page.evaluate(() => {
+        localStorage.setItem('illithid-language', 'ja')
+        localStorage.setItem('illithid-color-scheme', 'light')
+        localStorage.setItem('illithid-view:mcp', 'grid')
+      })
+      // Remove what this launch itself may have written, so the next start sees an old-format install
+      writeFileSync(
+        join(home, '.config/illithid/config.json'),
+        JSON.stringify({ version: 1, toolsInUse: [], marketEnabled: false, updateCheck: false })
+      )
+    } finally {
+      await seed.close()
+    }
+    const next = await launch(envFor(home, userData))
+    try {
+      const page = await next.firstWindow()
+      await until(
+        () => (uiOf(home)?.views as Record<string, string> | undefined)?.mcp === 'grid',
+        'localStorage values moved'
+      )
+      assert.deepEqual(uiOf(home), { language: 'ja', colorScheme: 'light', views: { mcp: 'grid' } })
+      assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja')
+      assert.equal(await page.evaluate(() => localStorage.getItem('illithid-language')), 'ja')
+    } finally {
+      await next.close()
+    }
   }
-  const next = await launch(envFor(home, userData))
-  try {
-    const page = await next.firstWindow()
-    await until(() => (uiOf(home)?.views as Record<string, string> | undefined)?.mcp === 'grid', 'localStorage values moved')
-    assert.deepEqual(uiOf(home), { language: 'ja', colorScheme: 'light', views: { mcp: 'grid' } })
-    assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja')
-    assert.equal(await page.evaluate(() => localStorage.getItem('illithid-language')), 'ja')
-  } finally {
-    await next.close()
-  }
-})
+)
 
 test(
   'REQ-SETTINGS-PERSISTENCE-7 REQ-SETTINGS-PERSISTENCE-8 a same-version launch focuses the running app; a newer one takes over',
@@ -119,7 +161,9 @@ test(
     try {
       await running.firstWindow()
       const visible = (): Promise<boolean> =>
-        running.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w.isVisible()))
+        running.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some((w) => w.isVisible())
+        )
       assert.equal(await visible(), false)
       await until(() => existsSync(join(userData, 'instance.json')), 'instance.json written')
 
@@ -130,10 +174,14 @@ test(
       await until(visible, 'running window brought forward')
 
       const runningExit = exited(running.process())
-      newer = spawn(electronBin, [MAIN], { env: envFor(home, userData, { ILLITHID_TEST_VERSION: '99.0.0' }), stdio: 'ignore' })
+      newer = spawn(electronBin, [MAIN], {
+        env: envFor(home, userData, { ILLITHID_TEST_VERSION: '99.0.0' }),
+        stdio: 'ignore'
+      })
       await runningExit
       await until(
-        () => JSON.parse(readFileSync(join(userData, 'instance.json'), 'utf8')).version === '99.0.0',
+        () =>
+          JSON.parse(readFileSync(join(userData, 'instance.json'), 'utf8')).version === '99.0.0',
         'newer build took over'
       )
       assert.equal(newer.exitCode, null)

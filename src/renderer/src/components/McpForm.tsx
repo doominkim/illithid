@@ -1,5 +1,18 @@
 import { useState } from 'react'
-import { ActionIcon, Alert, Box, Button, Group, NumberInput, PasswordInput, SegmentedControl, Stack, Text, Textarea, TextInput } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Box,
+  Button,
+  Group,
+  NumberInput,
+  PasswordInput,
+  SegmentedControl,
+  Stack,
+  Text,
+  Textarea,
+  TextInput
+} from '@mantine/core'
 import { Plus, Save, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { McpServer } from '../../../shared/api'
@@ -57,7 +70,18 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
 
   const build = (): McpServer => {
     const rest: Record<string, unknown> = { ...(def ?? {}) }
-    for (const k of ['transport', 'url', 'command', 'args', 'env', 'headers', 'bearerEnv', 'bearerToken', 'timeoutMs']) delete rest[k]
+    for (const k of [
+      'transport',
+      'url',
+      'command',
+      'args',
+      'env',
+      'headers',
+      'bearerEnv',
+      'bearerToken',
+      'timeoutMs'
+    ])
+      delete rest[k]
     const out: McpServer = { ...(rest as object), transport }
     if (transport === 'stdio') {
       out.command = command.trim()
@@ -94,22 +118,42 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
         <Text size="sm" fw={500}>
           {label}
         </Text>
-        <Button size="compact-xs" variant="subtle" leftSection={<Plus size={11} />} onClick={() => set([...rows, { k: '', v: '' }])}>
+        <Button
+          size="compact-xs"
+          variant="subtle"
+          leftSection={<Plus size={11} />}
+          onClick={() => set([...rows, { k: '', v: '' }])}
+        >
           {t('common.add')}
         </Button>
       </Group>
       <Stack gap={6}>
         {rows.map((r, i) => (
           <Box key={i} className="ac-kv">
-            <TextInput size="xs" placeholder={t('mcp.key')} value={r.k} onChange={(e) => set(rows.map((x, j) => (j === i ? { ...x, k: e.currentTarget.value } : x)))} />
+            <TextInput
+              size="xs"
+              placeholder={t('mcp.key')}
+              value={r.k}
+              onChange={(e) =>
+                set(rows.map((x, j) => (j === i ? { ...x, k: e.currentTarget.value } : x)))
+              }
+            />
             <PasswordInput
               size="xs"
               value={r.v}
-              onChange={(e) => set(rows.map((x, j) => (j === i ? { ...x, v: e.currentTarget.value } : x)))}
+              onChange={(e) =>
+                set(rows.map((x, j) => (j === i ? { ...x, v: e.currentTarget.value } : x)))
+              }
               ff="monospace"
               autoComplete="off"
             />
-            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => set(rows.filter((_, j) => j !== i))} aria-label={t('common.remove')}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="gray"
+              onClick={() => set(rows.filter((_, j) => j !== i))}
+              aria-label={t('common.remove')}
+            >
               <X size={13} />
             </ActionIcon>
           </Box>
@@ -122,28 +166,76 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
     <Box className="ac-card" p="lg">
       <Stack gap="md">
         <Group grow align="flex-start">
-          <TextInput label={t('common.name')} value={name} disabled={!isNew} onChange={(e) => setName(e.currentTarget.value)} error={name && !nameOk ? t('mcp.nameInvalid') : undefined} data-testid="mcp-name" />
+          <TextInput
+            label={t('common.name')}
+            value={name}
+            disabled={!isNew}
+            onChange={(e) => setName(e.currentTarget.value)}
+            error={name && !nameOk ? t('mcp.nameInvalid') : undefined}
+            data-testid="mcp-name"
+          />
           <Box>
             <Text size="sm" fw={500} mb={4}>
               {t('mcp.transport')}
             </Text>
-            <SegmentedControl fullWidth value={transport} onChange={setTransport} data={[{ value: 'http', label: 'http' }, { value: 'stdio', label: 'stdio' }]} />
+            <SegmentedControl
+              fullWidth
+              value={transport}
+              onChange={setTransport}
+              data={[
+                { value: 'http', label: 'http' },
+                { value: 'stdio', label: 'stdio' }
+              ]}
+            />
           </Box>
         </Group>
         {transport === 'stdio' ? (
           <>
-            <TextInput label={t('mcp.command')} value={command} onChange={(e) => setCommand(e.currentTarget.value)} ff="monospace" data-testid="mcp-command" />
-            <Textarea label={t('mcp.args')} description={t('mcp.argsHint')} value={args} onChange={(e) => setArgs(e.currentTarget.value)} autosize minRows={2} styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }} />
+            <TextInput
+              label={t('mcp.command')}
+              value={command}
+              onChange={(e) => setCommand(e.currentTarget.value)}
+              ff="monospace"
+              data-testid="mcp-command"
+            />
+            <Textarea
+              label={t('mcp.args')}
+              description={t('mcp.argsHint')}
+              value={args}
+              onChange={(e) => setArgs(e.currentTarget.value)}
+              autosize
+              minRows={2}
+              styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+            />
             {kvEditor(t('mcp.env'), env, setEnv)}
           </>
         ) : (
           <>
-            <TextInput label={t('mcp.url')} value={url} onChange={(e) => setUrl(e.currentTarget.value)} ff="monospace" data-testid="mcp-url" />
-            <PasswordInput label={t('mcp.bearer')} value={bearer} onChange={(e) => setBearer(e.currentTarget.value)} ff="monospace" autoComplete="off" />
+            <TextInput
+              label={t('mcp.url')}
+              value={url}
+              onChange={(e) => setUrl(e.currentTarget.value)}
+              ff="monospace"
+              data-testid="mcp-url"
+            />
+            <PasswordInput
+              label={t('mcp.bearer')}
+              value={bearer}
+              onChange={(e) => setBearer(e.currentTarget.value)}
+              ff="monospace"
+              autoComplete="off"
+            />
             {kvEditor(t('mcp.headers'), headers, setHeaders)}
           </>
         )}
-        <NumberInput label={t('mcp.timeout')} value={timeoutMs} onChange={setTimeoutMs} min={0} step={1000} w={200} />
+        <NumberInput
+          label={t('mcp.timeout')}
+          value={timeoutMs}
+          onChange={setTimeoutMs}
+          min={0}
+          step={1000}
+          w={200}
+        />
         {warnings.length > 0 && (
           <Alert color="yellow" variant="light" radius="md" title={t('mcp.warnings')}>
             <Stack gap={2}>
@@ -161,7 +253,13 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
               {t('common.cancel')}
             </Button>
           )}
-          <Button leftSection={<Save size={13} />} disabled={!valid} loading={saving} onClick={() => void save()} data-testid="mcp-save">
+          <Button
+            leftSection={<Save size={13} />}
+            disabled={!valid}
+            loading={saving}
+            onClick={() => void save()}
+            data-testid="mcp-save"
+          >
             {t('common.save')}
           </Button>
         </Group>

@@ -126,7 +126,12 @@ export interface FileChange {
    * - copilotHomeOverride COPILOT_HOME points elsewhere, so Copilot wouldn't read ~/.copilot — no Copilot file is written
    * - jsoncUnsupported    (the file exists) the alternate being used (opencode.jsonc) is not plain JSON — left untouched to keep its comments
    */
-  skip?: 'nothingToWrite' | 'toolNotInitialized' | 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
+  skip?:
+    | 'nothingToWrite'
+    | 'toolNotInitialized'
+    | 'copilotHomeOverride'
+    | 'grokHomeOverride'
+    | 'jsoncUnsupported'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]
   /** MCP targets: servers this change adds, updates or removes (names only) */

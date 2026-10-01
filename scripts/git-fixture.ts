@@ -176,8 +176,15 @@ async function run(root: string): Promise<void> {
     pullDiverged.ok ? '' : pullDiverged.reason.split('\n').slice(-1)[0]
   )
   s = await gitStatus(a)
-  check('gitPull: no merge attempted (HEAD unchanged)', sh(a, 'rev-parse', 'HEAD').trim() === headBefore)
-  check('gitPull: no conflicts or changes', s.clean && s.conflicted.length === 0, JSON.stringify(s.files))
+  check(
+    'gitPull: no merge attempted (HEAD unchanged)',
+    sh(a, 'rev-parse', 'HEAD').trim() === headBefore
+  )
+  check(
+    'gitPull: no conflicts or changes',
+    s.clean && s.conflicted.length === 0,
+    JSON.stringify(s.files)
+  )
   check(
     'gitStatus: diverged ahead 1 · behind 1',
     s.ahead === 1 && s.behind === 1,

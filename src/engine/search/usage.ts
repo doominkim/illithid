@@ -19,9 +19,30 @@ type Json = Record<string, unknown>
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$/
 const SKILL_MD_RE = /skills[\\/]+([A-Za-z0-9._-]+)[\\/]+SKILL\.md/g
 /** Codex calls that change a SKILL.md rather than use the skill */
-const SKILL_EDIT_RE = /\bsed\s+-i\b|\btee\b|\bcp\b|\bmv\b|\brm\b|>\s*\S*SKILL\.md|\*\*\* (?:Update|Add|Delete) File:/
+const SKILL_EDIT_RE =
+  /\bsed\s+-i\b|\btee\b|\bcp\b|\bmv\b|\brm\b|>\s*\S*SKILL\.md|\*\*\* (?:Update|Add|Delete) File:/
 /** OpenCode tools that aren't MCP even though they may contain an underscore */
-const OPENCODE_BUILTIN = new Set(['bash', 'read', 'write', 'edit', 'multiedit', 'glob', 'grep', 'list', 'task', 'todowrite', 'todoread', 'webfetch', 'websearch', 'patch', 'lsp_diagnostics', 'lsp_hover', 'skill', 'invalid', 'batch'])
+const OPENCODE_BUILTIN = new Set([
+  'bash',
+  'read',
+  'write',
+  'edit',
+  'multiedit',
+  'glob',
+  'grep',
+  'list',
+  'task',
+  'todowrite',
+  'todoread',
+  'webfetch',
+  'websearch',
+  'patch',
+  'lsp_diagnostics',
+  'lsp_hover',
+  'skill',
+  'invalid',
+  'batch'
+])
 
 /** Create (or reset on a version change) the usage table. Returns true when it was (re)created */
 export function ensureUsage(db: DatabaseSync): boolean {
@@ -128,7 +149,10 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
 
 /** Per-session accumulator: counts by (kind, name, model, day). Codex skills count once per turn */
 export class UsageCounter {
-  readonly rows = new Map<string, { kind: StoredKind; name: string; model: string; day: string; n: number }>()
+  readonly rows = new Map<
+    string,
+    { kind: StoredKind; name: string; model: string; day: string; n: number }
+  >()
   private readonly seenTurn = new Set<string>()
 
   constructor(
@@ -218,8 +242,16 @@ export function mcpKey(name: string): string {
  * Rows that belong to one skill or MCP server. usageOf filters in SQL and usageSummaries in code; both live here so the
  * list and the detail always count the same calls. SQLite LIKE is case-insensitive for ASCII, and MCP names are ASCII
  */
-function usageFilter(kind: UsageKind, name: string): { sql: string; args: string[]; test: (r: { kind: string; name: string }) => boolean } {
-  if (kind === 'skill') return { sql: `kind = 'skill' and name = ?`, args: [name], test: (r) => r.kind === 'skill' && r.name === name }
+function usageFilter(
+  kind: UsageKind,
+  name: string
+): { sql: string; args: string[]; test: (r: { kind: string; name: string }) => boolean } {
+  if (kind === 'skill')
+    return {
+      sql: `kind = 'skill' and name = ?`,
+      args: [name],
+      test: (r) => r.kind === 'skill' && r.name === name
+    }
   const key = mcpKey(name)
   const prefixes = [`${name}_`, `${key}_`].map((p) => p.toLowerCase())
   return {
@@ -235,7 +267,13 @@ function usageFilter(kind: UsageKind, name: string): { sql: string; args: string
 function dailyKeysOf(days: number, now: number): string[] {
   const today = new Date(now)
   const keys: string[] = []
-  for (let i = days - 1; i >= 0; i--) keys.push(dayOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i, 12).toISOString(), undefined))
+  for (let i = days - 1; i >= 0; i--)
+    keys.push(
+      dayOf(
+        new Date(today.getFullYear(), today.getMonth(), today.getDate() - i, 12).toISOString(),
+        undefined
+      )
+    )
   return keys
 }
 
@@ -250,7 +288,12 @@ export interface UsageSummary {
  * Recent usage of many skills or MCP servers in one query, for the lists. Same counts as usageOf's recent/daily.
  * null while there is nothing to read yet (no index, another schema)
  */
-export function usageSummaries(home: string, kind: UsageKind, names: string[], opts: { days?: number; now?: number; dbPath?: string } = {}): Record<string, UsageSummary> | null {
+export function usageSummaries(
+  home: string,
+  kind: UsageKind,
+  names: string[],
+  opts: { days?: number; now?: number; dbPath?: string } = {}
+): Record<string, UsageSummary> | null {
   const keys = dailyKeysOf(opts.days ?? 30, opts.now ?? Date.now())
   const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
   if (!db) return null
@@ -258,8 +301,15 @@ export function usageSummaries(home: string, kind: UsageKind, names: string[], o
     if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return null
     const kinds = kind === 'skill' ? ['skill'] : ['mcp', 'mcpRaw']
     const rows = db
-      .prepare(`select kind, name, day, sum(n) as n from usage where kind in (${kinds.map(() => '?').join(', ')}) and day >= ? and day <= ? group by kind, name, day`)
-      .all(...kinds, keys[0], keys[keys.length - 1]) as { kind: string; name: string; day: string; n: number }[]
+      .prepare(
+        `select kind, name, day, sum(n) as n from usage where kind in (${kinds.map(() => '?').join(', ')}) and day >= ? and day <= ? group by kind, name, day`
+      )
+      .all(...kinds, keys[0], keys[keys.length - 1]) as {
+      kind: string
+      name: string
+      day: string
+      n: number
+    }[]
     const slot = new Map(keys.map((d, i) => [d, i]))
     const out: Record<string, UsageSummary> = {}
     for (const name of names) {
@@ -281,7 +331,12 @@ export function usageSummaries(home: string, kind: UsageKind, names: string[], o
  * Usage of one skill or MCP server. null while there is nothing to read yet (no index, another schema, usage not built) —
  * the caller should start an index run. Never creates or migrates the index
  */
-export function usageOf(home: string, kind: UsageKind, name: string, opts: { days?: number; now?: number; dbPath?: string } = {}): UsageStats | null {
+export function usageOf(
+  home: string,
+  kind: UsageKind,
+  name: string,
+  opts: { days?: number; now?: number; dbPath?: string } = {}
+): UsageStats | null {
   const days = opts.days ?? 30
   const dailyKeys = dailyKeysOf(days, opts.now ?? Date.now())
   const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
@@ -289,7 +344,11 @@ export function usageOf(home: string, kind: UsageKind, name: string, opts: { day
   try {
     if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return null
     const { sql: where, args } = usageFilter(kind, name)
-    const rows = db.prepare(`select tool, model, day, sum(n) as n from usage where ${where} group by tool, model, day`).all(...args) as {
+    const rows = db
+      .prepare(
+        `select tool, model, day, sum(n) as n from usage where ${where} group by tool, model, day`
+      )
+      .all(...args) as {
       tool: string
       model: string
       day: string
@@ -319,9 +378,16 @@ export function usageOf(home: string, kind: UsageKind, name: string, opts: { day
       }
     }
     const daily = dailyKeys.map((day) => ({ day, n: byDay.get(day) ?? 0 }))
-    const sortDesc = <K extends string>(m: Map<string, number>, key: K): ({ n: number } & Record<K, string>)[] =>
-      [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k, n]) => ({ [key]: k, n }) as { n: number } & Record<K, string>)
-    const ranked = [...recentByModel.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([m]) => m)
+    const sortDesc = <K extends string>(
+      m: Map<string, number>,
+      key: K
+    ): ({ n: number } & Record<K, string>)[] =>
+      [...m.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([k, n]) => ({ [key]: k, n }) as { n: number } & Record<K, string>)
+    const ranked = [...recentByModel.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([m]) => m)
     const top = ranked.slice(0, TOP_DAILY_MODELS)
     const others = ranked.length > TOP_DAILY_MODELS
     const dailyByModel = {
@@ -329,7 +395,12 @@ export function usageOf(home: string, kind: UsageKind, name: string, opts: { day
       others,
       days: dailyKeys.map((day) => {
         const n = top.map((m) => dayModel.get(`${day}\u0000${m}`) ?? 0)
-        if (others) n.push(ranked.slice(TOP_DAILY_MODELS).reduce((a, m) => a + (dayModel.get(`${day}\u0000${m}`) ?? 0), 0))
+        if (others)
+          n.push(
+            ranked
+              .slice(TOP_DAILY_MODELS)
+              .reduce((a, m) => a + (dayModel.get(`${day}\u0000${m}`) ?? 0), 0)
+          )
         return { day, n }
       })
     }

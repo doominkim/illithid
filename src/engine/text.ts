@@ -144,7 +144,8 @@ export function removeServers(obj: Record<string, unknown>, key: string, names: 
 /** Notes about on/off (names only) */
 export function toggleNotes(removed: string[], keptUnowned: string[]): string[] {
   const out: string[] = []
-  if (removed.length) out.push(`removed previously owned servers that are now off: ${removed.join(', ')}`)
+  if (removed.length)
+    out.push(`removed previously owned servers that are now off: ${removed.join(', ')}`)
   if (keptUnowned.length)
     out.push(
       `servers that are off but have no app ownership record — left as-is in tool config: ${keptUnowned.join(', ')}`
@@ -208,7 +209,10 @@ export function removeBlockMulti(text: string, pairs: readonly MarkerPair[]): st
   if (!p) return text
   const { i, j } = findBlock(text, p)!
   const head = text.slice(0, i).trimEnd()
-  const tail = text.slice(j + p[1].length).replace(/^\s*\n/, '').replace(/^\n+/, '')
+  const tail = text
+    .slice(j + p[1].length)
+    .replace(/^\s*\n/, '')
+    .replace(/^\n+/, '')
   if (!head) return tail
   if (!tail.trim()) return head + '\n'
   return head + '\n\n' + tail

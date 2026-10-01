@@ -1,4 +1,10 @@
-import { jsonSubKeysRegion, mcpEntries, removeServers, toggleNotes, untouchedKeysSame } from '../text'
+import {
+  jsonSubKeysRegion,
+  mcpEntries,
+  removeServers,
+  toggleNotes,
+  untouchedKeysSame
+} from '../text'
 import type { Env, McpSource, TargetDef } from '../types'
 import type { SecretBackend } from '../secrets'
 import { isServerError, renderHttpHeaders, renderValue } from './mcpRender'
@@ -51,7 +57,9 @@ export function buildCopilotMcp(
       if (s.transport === 'stdio') {
         const server: Json = { type: 'stdio', command: s.command, args: s.args ?? [] }
         if (s.env)
-          server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, renderValue(v, 'claude', env, secrets)]))
+          server.env = Object.fromEntries(
+            Object.entries(s.env).map(([k, v]) => [k, renderValue(v, 'claude', env, secrets)])
+          )
         servers[name] = server
       } else {
         const server: Json = { type: 'http', url: s.url }
@@ -64,7 +72,10 @@ export function buildCopilotMcp(
       errors[name] = e.message
     }
   }
-  Object.assign(kept, keepToolOnlyKeys(servers, (config.mcpServers ?? {}) as Json, COPILOT_KEPT_SERVER_KEYS))
+  Object.assign(
+    kept,
+    keepToolOnlyKeys(servers, (config.mcpServers ?? {}) as Json, COPILOT_KEPT_SERVER_KEYS)
+  )
   // Servers outside the SSOT (Copilot-only, plugins) are left alone. No empty table is added to a file that has none
   const merged = { ...((config.mcpServers as Json | undefined) ?? {}), ...servers }
   if (config.mcpServers !== undefined || Object.keys(merged).length) next.mcpServers = merged
@@ -87,14 +98,23 @@ export const copilotMcp: TargetDef = {
     const config = parsePlainJsonConfig(before, 'mcp-config.json')
     const serverErrors: Record<string, string> = {}
     const kept: Record<string, string[]> = {}
-    const next = buildCopilotMcp(mcpForTool(sources, 'copilot'), config, env, ctx.secrets, serverErrors, kept)
+    const next = buildCopilotMcp(
+      mcpForTool(sources, 'copilot'),
+      config,
+      env,
+      ctx.secrets,
+      serverErrors,
+      kept
+    )
     const stale = staleServerNames(sources, 'copilot', ctx, 'copilotMcp')
     removeServers(next, 'mcpServers', stale)
-    const after = JSON.stringify(next) === JSON.stringify(config) ? before : toSettingsText(before, next)
+    const after =
+      JSON.stringify(next) === JSON.stringify(config) ? before : toSettingsText(before, next)
     const { count, same } = untouchedKeysSame(config, next, 'mcpServers')
     const notes = [`${count} keys other than mcpServers unchanged: ${same ? 'OK' : 'broken!'}`]
     notes.push(...toggleNotes(stale, disabledUnownedServers(sources, 'copilot', ctx, 'copilotMcp')))
-    for (const [n, keys] of Object.entries(kept)) notes.push(`kept Copilot-only settings of ${n}: ${keys.join(', ')}`)
+    for (const [n, keys] of Object.entries(kept))
+      notes.push(`kept Copilot-only settings of ${n}: ${keys.join(', ')}`)
     const owned = enabledServerNames(sources, 'copilot')
     const errs = Object.keys(serverErrors).length ? { serverErrors } : {}
     return same

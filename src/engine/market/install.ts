@@ -3,7 +3,15 @@
  * that only touches the library (so it runs inside the app's normal library-write path and sync).
  * New items are turned on only for the tools in use. Updates move the old copy to the library trash first.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, sep } from 'node:path'
 import matter from 'gray-matter'
@@ -25,32 +33,62 @@ import type { McpServer } from '../types'
 import { instructionBody, listInstructions, type MarketRuleItem } from './awesomeCopilot'
 import { dirSha, findSkillDir, listTree, rawFile, resolveSha, skillFilePlan } from './github'
 import { MarketError, type FetchFn } from './http'
-import { installChoices, packageRef, serverDetail, toMcpServer, type RegistryServer } from './mcpRegistry'
-import { itemExists, itemPath, liveOrigins, readOrigins, originKey, recordOrigin, type MarketKind, type MarketOrigin } from './origins'
+import {
+  installChoices,
+  packageRef,
+  serverDetail,
+  toMcpServer,
+  type RegistryServer
+} from './mcpRegistry'
+import {
+  itemExists,
+  itemPath,
+  liveOrigins,
+  readOrigins,
+  originKey,
+  recordOrigin,
+  type MarketKind,
+  type MarketOrigin
+} from './origins'
 import { SKILL_ID_RE } from './skillsSh'
 
-const MANIFEST_KIND: Record<MarketKind, ManifestKind> = { skill: 'skills', mcp: 'mcp', rule: 'rules' }
+const MANIFEST_KIND: Record<MarketKind, ManifestKind> = {
+  skill: 'skills',
+  mcp: 'mcp',
+  rule: 'rules'
+}
 
 /** Turn a new item off for tools not in use (missing key = on) */
 function applyInUseToggles(home: string, kind: MarketKind, name: string): void {
   const inUse = toolsInUse(home)
   const mk = MANIFEST_KIND[kind]
-  for (const tool of MANIFEST_TOOLS[mk]) if (!inUse.includes(tool)) setToggle(home, mk, name, tool, false)
+  for (const tool of MANIFEST_TOOLS[mk])
+    if (!inUse.includes(tool)) setToggle(home, mk, name, tool, false)
 }
 
 function assertName(kind: MarketKind, name: string): void {
-  if (typeof name !== 'string' || !NAME_RE.test(name) || name.includes('..') || (kind === 'rule' && !name.endsWith('.md')))
+  if (
+    typeof name !== 'string' ||
+    !NAME_RE.test(name) ||
+    name.includes('..') ||
+    (kind === 'rule' && !name.endsWith('.md'))
+  )
     throw new LibraryError('invalidName', `invalid ${kind} name format`)
 }
 
 function assertFree(home: string, kind: MarketKind, name: string): void {
   assertName(kind, name)
-  if (itemExists(home, kind, name)) throw new LibraryError('exists', `a ${kind} with the same name exists`)
+  if (itemExists(home, kind, name))
+    throw new LibraryError('exists', `a ${kind} with the same name exists`)
 }
 
 function toName(raw: string | undefined): string | undefined {
   if (!raw) return undefined
-  const n = raw.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 64)
+  const n = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .slice(0, 64)
   return NAME_RE.test(n) ? n : undefined
 }
 
@@ -71,9 +109,17 @@ export interface PreparedSkill {
 }
 
 /** One HEAD + tree per repository, shared by bulk installs (the unauthenticated GitHub API allows 60 calls an hour) */
-export type RepoTrees = Map<string, Promise<{ sha: string; tree: Awaited<ReturnType<typeof listTree>> }>>
+export type RepoTrees = Map<
+  string,
+  Promise<{ sha: string; tree: Awaited<ReturnType<typeof listTree>> }>
+>
 
-export async function prepareSkill(fetchFn: FetchFn, source: string, skillId: string, trees?: RepoTrees): Promise<PreparedSkill> {
+export async function prepareSkill(
+  fetchFn: FetchFn,
+  source: string,
+  skillId: string,
+  trees?: RepoTrees
+): Promise<PreparedSkill> {
   if (!SKILL_ID_RE.test(skillId)) throw new MarketError('invalid', 'invalid skill id')
   const load = async (): Promise<{ sha: string; tree: Awaited<ReturnType<typeof listTree>> }> => {
     const sha = await resolveSha(fetchFn, source)
@@ -105,7 +151,8 @@ export async function prepareSkill(fetchFn: FetchFn, source: string, skillId: st
   // A repository-root SKILL.md is only accepted when it is the skill that was asked for
   if (dir === '' && toName(typeof fm.name === 'string' ? fm.name : undefined) !== toName(skillId))
     throw new MarketError('notFound', 'SKILL.md not found')
-  const name = toName(typeof fm.name === 'string' ? fm.name : undefined) ?? toName(skillId) ?? 'skill'
+  const name =
+    toName(typeof fm.name === 'string' ? fm.name : undefined) ?? toName(skillId) ?? 'skill'
   return {
     source,
     skillId,
@@ -133,7 +180,12 @@ function stage(prep: PreparedSkill): string {
   return tmp
 }
 
-export function commitSkill(home: string, prep: PreparedSkill, name: string, opts: { update?: boolean } = {}): { name: string } {
+export function commitSkill(
+  home: string,
+  prep: PreparedSkill,
+  name: string,
+  opts: { update?: boolean } = {}
+): { name: string } {
   if (opts.update) assertName('skill', name)
   else assertFree(home, 'skill', name)
   const tmp = stage(prep)
@@ -209,14 +261,23 @@ function baseId(type: string, id: string): string {
  * user entered and Keychain references stay. Refuses when the package can't be matched (reinstall instead).
  * Remote servers have nothing to pin — only the recorded version moves
  */
-export function commitMcpUpdate(home: string, name: string, server: RegistryServer): { name: string; changed: boolean } {
+export function commitMcpUpdate(
+  home: string,
+  name: string,
+  server: RegistryServer
+): { name: string; changed: boolean } {
   const o = readOrigins(home)[originKey('mcp', name)]
   if (!o) throw new LibraryError('notFound', 'not installed from the marketplace')
   let changed = false
   if (o.choice?.startsWith('package:')) {
     const want = o.pkg
-    const next = want ? server.packages.find((p) => p.registryType === want.type && baseId(p.registryType, p.identifier) === want.id) : undefined
-    if (!want || !next) throw new MarketError('unsupported', 'package changed in the registry — reinstall to update')
+    const next = want
+      ? server.packages.find(
+          (p) => p.registryType === want.type && baseId(p.registryType, p.identifier) === want.id
+        )
+      : undefined
+    if (!want || !next)
+      throw new MarketError('unsupported', 'package changed in the registry — reinstall to update')
     const def = readMcpServer(home, name) as McpServer
     const id = want.id
     const isRef = (a: string): boolean =>
@@ -224,7 +285,11 @@ export function commitMcpUpdate(home: string, name: string, server: RegistryServ
         ? a === id || a.startsWith(`${id}:`) || a.startsWith(`${id}@`)
         : a === id || a.startsWith(`${id}@`) || a.startsWith(`${id}==`)
     const args = Array.isArray(def.args) ? def.args : []
-    if (!args.some(isRef)) throw new MarketError('unsupported', 'installed command no longer matches — reinstall to update')
+    if (!args.some(isRef))
+      throw new MarketError(
+        'unsupported',
+        'installed command no longer matches — reinstall to update'
+      )
     const nextRef = next.registryType === 'oci' ? next.identifier : packageRef(next)
     const updated = args.map((a) => (isRef(a) ? nextRef : a))
     changed = updated.some((a, i) => a !== args[i])
@@ -243,13 +308,22 @@ export interface PreparedRule {
   name: string
 }
 
-export async function prepareRule(fetchFn: FetchFn, home: string, id: string): Promise<PreparedRule> {
+export async function prepareRule(
+  fetchFn: FetchFn,
+  home: string,
+  id: string
+): Promise<PreparedRule> {
   const item = (await listInstructions(fetchFn, home)).find((x) => x.id === id)
   if (!item) throw new MarketError('notFound', 'rule not found')
   return { item, body: await instructionBody(fetchFn, item.path), name: `${item.id}.md` }
 }
 
-export function commitRule(home: string, prep: PreparedRule, name: string, opts: { update?: boolean } = {}): { name: string } {
+export function commitRule(
+  home: string,
+  prep: PreparedRule,
+  name: string,
+  opts: { update?: boolean } = {}
+): { name: string } {
   const file = name.endsWith('.md') ? name : `${name}.md`
   if (opts.update && itemExists(home, 'rule', file)) {
     // Old copy (with any local edits) goes to the library trash first; restored if the new write fails
@@ -292,7 +366,10 @@ export interface MarketUpdate {
  * Items whose source moved on. One GitHub call per distinct skill repository, one registry call per server, one rule
  * index fetch. Per-item failures are skipped (reported in `failed`)
  */
-export async function checkUpdates(fetchFn: FetchFn, home: string): Promise<{ updates: MarketUpdate[]; failed: string[] }> {
+export async function checkUpdates(
+  fetchFn: FetchFn,
+  home: string
+): Promise<{ updates: MarketUpdate[]; failed: string[] }> {
   const updates: MarketUpdate[] = []
   const failed: string[] = []
   const origins = liveOrigins(home)
@@ -300,8 +377,14 @@ export async function checkUpdates(fetchFn: FetchFn, home: string): Promise<{ up
   let rules: Promise<MarketRuleItem[]> | undefined
   const one = async (o: MarketOrigin): Promise<void> => {
     try {
-      const latest = await latestRef(fetchFn, o, trees, () => (rules ??= listInstructions(fetchFn, home, { force: true })))
-      if (latest && latest !== o.ref) updates.push({ kind: o.kind, name: o.name, id: o.id, current: o.ref, latest })
+      const latest = await latestRef(
+        fetchFn,
+        o,
+        trees,
+        () => (rules ??= listInstructions(fetchFn, home, { force: true }))
+      )
+      if (latest && latest !== o.ref)
+        updates.push({ kind: o.kind, name: o.name, id: o.id, current: o.ref, latest })
     } catch {
       failed.push(originKey(o.kind, o.name))
     }
@@ -320,7 +403,11 @@ async function latestRef(
 ): Promise<string | undefined> {
   if (o.kind === 'skill') {
     const repo = o.id.split('/').slice(0, 2).join('/')
-    if (!trees.has(repo)) trees.set(repo, resolveSha(fetchFn, repo).then((sha) => listTree(fetchFn, repo, sha)))
+    if (!trees.has(repo))
+      trees.set(
+        repo,
+        resolveSha(fetchFn, repo).then((sha) => listTree(fetchFn, repo, sha))
+      )
     return dirSha(await trees.get(repo)!, o.path ?? '') || undefined
   }
   if (o.kind === 'mcp') return (await serverDetail(fetchFn, o.id)).version

@@ -80,7 +80,13 @@ export function readModels(home: string): ToolModels[] {
     if ('error' in res) {
       return { ...base, values: keys.map((key) => ({ key, value: null })), error: res.error }
     }
-    return { ...base, values: keys.map((key) => ({ key, value: toDisplay(getPath(res.value, keyPath(key, format))) })) }
+    return {
+      ...base,
+      values: keys.map((key) => ({
+        key,
+        value: toDisplay(getPath(res.value, keyPath(key, format)))
+      }))
+    }
   })
 }
 
@@ -166,7 +172,11 @@ function setTomlTableKey(text: string, table: string, key: string, value: string
   const literal = JSON.stringify(value)
   const esc = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const firstHeader = lines.findIndex((l) => /^\s*\[/.test(l))
-  if (lines.slice(0, firstHeader === -1 ? lines.length : firstHeader).some((l) => new RegExp(`^\\s*${esc}\\s*[.=]`).test(l)))
+  if (
+    lines
+      .slice(0, firstHeader === -1 ? lines.length : firstHeader)
+      .some((l) => new RegExp(`^\\s*${esc}\\s*[.=]`).test(l))
+  )
     throw new SetModelError(`${table} is written inline; not changing ${table}.${key}`)
   const header = lines.findIndex((l) => new RegExp(`^\\s*\\[\\s*${esc}\\s*\\]\\s*(#.*)?$`).test(l))
   if (header === -1) {
@@ -185,7 +195,8 @@ function setTomlTableKey(text: string, table: string, key: string, value: string
   if (hits.length === 1) {
     const [i, m] = hits[0]
     const vm = /^("(?:[^"\\]|\\.)*"|'[^']*')(\s*(?:#.*)?)$/.exec(m![2])
-    if (!vm) throw new SetModelError(`${table}.${key} value is not a single-line string; not changing it`)
+    if (!vm)
+      throw new SetModelError(`${table}.${key} value is not a single-line string; not changing it`)
     lines[i] = m![1] + literal + vm[2]
   } else lines.splice(header + 1, 0, `${key} = ${literal}`)
   return lines.join(eol)
@@ -196,8 +207,7 @@ function setTomlTableKey(text: string, table: string, key: string, value: string
  * Before writing, parse the result to confirm all other top-level keys are unchanged; otherwise don't write.
  */
 export function setModel(home: string, tool: ToolId, key: string, value: string): SetModelResult {
-  if (!MODEL_KEYS[tool]?.includes(key))
-    throw new SetModelError(`${tool}.${key} cannot be changed`)
+  if (!MODEL_KEYS[tool]?.includes(key)) throw new SetModelError(`${tool}.${key} cannot be changed`)
   if (
     typeof value !== 'string' ||
     !value.trim() ||
@@ -206,7 +216,8 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   ) {
     throw new SetModelError('value must be a 1–200 character string without control characters')
   }
-  if (!toolInUse(home, tool)) throw new SetModelError(`${tool} is not in use on this device (settings → tools in use)`)
+  if (!toolInUse(home, tool))
+    throw new SetModelError(`${tool} is not in use on this device (settings → tools in use)`)
   const t = tools(home).find((x) => x.id === tool)!
   const { path, format } = t.models
   if (!existsSync(path)) throw new SetModelError('config file not found')
@@ -246,7 +257,8 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
     let cur: Record<string, unknown> | undefined = c
     for (const k of kp.slice(0, -1)) {
       const n: unknown = cur?.[k]
-      cur = n && typeof n === 'object' && !Array.isArray(n) ? (n as Record<string, unknown>) : undefined
+      cur =
+        n && typeof n === 'object' && !Array.isArray(n) ? (n as Record<string, unknown>) : undefined
     }
     if (cur) delete cur[kp[kp.length - 1]]
     // A parent object the edit created (now empty) counts as unchanged

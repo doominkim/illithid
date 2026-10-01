@@ -94,30 +94,51 @@ const ENV_OPS: ReadonlySet<Op> = new Set<Op>(['status', 'syncPending', 'syncPrev
 /** Recent sessions for the menu bar item (worker scan; subagent, untitled and non-resumable sessions left out) */
 export async function recentSessions(limit: number): Promise<TraySession[]> {
   const { home } = resolveHome()
-  const r = await inWorker<{ sessions: { title: string; tool: string; updatedAt?: string; parentId?: string; resumeCommand?: string }[] }>('sessions', home)
+  const r = await inWorker<{
+    sessions: {
+      title: string
+      tool: string
+      updatedAt?: string
+      parentId?: string
+      resumeCommand?: string
+    }[]
+  }>('sessions', home)
   return r.sessions
     .filter((s) => !s.parentId && s.resumeCommand && s.title.trim())
     .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
     .slice(0, limit)
-    .map((s) => ({ title: s.title, tool: s.tool as ToolId, updatedAt: s.updatedAt, resumeCommand: s.resumeCommand! }))
+    .map((s) => ({
+      title: s.title,
+      tool: s.tool as ToolId,
+      updatedAt: s.updatedAt,
+      resumeCommand: s.resumeCommand!
+    }))
 }
 
-async function inWorker<T>(op: Op, home: string, args: unknown[] = [], onProgress?: (p: unknown) => void): Promise<T> {
+async function inWorker<T>(
+  op: Op,
+  home: string,
+  args: unknown[] = [],
+  onProgress?: (p: unknown) => void
+): Promise<T> {
   // Workers get a copy of process.env. Only reads that depend on it wait for the login shell environment,
   // so lists (rules, skills, sessions, artifacts, search) show right away even when the shell is slow to start
   if (ENV_OPS.has(op)) await shellEnvReady()
   return new Promise((resolve, reject) => {
     const w = createWorker({ workerData: { op, home, env: { ...process.env }, args } })
     let settled = false
-    w.on('message', (m: { ok: true; value: T } | { ok: false; message: string } | { progress: unknown }) => {
-      if ('progress' in m) {
-        onProgress?.(m.progress)
-        return
+    w.on(
+      'message',
+      (m: { ok: true; value: T } | { ok: false; message: string } | { progress: unknown }) => {
+        if ('progress' in m) {
+          onProgress?.(m.progress)
+          return
+        }
+        settled = true
+        if (m.ok) resolve(m.value)
+        else reject(new Error(m.message))
       }
-      settled = true
-      if (m.ok) resolve(m.value)
-      else reject(new Error(m.message))
-    })
+    )
     w.once('error', (e) => {
       settled = true
       reject(e)
@@ -149,7 +170,9 @@ const INLINE_TOTAL_LIMIT = 15 * 1024 * 1024
  * limits. Other references stay as they are and don't load in the sandbox
  */
 async function inlineLocalImages(html: string, dir: string): Promise<string> {
-  const refs = [...new Set([...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(["'])([^"']+)\1/gi)].map((m) => m[2]))]
+  const refs = [
+    ...new Set([...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(["'])([^"']+)\1/gi)].map((m) => m[2]))
+  ]
   const urls = new Map<string, string>()
   let total = 0
   for (const ref of refs) {
@@ -174,8 +197,10 @@ async function inlineLocalImages(html: string, dir: string): Promise<string> {
     }
   }
   if (!urls.size) return html
-  return html.replace(/(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)\2/gi, (m, pre: string, q: string, ref: string) =>
-    urls.has(ref) ? `${pre}${q}${urls.get(ref)}${q}` : m
+  return html.replace(
+    /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)\2/gi,
+    (m, pre: string, q: string, ref: string) =>
+      urls.has(ref) ? `${pre}${q}${urls.get(ref)}${q}` : m
   )
 }
 
@@ -332,10 +357,22 @@ export function registerIpc(): void {
     searchAll: (q) => inWorker('searchAll', home, [str(q)]),
     sessionTranscript: async (tool, id, opts): Promise<TranscriptView> => {
       try {
-        const tr = await readSessionTranscript(home, tool as ToolId, str(id), (opts ?? {}) as TranscriptOptions)
+        const tr = await readSessionTranscript(
+          home,
+          tool as ToolId,
+          str(id),
+          (opts ?? {}) as TranscriptOptions
+        )
         return { ...tr, available: true }
       } catch (e) {
-        return { available: false, messages: [], prompts: [], total: 0, truncated: false, error: (e as Error).message }
+        return {
+          available: false,
+          messages: [],
+          prompts: [],
+          total: 0,
+          truncated: false,
+          error: (e as Error).message
+        }
       }
     },
     artifacts: async () => {
@@ -377,7 +414,8 @@ export function registerIpc(): void {
     },
     artifactPreview: async (id) => {
       const a = typeof id === 'string' ? artifacts.get(id) : undefined
-      if (!a) return { id: String(id), kind: 'binary', size: 0, truncated: false, error: 'unknownId' }
+      if (!a)
+        return { id: String(id), kind: 'binary', size: 0, truncated: false, error: 'unknownId' }
       return preview(a)
     },
     // ---- Settings and library setup
@@ -388,12 +426,15 @@ export function registerIpc(): void {
         return W.configView(home, fixture)
       })
       // Retention settings changed → clean up with the new values (if enabled)
-      if (r.ok && patch && typeof patch === 'object' && 'backupRetention' in patch) void runBackupCleanup()
+      if (r.ok && patch && typeof patch === 'object' && 'backupRetention' in patch)
+        void runBackupCleanup()
       return r
     },
     uiPrefsSet: async (patch) => {
       const r = W.wrap(() => W.uiPrefsSet(home, (patch ?? {}) as UiPrefsPatch))
-      if (r.ok) for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:uiPrefsEvent', r.value)
+      if (r.ok)
+        for (const w of BrowserWindow.getAllWindows())
+          w.webContents.send('api:uiPrefsEvent', r.value)
       return r
     },
     toolsInUseGet: async () => W.toolsInUseView(home, await envNow()),
@@ -490,7 +531,8 @@ export function registerIpc(): void {
       if (!file) return { ok: true, value: null }
       return W.wrap(() => {
         // Check file size before reading (reject if even the compressed file exceeds the limit)
-        if (statSync(file).size > 50 * 1024 * 1024) throw Object.assign(new Error('file is too large'), { code: 'tooLarge' })
+        if (statSync(file).size > 50 * 1024 * 1024)
+          throw Object.assign(new Error('file is too large'), { code: 'tooLarge' })
         W.markSelfWrite(3000)
         return W.workspaceImportData(home, new Uint8Array(readFileSync(file)))
       })
@@ -498,7 +540,9 @@ export function registerIpc(): void {
     libraryInit: async (path, importLegacy) => {
       const env = await envNow()
       W.markSelfWrite(3000)
-      const r = W.wrap(() => W.libraryInitRun(home, typeof path === 'string' && path ? path : undefined, !!importLegacy))
+      const r = W.wrap(() =>
+        W.libraryInitRun(home, typeof path === 'string' && path ? path : undefined, !!importLegacy)
+      )
       if (!r.ok) return r
       const sync = W.syncNow(home, env)
       W.markSelfWrite(3000)
@@ -508,46 +552,58 @@ export function registerIpc(): void {
     toggle: async (kind, name, tool, on) =>
       libWrite(() => W.lib.toggle(home, kind as ManifestKind, str(name), tool as ToolId, !!on)),
     ruleRead: async (name) => W.wrap(() => W.lib.ruleRead(home, str(name))),
-    ruleSave: async (name, content) => libWrite(() => W.lib.ruleSave(home, str(name), str(content))),
-    ruleCreate: async (name, content) => libWrite(() => W.lib.ruleCreate(home, str(name), str(content))),
+    ruleSave: async (name, content) =>
+      libWrite(() => W.lib.ruleSave(home, str(name), str(content))),
+    ruleCreate: async (name, content) =>
+      libWrite(() => W.lib.ruleCreate(home, str(name), str(content))),
     ruleDelete: async (name) => libWrite(() => W.lib.ruleDelete(home, str(name))),
     ruleRename: async (from, to) => libWrite(() => W.lib.ruleRename(home, str(from), str(to))),
     skillFiles: async (name) => W.wrap(() => W.lib.skillFiles(home, str(name))),
-    skillFileRead: async (name, rel) => W.wrap(() => W.lib.skillFileRead(home, str(name), str(rel))),
+    skillFileRead: async (name, rel) =>
+      W.wrap(() => W.lib.skillFileRead(home, str(name), str(rel))),
     skillFileSave: async (name, rel, content) =>
       libWrite(() => W.lib.skillFileSave(home, str(name), str(rel), str(content))),
-    skillCreate: async (name, description) => libWrite(() => W.lib.skillCreate(home, str(name), str(description))),
+    skillCreate: async (name, description) =>
+      libWrite(() => W.lib.skillCreate(home, str(name), str(description))),
     skillDelete: async (name) => libWrite(() => W.lib.skillDelete(home, str(name))),
     skillDoc: async (name) => W.wrap(() => W.lib.skillDoc(home, str(name))),
-    skillDocSave: async (name, doc) => libWrite(() => W.lib.skillDocSave(home, str(name), doc as never)),
+    skillDocSave: async (name, doc) =>
+      libWrite(() => W.lib.skillDocSave(home, str(name), doc as never)),
     skillRename: async (from, to) => libWrite(() => W.lib.skillRename(home, str(from), str(to))),
-    agentCreate: async (name, description) => libWrite(() => W.lib.agentCreate(home, str(name), str(description))),
+    agentCreate: async (name, description) =>
+      libWrite(() => W.lib.agentCreate(home, str(name), str(description))),
     agentDelete: async (name) => libWrite(() => W.lib.agentDelete(home, str(name))),
     agentDoc: async (name) => W.wrap(() => W.lib.agentDoc(home, str(name))),
-    agentDocSave: async (name, doc) => libWrite(() => W.lib.agentDocSave(home, str(name), doc as never)),
+    agentDocSave: async (name, doc) =>
+      libWrite(() => W.lib.agentDocSave(home, str(name), doc as never)),
     agentRename: async (from, to) => libWrite(() => W.lib.agentRename(home, str(from), str(to))),
     mcpRead: async (name) => W.wrap(() => W.mcpRead(home, str(name))),
     mcpSave: async (name, def) => libWrite(() => W.mcpSave(home, str(name), def as never)),
     mcpDelete: async (name) => libWrite(() => W.lib.mcpDelete(home, str(name))),
     memoryFiles: async () => W.wrap(() => W.lib.memoryFiles(home)),
     memoryRead: async (rel) => W.wrap(() => W.lib.memoryRead(home, str(rel))),
-    memorySave: async (rel, content) => libWrite(() => W.lib.memorySave(home, str(rel), str(content))),
+    memorySave: async (rel, content) =>
+      libWrite(() => W.lib.memorySave(home, str(rel), str(content))),
     memoryDelete: async (rel) => libWrite(() => W.lib.memoryDelete(home, str(rel))),
     // ---- Tool auto memory. Writes use the tool write gate; promote also uses the library write path (libGate + sync)
     toolMemoryScan: () => inWorker('toolMemory', home),
-    toolMemoryRead: async (slug, file) => W.wrap(() => readClaudeMemoryFile(home, str(slug), str(file))),
+    toolMemoryRead: async (slug, file) =>
+      W.wrap(() => readClaudeMemoryFile(home, str(slug), str(file))),
     codexMemoryRead: async (rel, offset) =>
       W.wrap(() => readCodexMemoryFile(home, str(rel), typeof offset === 'number' ? offset : 0)),
     codexRollouts: async () => W.wrap(() => listCodexRolloutSummaries(home)),
     toolMemorySlug: async (path) => {
-      const p = str(path).trim().replace(/^~(?=\/|$)/, home)
+      const p = str(path)
+        .trim()
+        .replace(/^~(?=\/|$)/, home)
       return p.startsWith('/') ? claudeProjectSlug(p) : ''
     },
     toolMemoryPromote: async (slug, file, type) =>
       W.gate(home) ?? libWrite(() => promoteClaudeMemory(home, str(slug), str(file), str(type))),
     toolMemoryMove: async (slug, file, toSlug) =>
       gated(() => moveClaudeMemory(home, str(slug), str(file), str(toSlug))),
-    toolMemoryTrash: async (slug, file) => gated(() => trashClaudeMemory(home, str(slug), str(file))),
+    toolMemoryTrash: async (slug, file) =>
+      gated(() => trashClaudeMemory(home, str(slug), str(file))),
     importSources: async () => W.importSources(home),
     importPlan: async (sourceId) => W.wrap(() => W.importPlanView(home, str(sourceId))),
     importApply: async (sourceId, selections) =>
@@ -555,7 +611,10 @@ export function registerIpc(): void {
     // ---- Sync
     syncStatus: async () => W.syncStatus(),
     syncNow: async () => W.syncNow(home, await envNow()),
-    syncPending: async () => ({ pending: await inWorker<number>('syncPending', home), failed: W.syncFailedCount() }),
+    syncPending: async () => ({
+      pending: await inWorker<number>('syncPending', home),
+      failed: W.syncFailedCount()
+    }),
     // Sidebar sync button: a user click is a one-time approval (independent of allowRealApply, which is not changed)
     syncApplyOnce: async (fingerprint) => {
       const env = await envNow()
@@ -572,7 +631,11 @@ export function registerIpc(): void {
       W.markSelfWrite()
       const req = (item ?? {}) as { kind?: unknown; tool?: unknown; path?: unknown }
       return W.wrap(() =>
-        keepImportedOriginal(home, env, { kind: req.kind as never, tool: req.tool as ToolId, path: str(req.path) })
+        keepImportedOriginal(home, env, {
+          kind: req.kind as never,
+          tool: req.tool as ToolId,
+          path: str(req.path)
+        })
       )
     },
     editedRuleKeep: async (tool, name) => {
@@ -588,7 +651,8 @@ export function registerIpc(): void {
       const env = await envNow()
       return gated(() => W.deleteCandidates(home, env, items as never))
     },
-    modelSet: async (tool, key, value) => gated(() => W.modelSet(home, tool as ToolId, str(key), str(value))),
+    modelSet: async (tool, key, value) =>
+      gated(() => W.modelSet(home, tool as ToolId, str(key), str(value))),
     // ---- Backup (library git). Remote access only via the user-provided URL
     backupStatus: async () => backupView(),
     backupConnect: async (url) => {
@@ -602,7 +666,9 @@ export function registerIpc(): void {
       const g = W.libGate(home)
       if (g) return g
       W.markSelfWrite(5000)
-      const r = fromGit(await snapshot(home, typeof message === 'string' && message ? message : undefined))
+      const r = fromGit(
+        await snapshot(home, typeof message === 'string' && message ? message : undefined)
+      )
       if (!r.ok) return r
       const v = r.value as unknown as { snapshot?: unknown; skipped?: string }
       return { ok: true, value: (v.snapshot ?? null) as never }
@@ -636,7 +702,9 @@ export function registerIpc(): void {
         ? { ok: true, value: await backupView() }
         : { ok: false, code: 'config', message: 'deviceName' },
     backupSetAuto: async (on) => {
-      const r = W.wrap(() => W.configSet(home, { autoBackup: !!on } as unknown as Partial<AppConfig>))
+      const r = W.wrap(() =>
+        W.configSet(home, { autoBackup: !!on } as unknown as Partial<AppConfig>)
+      )
       return r.ok ? { ok: true, value: await backupView() } : r
     },
     backupCleanupPreview: async () => {
@@ -766,7 +834,9 @@ export function runBackupCleanup(manual = false): Promise<BackupCleanupView> {
     if (r.moved) console.log(`[backup-cleanup] moved ${r.moved} to Trash (${r.bytes} bytes)`)
     if (r.failed.length) {
       console.warn(`[backup-cleanup] ${r.failed.length} failed`)
-      if (!manual) for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:backupCleanupEvent', view)
+      if (!manual)
+        for (const w of BrowserWindow.getAllWindows())
+          w.webContents.send('api:backupCleanupEvent', view)
     }
     return view
   })().finally(() => {

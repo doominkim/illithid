@@ -27,7 +27,11 @@ export async function runWrite<T>(
   try {
     r = await p
   } catch (e) {
-    notifications.show({ color: 'red', title: t('common.error'), message: String((e as Error).message ?? e) })
+    notifications.show({
+      color: 'red',
+      title: t('common.error'),
+      message: String((e as Error).message ?? e)
+    })
     return null
   }
   if (isRefused(r)) {
@@ -39,7 +43,11 @@ export async function runWrite<T>(
     return null
   }
   if (!r.ok) {
-    notifications.show({ color: 'red', title: t(`libError.${r.code}`, { defaultValue: r.code }), message: r.message })
+    notifications.show({
+      color: 'red',
+      title: t(`libError.${r.code}`, { defaultValue: r.code }),
+      message: r.message
+    })
     return null
   }
   if (opts.invalidate !== false) clearApiCache()
@@ -47,7 +55,12 @@ export async function runWrite<T>(
   // Auto apply off: the write stayed in the library — say so instead of implying the tools were updated
   const libraryOnly = !!sync && !sync.wrote && !sync.refused
   if (opts.success)
-    notifications.show({ color: 'accent', ...(libraryOnly ? { title: t('sync.savedOnly') } : {}), message: opts.success, autoClose: 2000 })
+    notifications.show({
+      color: 'accent',
+      ...(libraryOnly ? { title: t('sync.savedOnly') } : {}),
+      message: opts.success,
+      autoClose: 2000
+    })
   // Auto-sync result after a library write
   if (sync) {
     notifySync(sync)
@@ -72,16 +85,30 @@ const NOTICE_REASONS = new Set(['importedChanged', 'noAppCopy'])
 export function notifySync(s: SyncStatusView): void {
   const t = i18n.t.bind(i18n)
   if (s.wrote) {
-    const n = s.targets.filter((x) => x.status === 'written').length + [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'done').length
-    if (s.errorCount) notifications.show({ color: 'red', title: t('sync.syncedWithErrors', { n: s.errorCount }), message: s.errors.join(' · ') })
-    else notifications.show({ color: 'accent', message: t('sync.syncedNow', { n }), autoClose: 2500 })
-    const notices = [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'skipped' && x.reason && NOTICE_REASONS.has(x.reason))
+    const n =
+      s.targets.filter((x) => x.status === 'written').length +
+      [...s.rules, ...s.skills, ...(s.agents ?? [])].filter((x) => x.status === 'done').length
+    if (s.errorCount)
+      notifications.show({
+        color: 'red',
+        title: t('sync.syncedWithErrors', { n: s.errorCount }),
+        message: s.errors.join(' · ')
+      })
+    else
+      notifications.show({ color: 'accent', message: t('sync.syncedNow', { n }), autoClose: 2500 })
+    const notices = [...s.rules, ...s.skills, ...(s.agents ?? [])].filter(
+      (x) => x.status === 'skipped' && x.reason && NOTICE_REASONS.has(x.reason)
+    )
     if (notices.length)
       notifications.show({
         color: 'yellow',
         message: notices.map((x) => `${x.name}: ${t(`sync.reason.${x.reason}`)}`).join(' · ')
       })
   } else if (s.refused === 'realHomeNotAllowed') {
-    notifications.show({ color: 'yellow', title: t('sync.savedOnly'), message: t('refused.allowRealApplyHint') })
+    notifications.show({
+      color: 'yellow',
+      title: t('sync.savedOnly'),
+      message: t('refused.allowRealApplyHint')
+    })
   }
 }

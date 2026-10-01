@@ -37,7 +37,9 @@ export function previouslyOwned(ctx: BuildContext | undefined, id: TargetId): st
 /** Workspace folder ids (only well-formed directories) */
 function dirIds(root: string): string[] {
   try {
-    return readdirSync(root).filter((n) => WORKSPACE_ID_RE.test(n) && statSync(join(root, n)).isDirectory())
+    return readdirSync(root).filter(
+      (n) => WORKSPACE_ID_RE.test(n) && statSync(join(root, n)).isDirectory()
+    )
   } catch {
     return []
   }

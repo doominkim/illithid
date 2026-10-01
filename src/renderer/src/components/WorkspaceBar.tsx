@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ActionIcon, Button, Group, Modal, ScrollArea, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core'
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Modal,
+  ScrollArea,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  TextInput
+} from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { Download, Pencil, Trash2, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -61,11 +72,14 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
   useEffect(() => {
     const on = (e: Event): void => {
       const id = (e as CustomEvent<string>).detail
-      window.api.workspaces().then((ws) => {
-        setList(ws)
-        const w = ws.find((x) => x.id === id)
-        if (w && !w.active) openSwitch(w)
-      }, () => {})
+      window.api.workspaces().then(
+        (ws) => {
+          setList(ws)
+          const w = ws.find((x) => x.id === id)
+          if (w && !w.active) openSwitch(w)
+        },
+        () => {}
+      )
     }
     window.addEventListener(WORKSPACE_SWITCH_REQUEST, on)
     return () => window.removeEventListener(WORKSPACE_SWITCH_REQUEST, on)
@@ -137,7 +151,13 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
   }
 
   /** Icons on the right of an item: stop clicks from propagating to item selection (switch) */
-  const optionAction = (label: string, icon: React.ReactNode, disabled: boolean, run: () => void, testId: string): React.JSX.Element => (
+  const optionAction = (
+    label: string,
+    icon: React.ReactNode,
+    disabled: boolean,
+    run: () => void,
+    testId: string
+  ): React.JSX.Element => (
     <span
       onMouseDown={(e) => {
         e.preventDefault()
@@ -151,24 +171,58 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
         run()
       }}
     >
-      <ActionIcon component="span" variant="subtle" color="gray" size="sm" aria-label={label} disabled={disabled} data-testid={testId}>
+      <ActionIcon
+        component="span"
+        variant="subtle"
+        color="gray"
+        size="sm"
+        aria-label={label}
+        disabled={disabled}
+        data-testid={testId}
+      >
         {icon}
       </ActionIcon>
     </span>
   )
 
-  const renderOption = ({ option }: { option: { value: string; label: string } }): React.JSX.Element => {
+  const renderOption = ({
+    option
+  }: {
+    option: { value: string; label: string }
+  }): React.JSX.Element => {
     const w = list.find((x) => x.id === option.value)
     if (!w) return <span>{option.label}</span>
     return (
       <Group gap={2} wrap="nowrap" style={{ width: '100%' }}>
-        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
-        {optionAction(t('workspace.rename'), <Pencil size={13} />, false, () => {
-          setRenameTo(w.name)
-          setRenaming(w)
-        }, `workspace-rename-${w.id}`)}
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {w.name}
+        </span>
+        {optionAction(
+          t('workspace.rename'),
+          <Pencil size={13} />,
+          false,
+          () => {
+            setRenameTo(w.name)
+            setRenaming(w)
+          },
+          `workspace-rename-${w.id}`
+        )}
         {w.id !== 'default' &&
-          optionAction(t('workspace.delete'), <Trash2 size={13} />, w.active || list.length <= 1, () => setDeleting(w), `workspace-delete-${w.id}`)}
+          optionAction(
+            t('workspace.delete'),
+            <Trash2 size={13} />,
+            w.active || list.length <= 1,
+            () => setDeleting(w),
+            `workspace-delete-${w.id}`
+          )}
       </Group>
     )
   }
@@ -176,7 +230,12 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
   const doExport = async (): Promise<void> => {
     const r = await window.api.workspaceExport()
     if (!r.ok) return fail(r.message)
-    if (r.value) notifications.show({ color: 'accent', message: t('workspace.exported', { path: r.value.path }), autoClose: 3000 })
+    if (r.value)
+      notifications.show({
+        color: 'accent',
+        message: t('workspace.exported', { path: r.value.path }),
+        autoClose: 3000
+      })
   }
 
   const doImport = async (): Promise<void> => {
@@ -204,24 +263,53 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
           allowDeselect={false}
           value={active?.id ?? null}
           onChange={onSelect}
-          data={[...list.map((w) => ({ value: w.id, label: w.name })), { value: NEW, label: t('workspace.new') }]}
+          data={[
+            ...list.map((w) => ({ value: w.id, label: w.name })),
+            { value: NEW, label: t('workspace.new') }
+          ]}
           renderOption={renderOption}
           dropdownOpened={dropdown}
           onDropdownOpen={() => setDropdown(true)}
           onDropdownClose={() => setDropdown(false)}
           data-testid="workspace-select"
         />
-        <ActionIcon variant="subtle" color="gray" size="md" aria-label={t('workspace.import')} onClick={() => void doImport()} data-testid="workspace-import">
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="md"
+          aria-label={t('workspace.import')}
+          onClick={() => void doImport()}
+          data-testid="workspace-import"
+        >
           <Download size={15} />
         </ActionIcon>
-        <ActionIcon variant="subtle" color="gray" size="md" aria-label={t('workspace.export')} onClick={() => void doExport()} data-testid="workspace-export">
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          size="md"
+          aria-label={t('workspace.export')}
+          onClick={() => void doExport()}
+          data-testid="workspace-export"
+        >
           <Upload size={15} />
         </ActionIcon>
       </Group>
 
-      <Modal opened={creating} onClose={() => setCreating(false)} title={t('workspace.new')} centered radius="lg">
+      <Modal
+        opened={creating}
+        onClose={() => setCreating(false)}
+        title={t('workspace.new')}
+        centered
+        radius="lg"
+      >
         <Stack gap="md">
-          <TextInput label={t('common.name')} value={newName} onChange={(e) => setNewName(e.currentTarget.value)} data-autofocus data-testid="workspace-new-name" />
+          <TextInput
+            label={t('common.name')}
+            value={newName}
+            onChange={(e) => setNewName(e.currentTarget.value)}
+            data-autofocus
+            data-testid="workspace-new-name"
+          />
           <SegmentedControl
             value={from}
             onChange={(v) => setFrom(v === 'current' ? 'current' : 'empty')}
@@ -234,21 +322,43 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
             <Button variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim()} loading={busy} onClick={() => void create()} data-testid="workspace-new-ok">
+            <Button
+              disabled={!newName.trim()}
+              loading={busy}
+              onClick={() => void create()}
+              data-testid="workspace-new-ok"
+            >
               {t('common.create')}
             </Button>
           </Group>
         </Stack>
       </Modal>
 
-      <Modal opened={!!renaming} onClose={() => setRenaming(null)} title={t('workspace.rename')} centered radius="lg">
+      <Modal
+        opened={!!renaming}
+        onClose={() => setRenaming(null)}
+        title={t('workspace.rename')}
+        centered
+        radius="lg"
+      >
         <Stack gap="md">
-          <TextInput label={t('common.name')} value={renameTo} onChange={(e) => setRenameTo(e.currentTarget.value)} data-autofocus data-testid="workspace-rename-name" />
+          <TextInput
+            label={t('common.name')}
+            value={renameTo}
+            onChange={(e) => setRenameTo(e.currentTarget.value)}
+            data-autofocus
+            data-testid="workspace-rename-name"
+          />
           <Group justify="flex-end" gap="xs">
             <Button variant="default" onClick={() => setRenaming(null)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!renameTo.trim() || renameTo.trim() === renaming?.name} loading={busy} onClick={() => void doRename()} data-testid="workspace-rename-ok">
+            <Button
+              disabled={!renameTo.trim() || renameTo.trim() === renaming?.name}
+              loading={busy}
+              onClick={() => void doRename()}
+              data-testid="workspace-rename-ok"
+            >
               {t('common.save')}
             </Button>
           </Group>

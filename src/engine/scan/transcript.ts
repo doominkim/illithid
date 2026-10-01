@@ -219,7 +219,14 @@ export type ToolErrorKind = 'mistake' | 'command' | 'policy' | 'userReject' | 'o
  * `turn` is one model call (one API response)
  */
 export interface StatsHooks {
-  turn(t: { model?: string; effort?: string; at?: string; endAt?: string; usage: TurnUsage; cost?: number }): void
+  turn(t: {
+    model?: string
+    effort?: string
+    at?: string
+    endAt?: string
+    usage: TurnUsage
+    cost?: number
+  }): void
   toolError(e: { name?: string; kind: ToolErrorKind; at?: string }): void
   /** A request typed by the user starts */
   prompt(at?: string): void
@@ -233,8 +240,16 @@ export interface StatsHooks {
 /** Classify a failed tool result from the first part of its text (the text itself is not kept) */
 export function toolErrorKind(text: string): ToolErrorKind {
   const t = text.slice(0, 400).toLowerCase()
-  if (t.includes("user doesn't want") || t.includes('the user doesn') || t.includes('rejected')) return 'userReject'
-  if (t.includes('permission') || t.includes('denied') || t.includes('hook') || t.includes('blocked') || t.includes('not allowed')) return 'policy'
+  if (t.includes("user doesn't want") || t.includes('the user doesn') || t.includes('rejected'))
+    return 'userReject'
+  if (
+    t.includes('permission') ||
+    t.includes('denied') ||
+    t.includes('hook') ||
+    t.includes('blocked') ||
+    t.includes('not allowed')
+  )
+    return 'policy'
   if (
     t.includes('has not been read') ||
     t.includes('modified since') ||
@@ -246,7 +261,14 @@ export function toolErrorKind(text: string): ToolErrorKind {
     t.includes('enoent')
   )
     return 'mistake'
-  if (t.includes('exit code') || t.includes('exited with') || t.includes('error:') || t.includes('failed') || t.includes('timed out')) return 'command'
+  if (
+    t.includes('exit code') ||
+    t.includes('exited with') ||
+    t.includes('error:') ||
+    t.includes('failed') ||
+    t.includes('timed out')
+  )
+    return 'command'
   return 'other'
 }
 
@@ -359,7 +381,8 @@ function claudeEffort(l: Json): string | undefined {
 /** Text of a tool_result block (string or text parts) */
 function toolResultText(content: unknown): string {
   if (typeof content === 'string') return content
-  if (Array.isArray(content)) return (content as Json[]).map((x) => (x && typeof x.text === 'string' ? x.text : '')).join(' ')
+  if (Array.isArray(content))
+    return (content as Json[]).map((x) => (x && typeof x.text === 'string' ? x.text : '')).join(' ')
   return ''
 }
 
@@ -367,23 +390,39 @@ function toolResultText(content: unknown): string {
  * Model stats of a Claude transcript line, shared by the main reader and the subagent reader. Streaming writes several lines
  * per API response with the same message id, so turns count once per id
  */
-function claudeStatsLine(l: Json, stats: StatsHooks, seen: Set<string>, toolNames: Map<string, string>): void {
+function claudeStatsLine(
+  l: Json,
+  stats: StatsHooks,
+  seen: Set<string>,
+  toolNames: Map<string, string>
+): void {
   const m = l.message as Json | undefined
   const at = isoOrUndefined(l.timestamp)
   if (l.type === 'assistant' && m?.role === 'assistant') {
     const id = typeof m.id === 'string' ? m.id : undefined
     if (!id || !seen.has(id)) {
       if (id) seen.add(id)
-      stats.turn({ model: typeof m.model === 'string' ? m.model : undefined, effort: claudeEffort(l), at, usage: claudeUsage(m.usage as Json | undefined) })
+      stats.turn({
+        model: typeof m.model === 'string' ? m.model : undefined,
+        effort: claudeEffort(l),
+        at,
+        usage: claudeUsage(m.usage as Json | undefined)
+      })
     }
     if (Array.isArray(m.content))
-      for (const b of m.content as Json[]) if (b?.type === 'tool_use' && typeof b.id === 'string') toolNames.set(b.id, String(b.name ?? ''))
+      for (const b of m.content as Json[])
+        if (b?.type === 'tool_use' && typeof b.id === 'string')
+          toolNames.set(b.id, String(b.name ?? ''))
     return
   }
   if (l.type === 'user' && m?.role === 'user' && Array.isArray(m.content))
     for (const b of m.content as Json[])
       if (b?.type === 'tool_result' && b.is_error)
-        stats.toolError({ name: typeof b.tool_use_id === 'string' ? toolNames.get(b.tool_use_id) : undefined, kind: toolErrorKind(toolResultText(b.content)), at })
+        stats.toolError({
+          name: typeof b.tool_use_id === 'string' ? toolNames.get(b.tool_use_id) : undefined,
+          kind: toolErrorKind(toolResultText(b.content)),
+          at
+        })
 }
 
 const INTERRUPT_MARK = '[Request interrupted by user'
@@ -397,7 +436,12 @@ export async function readClaude(path: string, c: Collector): Promise<void> {
     const at = isoOrUndefined(l.timestamp)
     if (l.type === 'user' && m?.role === 'user') {
       if (l.isMeta || l.isSidechain) return
-      const raw = c.onCall || c.stats ? (typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')) : ''
+      const raw =
+        c.onCall || c.stats
+          ? typeof m.content === 'string'
+            ? m.content
+            : JSON.stringify(m.content ?? '')
+          : ''
       if (c.onCall) {
         const cmd = COMMAND_RE.exec(raw)
         if (cmd) c.onCall({ name: 'SlashCommand', input: { command: cmd[1] }, model, at })
@@ -421,7 +465,12 @@ export async function readClaude(path: string, c: Collector): Promise<void> {
         else if (b.type === 'tool_use') {
           if (texts.length) c.push('assistant', texts.splice(0).join('\n\n'), at)
           c.push('assistant', toolLine(String(b.name ?? 'tool'), b.input), at, 'tool')
-          c.onCall?.({ name: String(b.name ?? ''), input: b.input, model: typeof m.model === 'string' ? m.model : undefined, at })
+          c.onCall?.({
+            name: String(b.name ?? ''),
+            input: b.input,
+            model: typeof m.model === 'string' ? m.model : undefined,
+            at
+          })
         }
       }
       if (texts.length) c.push('assistant', texts.join('\n\n'), at)
@@ -430,7 +479,11 @@ export async function readClaude(path: string, c: Collector): Promise<void> {
 }
 
 /** Model stats and tool calls of a Claude subagent transcript (sidechain lines included — they are the subagent's own turns) */
-export async function readClaudeSubagentStats(path: string, onCall: (c: ToolCall) => void, stats?: StatsHooks): Promise<void> {
+export async function readClaudeSubagentStats(
+  path: string,
+  onCall: (c: ToolCall) => void,
+  stats?: StatsHooks
+): Promise<void> {
   const seen = new Set<string>()
   const toolNames = new Map<string, string>()
   await eachJsonLine(path, (l) => {
@@ -439,7 +492,13 @@ export async function readClaudeSubagentStats(path: string, onCall: (c: ToolCall
     if (l.type !== 'assistant' || !m || !Array.isArray(m.content)) return
     const at = typeof l.timestamp === 'string' ? l.timestamp : undefined
     for (const b of m.content as Json[])
-      if (b && b.type === 'tool_use') onCall({ name: String(b.name ?? ''), input: b.input, model: typeof m.model === 'string' ? m.model : undefined, at })
+      if (b && b.type === 'tool_use')
+        onCall({
+          name: String(b.name ?? ''),
+          input: b.input,
+          model: typeof m.model === 'string' ? m.model : undefined,
+          at
+        })
   })
 }
 
@@ -468,7 +527,12 @@ function codexArgs(v: unknown): unknown {
 const EXIT_CODE_RE = /[Ee]xit code:? ?(\d+)|"exit_code":\s*(\d+)/
 
 /** Codex event_msg lines for model stats: request boundaries, tokens per model call, subscription usage */
-function codexStatsEvent(p: Json, at: string | undefined, stats: StatsHooks, state: { model?: string; effort?: string; taskOpen: boolean }): void {
+function codexStatsEvent(
+  p: Json,
+  at: string | undefined,
+  stats: StatsHooks,
+  state: { model?: string; effort?: string; taskOpen: boolean }
+): void {
   switch (p.type) {
     case 'task_started':
       state.taskOpen = true
@@ -510,7 +574,8 @@ function codexStatsEvent(p: Json, at: string | undefined, stats: StatsHooks, sta
         stats.limits({
           at,
           usedPercent: primary.used_percent,
-          windowMinutes: typeof primary.window_minutes === 'number' ? primary.window_minutes : undefined,
+          windowMinutes:
+            typeof primary.window_minutes === 'number' ? primary.window_minutes : undefined,
           plan: typeof rl?.plan_type === 'string' ? rl.plan_type : undefined
         })
       return
@@ -546,7 +611,12 @@ export async function readCodex(path: string, c: Collector): Promise<void> {
       const out = typeof p.output === 'string' ? p.output : JSON.stringify(p.output ?? '')
       const exit = EXIT_CODE_RE.exec(out)
       const code = exit ? (exit[1] ?? exit[2]) : undefined
-      if (code && code !== '0') c.stats.toolError({ name: typeof p.call_id === 'string' ? callNames.get(p.call_id) : undefined, kind: 'command', at })
+      if (code && code !== '0')
+        c.stats.toolError({
+          name: typeof p.call_id === 'string' ? callNames.get(p.call_id) : undefined,
+          kind: 'command',
+          at
+        })
       return
     }
     if (p.type === 'message' && p.role === 'user') {
@@ -569,7 +639,14 @@ export async function readCodex(path: string, c: Collector): Promise<void> {
       const input = codexArgs(p.arguments ?? p.input ?? p.action)
       if (typeof p.call_id === 'string') callNames.set(p.call_id, name)
       c.push('assistant', toolLine(name, input), at, 'tool')
-      c.onCall?.({ name, input, namespace: typeof p.namespace === 'string' ? p.namespace : undefined, model, at, turn })
+      c.onCall?.({
+        name,
+        input,
+        namespace: typeof p.namespace === 'string' ? p.namespace : undefined,
+        model,
+        at,
+        turn
+      })
     }
   })
 }
@@ -577,10 +654,7 @@ export async function readCodex(path: string, c: Collector): Promise<void> {
 // ---------------------------------------------------------------- OpenCode
 
 interface SqliteModule {
-  DatabaseSync: new (
-    path: string,
-    opts?: { readOnly?: boolean }
-  ) => OpencodeDb
+  DatabaseSync: new (path: string, opts?: { readOnly?: boolean }) => OpencodeDb
 }
 
 export interface OpencodeDb {
@@ -635,7 +709,13 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
           model: typeof data.modelID === 'string' ? data.modelID : undefined,
           at,
           endAt: isoOrUndefined(time?.completed),
-          usage: { input: num(tk?.input), cacheRead: num(cache?.read), cacheWrite: num(cache?.write), output: num(tk?.output), reasoning: num(tk?.reasoning) },
+          usage: {
+            input: num(tk?.input),
+            cacheRead: num(cache?.read),
+            cacheWrite: num(cache?.write),
+            output: num(tk?.output),
+            reasoning: num(tk?.reasoning)
+          },
           cost: typeof data.cost === 'number' ? data.cost : undefined
         })
       }
@@ -663,8 +743,14 @@ export function readOpencodeDb(db: OpencodeDb, id: string, c: Collector): void {
           at,
           'tool'
         )
-        c.onCall?.({ name: String(part.tool ?? ''), input: state?.input, model: typeof data.modelID === 'string' ? data.modelID : undefined, at })
-        if (state?.status === 'error') c.stats?.toolError({ name: String(part.tool ?? ''), kind: 'other', at })
+        c.onCall?.({
+          name: String(part.tool ?? ''),
+          input: state?.input,
+          model: typeof data.modelID === 'string' ? data.modelID : undefined,
+          at
+        })
+        if (state?.status === 'error')
+          c.stats?.toolError({ name: String(part.tool ?? ''), kind: 'other', at })
       }
     }
     if (texts.length) c.push(role, texts.join('\n\n'), at)
@@ -714,7 +800,9 @@ export function replayGemini(records: Iterable<Json>): GeminiConversation {
   let meta: Json = {}
   const byId = new Map<string, Json>()
   const addAll = (list: unknown): void => {
-    if (Array.isArray(list)) for (const m of list as Json[]) if (m && typeof m === 'object' && isMessage(m)) byId.set(m.id as string, m)
+    if (Array.isArray(list))
+      for (const m of list as Json[])
+        if (m && typeof m === 'object' && isMessage(m)) byId.set(m.id as string, m)
   }
   for (const r of records) {
     if (typeof r.$rewindTo === 'string') {
@@ -746,7 +834,13 @@ export function geminiText(content: unknown): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
   return (content as unknown[])
-    .map((p) => (typeof p === 'string' ? p : p && typeof p === 'object' && !(p as Json).thought && typeof (p as Json).text === 'string' ? ((p as Json).text as string) : ''))
+    .map((p) =>
+      typeof p === 'string'
+        ? p
+        : p && typeof p === 'object' && !(p as Json).thought && typeof (p as Json).text === 'string'
+          ? ((p as Json).text as string)
+          : ''
+    )
     .join('')
 }
 
@@ -769,8 +863,18 @@ export async function readGemini(path: string, c: Collector): Promise<void> {
       if (Array.isArray(m.toolCalls))
         for (const t of m.toolCalls as Json[])
           if (t && typeof t === 'object') {
-            c.push('assistant', toolLine(String(t.name ?? t.displayName ?? 'tool'), t.args), at, 'tool')
-            c.onCall?.({ name: String(t.name ?? ''), input: t.args, model: typeof m.model === 'string' ? m.model : undefined, at })
+            c.push(
+              'assistant',
+              toolLine(String(t.name ?? t.displayName ?? 'tool'), t.args),
+              at,
+              'tool'
+            )
+            c.onCall?.({
+              name: String(t.name ?? ''),
+              input: t.args,
+              model: typeof m.model === 'string' ? m.model : undefined,
+              at
+            })
           }
     }
   }
@@ -785,7 +889,12 @@ export async function readGemini(path: string, c: Collector): Promise<void> {
 function grokFile(home: string, id: string): string | undefined {
   const root = join(home, '.grok/sessions')
   if (!existsSync(root) || !/^[A-Za-z0-9_-]+$/.test(id)) return undefined
-  return fg.sync(`*/${id}/chat_history.jsonl`, { cwd: root, absolute: true, onlyFiles: true, suppressErrors: true })[0]
+  return fg.sync(`*/${id}/chat_history.jsonl`, {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    suppressErrors: true
+  })[0]
 }
 
 export async function readGrok(path: string, c: Collector): Promise<void> {

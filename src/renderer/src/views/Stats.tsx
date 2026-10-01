@@ -147,9 +147,25 @@ function ToolTag({ tool }: { tool: string }): React.JSX.Element {
 
 // ---------------------------------------------------------------- detail pieces
 
-function Tile({ label: name, value, sub, tip }: { label: string; value: string; sub?: string; tip?: string }): React.JSX.Element {
+function Tile({
+  label: name,
+  value,
+  sub,
+  tip
+}: {
+  label: string
+  value: string
+  sub?: string
+  tip?: string
+}): React.JSX.Element {
   return (
-    <Box p="md" style={{ borderRight: '1px solid var(--ac-border-subtle)', borderBottom: '1px solid var(--ac-border-subtle)' }}>
+    <Box
+      p="md"
+      style={{
+        borderRight: '1px solid var(--ac-border-subtle)',
+        borderBottom: '1px solid var(--ac-border-subtle)'
+      }}
+    >
       <Text size="xs" c="dimmed">
         {name}
         {tip && <Tip label={tip} />}
@@ -168,8 +184,22 @@ function Tile({ label: name, value, sub, tip }: { label: string; value: string; 
 
 function ShareBar({ v }: { v: number }): React.JSX.Element {
   return (
-    <Box style={{ width: 90, height: 6, borderRadius: 3, background: 'var(--ac-surface-active)', overflow: 'hidden' }}>
-      <Box style={{ width: `${Math.min(100, v * 100)}%`, height: '100%', background: 'var(--ac-text-muted)' }} />
+    <Box
+      style={{
+        width: 90,
+        height: 6,
+        borderRadius: 3,
+        background: 'var(--ac-surface-active)',
+        overflow: 'hidden'
+      }}
+    >
+      <Box
+        style={{
+          width: `${Math.min(100, v * 100)}%`,
+          height: '100%',
+          background: 'var(--ac-text-muted)'
+        }}
+      />
     </Box>
   )
 }
@@ -194,13 +224,23 @@ function shiftDay(day: string, n: number): string {
 }
 
 type DistKey = 'responseSec' | 'toolsPerRequest' | 'turnsPerRequest' | 'outputPerRequest'
-const DIST_KEYS: DistKey[] = ['responseSec', 'toolsPerRequest', 'turnsPerRequest', 'outputPerRequest']
+const DIST_KEYS: DistKey[] = [
+  'responseSec',
+  'toolsPerRequest',
+  'turnsPerRequest',
+  'outputPerRequest'
+]
 
 function DistTable({
   rows,
   fmt
 }: {
-  rows: { key: DistKey | 'contextPerTurn'; d: Dist | null; max?: React.ReactNode; requests?: number }[]
+  rows: {
+    key: DistKey | 'contextPerTurn'
+    d: Dist | null
+    max?: React.ReactNode
+    requests?: number
+  }[]
   fmt: (k: string) => (n: number) => string
 }): React.JSX.Element {
   const { t } = useTranslation()
@@ -253,7 +293,9 @@ function DistTable({
               ) : (
                 <Table.Td colSpan={8}>
                   <Text size="xs" c="dimmed">
-                    {r.requests !== undefined ? t('models.detail.fewRequests', { n: r.requests }) : '—'}
+                    {r.requests !== undefined
+                      ? t('models.detail.fewRequests', { n: r.requests })
+                      : '—'}
                   </Text>
                 </Table.Td>
               )}
@@ -268,18 +310,33 @@ function DistTable({
   )
 }
 
-function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; onSession: (tool: string, id: string) => void }): React.JSX.Element {
+function ModelDetailView({
+  k,
+  range,
+  onSession
+}: {
+  k: ModelKey
+  range: Range
+  onSession: (tool: string, id: string) => void
+}): React.JSX.Element {
   const f = useFmt()
   const { t } = f
   const [tab, setTab] = useState<string | null>('turns')
   const [listTab, setListTab] = useState<string | null>('tools')
   const [sessionSort, setSessionSort] = useState<'turns' | 'output' | 'toolCalls'>('turns')
-  const { data } = useStatsLoad<ModelDetail>([modelKeyStr(k), JSON.stringify(range)], () => window.api.modelDetail(k, range))
+  const { data } = useStatsLoad<ModelDetail>([modelKeyStr(k), JSON.stringify(range)], () =>
+    window.api.modelDetail(k, range)
+  )
   if (data === undefined) return <Loading />
   if (!data) return <Text c="dimmed">{t('models.indexing')}</Text>
   const s = data.summary
   const med = s.median
-  const fmtOf = (key: string): ((n: number) => string) => (key === 'responseSec' ? f.dur : key === 'outputPerRequest' || key === 'contextPerTurn' ? f.tok : f.int)
+  const fmtOf = (key: string): ((n: number) => string) =>
+    key === 'responseSec'
+      ? f.dur
+      : key === 'outputPerRequest' || key === 'contextPerTurn'
+        ? f.tok
+        : f.int
   const axis = dayAxis(data.daily, range)
   const byDay = new Map(data.daily.map((d) => [d.day, d]))
   const chartKey = tab === 'output' ? 'output' : tab === 'context' ? 'context' : 'turns'
@@ -288,9 +345,11 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
   const weekly = data.limits.filter((l) => l.windowMinutes === 10080)
   const limits = weekly.length ? weekly : data.limits
   const plan = limits.find((l) => l.plan)?.plan ?? '—'
-  const errTotal = s.errors.mistake + s.errors.command + s.errors.policy + s.errors.userReject + s.errors.other
+  const errTotal =
+    s.errors.mistake + s.errors.command + s.errors.policy + s.errors.userReject + s.errors.other
   const kinds = ['mistake', 'command', 'policy', 'userReject', 'other'] as const
-  const kindAvailable = (kind: (typeof kinds)[number]): boolean => s.tool === 'claude' || (s.tool === 'codex' ? kind === 'command' : kind === 'other')
+  const kindAvailable = (kind: (typeof kinds)[number]): boolean =>
+    s.tool === 'claude' || (s.tool === 'codex' ? kind === 'command' : kind === 'other')
   const sessions = [...data.sessions].sort((a, b) => b[sessionSort] - a[sessionSort]).slice(0, 10)
   const listRows = listTab === 'skills' ? data.skills : listTab === 'mcp' ? data.mcp : data.tools
   const listMax = Math.max(1, ...listRows.map((x) => x.calls))
@@ -299,28 +358,78 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
   return (
     <Stack gap="xl" data-testid="stats-detail">
       <Text size="sm" c="dimmed" style={NUM}>
-        {t('models.detail.sub', { from: s.first, to: s.last, days: s.activeDays, n: f.int(s.requests) })}
+        {t('models.detail.sub', {
+          from: s.first,
+          to: s.last,
+          days: s.activeDays,
+          n: f.int(s.requests)
+        })}
       </Text>
 
       <Box>
         <SectionTitle>{t('models.detail.summary')}</SectionTitle>
         <Box className="ac-card" style={{ overflow: 'hidden' }}>
           <SimpleGrid cols={3} spacing={0}>
-            <Tile label={t('models.detail.sessions')} value={f.int(s.sessions)} sub={s.sessions ? t('models.detail.sessionsSub', { n: (s.requests / s.sessions).toFixed(1) }) : undefined} />
-            <Tile label={t('models.detail.subagents')} value={f.int(s.subagentSessions)} sub={t('models.detail.subagentsSub')} />
-            <Tile label={t('models.detail.turns')} value={f.int(s.turns)} sub={med.turnsPerRequest !== null ? t('models.detail.turnsSub', { n: med.turnsPerRequest }) : undefined} tip={t('models.tip.turns')} />
-            <Tile label={t('models.detail.toolCalls')} value={f.int(s.toolCalls)} sub={med.toolsPerRequest !== null ? t('models.detail.toolCallsSub', { n: med.toolsPerRequest }) : undefined} />
+            <Tile
+              label={t('models.detail.sessions')}
+              value={f.int(s.sessions)}
+              sub={
+                s.sessions
+                  ? t('models.detail.sessionsSub', { n: (s.requests / s.sessions).toFixed(1) })
+                  : undefined
+              }
+            />
+            <Tile
+              label={t('models.detail.subagents')}
+              value={f.int(s.subagentSessions)}
+              sub={t('models.detail.subagentsSub')}
+            />
+            <Tile
+              label={t('models.detail.turns')}
+              value={f.int(s.turns)}
+              sub={
+                med.turnsPerRequest !== null
+                  ? t('models.detail.turnsSub', { n: med.turnsPerRequest })
+                  : undefined
+              }
+              tip={t('models.tip.turns')}
+            />
+            <Tile
+              label={t('models.detail.toolCalls')}
+              value={f.int(s.toolCalls)}
+              sub={
+                med.toolsPerRequest !== null
+                  ? t('models.detail.toolCallsSub', { n: med.toolsPerRequest })
+                  : undefined
+              }
+            />
             <Tile
               label={t('models.detail.mistakes')}
               value={s.tool === 'claude' ? f.int(s.errors.mistake) : '—'}
-              sub={s.tool !== 'claude' ? t('models.detail.mistakesNA') : s.toolCalls >= MIN_TOOL_CALLS ? t('models.detail.mistakesSub', { n: (s.errors.mistake / (s.toolCalls / 100)).toFixed(2) }) : undefined}
+              sub={
+                s.tool !== 'claude'
+                  ? t('models.detail.mistakesNA')
+                  : s.toolCalls >= MIN_TOOL_CALLS
+                    ? t('models.detail.mistakesSub', {
+                        n: (s.errors.mistake / (s.toolCalls / 100)).toFixed(2)
+                      })
+                    : undefined
+              }
               tip={t('models.tip.mistakes')}
             />
             <Tile
               label={t('models.detail.interrupts')}
               value={s.tool === 'opencode' ? '—' : f.int(s.interrupts)}
-              sub={s.tool !== 'opencode' ? t('models.detail.interruptsSub', { n: ((s.interrupts / turnsTotal) * 100).toFixed(2) }) : undefined}
-              tip={t(`models.detail.interruptTip.${s.tool === 'codex' ? 'codex' : s.tool === 'opencode' ? 'opencode' : 'claude'}`)}
+              sub={
+                s.tool !== 'opencode'
+                  ? t('models.detail.interruptsSub', {
+                      n: ((s.interrupts / turnsTotal) * 100).toFixed(2)
+                    })
+                  : undefined
+              }
+              tip={t(
+                `models.detail.interruptTip.${s.tool === 'codex' ? 'codex' : s.tool === 'opencode' ? 'opencode' : 'claude'}`
+              )}
             />
           </SimpleGrid>
         </Box>
@@ -342,7 +451,15 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
             h={200}
             data={chart}
             dataKey="day"
-            series={[{ name: 'v', label: t(`models.detail.tab${chartKey === 'turns' ? 'Turns' : chartKey === 'output' ? 'Output' : 'Context'}`), color: 'accent.6' }]}
+            series={[
+              {
+                name: 'v',
+                label: t(
+                  `models.detail.tab${chartKey === 'turns' ? 'Turns' : chartKey === 'output' ? 'Output' : 'Context'}`
+                ),
+                color: 'accent.6'
+              }
+            ]}
             withLegend={false}
             gridAxis="y"
             tickLine="none"
@@ -377,24 +494,26 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {(['input', 'cacheWrite', 'cacheRead', 'output', 'reasoning'] as const).map((key) => {
-                  const v = s.tokens[key]
-                  // Codex logs have no cache writes
-                  const missing = v === 0 && key === 'cacheWrite' && s.tool === 'codex'
-                  return (
-                    <Table.Tr key={key}>
-                      <Table.Td>
-                        <Text size="sm">{t(`models.detail.tk.${key}`)}</Text>
-                      </Table.Td>
-                      <Table.Td ta="right" style={NUM}>
-                        {missing ? '—' : f.tok(v)}
-                      </Table.Td>
-                      <Table.Td ta="right" style={NUM}>
-                        {missing ? '—' : f.tok(v / turnsTotal)}
-                      </Table.Td>
-                    </Table.Tr>
-                  )
-                })}
+                {(['input', 'cacheWrite', 'cacheRead', 'output', 'reasoning'] as const).map(
+                  (key) => {
+                    const v = s.tokens[key]
+                    // Codex logs have no cache writes
+                    const missing = v === 0 && key === 'cacheWrite' && s.tool === 'codex'
+                    return (
+                      <Table.Tr key={key}>
+                        <Table.Td>
+                          <Text size="sm">{t(`models.detail.tk.${key}`)}</Text>
+                        </Table.Td>
+                        <Table.Td ta="right" style={NUM}>
+                          {missing ? '—' : f.tok(v)}
+                        </Table.Td>
+                        <Table.Td ta="right" style={NUM}>
+                          {missing ? '—' : f.tok(v / turnsTotal)}
+                        </Table.Td>
+                      </Table.Tr>
+                    )
+                  }
+                )}
               </Table.Tbody>
             </Table>
             {s.cost !== null && (
@@ -431,7 +550,15 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
       </Box>
 
       <Box>
-        <SectionTitle right={<Text size="xs" c="dimmed">{f.int(s.requests)}</Text>}>{t('models.detail.dist')}</SectionTitle>
+        <SectionTitle
+          right={
+            <Text size="xs" c="dimmed">
+              {f.int(s.requests)}
+            </Text>
+          }
+        >
+          {t('models.detail.dist')}
+        </SectionTitle>
         {s.requests < MIN_REQUESTS ? (
           <Text size="sm" c="dimmed">
             {t('models.detail.distTooFew', { min: MIN_REQUESTS, n: s.requests })}
@@ -445,8 +572,17 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
                 key,
                 d: data.dist[key],
                 max: ref ? (
-                  <Tooltip label={t('models.detail.maxSession', { title: ref.title || t('models.detail.untitled') })} withArrow>
-                    <UnstyledButton ml={4} onClick={() => onSession(ref.tool, ref.id)} aria-label={t('models.detail.maxSession', { title: ref.title })}>
+                  <Tooltip
+                    label={t('models.detail.maxSession', {
+                      title: ref.title || t('models.detail.untitled')
+                    })}
+                    withArrow
+                  >
+                    <UnstyledButton
+                      ml={4}
+                      onClick={() => onSession(ref.tool, ref.id)}
+                      aria-label={t('models.detail.maxSession', { title: ref.title })}
+                    >
                       <Text span size="xs" c="dimmed">
                         ↗
                       </Text>
@@ -460,7 +596,15 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
       </Box>
 
       <Box>
-        <SectionTitle right={<Text size="xs" c="dimmed">{f.int(errTotal)}</Text>}>{t('models.detail.errors')}</SectionTitle>
+        <SectionTitle
+          right={
+            <Text size="xs" c="dimmed">
+              {f.int(errTotal)}
+            </Text>
+          }
+        >
+          {t('models.detail.errors')}
+        </SectionTitle>
         <Box className="ac-card" p="md">
           {s.tool !== 'claude' && (
             <Text size="xs" c="dimmed" mb="sm">
@@ -468,7 +612,12 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
             </Text>
           )}
           {errTotal > 0 && (
-            <Group gap={0} wrap="nowrap" mb="md" style={{ height: 10, borderRadius: 5, overflow: 'hidden' }}>
+            <Group
+              gap={0}
+              wrap="nowrap"
+              mb="md"
+              style={{ height: 10, borderRadius: 5, overflow: 'hidden' }}
+            >
               {kinds.map((kind, i) =>
                 s.errors[kind] ? (
                   <Box
@@ -476,7 +625,10 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
                     style={{
                       width: `${(s.errors[kind] / errTotal) * 100}%`,
                       height: '100%',
-                      background: kind === 'mistake' ? 'var(--ac-accent)' : `color-mix(in srgb, var(--ac-text-muted) ${90 - i * 15}%, transparent)`
+                      background:
+                        kind === 'mistake'
+                          ? 'var(--ac-accent)'
+                          : `color-mix(in srgb, var(--ac-text-muted) ${90 - i * 15}%, transparent)`
                     }}
                   />
                 ) : null
@@ -522,7 +674,9 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
                       {ok ? f.int(n) : '—'}
                     </Table.Td>
                     <Table.Td ta="right" style={NUM}>
-                      {ok && s.toolCalls >= MIN_TOOL_CALLS ? (n / (s.toolCalls / 100)).toFixed(2) : '—'}
+                      {ok && s.toolCalls >= MIN_TOOL_CALLS
+                        ? (n / (s.toolCalls / 100)).toFixed(2)
+                        : '—'}
                     </Table.Td>
                     <Table.Td ta="right" style={NUM}>
                       {ok && errTotal ? f.pct(n / errTotal) : '—'}
@@ -598,7 +752,12 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
           {t('models.detail.sessions10')}
         </SectionTitle>
         <Box className="ac-card" style={{ overflowX: 'auto' }}>
-          <Table highlightOnHover verticalSpacing={6} horizontalSpacing="sm" style={{ minWidth: 720 }}>
+          <Table
+            highlightOnHover
+            verticalSpacing={6}
+            horizontalSpacing="sm"
+            style={{ minWidth: 720 }}
+          >
             <Table.Thead>
               <Table.Tr>
                 {['colSession', 'colProject', 'colPeriod'].map((c) => (
@@ -619,20 +778,32 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
             </Table.Thead>
             <Table.Tbody>
               {sessions.map((x) => (
-                <Table.Tr key={`${x.tool}:${x.id}`} onClick={() => onSession(x.tool, x.id)} style={{ cursor: 'pointer' }} data-testid="stats-session">
+                <Table.Tr
+                  key={`${x.tool}:${x.id}`}
+                  onClick={() => onSession(x.tool, x.id)}
+                  style={{ cursor: 'pointer' }}
+                  data-testid="stats-session"
+                >
                   <Table.Td maw={260}>
                     <Text size="sm" truncate="end">
                       {x.title || t('models.detail.untitled')}
                     </Text>
                   </Table.Td>
                   <Table.Td maw={160}>
-                    <Text size="xs" c="dimmed" ff={x.project ? 'monospace' : undefined} truncate="end">
+                    <Text
+                      size="xs"
+                      c="dimmed"
+                      ff={x.project ? 'monospace' : undefined}
+                      truncate="end"
+                    >
                       {x.project || t('models.detail.noProject')}
                     </Text>
                   </Table.Td>
                   <Table.Td style={NUM}>
                     <Text size="xs" c="dimmed">
-                      {x.first === x.last ? x.first.slice(5) : `${x.first.slice(5)} ~ ${x.last.slice(5)}`}
+                      {x.first === x.last
+                        ? x.first.slice(5)
+                        : `${x.first.slice(5)} ~ ${x.last.slice(5)}`}
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right" style={NUM}>
@@ -662,7 +833,11 @@ function ModelDetailView({ k, range, onSession }: { k: ModelKey; range: Range; o
               {data.projects.slice(0, 10).map((p) => (
                 <Table.Tr key={p.project}>
                   <Table.Td>
-                    <Text size="sm" ff={p.project ? 'monospace' : undefined} c={p.project ? undefined : 'dimmed'}>
+                    <Text
+                      size="sm"
+                      ff={p.project ? 'monospace' : undefined}
+                      c={p.project ? undefined : 'dimmed'}
+                    >
                       {p.project || t('models.detail.noProject')}
                     </Text>
                   </Table.Td>
@@ -709,7 +884,13 @@ function Stats(): React.JSX.Element {
     <Stack gap={0} style={{ flex: 1 }}>
       <PageHeader
         title={t('nav.stats')}
-        count={data ? new Set(models.filter((m) => showSmall || m.requests >= MIN_REQUESTS).map((m) => m.model)).size : undefined}
+        count={
+          data
+            ? new Set(
+                models.filter((m) => showSmall || m.requests >= MIN_REQUESTS).map((m) => m.model)
+              ).size
+            : undefined
+        }
         actions={<ReloadButton />}
       />
       <Group gap="sm" mb="sm" wrap="wrap" className="ac-stats-filters">
@@ -784,11 +965,44 @@ function Stats(): React.JSX.Element {
             data-testid="stats-tool"
           />
         </Group>
-<Switch size="xs" label={t('models.showSmall')} checked={showSmall} onChange={(e) => setShowSmall(e.currentTarget.checked)} data-testid="stats-show-small" />
+        <Switch
+          size="xs"
+          label={t('models.showSmall')}
+          checked={showSmall}
+          onChange={(e) => setShowSmall(e.currentTarget.checked)}
+          data-testid="stats-show-small"
+        />
       </Group>
 
-      {tool === 'all' && tools.length > 1 && <Text size="xs" c="dimmed" mb="sm" data-testid="stats-mixed-tools">{t('efficiency.mixedTools')}</Text>}
-      {models.some((m) => m.pricing) && <Text size="xs" c="dimmed" mb="sm">{t('efficiency.priceNote', { date: [...new Set(models.flatMap((m) => m.pricing ? [m.pricing.date] : []))].sort().join(' / '), source: [...new Set(models.flatMap((m) => m.pricing ? [t(m.pricing.priceSource === 'cache' ? 'efficiency.cache' : 'efficiency.snapshot')] : []))].join(' / ') })}</Text>}
+      {tool === 'all' && tools.length > 1 && (
+        <Text size="xs" c="dimmed" mb="sm" data-testid="stats-mixed-tools">
+          {t('efficiency.mixedTools')}
+        </Text>
+      )}
+      {models.some((m) => m.pricing) && (
+        <Text size="xs" c="dimmed" mb="sm">
+          {t('efficiency.priceNote', {
+            date: [...new Set(models.flatMap((m) => (m.pricing ? [m.pricing.date] : [])))]
+              .sort()
+              .join(' / '),
+            source: [
+              ...new Set(
+                models.flatMap((m) =>
+                  m.pricing
+                    ? [
+                        t(
+                          m.pricing.priceSource === 'cache'
+                            ? 'efficiency.cache'
+                            : 'efficiency.snapshot'
+                        )
+                      ]
+                    : []
+                )
+              )
+            ].join(' / ')
+          })}
+        </Text>
+      )}
       {data === undefined ? (
         <Loading />
       ) : data === null ? (
@@ -800,11 +1014,7 @@ function Stats(): React.JSX.Element {
           {indexing ? t('models.indexing') : t('models.none')}
         </Text>
       ) : (
-        <UsageLeaderboard
-          models={models}
-          showSmall={showSmall}
-          onOpen={setSelected}
-        />
+        <UsageLeaderboard models={models} showSmall={showSmall} onOpen={setSelected} />
       )}
 
       <DetailSheet
@@ -823,13 +1033,7 @@ function Stats(): React.JSX.Element {
           )
         }
       >
-        {selected && (
-          <ModelDetailView
-            k={selected}
-            range={range}
-            onSession={openSession}
-          />
-        )}
+        {selected && <ModelDetailView k={selected} range={range} onSession={openSession} />}
       </DetailSheet>
     </Stack>
   )

@@ -92,7 +92,9 @@ function input(v: unknown): RegistryInput | null {
     isSecret: v.isSecret === true,
     type: str(v.type),
     variables: Object.keys(vars).length ? vars : undefined,
-    choices: Array.isArray(v.choices) ? v.choices.filter((c): c is string => typeof c === 'string') : undefined,
+    choices: Array.isArray(v.choices)
+      ? v.choices.filter((c): c is string => typeof c === 'string')
+      : undefined,
     placeholder: str(v.placeholder)
   }
 }
@@ -106,7 +108,9 @@ export function parseServer(entry: unknown): RegistryServer | null {
   const s = entry.server
   const name = str(s.name)
   if (!name) return null
-  const meta = isObj(entry._meta) ? entry._meta['io.modelcontextprotocol.registry/official'] : undefined
+  const meta = isObj(entry._meta)
+    ? entry._meta['io.modelcontextprotocol.registry/official']
+    : undefined
   const packages: RegistryPackage[] = []
   if (Array.isArray(s.packages))
     for (const p of s.packages) {
@@ -116,7 +120,9 @@ export function parseServer(entry: unknown): RegistryServer | null {
         identifier: str(p.identifier)!,
         version: str(p.version),
         runtimeHint: str(p.runtimeHint),
-        transport: isObj(p.transport) ? { type: str(p.transport.type), url: str(p.transport.url) } : undefined,
+        transport: isObj(p.transport)
+          ? { type: str(p.transport.type), url: str(p.transport.url) }
+          : undefined,
         runtimeArguments: inputs(p.runtimeArguments),
         packageArguments: inputs(p.packageArguments),
         environmentVariables: inputs(p.environmentVariables)
@@ -132,7 +138,12 @@ export function parseServer(entry: unknown): RegistryServer | null {
           const i = input(x)
           if (i) vars[k] = i
         }
-      remotes.push({ type: str(r.type)!, url: str(r.url)!, headers: inputs(r.headers), variables: Object.keys(vars).length ? vars : undefined })
+      remotes.push({
+        type: str(r.type)!,
+        url: str(r.url)!,
+        headers: inputs(r.headers),
+        variables: Object.keys(vars).length ? vars : undefined
+      })
     }
   return {
     name,
@@ -160,7 +171,9 @@ export function isHiddenServer(s: RegistryServer): boolean {
 }
 
 function runKind(p: RegistryPackage): McpRunKind {
-  return p.registryType === 'npm' || p.registryType === 'pypi' || p.registryType === 'oci' ? p.registryType : 'other'
+  return p.registryType === 'npm' || p.registryType === 'pypi' || p.registryType === 'oci'
+    ? p.registryType
+    : 'other'
 }
 
 export function toItem(s: RegistryServer): MarketMcpItem {
@@ -187,12 +200,16 @@ export async function searchServers(
   cursor?: string,
   limit = MCP_PAGE_SIZE
 ): Promise<{ items: MarketMcpItem[]; nextCursor?: string }> {
-  const params = new URLSearchParams({ version: 'latest', limit: String(Math.min(Math.max(limit, 1), 100)) })
+  const params = new URLSearchParams({
+    version: 'latest',
+    limit: String(Math.min(Math.max(limit, 1), 100))
+  })
   const query = String(q ?? '').trim()
   if (query) params.set('search', query)
   if (cursor) params.set('cursor', cursor)
   const body = await getJson(fetchFn, `${MCP_REGISTRY_API}/servers?${params}`)
-  if (!isObj(body) || !Array.isArray(body.servers)) throw new MarketError('invalid', 'unexpected registry response')
+  if (!isObj(body) || !Array.isArray(body.servers))
+    throw new MarketError('invalid', 'unexpected registry response')
   const items: MarketMcpItem[] = []
   for (const e of body.servers) {
     const s = parseServer(e)
@@ -206,8 +223,12 @@ export async function searchServers(
 export const SERVER_NAME_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/
 
 export async function serverDetail(fetchFn: FetchFn, name: string): Promise<RegistryServer> {
-  if (typeof name !== 'string' || !SERVER_NAME_RE.test(name)) throw new MarketError('invalid', 'invalid server name')
-  const body = await getJson(fetchFn, `${MCP_REGISTRY_API}/servers/${encodeURIComponent(name)}/versions/latest`)
+  if (typeof name !== 'string' || !SERVER_NAME_RE.test(name))
+    throw new MarketError('invalid', 'invalid server name')
+  const body = await getJson(
+    fetchFn,
+    `${MCP_REGISTRY_API}/servers/${encodeURIComponent(name)}/versions/latest`
+  )
   const s = parseServer(body)
   if (!s) throw new MarketError('invalid', 'unexpected registry response')
   return s
@@ -246,7 +267,11 @@ function templateVars(s: string | undefined): string[] {
   return s ? [...s.matchAll(TEMPLATE_RE)].map((m) => m[1]) : []
 }
 
-function varSpecs(names: string[], defs: Record<string, RegistryInput> | undefined, seen: Set<string>): InputSpec[] {
+function varSpecs(
+  names: string[],
+  defs: Record<string, RegistryInput> | undefined,
+  seen: Set<string>
+): InputSpec[] {
   const out: InputSpec[] = []
   for (const n of names) {
     if (seen.has(n)) continue
@@ -294,7 +319,12 @@ function envSpecs(envs: RegistryInput[], seen: Set<string>): InputSpec[] {
   for (const e of envs) {
     if (!e.name) continue
     if (e.value !== undefined) {
-      out.push(...varSpecs(templateVars(e.value), e.variables, seen).map((v) => ({ ...v, secret: v.secret || !!e.isSecret })))
+      out.push(
+        ...varSpecs(templateVars(e.value), e.variables, seen).map((v) => ({
+          ...v,
+          secret: v.secret || !!e.isSecret
+        }))
+      )
       continue
     }
     out.push({
@@ -317,15 +347,32 @@ export function installChoices(s: RegistryServer): InstallChoice[] {
     const kind = runKind(p)
     const stdio = !p.transport?.type || p.transport.type === 'stdio'
     if (kind === 'other' || !stdio) {
-      out.push({ id: `package:${i}`, kind, label: p.identifier, supported: false, reason: kind === 'other' ? 'kind' : 'transport', inputs: [] })
+      out.push({
+        id: `package:${i}`,
+        kind,
+        label: p.identifier,
+        supported: false,
+        reason: kind === 'other' ? 'kind' : 'transport',
+        inputs: []
+      })
       return
     }
     const seen = new Set<string>()
-    const argInputs = [...argSpecs(p.runtimeArguments ?? [], 'rt', seen), ...argSpecs(p.packageArguments ?? [], 'arg', seen)]
+    const argInputs = [
+      ...argSpecs(p.runtimeArguments ?? [], 'rt', seen),
+      ...argSpecs(p.packageArguments ?? [], 'arg', seen)
+    ]
     const specs = [...argInputs, ...envSpecs(p.environmentVariables ?? [], seen)]
     // Only env and headers move to the Keychain; a secret in args would be written to the library in plain text
     const secretInArgs = argInputs.some((x) => x.secret)
-    out.push({ id: `package:${i}`, kind, label: p.identifier, supported: !secretInArgs, reason: secretInArgs ? 'secretInArgs' : undefined, inputs: specs })
+    out.push({
+      id: `package:${i}`,
+      kind,
+      label: p.identifier,
+      supported: !secretInArgs,
+      reason: secretInArgs ? 'secretInArgs' : undefined,
+      inputs: specs
+    })
   })
   s.remotes.forEach((r, i) => {
     const seen = new Set<string>()
@@ -334,7 +381,12 @@ export function installChoices(s: RegistryServer): InstallChoice[] {
     for (const h of r.headers ?? []) {
       if (!h.name) continue
       if (h.value !== undefined && templateVars(h.value).length) {
-        specs.push(...varSpecs(templateVars(h.value), h.variables, seen).map((v) => ({ ...v, secret: v.secret || !!h.isSecret })))
+        specs.push(
+          ...varSpecs(templateVars(h.value), h.variables, seen).map((v) => ({
+            ...v,
+            secret: v.secret || !!h.isSecret
+          }))
+        )
       } else if (h.value === undefined) {
         specs.push({
           key: `header:${h.name}`,
@@ -358,19 +410,31 @@ export function installChoices(s: RegistryServer): InstallChoice[] {
     })
   })
   const order: McpRunKind[] = ['npm', 'pypi', 'oci', 'remote', 'other']
-  return out.sort((a, b) => Number(b.supported) - Number(a.supported) || order.indexOf(a.kind) - order.indexOf(b.kind))
+  return out.sort(
+    (a, b) =>
+      Number(b.supported) - Number(a.supported) || order.indexOf(a.kind) - order.indexOf(b.kind)
+  )
 }
 
 // ---------------------------------------------------------------- conversion
 
-function need(values: Record<string, string>, spec: { key: string; required: boolean; default?: string; label: string }): string | undefined {
+function need(
+  values: Record<string, string>,
+  spec: { key: string; required: boolean; default?: string; label: string }
+): string | undefined {
   const v = values[spec.key]
   const val = v !== undefined && v !== '' ? v : spec.default
-  if ((val === undefined || val === '') && spec.required) throw new MarketError('invalid', `missing value: ${spec.label}`)
+  if ((val === undefined || val === '') && spec.required)
+    throw new MarketError('invalid', `missing value: ${spec.label}`)
   return val === '' ? undefined : val
 }
 
-function fill(template: string, values: Record<string, string>, defs: Record<string, RegistryInput> | undefined, encode = false): string {
+function fill(
+  template: string,
+  values: Record<string, string>,
+  defs: Record<string, RegistryInput> | undefined,
+  encode = false
+): string {
   return template.replace(TEMPLATE_RE, (_m, n: string) => {
     const d = defs?.[n]
     const v = need(values, { key: `var:${n}`, required: true, default: d?.default, label: n }) ?? ''
@@ -379,20 +443,34 @@ function fill(template: string, values: Record<string, string>, defs: Record<str
 }
 
 /** Optional template (header or env) with every variable left empty: skip it */
-function emptyOptional(template: string, isRequired: boolean | undefined, choice: InstallChoice, values: Record<string, string>): boolean {
+function emptyOptional(
+  template: string,
+  isRequired: boolean | undefined,
+  choice: InstallChoice,
+  values: Record<string, string>
+): boolean {
   if (isRequired) return false
   const specs = templateVars(template).map((n) => choice.inputs.find((x) => x.key === `var:${n}`))
   return specs.every((sp) => !sp || (!values[sp.key] && !sp.default))
 }
 
-function renderArgs(args: RegistryInput[], prefix: 'arg' | 'rt', values: Record<string, string>): string[] {
+function renderArgs(
+  args: RegistryInput[],
+  prefix: 'arg' | 'rt',
+  values: Record<string, string>
+): string[] {
   const out: string[] = []
   args.forEach((a, i) => {
     const named = a.type === 'named' && a.name
     const val =
       a.value !== undefined
         ? fill(a.value, values, a.variables)
-        : need(values, { key: `${prefix}:${i}`, required: !!a.isRequired, default: a.default, label: a.name ?? `argument ${i + 1}` })
+        : need(values, {
+            key: `${prefix}:${i}`,
+            required: !!a.isRequired,
+            default: a.default,
+            label: a.name ?? `argument ${i + 1}`
+          })
     if (named) {
       if (a.format === 'boolean' && a.value === undefined) {
         if (val === 'true') out.push(a.name!)
@@ -414,10 +492,15 @@ export function packageRef(p: RegistryPackage): string {
 }
 
 /** Build the library server definition. Secret values stay plaintext here — upsertMcpServer moves them to the Keychain */
-export function toMcpServer(s: RegistryServer, choiceId: string, values: Record<string, string> = {}): McpServer {
+export function toMcpServer(
+  s: RegistryServer,
+  choiceId: string,
+  values: Record<string, string> = {}
+): McpServer {
   const choice = installChoices(s).find((c) => c.id === choiceId)
   if (!choice) throw new MarketError('invalid', 'unknown install option')
-  if (!choice.supported) throw new MarketError('unsupported', 'this install option is not supported')
+  if (!choice.supported)
+    throw new MarketError('unsupported', 'this install option is not supported')
   const [type, idx] = choiceId.split(':')
   if (type === 'package') {
     const p = s.packages[Number(idx)]
@@ -427,13 +510,15 @@ export function toMcpServer(s: RegistryServer, choiceId: string, values: Record<
       if (e.value !== undefined) {
         // Fixed values are part of the server's contract; templates are filled from their variables
         if (!templateVars(e.value).length) env[e.name] = e.value
-        else if (!emptyOptional(e.value, e.isRequired, choice, values)) env[e.name] = fill(e.value, values, e.variables)
+        else if (!emptyOptional(e.value, e.isRequired, choice, values))
+          env[e.name] = fill(e.value, values, e.variables)
         continue
       }
       const spec = choice.inputs.find((x) => x.key === `env:${e.name}`)!
       // Optional variables the user left empty are omitted: the server applies its own default
       const typed = values[spec.key]
-      const v = typed !== undefined && typed !== '' ? typed : spec.required ? need(values, spec) : undefined
+      const v =
+        typed !== undefined && typed !== '' ? typed : spec.required ? need(values, spec) : undefined
       if (v !== undefined) env[e.name] = v
     }
     const rt = renderArgs(p.runtimeArguments ?? [], 'rt', values)
@@ -441,7 +526,16 @@ export function toMcpServer(s: RegistryServer, choiceId: string, values: Record<
     let args: string[]
     if (p.registryType === 'npm') args = [...(rt.length ? rt : ['-y']), packageRef(p), ...pkg]
     else if (p.registryType === 'pypi') args = [...rt, packageRef(p), ...pkg]
-    else args = ['run', '-i', '--rm', ...rt, ...Object.keys(env).flatMap((k) => ['-e', k]), p.identifier, ...pkg]
+    else
+      args = [
+        'run',
+        '-i',
+        '--rm',
+        ...rt,
+        ...Object.keys(env).flatMap((k) => ['-e', k]),
+        p.identifier,
+        ...pkg
+      ]
     const def: McpServer = { transport: 'stdio', command: COMMAND[p.registryType], args }
     if (Object.keys(env).length) def.env = env
     return def
@@ -459,7 +553,10 @@ export function toMcpServer(s: RegistryServer, choiceId: string, values: Record<
       if (emptyOptional(h.value, h.isRequired, choice, values)) continue
       headers[h.name] = fill(h.value, values, { ...r.variables, ...h.variables })
     } else {
-      const v = need(values, choice.inputs.find((x) => x.key === `header:${h.name}`)!)
+      const v = need(
+        values,
+        choice.inputs.find((x) => x.key === `header:${h.name}`)!
+      )
       if (v !== undefined) headers[h.name] = v
     }
   }
@@ -471,6 +568,10 @@ export function toMcpServer(s: RegistryServer, choiceId: string, values: Record<
 /** Library name suggestion from the registry name (`io.github.foo/bar-mcp` → `bar-mcp`) */
 export function suggestMcpName(registryName: string): string {
   const last = registryName.split('/').pop() ?? registryName
-  const n = last.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 64)
+  const n = last
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .slice(0, 64)
   return n || 'server'
 }

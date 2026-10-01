@@ -1,6 +1,12 @@
 import { tilde } from '../agents'
 import { isEnabled } from '../manifest'
-import { blockBodyMulti, outsideBlockMulti, removeBlockMulti, spliceBlockMulti, type MarkerPair } from '../text'
+import {
+  blockBodyMulti,
+  outsideBlockMulti,
+  removeBlockMulti,
+  spliceBlockMulti,
+  type MarkerPair
+} from '../text'
 import type { ToolId } from '../toolIds'
 import type { Sources, TargetDef } from '../types'
 
@@ -11,7 +17,8 @@ export const MD_END = '<!-- END illithid -->'
 export const LEGACY_KO_MD_BEGIN =
   '<!-- BEGIN illithid — DO NOT EDIT: Illithid \uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0\uC11C \uC0DD\uC131\uB428 -->'
 /** Previous system (sync.mjs) marker. If present, the block is recognized and replaced with the app marker block */
-export const LEGACY_MD_BEGIN = '<!-- BEGIN agents-sync — DO NOT EDIT: ~/.agents \uC5D0\uC11C \uC0DD\uC131\uB428 -->'
+export const LEGACY_MD_BEGIN =
+  '<!-- BEGIN agents-sync — DO NOT EDIT: ~/.agents \uC5D0\uC11C \uC0DD\uC131\uB428 -->'
 export const LEGACY_MD_END = '<!-- END agents-sync -->'
 /** Previous app name (harnesssync) marker */
 export const LEGACY_HS_MD_BEGIN =
@@ -38,7 +45,9 @@ export const MD_HEADER =
 
 /** Rule names enabled for the tool (all if there is no manifest) */
 export function blockRuleNames(sources: Sources, tool: ToolId): string[] {
-  return sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool)).map((x) => x.name)
+  return sources.rules
+    .filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool))
+    .map((x) => x.name)
 }
 
 /** Rule names enabled for Codex (all if there is no manifest) */
@@ -53,7 +62,12 @@ export function blockSourceLine(sources: Sources, home?: string): string {
 }
 
 /** Marker block body for tools that get rules inlined (Codex AGENTS.md, Gemini GEMINI.md) */
-export function buildRulesBlockBody(sources: Sources, tool: ToolId, header = MD_HEADER, home?: string): string {
+export function buildRulesBlockBody(
+  sources: Sources,
+  tool: ToolId,
+  header = MD_HEADER,
+  home?: string
+): string {
   const parts = [`${header}\n${blockSourceLine(sources, home)}`]
   // Skip rules disabled for the tool (all included if there is no manifest)
   for (const r of sources.rules.filter((x) => isEnabled(sources.manifest, 'rules', x.name, tool))) {
@@ -89,7 +103,11 @@ export const codexAgents: TargetDef = {
       const after = removeBlockMulti(before, ALL_MD_MARKERS)
       return {
         after,
-        notes: [after === before ? '0 rules/memory — block not written' : '0 rules/memory — previous block removed']
+        notes: [
+          after === before
+            ? '0 rules/memory — block not written'
+            : '0 rules/memory — previous block removed'
+        ]
       }
     }
     const after = spliceBlockMulti(

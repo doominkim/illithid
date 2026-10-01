@@ -32,10 +32,14 @@ export class SessionScanCache {
 
   constructor(private readonly path: string) {
     try {
-      const o = JSON.parse(readFileSync(path, 'utf8')) as { version?: unknown; entries?: Record<string, Entry> }
+      const o = JSON.parse(readFileSync(path, 'utf8')) as {
+        version?: unknown
+        entries?: Record<string, Entry>
+      }
       if (o.version === VERSION && o.entries && typeof o.entries === 'object') {
         for (const [k, e] of Object.entries(o.entries)) {
-          if (e && typeof e.t === 'string' && typeof e.m === 'number' && typeof e.s === 'number') this.old.set(k, e)
+          if (e && typeof e.t === 'string' && typeof e.m === 'number' && typeof e.s === 'number')
+            this.old.set(k, e)
         }
       }
     } catch {
@@ -67,7 +71,11 @@ export class SessionScanCache {
     }
     if (!this.dirty && this.next.size === this.old.size) return
     try {
-      atomicWrite(this.path, JSON.stringify({ version: VERSION, entries: Object.fromEntries(this.next) }), { mode: 0o600 })
+      atomicWrite(
+        this.path,
+        JSON.stringify({ version: VERSION, entries: Object.fromEntries(this.next) }),
+        { mode: 0o600 }
+      )
     } catch {
       // Read-only home or a concurrent writer: keep going without the cache
     }

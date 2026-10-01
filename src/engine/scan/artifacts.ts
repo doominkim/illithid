@@ -219,7 +219,12 @@ function plansDirs(root: string, depth: number): string[] {
   })
 }
 
-function toArtifact(e: fg.Entry, source: ArtifactSource, tool: ArtifactTool, project?: string): Artifact {
+function toArtifact(
+  e: fg.Entry,
+  source: ArtifactSource,
+  tool: ArtifactTool,
+  project?: string
+): Artifact {
   const size = e.stats?.size ?? 0
   const kind = kindOf(e.path)
   return {
@@ -245,7 +250,8 @@ export function scanArtifacts(
   for (const src of sources ?? artifactSources(home)) {
     if (!existsSync(src.root)) continue
     const fixed = src.tool ?? toolOfLocation(home, src.root)
-    const toolOf = (file: string, base: string): ArtifactTool => fixed ?? toolFromManifests(file, base, cache)
+    const toolOf = (file: string, base: string): ArtifactTool =>
+      fixed ?? toolFromManifests(file, base, cache)
     if (src.mode === 'dir') {
       for (const e of listFiles(src.root)) {
         if (out.has(e.path)) continue
@@ -260,7 +266,8 @@ export function scanArtifacts(
       for (const dir of plansDirs(src.root, src.depth ?? 4)) {
         const project = basename(dirname(dir))
         for (const e of listFiles(dir)) {
-          if (!out.has(e.path)) out.set(e.path, toArtifact(e, src, toolOf(e.path, src.root), project))
+          if (!out.has(e.path))
+            out.set(e.path, toArtifact(e, src, toolOf(e.path, src.root), project))
         }
       }
     }

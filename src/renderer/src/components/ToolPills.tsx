@@ -20,7 +20,13 @@ interface Props {
  * Tool pill row: on opaque / off dimmed with a slash / problem amber ring / pending dot. Tools not in use on this device are not shown.
  * Every pill has a tooltip with the tool name and state, so off is never told by color alone
  */
-export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: Props): React.JSX.Element {
+export function ToolPills({
+  pills,
+  onToggle,
+  busy,
+  size = 20,
+  showNa = false
+}: Props): React.JSX.Element {
   const { t } = useTranslation()
   const tools = useToolsInUse()
   const saving: readonly ToolId[] = busy == null ? [] : typeof busy === 'string' ? [busy] : busy
@@ -31,7 +37,11 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
         const p = pills[tool]
         if (!p || (p.na && !showNa)) return null
         const name = TOOL_NAME[tool]
-        const icon = saving.includes(tool) ? <Loader size={size - 4} color="accent" /> : <ToolIcon tool={tool} size={size} />
+        const icon = saving.includes(tool) ? (
+          <Loader size={size - 4} color="accent" />
+        ) : (
+          <ToolIcon tool={tool} size={size} />
+        )
         const pill = (
           <span
             className="ac-pill"
@@ -50,7 +60,13 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
           : `${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`
         const label = p.hint ? `${state}\n${p.hint}` : state
         return (
-          <Tooltip key={tool} label={label} withArrow openDelay={300} style={{ whiteSpace: 'pre-line' }}>
+          <Tooltip
+            key={tool}
+            label={label}
+            withArrow
+            openDelay={300}
+            style={{ whiteSpace: 'pre-line' }}
+          >
             {onToggle ? (
               <UnstyledButton
                 disabled={!toggle}
@@ -65,7 +81,11 @@ export function ToolPills({ pills, onToggle, busy, size = 20, showNa = false }: 
                 {pill}
               </UnstyledButton>
             ) : (
-              <span style={{ display: 'inline-flex' }} role="img" aria-label={`${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`}>
+              <span
+                style={{ display: 'inline-flex' }}
+                role="img"
+                aria-label={`${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`}
+              >
                 {pill}
               </span>
             )}

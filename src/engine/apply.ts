@@ -101,7 +101,11 @@ function backupRemovedServers(home: string, c: FileChange): string[] {
  * geminiRules whose block was edited on the tool side (Gemini writes GEMINI.md itself): the previous block goes to
  * backups/deleted/<ts>/gemini/GEMINI.block.md (0600) before it is replaced. null if nothing to keep
  */
-function backupEditedBlock(home: string, c: FileChange, applied: string | undefined): string | null {
+function backupEditedBlock(
+  home: string,
+  c: FileChange,
+  applied: string | undefined
+): string | null {
   if (c.id !== 'geminiRules' || !blockEdited(c.before, applied)) return null
   const body = blockBody(c.before, MD_BEGIN, MD_END)!
   const ts = new Date().toISOString().replace(/[:.]/g, '-')
@@ -158,7 +162,15 @@ export function apply(
       state.applied[c.id] = { regionHash: c.afterRegionHash, at: new Date().toISOString() }
     }
     const dropped = c.retired?.length
-      ? dropPending(state, c.retired.map((path) => ({ kind: 'instruction' as const, tool: 'opencode' as const, path, workspace: activeWorkspaceId(home) })))
+      ? dropPending(
+          state,
+          c.retired.map((path) => ({
+            kind: 'instruction' as const,
+            tool: 'opencode' as const,
+            path,
+            workspace: activeWorkspaceId(home)
+          }))
+        )
       : false
     if (c.owned || c.afterRegionHash !== null || dropped) writeState(home, state)
   }
@@ -173,13 +185,22 @@ export function apply(
       const t = ALL_TARGETS.find((x) => x.id === planned.id)!
       c = planTarget(home, t, buildContext(home, readPlanSources(home), env, opts.secrets))
     }
-    const base = { id: c.id, label: c.label, ...(c.serverErrors ? { serverErrors: c.serverErrors } : {}) }
+    const base = {
+      id: c.id,
+      label: c.label,
+      ...(c.serverErrors ? { serverErrors: c.serverErrors } : {})
+    }
     const skip = (reason: ApplySkipReason, detail?: string): void => {
       results.push({ ...base, status: 'skipped', reason, ...(detail ? { detail } : {}) })
     }
     // Absent file left alone (nothing to write, or a file only the tool itself creates) — not a failure, nothing recorded
     if (c.skip) {
-      results.push({ ...base, status: 'unchanged', reason: c.skip, ...(c.notes[0] ? { detail: c.notes[0] } : {}) })
+      results.push({
+        ...base,
+        status: 'unchanged',
+        reason: c.skip,
+        ...(c.notes[0] ? { detail: c.notes[0] } : {})
+      })
       continue
     }
     if (c.error) {
@@ -230,7 +251,9 @@ export function apply(
       ...(backupPath ? { backupPath } : {}),
       ...(removedServerBackups.length ? { removedServerBackups } : {}),
       ...(blockBackup ? { blockBackup } : {}),
-      ...(restored ? { restored: true, detail: 'restored owned region changed on the tool side from source' } : {})
+      ...(restored
+        ? { restored: true, detail: 'restored owned region changed on the tool side from source' }
+        : {})
     })
   }
   return results

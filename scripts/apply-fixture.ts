@@ -192,7 +192,8 @@ function setupLibrary(F: string): void {
 
 function setupTargets(F: string): string[] {
   for (const t of TARGETS) {
-    if (!copyInto(REAL_HOME, F, t.rel, MODES[t.id])) throw new Error(`${t.rel} missing in real HOME`)
+    if (!copyInto(REAL_HOME, F, t.rel, MODES[t.id]))
+      throw new Error(`${t.rel} missing in real HOME`)
   }
   const ssot = mcpEntries(readSources(F).mcp).map(([n]) => n)
   if (!ssot.length) throw new Error('no SSOT servers')
@@ -334,7 +335,8 @@ function run(): void {
         continue
       }
       if (m) {
-        if (outsideBlockMulti(before, m) !== outsideBlockMulti(after, m)) bad.push(`${id}:outside block`)
+        if (outsideBlockMulti(before, m) !== outsideBlockMulti(after, m))
+          bad.push(`${id}:outside block`)
         continue
       }
       const o = jsonOwned[id]!
@@ -534,7 +536,8 @@ function run(): void {
         bad.push(`${tool}.${key}:value`)
       const keys = new Set([...Object.keys(A), ...Object.keys(B)])
       keys.delete(key)
-      for (const k of keys) if (!isDeepStrictEqual(A[k], B[k])) bad.push(`${tool}.${key}:${k} changed`)
+      for (const k of keys)
+        if (!isDeepStrictEqual(A[k], B[k])) bad.push(`${tool}.${key}:${k} changed`)
       if (!/^\{\n {2}"/.test(afterText) || afterText.endsWith('\n') !== beforeText.endsWith('\n'))
         bad.push(`${tool}.${key}:format`)
       if (!r.backupPath || !existsSync(r.backupPath) || sha(read(r.backupPath)) !== sha(beforeText))
@@ -650,7 +653,8 @@ function run(): void {
       .filter((x) => x.action === 'copy')
       .every((x) => isRealDir(x.path) && dirContentHash(x.path) === x.sourceHash)
     if (!copiesOk) bad.push('copy result hash mismatch')
-    if (!existsSync(join(F, 'other-source', canon[1], 'SKILL.md'))) bad.push('previous link target damaged')
+    if (!existsSync(join(F, 'other-source', canon[1], 'SKILL.md')))
+      bad.push('previous link target damaged')
     if (dirContentHash(userDir) !== userHash) bad.push('user-owned directory changed')
     if (untouched.some((p, i) => dirContentHash(p) !== untouchedHash[i]))
       bad.push('hidden/extra changed')
@@ -693,7 +697,8 @@ function run(): void {
       sha(read(join(bak, 'SKILL.md'))) === editedHash &&
       dirContentHash(join(cs, canon[0])) === srcHash(canon[0])
     if (!restoredOk) bad.push('tool-side edit → restore/backup failed')
-    if (bak.startsWith(cs + '/') || bak.startsWith(xs + '/')) bad.push('backup inside skill directory')
+    if (bak.startsWith(cs + '/') || bak.startsWith(xs + '/'))
+      bad.push('backup inside skill directory')
     if (cell('claude') !== 'synced') bad.push(`status after restore ${cell('claude')}`)
 
     // i5. old app-written copy (canonical changed) → update without drift
@@ -790,7 +795,11 @@ function run(): void {
       toJsonText(changed, noNl) === JSON.stringify(changed, null, 2) &&
       toJsonText(changed, noNl + '\n') === JSON.stringify(changed, null, 2) + '\n' &&
       toJsonText(changed) === JSON.stringify(changed, null, 2) + '\n'
-    check('k. JSON targets keep unchanged text and the file\'s trailing-newline style', ok, ok ? 'ok' : 'mismatch')
+    check(
+      "k. JSON targets keep unchanged text and the file's trailing-newline style",
+      ok,
+      ok ? 'ok' : 'mismatch'
+    )
   }
 }
 

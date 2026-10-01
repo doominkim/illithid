@@ -18,8 +18,12 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
 
   useEffect(() => {
     let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- show loading while another item loads
     setStats(undefined)
-    window.api.sessionIndexStatus().then((v) => alive && setIndexing(v.running), () => {})
+    window.api.sessionIndexStatus().then(
+      (v) => alive && setIndexing(v.running),
+      () => {}
+    )
     const load = (): void => {
       window.api.usage(kind, name).then(
         (s) => alive && setStats(s),
@@ -45,7 +49,11 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
       right={
         stats && stats.total > 0 ? (
           <Text size="sm" c="dimmed">
-            {t('usage.summary', { recent: fmt(stats.recent), days: stats.days, total: fmt(stats.total) })}
+            {t('usage.summary', {
+              recent: fmt(stats.recent),
+              days: stats.days,
+              total: fmt(stats.total)
+            })}
           </Text>
         ) : undefined
       }
@@ -79,7 +87,10 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
     label,
     color: i < dm.models.length ? LINE_COLORS[i % LINE_COLORS.length] : 'gray.5'
   }))
-  const daily = dm.days.map((d) => ({ day: d.day.slice(5), ...Object.fromEntries(d.n.map((n, i) => [`m${i}`, n])) }))
+  const daily = dm.days.map((d) => ({
+    day: d.day.slice(5),
+    ...Object.fromEntries(d.n.map((n, i) => [`m${i}`, n]))
+  }))
   const models = stats.byModel.slice(0, TOP_MODELS)
   const rest = stats.byModel.slice(TOP_MODELS).reduce((a, m) => a + m.n, 0)
   if (rest) models.push({ model: t('usage.others'), n: rest })
@@ -104,7 +115,9 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
           tooltipProps={{
             content: ({ label, payload }) => {
               const hits = (payload ?? []).filter((p) => Number(p.value) > 0)
-              return hits.length ? <ChartTooltip label={label} payload={hits} series={lineSeries} /> : null
+              return hits.length ? (
+                <ChartTooltip label={label} payload={hits} series={lineSeries} />
+              ) : null
             }
           }}
           strokeWidth={2}

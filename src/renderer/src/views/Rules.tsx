@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Badge, Box, Button, Group, Modal, Stack, Tabs, TextInput } from '@mantine/core'
 import { Download, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,8 @@ import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
-import { ReloadButton, useReload } from '../components/ReloadButton'
+import { ReloadButton } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
@@ -33,7 +34,12 @@ import { useViewMode } from '../lib/viewMode'
 function firstHeading(text: string): string {
   const m = /^#{1,3}\s+(.+)$/m.exec(text)
   if (m) return m[1].trim()
-  return text.split('\n').find((l) => l.trim())?.trim() ?? ''
+  return (
+    text
+      .split('\n')
+      .find((l) => l.trim())
+      ?.trim() ?? ''
+  )
 }
 
 /** Card description: first heading. Empty if it equals the file name (ignoring case and .md) */
@@ -67,16 +73,25 @@ function Rules(): React.JSX.Element {
   /** Keep the detail open right after a rename until the list is reloaded */
   const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null)
   useNavSelect(setSelected)
-  useEffect(() => {
+  // Reset the rename field when another rule is opened (state from the previous render)
+  const [draftFor, setDraftFor] = useState<string | null | undefined>(undefined)
+  if (selected !== draftFor) {
+    setDraftFor(selected)
     setNameDraft(selected ?? '')
     setRenameErr(null)
-  }, [selected])
+  }
 
   /** Per-tool sync state (status cells) */
   const injection = useMemo<PillMap>(() => {
     const cells = status.data?.cells.filter((c) => c.resource === 'rules') ?? []
     return Object.fromEntries(
-      cells.map((c) => [c.tool, { ...pillFromCellState(c.state), ...(c.state === 'error' && c.detail ? { hint: c.detail } : {}) }])
+      cells.map((c) => [
+        c.tool,
+        {
+          ...pillFromCellState(c.state),
+          ...(c.state === 'error' && c.detail ? { hint: c.detail } : {})
+        }
+      ])
     ) as PillMap
   }, [status.data])
 
@@ -92,18 +107,26 @@ function Rules(): React.JSX.Element {
       TOOLS.map((tool) => {
         const on = enabled(name, tool)
         const inj = injection[tool]
-        const failure = on && (tool === 'claude' || tool === 'copilot' || tool === 'grok') ? failedIn('rule', name, tool) : null
-        if (failure) return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
+        const failure =
+          on && (tool === 'claude' || tool === 'copilot' || tool === 'grok')
+            ? failedIn('rule', name, tool)
+            : null
+        if (failure)
+          return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
         return [tool, on ? { ...inj, on: true } : { on: false }]
       })
     ) as PillMap
 
   const toggle = async (name: string, tool: ToolId, on: boolean): Promise<void> => {
-    await pending.run(name, tool, () => runWrite(window.api.toggle('rules', name, tool, on), { success: t('toggles.saved') }))
+    await pending.run(name, tool, () =>
+      runWrite(window.api.toggle('rules', name, tool, on), { success: t('toggles.saved') })
+    )
     reload()
   }
   const toggleAll = async (name: string, on: boolean): Promise<void> => {
-    for (const tool of cardTools) if (enabled(name, tool) !== on) await runWrite(window.api.toggle('rules', name, tool, on), { invalidate: true })
+    for (const tool of cardTools)
+      if (enabled(name, tool) !== on)
+        await runWrite(window.api.toggle('rules', name, tool, on), { invalidate: true })
     reload()
   }
   const save = async (name: string, text: string): Promise<boolean> => {
@@ -113,7 +136,9 @@ function Rules(): React.JSX.Element {
   }
   const create = async (): Promise<void> => {
     const name = newName.trim().endsWith('.md') ? newName.trim() : `${newName.trim()}.md`
-    const r = await runWrite(window.api.ruleCreate(name, `# ${name.replace(/\.md$/, '')}\n\n`), { success: t('rules.created') })
+    const r = await runWrite(window.api.ruleCreate(name, `# ${name.replace(/\.md$/, '')}\n\n`), {
+      success: t('rules.created')
+    })
     if (r !== null) {
       setCreating(false)
       setNewName('')
@@ -133,9 +158,14 @@ function Rules(): React.JSX.Element {
 
   const q = query.trim().toLowerCase()
   const files = data.files.filter((f) => !q || includesCI(f.name, q) || includesCI(f.text, q))
-  const prev = renamed && renamed.to === selected ? data.files.find((f) => f.name === renamed.from) : undefined
-  const current = data.files.find((f) => f.name === selected) ?? (prev && { ...prev, name: renamed!.to })
-  const nextName = nameDraft.trim() && !nameDraft.trim().endsWith('.md') ? `${nameDraft.trim()}.md` : nameDraft.trim()
+  const prev =
+    renamed && renamed.to === selected ? data.files.find((f) => f.name === renamed.from) : undefined
+  const current =
+    data.files.find((f) => f.name === selected) ?? (prev && { ...prev, name: renamed!.to })
+  const nextName =
+    nameDraft.trim() && !nameDraft.trim().endsWith('.md')
+      ? `${nameDraft.trim()}.md`
+      : nameDraft.trim()
   const rename = async (): Promise<void> => {
     if (!current) return
     const from = current.name
@@ -160,10 +190,21 @@ function Rules(): React.JSX.Element {
         count={data.files.length}
         actions={
           <>
-            <Button size="xs" leftSection={<Plus size={13} />} onClick={() => setCreating(true)} data-testid="rule-new">
+            <Button
+              size="xs"
+              leftSection={<Plus size={13} />}
+              onClick={() => setCreating(true)}
+              data-testid="rule-new"
+            >
               {t('rules.new')}
             </Button>
-            <Button size="xs" variant="default" leftSection={<Download size={13} />} onClick={() => setImportOpen(true)} data-testid="rule-import">
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Download size={13} />}
+              onClick={() => setImportOpen(true)}
+              data-testid="rule-import"
+            >
               {t('common.import')}
             </Button>
             <ReloadButton />
@@ -185,7 +226,9 @@ function Rules(): React.JSX.Element {
               key={f.name}
               name={f.name}
               description={cardTitle(f.name, f.text)}
-              switchChecked={cardTools.length > 0 && cardTools.every((tool) => enabled(f.name, tool))}
+              switchChecked={
+                cardTools.length > 0 && cardTools.every((tool) => enabled(f.name, tool))
+              }
               switchIndeterminate={cardTools.some((tool) => enabled(f.name, tool))}
               onSwitch={(v) => void toggleAll(f.name, v)}
               footerLeft={
@@ -193,7 +236,14 @@ function Rules(): React.JSX.Element {
                   {t('rules.lines', { n: f.text.split('\n').length })}
                 </Badge>
               }
-              footerRight={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={pending.of(f.name)} />}
+              footerRight={
+                <ToolPills
+                  pills={pillsOf(f.name)}
+                  size={18}
+                  onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))}
+                  busy={pending.of(f.name)}
+                />
+              }
               selected={f.name === selected}
               onClick={() => setSelected(f.name)}
             />
@@ -207,7 +257,14 @@ function Rules(): React.JSX.Element {
               avatar={<Initial text={f.name.replace(/^\d+-/, '')} />}
               title={f.name}
               subtitle={cardTitle(f.name, f.text)}
-              right={<ToolPills pills={pillsOf(f.name)} size={18} onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))} busy={pending.of(f.name)} />}
+              right={
+                <ToolPills
+                  pills={pillsOf(f.name)}
+                  size={18}
+                  onToggle={(tool) => void toggle(f.name, tool, !enabled(f.name, tool))}
+                  busy={pending.of(f.name)}
+                />
+              }
               active={f.name === selected}
               onClick={() => setSelected(f.name)}
             />
@@ -277,7 +334,10 @@ function Rules(): React.JSX.Element {
                       {t('rules.rename')}
                     </Button>
                   </Group>
-                  <MarkdownEditor value={current.text} onSave={(text) => save(current.name, text)} />
+                  <MarkdownEditor
+                    value={current.text}
+                    onSave={(text) => save(current.name, text)}
+                  />
                 </Stack>
               </Tabs.Panel>
             </Tabs>
@@ -285,8 +345,19 @@ function Rules(): React.JSX.Element {
         )}
       </DetailSheet>
 
-      <ImportModal opened={importOpen} onClose={() => setImportOpen(false)} onImported={reload} kind="rule" />
-      <Modal opened={creating} onClose={() => setCreating(false)} title={t('rules.new')} centered radius="lg">
+      <ImportModal
+        opened={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={reload}
+        kind="rule"
+      />
+      <Modal
+        opened={creating}
+        onClose={() => setCreating(false)}
+        title={t('rules.new')}
+        centered
+        radius="lg"
+      >
         <Stack gap="md">
           <TextInput
             label={t('common.name')}
@@ -301,7 +372,11 @@ function Rules(): React.JSX.Element {
             <Button variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim()} onClick={() => void create()} data-testid="rule-new-ok">
+            <Button
+              disabled={!newName.trim()}
+              onClick={() => void create()}
+              data-testid="rule-new-ok"
+            >
               {t('common.create')}
             </Button>
           </Group>

@@ -231,8 +231,7 @@ async function ensureIdentity(g: SimpleGit, device: string): Promise<void> {
     }
   }
   if (!(await get('user.name'))) await g.raw(['config', 'user.name', `illithid@${device}`])
-  if (!(await get('user.email')))
-    await g.raw(['config', 'user.email', `illithid@${device}.local`])
+  if (!(await get('user.email'))) await g.raw(['config', 'user.email', `illithid@${device}.local`])
   if (!(await get('commit.gpgsign'))) await g.raw(['config', 'commit.gpgsign', 'false'])
 }
 
@@ -291,7 +290,8 @@ function looksDiverged(msg: string): boolean {
  */
 export async function snapshot(home: string, message?: string): Promise<SnapshotResult> {
   const root = libraryRoot(home)
-  if (!isRepo(root)) return { ok: false, reason: 'Backup is not connected (run connectBackup first)' }
+  if (!isRepo(root))
+    return { ok: false, reason: 'Backup is not connected (run connectBackup first)' }
   const g = git(root)
   const device = deviceName(home)
   try {

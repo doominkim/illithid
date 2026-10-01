@@ -5,7 +5,10 @@ import type { UsageKind, UsageSummary } from '../../../shared/api'
  * Last-30-days usage for every name in a list, in one request. undefined while loading, null until the usage index exists;
  * reloads when an index run finishes. The previous result stays on screen while a changed list reloads
  */
-export function useUsageSummary(kind: UsageKind, names: string[]): Record<string, UsageSummary> | null | undefined {
+export function useUsageSummary(
+  kind: UsageKind,
+  names: string[]
+): Record<string, UsageSummary> | null | undefined {
   const key = JSON.stringify([kind, [...names].sort()])
   const [result, setResult] = useState<Record<string, UsageSummary> | null | undefined>(undefined)
   useEffect(() => {

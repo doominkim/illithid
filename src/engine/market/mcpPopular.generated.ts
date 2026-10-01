@@ -4,356 +4,305 @@ import type { MarketMcpItem } from './mcpRegistry'
 export const MCP_POPULAR_AT = '2026-09-27'
 export const MCP_POPULAR: readonly MarketMcpItem[] = [
   {
-    "name": "io.github.ChromeDevTools/chrome-devtools-mcp",
-    "title": "Chrome DevTools MCP",
-    "description": "MCP server for Chrome DevTools",
-    "version": "1.10.1",
-    "repo": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "chrome-devtools-mcp",
-    "downloads": 2939678
+    name: 'io.github.ChromeDevTools/chrome-devtools-mcp',
+    title: 'Chrome DevTools MCP',
+    description: 'MCP server for Chrome DevTools',
+    version: '1.10.1',
+    repo: 'https://github.com/ChromeDevTools/chrome-devtools-mcp',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'chrome-devtools-mcp',
+    downloads: 2939678
   },
   {
-    "name": "io.github.upstash/context7",
-    "title": "Context7",
-    "description": "Up-to-date code docs for any prompt",
-    "version": "4.1.1",
-    "repo": "https://github.com/upstash/context7",
-    "website": "https://context7.com",
-    "kinds": [
-      "npm",
-      "other",
-      "remote"
-    ],
-    "installable": true,
-    "npm": "@upstash/context7-mcp",
-    "downloads": 463929
+    name: 'io.github.upstash/context7',
+    title: 'Context7',
+    description: 'Up-to-date code docs for any prompt',
+    version: '4.1.1',
+    repo: 'https://github.com/upstash/context7',
+    website: 'https://context7.com',
+    kinds: ['npm', 'other', 'remote'],
+    installable: true,
+    npm: '@upstash/context7-mcp',
+    downloads: 463929
   },
   {
-    "name": "io.github.callstack/agent-device",
-    "title": "agent-device",
-    "description": "MCP server for mobile app automation: verify, control, and debug iOS, Android, TV, and desktop apps",
-    "version": "0.21.15",
-    "repo": "https://github.com/callstack/agent-device",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "agent-device",
-    "downloads": 227867
+    name: 'io.github.callstack/agent-device',
+    title: 'agent-device',
+    description:
+      'MCP server for mobile app automation: verify, control, and debug iOS, Android, TV, and desktop apps',
+    version: '0.21.15',
+    repo: 'https://github.com/callstack/agent-device',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'agent-device',
+    downloads: 227867
   },
   {
-    "name": "io.github.firecrawl/firecrawl-mcp-server",
-    "title": "Firecrawl MCP Server",
-    "description": "MCP server for Firecrawl — web search, scraping, and biomedical/arXiv paper search.",
-    "version": "3.25.5",
-    "repo": "https://github.com/firecrawl/firecrawl-mcp-server.git",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "firecrawl-mcp",
-    "downloads": 178059
+    name: 'io.github.firecrawl/firecrawl-mcp-server',
+    title: 'Firecrawl MCP Server',
+    description:
+      'MCP server for Firecrawl — web search, scraping, and biomedical/arXiv paper search.',
+    version: '3.25.5',
+    repo: 'https://github.com/firecrawl/firecrawl-mcp-server.git',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'firecrawl-mcp',
+    downloads: 178059
   },
   {
-    "name": "io.github.getsentry/sentry-mcp",
-    "description": "MCP server for Sentry - error monitoring, issue tracking, and debugging for AI assistants",
-    "version": "0.42.0",
-    "repo": "https://github.com/getsentry/sentry-mcp",
-    "kinds": [
-      "npm",
-      "remote"
-    ],
-    "installable": true,
-    "npm": "@sentry/mcp-server",
-    "downloads": 153593
+    name: 'io.github.getsentry/sentry-mcp',
+    description:
+      'MCP server for Sentry - error monitoring, issue tracking, and debugging for AI assistants',
+    version: '0.42.0',
+    repo: 'https://github.com/getsentry/sentry-mcp',
+    kinds: ['npm', 'remote'],
+    installable: true,
+    npm: '@sentry/mcp-server',
+    downloads: 153593
   },
   {
-    "name": "io.github.zereight/gitlab-mcp",
-    "description": "GitLab MCP server for projects, merge requests, issues, pipelines, wiki, releases, and more.",
-    "version": "2.1.66",
-    "repo": "https://github.com/zereight/gitlab-mcp",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@zereight/mcp-gitlab",
-    "downloads": 152999
+    name: 'io.github.zereight/gitlab-mcp',
+    description:
+      'GitLab MCP server for projects, merge requests, issues, pipelines, wiki, releases, and more.',
+    version: '2.1.66',
+    repo: 'https://github.com/zereight/gitlab-mcp',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@zereight/mcp-gitlab',
+    downloads: 152999
   },
   {
-    "name": "io.github.vercel/next-devtools-mcp",
-    "description": "Next.js development tools MCP server with stdio transport",
-    "version": "0.3.6",
-    "repo": "https://github.com/vercel/next-devtools-mcp",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "next-devtools-mcp",
-    "downloads": 142776
+    name: 'io.github.vercel/next-devtools-mcp',
+    description: 'Next.js development tools MCP server with stdio transport',
+    version: '0.3.6',
+    repo: 'https://github.com/vercel/next-devtools-mcp',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'next-devtools-mcp',
+    downloads: 142776
   },
   {
-    "name": "io.github.wonderwhy-er/desktop-commander",
-    "title": "Desktop Commander",
-    "description": "MCP server for terminal commands, file operations, and process management",
-    "version": "0.2.51",
-    "repo": "https://github.com/wonderwhy-er/DesktopCommanderMCP",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@wonderwhy-er/desktop-commander",
-    "downloads": 140152
+    name: 'io.github.wonderwhy-er/desktop-commander',
+    title: 'Desktop Commander',
+    description: 'MCP server for terminal commands, file operations, and process management',
+    version: '0.2.51',
+    repo: 'https://github.com/wonderwhy-er/DesktopCommanderMCP',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@wonderwhy-er/desktop-commander',
+    downloads: 140152
   },
   {
-    "name": "com.supabase/mcp",
-    "title": "Supabase",
-    "description": "MCP server for interacting with the Supabase platform",
-    "version": "0.13.0",
-    "repo": "https://github.com/supabase/mcp",
-    "website": "https://supabase.com/mcp",
-    "kinds": [
-      "npm",
-      "remote"
-    ],
-    "installable": true,
-    "npm": "@supabase/mcp-server-supabase",
-    "downloads": 108552
+    name: 'com.supabase/mcp',
+    title: 'Supabase',
+    description: 'MCP server for interacting with the Supabase platform',
+    version: '0.13.0',
+    repo: 'https://github.com/supabase/mcp',
+    website: 'https://supabase.com/mcp',
+    kinds: ['npm', 'remote'],
+    installable: true,
+    npm: '@supabase/mcp-server-supabase',
+    downloads: 108552
   },
   {
-    "name": "io.github.UI5/mcp-server",
-    "description": "MCP server for SAPUI5/OpenUI5 development",
-    "version": "0.3.1",
-    "repo": "https://github.com/UI5/mcp-server",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@ui5/mcp-server",
-    "downloads": 104517
+    name: 'io.github.UI5/mcp-server',
+    description: 'MCP server for SAPUI5/OpenUI5 development',
+    version: '0.3.1',
+    repo: 'https://github.com/UI5/mcp-server',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@ui5/mcp-server',
+    downloads: 104517
   },
   {
-    "name": "io.github.SAP/fiori-mcp-server",
-    "description": "SAP Fiori - Model Context Protocol (MCP) server",
-    "version": "1.13.0",
-    "repo": "https://github.com/SAP/open-ux-tools",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@sap-ux/fiori-mcp-server",
-    "downloads": 101653
+    name: 'io.github.SAP/fiori-mcp-server',
+    description: 'SAP Fiori - Model Context Protocol (MCP) server',
+    version: '1.13.0',
+    repo: 'https://github.com/SAP/open-ux-tools',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@sap-ux/fiori-mcp-server',
+    downloads: 101653
   },
   {
-    "name": "io.github.GLips/Figma-Context-MCP",
-    "description": "Give your coding agent access to your Figma data. Implement designs in any framework in one-shot.",
-    "version": "0.13.2",
-    "repo": "https://github.com/GLips/Figma-Context-MCP",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "figma-developer-mcp",
-    "downloads": 83854
+    name: 'io.github.GLips/Figma-Context-MCP',
+    description:
+      'Give your coding agent access to your Figma data. Implement designs in any framework in one-shot.',
+    version: '0.13.2',
+    repo: 'https://github.com/GLips/Figma-Context-MCP',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'figma-developer-mcp',
+    downloads: 83854
   },
   {
-    "name": "io.github.nrwl/nx-console",
-    "description": "A Model Context Protocol server implementation for Nx",
-    "version": "0.6.12",
-    "repo": "https://github.com/nrwl/nx-console",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "nx-mcp",
-    "downloads": 69787
+    name: 'io.github.nrwl/nx-console',
+    description: 'A Model Context Protocol server implementation for Nx',
+    version: '0.6.12',
+    repo: 'https://github.com/nrwl/nx-console',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'nx-mcp',
+    downloads: 69787
   },
   {
-    "name": "io.github.cap-js/mcp-server",
-    "description": "Model Context Protocol (MCP) server for AI-assisted development of CAP applications.",
-    "version": "0.0.6",
-    "repo": "https://github.com/cap-js/mcp-server",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@cap-js/mcp-server",
-    "downloads": 59554
+    name: 'io.github.cap-js/mcp-server',
+    description:
+      'Model Context Protocol (MCP) server for AI-assisted development of CAP applications.',
+    version: '0.0.6',
+    repo: 'https://github.com/cap-js/mcp-server',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@cap-js/mcp-server',
+    downloads: 59554
   },
   {
-    "name": "com.xcodebuildmcp/XcodeBuildMCP",
-    "description": "XcodeBuildMCP provides tools for Xcode project management, simulator management, and app utilities.",
-    "version": "2.7.0",
-    "repo": "https://github.com/getsentry/XcodeBuildMCP",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "xcodebuildmcp",
-    "downloads": 59019
+    name: 'com.xcodebuildmcp/XcodeBuildMCP',
+    description:
+      'XcodeBuildMCP provides tools for Xcode project management, simulator management, and app utilities.',
+    version: '2.7.0',
+    repo: 'https://github.com/getsentry/XcodeBuildMCP',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'xcodebuildmcp',
+    downloads: 59019
   },
   {
-    "name": "io.github.Softeria/ms-365-mcp-server",
-    "title": "Microsoft 365 MCP Server",
-    "description": "Interact with Microsoft 365 and Office services through the Microsoft Graph API.",
-    "version": "0.156.1",
-    "repo": "https://github.com/Softeria/ms-365-mcp-server",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@softeria/ms-365-mcp-server",
-    "downloads": 49868
+    name: 'io.github.Softeria/ms-365-mcp-server',
+    title: 'Microsoft 365 MCP Server',
+    description: 'Interact with Microsoft 365 and Office services through the Microsoft Graph API.',
+    version: '0.156.1',
+    repo: 'https://github.com/Softeria/ms-365-mcp-server',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@softeria/ms-365-mcp-server',
+    downloads: 49868
   },
   {
-    "name": "com.microsoft/powerbi-modeling-mcp",
-    "title": "Power BI Authoring MCP Server (Local)",
-    "description": "The Power BI Authoring MCP server lets an AI agent create and change Power BI semantic models.",
-    "version": "1.0.0",
-    "repo": "https://github.com/microsoft/powerbi-modeling-mcp.git",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@microsoft/powerbi-modeling-mcp",
-    "downloads": 34138
+    name: 'com.microsoft/powerbi-modeling-mcp',
+    title: 'Power BI Authoring MCP Server (Local)',
+    description:
+      'The Power BI Authoring MCP server lets an AI agent create and change Power BI semantic models.',
+    version: '1.0.0',
+    repo: 'https://github.com/microsoft/powerbi-modeling-mcp.git',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@microsoft/powerbi-modeling-mcp',
+    downloads: 34138
   },
   {
-    "name": "ai.perplexity/mcp-server",
-    "title": "Perplexity API Platform",
-    "description": "Real-time web search, reasoning, and research through Perplexity's API",
-    "version": "1.2.1",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@perplexity-ai/mcp-server",
-    "downloads": 33468
+    name: 'ai.perplexity/mcp-server',
+    title: 'Perplexity API Platform',
+    description: "Real-time web search, reasoning, and research through Perplexity's API",
+    version: '1.2.1',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@perplexity-ai/mcp-server',
+    downloads: 33468
   },
   {
-    "name": "io.github.TencentCloudBase/cloudbase-mcp",
-    "title": "CloudBase",
-    "description": "CloudBase MCP: DB, functions, storage, hosting via @cloudbase/cloudbase-mcp",
-    "version": "2.34.6",
-    "repo": "https://github.com/TencentCloudBase/CloudBase-AI-Toolkit",
-    "website": "https://github.com/TencentCloudBase/CloudBase-AI-Toolkit",
-    "kinds": [
-      "npm",
-      "remote"
-    ],
-    "installable": true,
-    "npm": "@cloudbase/cloudbase-mcp",
-    "downloads": 32345
+    name: 'io.github.TencentCloudBase/cloudbase-mcp',
+    title: 'CloudBase',
+    description: 'CloudBase MCP: DB, functions, storage, hosting via @cloudbase/cloudbase-mcp',
+    version: '2.34.6',
+    repo: 'https://github.com/TencentCloudBase/CloudBase-AI-Toolkit',
+    website: 'https://github.com/TencentCloudBase/CloudBase-AI-Toolkit',
+    kinds: ['npm', 'remote'],
+    installable: true,
+    npm: '@cloudbase/cloudbase-mcp',
+    downloads: 32345
   },
   {
-    "name": "io.github.tavily-ai/tavily-mcp",
-    "description": "MCP server for advanced web search using Tavily",
-    "version": "0.2.15",
-    "repo": "https://github.com/tavily-ai/tavily-mcp",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "tavily-mcp",
-    "downloads": 25348
+    name: 'io.github.tavily-ai/tavily-mcp',
+    description: 'MCP server for advanced web search using Tavily',
+    version: '0.2.15',
+    repo: 'https://github.com/tavily-ai/tavily-mcp',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'tavily-mcp',
+    downloads: 25348
   },
   {
-    "name": "io.github.arose26/mbox-mcp",
-    "description": "Search local email archives (.mbox/.eml) entirely on your machine. No OAuth, no cloud.",
-    "version": "0.1.1",
-    "repo": "https://github.com/arose26/mbox-mcp",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "mbox-mcp",
-    "downloads": 24336
+    name: 'io.github.arose26/mbox-mcp',
+    description:
+      'Search local email archives (.mbox/.eml) entirely on your machine. No OAuth, no cloud.',
+    version: '0.1.1',
+    repo: 'https://github.com/arose26/mbox-mcp',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'mbox-mcp',
+    downloads: 24336
   },
   {
-    "name": "io.github.piotr-agier/google-drive-mcp",
-    "title": "Google Drive MCP",
-    "description": "Secure access to Google Drive, Docs, Sheets, Slides, and Calendar through MCP.",
-    "version": "2.12.0",
-    "repo": "https://github.com/piotr-agier/google-drive-mcp",
-    "website": "https://github.com/piotr-agier/google-drive-mcp#readme",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "@piotr-agier/google-drive-mcp",
-    "downloads": 18504
+    name: 'io.github.piotr-agier/google-drive-mcp',
+    title: 'Google Drive MCP',
+    description: 'Secure access to Google Drive, Docs, Sheets, Slides, and Calendar through MCP.',
+    version: '2.12.0',
+    repo: 'https://github.com/piotr-agier/google-drive-mcp',
+    website: 'https://github.com/piotr-agier/google-drive-mcp#readme',
+    kinds: ['npm'],
+    installable: true,
+    npm: '@piotr-agier/google-drive-mcp',
+    downloads: 18504
   },
   {
-    "name": "io.github.containers/kubernetes-mcp-server",
-    "description": "A Model Context Protocol (MCP) server for Kubernetes and OpenShift",
-    "version": "0.0.67",
-    "repo": "https://github.com/containers/kubernetes-mcp-server",
-    "kinds": [
-      "npm",
-      "pypi",
-      "oci"
-    ],
-    "installable": true,
-    "npm": "kubernetes-mcp-server",
-    "downloads": 17877
+    name: 'io.github.containers/kubernetes-mcp-server',
+    description: 'A Model Context Protocol (MCP) server for Kubernetes and OpenShift',
+    version: '0.0.67',
+    repo: 'https://github.com/containers/kubernetes-mcp-server',
+    kinds: ['npm', 'pypi', 'oci'],
+    installable: true,
+    npm: 'kubernetes-mcp-server',
+    downloads: 17877
   },
   {
-    "name": "io.github.ExaDev/agent-comms",
-    "title": "Agent Comms",
-    "description": "Cross-harness communication mesh for LLM agents — rooms, DMs, presence, and visibility over TCP",
-    "version": "8.0.8",
-    "repo": "https://github.com/ExaDev/agent-comms",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "agent-comms",
-    "downloads": 17639
+    name: 'io.github.ExaDev/agent-comms',
+    title: 'Agent Comms',
+    description:
+      'Cross-harness communication mesh for LLM agents — rooms, DMs, presence, and visibility over TCP',
+    version: '8.0.8',
+    repo: 'https://github.com/ExaDev/agent-comms',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'agent-comms',
+    downloads: 17639
   },
   {
-    "name": "io.github.Aureliolo/gdharness",
-    "description": "A harness for driving a Godot 4 project from an agent: addons, runtime bridge, MCP server, CLI.",
-    "version": "1.1.10",
-    "repo": "https://github.com/Aureliolo/gdharness",
-    "website": "https://github.com/Aureliolo/gdharness#readme",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "gdharness",
-    "downloads": 16348
+    name: 'io.github.Aureliolo/gdharness',
+    description:
+      'A harness for driving a Godot 4 project from an agent: addons, runtime bridge, MCP server, CLI.',
+    version: '1.1.10',
+    repo: 'https://github.com/Aureliolo/gdharness',
+    website: 'https://github.com/Aureliolo/gdharness#readme',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'gdharness',
+    downloads: 16348
   },
   {
-    "name": "io.github.IgniteUI/igniteui-theming",
-    "title": "Ignite UI Theming MCP Server",
-    "description": "Generate Sass palettes, typography, elevations, and themes for Ignite UI components.",
-    "version": "29.0.0",
-    "repo": "https://github.com/IgniteUI/igniteui-theming",
-    "website": "https://github.com/IgniteUI/igniteui-theming#readme",
-    "kinds": [
-      "npm"
-    ],
-    "installable": true,
-    "npm": "igniteui-theming",
-    "downloads": 14301
+    name: 'io.github.IgniteUI/igniteui-theming',
+    title: 'Ignite UI Theming MCP Server',
+    description:
+      'Generate Sass palettes, typography, elevations, and themes for Ignite UI components.',
+    version: '29.0.0',
+    repo: 'https://github.com/IgniteUI/igniteui-theming',
+    website: 'https://github.com/IgniteUI/igniteui-theming#readme',
+    kinds: ['npm'],
+    installable: true,
+    npm: 'igniteui-theming',
+    downloads: 14301
   },
   {
-    "name": "com.postman/postman-mcp-server",
-    "title": "Postman MCP Server",
-    "description": "Give your AI agents trusted access to the full Postman platform.",
-    "version": "2.13.0",
-    "repo": "https://github.com/postmanlabs/postman-mcp-server",
-    "website": "https://www.postman.com/product/mcp-server/",
-    "kinds": [
-      "npm",
-      "other",
-      "remote"
-    ],
-    "installable": true,
-    "npm": "@postman/postman-mcp-server",
-    "downloads": 13993
+    name: 'com.postman/postman-mcp-server',
+    title: 'Postman MCP Server',
+    description: 'Give your AI agents trusted access to the full Postman platform.',
+    version: '2.13.0',
+    repo: 'https://github.com/postmanlabs/postman-mcp-server',
+    website: 'https://www.postman.com/product/mcp-server/',
+    kinds: ['npm', 'other', 'remote'],
+    installable: true,
+    npm: '@postman/postman-mcp-server',
+    downloads: 13993
   }
 ]

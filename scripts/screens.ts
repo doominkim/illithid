@@ -42,7 +42,10 @@ async function selectItem(page: Page, menu: Menu): Promise<void> {
   const main = page.locator('main')
   const pickCard = async (name?: string): Promise<void> => {
     const cards = main.locator('[data-card]')
-    const card = name && (await cards.filter({ hasText: name }).count()) ? cards.filter({ hasText: name }).first() : cards.first()
+    const card =
+      name && (await cards.filter({ hasText: name }).count())
+        ? cards.filter({ hasText: name }).first()
+        : cards.first()
     if (await card.count()) await card.click()
   }
   if (menu === 'rules') await pickCard()
@@ -59,7 +62,10 @@ async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true })
   const userData = mkdtempSync(join(tmpdir(), 'illithid-userdata-'))
   // ILLITHID_TEST=1: hide the window (offscreen) and don't steal focus
-  const env = { ...process.env, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' } as Record<string, string>
+  const env = { ...process.env, ILLITHID_USER_DATA: userData, ILLITHID_TEST: '1' } as Record<
+    string,
+    string
+  >
   if (env.ILLITHID_HOME) env.HOME = env.ILLITHID_HOME
   delete env.ELECTRON_RENDERER_URL
   delete env.ELECTRON_RUN_AS_NODE

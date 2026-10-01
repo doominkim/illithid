@@ -1,9 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, Button, Code, Group, Image, SegmentedControl, Select, Stack, Tabs, Text, Title, UnstyledButton } from '@mantine/core'
+import {
+  Alert,
+  Box,
+  Button,
+  Code,
+  Group,
+  Image,
+  SegmentedControl,
+  Select,
+  Stack,
+  Tabs,
+  Text,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ExternalLink, File, FileText, FolderOpen, HelpCircle, Layers, MessagesSquare } from 'lucide-react'
+import {
+  ExternalLink,
+  File,
+  FileText,
+  FolderOpen,
+  HelpCircle,
+  Layers,
+  MessagesSquare
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Artifact, ArtifactTool, DocSearchResponse, DocSearchResult } from '../../../shared/api'
+import type {
+  Artifact,
+  ArtifactTool,
+  DocSearchResponse,
+  DocSearchResult
+} from '../../../shared/api'
 import { Initial } from '../components/ListRow'
 import { ErrorAlert, FillStack, Loading, NoSelection, SplitPane } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
@@ -36,7 +63,12 @@ const HTML_CSP = `<meta http-equiv="Content-Security-Policy" content="default-sr
 
 type KindFilter = 'all' | 'image' | 'doc' | 'other'
 const kindMatches = (k: KindFilter, a: Artifact): boolean =>
-  k === 'all' || (k === 'image' ? a.kind === 'image' : k === 'doc' ? a.kind === 'md' || a.kind === 'html' : a.kind === 'other')
+  k === 'all' ||
+  (k === 'image'
+    ? a.kind === 'image'
+    : k === 'doc'
+      ? a.kind === 'md' || a.kind === 'html'
+      : a.kind === 'other')
 
 /** Short name for a source location (the full path stays in the tooltip) */
 function sourceName(source: string, t: (k: string) => string): string {
@@ -65,8 +97,15 @@ function Thumb({ a }: { a: Artifact }): React.JSX.Element {
       if (!entries.some((e) => e.isIntersecting)) return
       io.disconnect()
       if (a.kind === 'md')
-        window.api.artifactPreview(a.id).then((p) => alive && !p.error && setMd((p.text ?? '').slice(0, MD_THUMB_CHARS)), () => {})
-      else window.api.artifactThumb(a.id).then((u) => alive && setUrl(u), () => {})
+        window.api.artifactPreview(a.id).then(
+          (p) => alive && !p.error && setMd((p.text ?? '').slice(0, MD_THUMB_CHARS)),
+          () => {}
+        )
+      else
+        window.api.artifactThumb(a.id).then(
+          (u) => alive && setUrl(u),
+          () => {}
+        )
     })
     io.observe(ref.current)
     return () => {
@@ -92,12 +131,29 @@ function Thumb({ a }: { a: Artifact }): React.JSX.Element {
 }
 
 /** Card grid: thumbnail, title, session or project and time */
-function ArtifactGrid({ items, selected, onSelect }: { items: Artifact[]; selected: string | null; onSelect: (id: string) => void }): React.JSX.Element {
+function ArtifactGrid({
+  items,
+  selected,
+  onSelect
+}: {
+  items: Artifact[]
+  selected: string | null
+  onSelect: (id: string) => void
+}): React.JSX.Element {
   return (
-    <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8 }} data-testid="artifact-grid">
+    <div
+      style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8 }}
+      data-testid="artifact-grid"
+    >
       <div className="ac-thumb-grid">
         {items.map((a) => (
-          <UnstyledButton key={a.id} className="ac-thumb-card" data-active={a.id === selected || undefined} onClick={() => onSelect(a.id)} title={a.path}>
+          <UnstyledButton
+            key={a.id}
+            className="ac-thumb-card"
+            data-active={a.id === selected || undefined}
+            onClick={() => onSelect(a.id)}
+            title={a.path}
+          >
             <Thumb a={a} />
             <Text size="xs" fw={500} truncate="end" mt={6}>
               {a.title}
@@ -120,23 +176,67 @@ function toolFilterIcon(v: string): React.JSX.Element {
 }
 
 /** Content search results (title + snippet, virtual scroll) */
-function ResultList({ rows, selected, onSelect }: { rows: { a: Artifact; hit: DocSearchResult }[]; selected: string | null; onSelect: (id: string) => void }): React.JSX.Element {
+function ResultList({
+  rows,
+  selected,
+  onSelect
+}: {
+  rows: { a: Artifact; hit: DocSearchResult }[]
+  selected: string | null
+  onSelect: (id: string) => void
+}): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
-  const v = useVirtualizer({ count: rows.length, getScrollElement: () => ref.current, estimateSize: () => 72, overscan: 8 })
+  const v = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => ref.current,
+    estimateSize: () => 72,
+    overscan: 8
+  })
   return (
-    <div ref={ref} style={{ flex: 1, minHeight: 0, overflow: 'auto' }} data-testid="artifact-content-results">
+    <div
+      ref={ref}
+      style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+      data-testid="artifact-content-results"
+    >
       <div style={{ height: v.getTotalSize(), position: 'relative' }}>
         {v.getVirtualItems().map((vr) => {
           const { a, hit } = rows[vr.index]
           return (
-            <div key={a.id} data-index={vr.index} ref={v.measureElement} className="mantine-NavLink-root" style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }}>
-              <UnstyledButton className="ac-row" data-active={a.id === selected || undefined} onClick={() => onSelect(a.id)} style={{ alignItems: 'flex-start' }} data-testid="artifact-content-hit">
-                {a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />}
+            <div
+              key={a.id}
+              data-index={vr.index}
+              ref={v.measureElement}
+              className="mantine-NavLink-root"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${vr.start}px)`
+              }}
+            >
+              <UnstyledButton
+                className="ac-row"
+                data-active={a.id === selected || undefined}
+                onClick={() => onSelect(a.id)}
+                style={{ alignItems: 'flex-start' }}
+                data-testid="artifact-content-hit"
+              >
+                {a.tool === 'unknown' ? (
+                  <Initial text={a.title} />
+                ) : (
+                  <ToolIcon tool={a.tool} size={22} />
+                )}
                 <Box style={{ flex: 1, minWidth: 0 }}>
                   <Text size="sm" fw={600} lineClamp={1}>
                     {a.title}
                   </Text>
-                  <Text size="xs" c="dimmed" lineClamp={2} style={{ lineHeight: 1.45, wordBreak: 'break-all' }}>
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    lineClamp={2}
+                    style={{ lineHeight: 1.45, wordBreak: 'break-all' }}
+                  >
                     <Snippet text={hit.snippet} marks={hit.marks} />
                   </Text>
                 </Box>
@@ -177,10 +277,23 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
         )}
       </Box>
       <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
-        <Button size="xs" variant="default" leftSection={<ExternalLink size={14} />} onClick={() => void runWrite(window.api.artifactOpen(a.id))} data-testid="artifact-open">
+        <Button
+          size="xs"
+          variant="default"
+          leftSection={<ExternalLink size={14} />}
+          onClick={() => void runWrite(window.api.artifactOpen(a.id))}
+          data-testid="artifact-open"
+        >
           {t('artifacts.open')}
         </Button>
-        <Button size="xs" variant="subtle" color="gray" leftSection={<FolderOpen size={14} />} onClick={() => void runWrite(window.api.artifactReveal(a.id))} data-testid="artifact-reveal">
+        <Button
+          size="xs"
+          variant="subtle"
+          color="gray"
+          leftSection={<FolderOpen size={14} />}
+          onClick={() => void runWrite(window.api.artifactReveal(a.id))}
+          data-testid="artifact-reveal"
+        >
           {t('artifacts.reveal')}
         </Button>
       </Group>
@@ -189,7 +302,14 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
   const facts = (
     <Stack gap={4}>
       <Text size="sm" c="dimmed">
-        {[a.tool === 'unknown' ? t('artifacts.unknownTool') : ARTIFACT_TOOL_NAME[a.tool], a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · ')}
+        {[
+          a.tool === 'unknown' ? t('artifacts.unknownTool') : ARTIFACT_TOOL_NAME[a.tool],
+          a.project,
+          fmtTime(a.mtime),
+          fmtSize(a.size)
+        ]
+          .filter(Boolean)
+          .join(' · ')}
       </Text>
       <Group gap={6} wrap="nowrap" c="dimmed">
         <FolderOpen size={14} style={{ flexShrink: 0 }} />
@@ -215,8 +335,13 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
       </Text>
     )
   else if (data.error?.startsWith('readFailed:'))
-    body = <ErrorAlert message={t('artifacts.readFailed', { code: data.error.slice('readFailed:'.length) })} />
-  else if (data.kind === 'image' && data.dataUrl) body = <Image src={data.dataUrl} alt={a.title} fit="contain" maw="100%" radius="md" />
+    body = (
+      <ErrorAlert
+        message={t('artifacts.readFailed', { code: data.error.slice('readFailed:'.length) })}
+      />
+    )
+  else if (data.kind === 'image' && data.dataUrl)
+    body = <Image src={data.dataUrl} alt={a.title} fit="contain" maw="100%" radius="md" />
   else if (data.kind === 'md') body = <Markdown text={data.text ?? ''} />
   else if (data.kind === 'html' && htmlView === 'rendered')
     body = (
@@ -247,7 +372,11 @@ function Preview({ a, highlight }: { a: Artifact; highlight: string }): React.JS
       {head}
       {facts}
       {data?.kind === 'html' && !data.error && (
-        <Tabs value={htmlView} onChange={(v) => v && setHtmlView(v as 'rendered' | 'source')} data-testid="artifact-html-view">
+        <Tabs
+          value={htmlView}
+          onChange={(v) => v && setHtmlView(v as 'rendered' | 'source')}
+          data-testid="artifact-html-view"
+        >
           <Tabs.List>
             <Tabs.Tab value="rendered">{t('artifacts.htmlRendered')}</Tabs.Tab>
             <Tabs.Tab value="source">{t('artifacts.htmlSourceView')}</Tabs.Tab>
@@ -286,9 +415,12 @@ function Artifacts(): React.JSX.Element {
       if (alive) setFound({ q: contentQ, tool, r })
     }
     const timer = setTimeout(() => {
-      void window.api.docSearch(contentQ, { kind: 'artifact', ...(tool === ALL ? {} : { tool: tool as ArtifactTool }) }).then(done, () =>
-        done({ results: [], mode: 'fts', limited: false, ms: 0 })
-      )
+      void window.api
+        .docSearch(contentQ, {
+          kind: 'artifact',
+          ...(tool === ALL ? {} : { tool: tool as ArtifactTool })
+        })
+        .then(done, () => done({ results: [], mode: 'fts', limited: false, ms: 0 }))
     }, 300)
     return () => {
       alive = false
@@ -307,7 +439,8 @@ function Artifacts(): React.JSX.Element {
           includesCI(a.path, q) ||
           includesCI(a.project, q) ||
           includesCI(a.sessionTitle, q) ||
-          (a.tool !== 'unknown' && (includesCI(a.tool, q) || includesCI(ARTIFACT_TOOL_NAME[a.tool], q))))
+          (a.tool !== 'unknown' &&
+            (includesCI(a.tool, q) || includesCI(ARTIFACT_TOOL_NAME[a.tool], q))))
     )
   }, [data, query, kind, tool, mode])
   /** Content hits mapped to the latest scan (hits no longer in the scan are dropped) */
@@ -331,7 +464,13 @@ function Artifacts(): React.JSX.Element {
       <Toolbar
         left={
           <>
-            <SearchInput value={query} onChange={setQuery} placeholder={mode === 'content' ? t('artifacts.searchContent') : t('artifacts.search')} />
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder={
+                mode === 'content' ? t('artifacts.searchContent') : t('artifacts.search')
+              }
+            />
             <SegmentedControl
               size="xs"
               value={mode}
@@ -363,7 +502,10 @@ function Artifacts(): React.JSX.Element {
               data-testid="artifact-tool-filter"
               data={[
                 { value: ALL, label: t('artifacts.allTools') },
-                ...TOOL_ORDER.map((x) => ({ value: x, label: x === 'unknown' ? t('artifacts.unknownTool') : ARTIFACT_TOOL_NAME[x] }))
+                ...TOOL_ORDER.map((x) => ({
+                  value: x,
+                  label: x === 'unknown' ? t('artifacts.unknownTool') : ARTIFACT_TOOL_NAME[x]
+                }))
               ]}
               leftSection={toolFilterIcon(tool)}
               renderOption={({ option }) => (
@@ -378,7 +520,10 @@ function Artifacts(): React.JSX.Element {
         right={
           <Group gap="sm" wrap="nowrap">
             <Text size="sm" c="dimmed" data-testid="artifact-count">
-              {t('common.shown', { shown: showResults ? (resultRows?.length ?? 0) : filtered.length, total: data.length })}
+              {t('common.shown', {
+                shown: showResults ? (resultRows?.length ?? 0) : filtered.length,
+                total: data.length
+              })}
             </Text>
             <ViewToggle value={view} onChange={setView} />
           </Group>
@@ -405,16 +550,34 @@ function Artifacts(): React.JSX.Element {
               items={filtered.map((a) => ({
                 id: a.id,
                 label: a.title,
-                avatar: a.tool === 'unknown' ? <Initial text={a.title} /> : <ToolIcon tool={a.tool} size={22} />,
+                avatar:
+                  a.tool === 'unknown' ? (
+                    <Initial text={a.title} />
+                  ) : (
+                    <ToolIcon tool={a.tool} size={22} />
+                  ),
                 // Location goes on the secondary line with time and size instead of a chip next to the title
-                description: [sourceName(a.source, t), a.sessionTitle ?? a.project, fmtTime(a.mtime), fmtSize(a.size)].filter(Boolean).join(' · ')
+                description: [
+                  sourceName(a.source, t),
+                  a.sessionTitle ?? a.project,
+                  fmtTime(a.mtime),
+                  fmtSize(a.size)
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
               }))}
               selected={selected}
               onSelect={setSelected}
             />
           )
         }
-        detail={current ? <Preview key={current.id} a={current} highlight={showResults ? contentQ : ''} /> : <NoSelection />}
+        detail={
+          current ? (
+            <Preview key={current.id} a={current} highlight={showResults ? contentQ : ''} />
+          ) : (
+            <NoSelection />
+          )
+        }
       />
     </FillStack>
   )

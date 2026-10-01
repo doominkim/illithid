@@ -71,7 +71,9 @@ function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | un
       // Gemini looks sessions up per project (the directory it runs in)
       return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && gemini --resume ${id}` : undefined
     case 'grok':
-      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && grok --resume ${id}` : `grok --resume ${id}`
+      return cwd && isAbsolute(cwd)
+        ? `cd -- ${shellWord(cwd)} && grok --resume ${id}`
+        : `grok --resume ${id}`
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -297,7 +299,9 @@ function parseCodex(path: string, size: number, mtime: string | undefined): Sess
     return undefined
   }
   const meta = head.find((l) => l.type === 'session_meta')?.payload as Json | undefined
-  const fromName = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(path)?.[1]
+  const fromName = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i.exec(
+    path
+  )?.[1]
   const id = str(meta?.id) ?? fromName ?? basename(path, '.jsonl')
   const cwd = str(meta?.cwd)
   const source = meta?.source as Json | undefined
@@ -309,7 +313,9 @@ function parseCodex(path: string, size: number, mtime: string | undefined): Sess
   // For title lookup only, read up to the first 256KB.
   if (!first && size > CHUNK) {
     try {
-      first = codexFirstUserText(parseLines(readRange(path, 0, Math.min(size, TITLE_SCAN_LIMIT)), false, true))
+      first = codexFirstUserText(
+        parseLines(readRange(path, 0, Math.min(size, TITLE_SCAN_LIMIT)), false, true)
+      )
     } catch {
       // Keep the session without a title
     }
@@ -393,7 +399,8 @@ function geminiProjects(home: string): Map<string, string> {
     const o = JSON.parse(readFileSync(join(home, '.gemini/projects.json'), 'utf8')) as Json
     const p = o.projects as Json | undefined
     if (p && typeof p === 'object' && !Array.isArray(p))
-      for (const [path, slug] of Object.entries(p)) if (typeof slug === 'string' && !out.has(slug)) out.set(slug, path)
+      for (const [path, slug] of Object.entries(p))
+        if (typeof slug === 'string' && !out.has(slug)) out.set(slug, path)
   } catch {
     // No project map — cwd comes from .project_root only
   }
@@ -451,7 +458,9 @@ function scanGemini(home: string): Session[] {
     if (!id) continue
     const slug = f.path.slice(root.length + 1).split('/')[0]
     const cwd = geminiCwd(root, slug, projects)
-    const first = str(meta.summary) ? undefined : (geminiFirstUserText(messages) ?? geminiFirstUserText(replayGemini(head).messages))
+    const first = str(meta.summary)
+      ? undefined
+      : (geminiFirstUserText(messages) ?? geminiFirstUserText(replayGemini(head).messages))
     const kind = str(meta.kind)
     out.push({
       id,
@@ -461,10 +470,14 @@ function scanGemini(home: string): Session[] {
       project: projectOf(cwd),
       startedAt: isoOrUndefined(meta.startTime) ?? firstTimestamp(head),
       updatedAt: isoOrUndefined(meta.lastUpdated) ?? lastTimestamp(tail) ?? mtime,
-      ...(head === tail ? { messageCount: messages.filter((m) => m.type === 'user' || m.type === 'gemini').length } : {}),
+      ...(head === tail
+        ? { messageCount: messages.filter((m) => m.type === 'user' || m.type === 'gemini').length }
+        : {}),
       path: f.path,
       // Subagent transcripts can't be resumed
-      ...(kind === undefined || kind === 'main' ? { resumeCommand: resumeCommand('gemini', id, cwd) } : {})
+      ...(kind === undefined || kind === 'main'
+        ? { resumeCommand: resumeCommand('gemini', id, cwd) }
+        : {})
     })
   }
   return out
@@ -479,7 +492,13 @@ function scanGemini(home: string): Session[] {
 function scanGrok(home: string): Session[] {
   const root = join(home, '.grok/sessions')
   if (!existsSync(root)) return []
-  const files = fg.sync('*/*/summary.json', { cwd: root, absolute: true, onlyFiles: true, followSymbolicLinks: false, suppressErrors: true })
+  const files = fg.sync('*/*/summary.json', {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    followSymbolicLinks: false,
+    suppressErrors: true
+  })
   const out: Session[] = []
   for (const f of files) {
     let s: Json
@@ -519,7 +538,11 @@ export interface ScanOptions {
 }
 
 /** Sorted by updatedAt descending. Returns the rest even if one tool fails. Writes nothing unless opts.cache is set */
-export function scanSessions(home: string, tools?: SessionTool[], opts: ScanOptions = {}): SessionScanResult {
+export function scanSessions(
+  home: string,
+  tools?: SessionTool[],
+  opts: ScanOptions = {}
+): SessionScanResult {
   const cache = opts.cache ? new SessionScanCache(sessionScanCachePath(home)) : undefined
   const scanners: Record<SessionTool, (h: string) => Session[]> = {
     claude: (h) => scanClaude(h, cache),

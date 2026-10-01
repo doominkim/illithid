@@ -31,7 +31,7 @@ import { ConfirmModal } from '../components/ConfirmModal'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
-import { useReload } from '../components/ReloadButton'
+import { useReload } from '../lib/reload'
 import { fmtSize, fmtTime, relTime } from '../lib/format'
 import { NEAR_LIMIT } from '../lib/memoryIndex'
 import { isRefused } from '../lib/mutate'
@@ -72,9 +72,21 @@ export function IndexBadges({
 }
 
 /** Index size as two bars with numbers (lines/200, KB/25): amber from 80%, red past the limit */
-export function IndexMeters({ stat, limits }: { stat: IndexStat; limits: IndexStat }): React.JSX.Element {
+export function IndexMeters({
+  stat,
+  limits
+}: {
+  stat: IndexStat
+  limits: IndexStat
+}): React.JSX.Element {
   const { t } = useTranslation()
-  const meter = (label: string, value: number, max: number, text: string, testId: string): React.JSX.Element => {
+  const meter = (
+    label: string,
+    value: number,
+    max: number,
+    text: string,
+    testId: string
+  ): React.JSX.Element => {
     const ratio = max > 0 ? value / max : 0
     const tone = ratio > 1 ? 'over' : ratio >= NEAR_LIMIT ? 'near' : undefined
     return (
@@ -87,7 +99,14 @@ export function IndexMeters({ stat, limits }: { stat: IndexStat; limits: IndexSt
             {text}
           </Text>
         </Group>
-        <div className="ac-meter-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}>
+        <div
+          className="ac-meter-bar"
+          role="progressbar"
+          aria-label={label}
+          aria-valuemin={0}
+          aria-valuemax={max}
+          aria-valuenow={value}
+        >
           <div className="ac-meter-fill" style={{ width: `${Math.min(100, ratio * 100)}%` }} />
         </div>
       </Box>
@@ -95,12 +114,21 @@ export function IndexMeters({ stat, limits }: { stat: IndexStat; limits: IndexSt
   }
   return (
     <Group gap="md" wrap="nowrap" data-testid="index-meters">
-      {meter(t('memory.indexLinesLabel'), stat.lines, limits.lines, t('memory.indexLines', { n: stat.lines, max: limits.lines }), 'index-meter-lines')}
+      {meter(
+        t('memory.indexLinesLabel'),
+        stat.lines,
+        limits.lines,
+        t('memory.indexLines', { n: stat.lines, max: limits.lines }),
+        'index-meter-lines'
+      )}
       {meter(
         t('memory.indexSizeLabel'),
         stat.bytes,
         limits.bytes,
-        t('memory.indexKb', { n: (stat.bytes / 1024).toFixed(1), max: Math.round(limits.bytes / 1024) }),
+        t('memory.indexKb', {
+          n: (stat.bytes / 1024).toFixed(1),
+          max: Math.round(limits.bytes / 1024)
+        }),
         'index-meter-size'
       )}
     </Group>

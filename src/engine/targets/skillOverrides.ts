@@ -83,8 +83,7 @@ export const claudeSkillOverrides: TargetDef = {
     if (!before.trim()) return { after: before, notes: ['settings.json missing — left untouched'] }
     const settings = parseJsonObject(before)
     const hits = claudeHits(settings, sources)
-    if (!hits.length)
-      return { after: before, notes: [`${CLAUDE_KEY}: no library skills disabled`] }
+    if (!hits.length) return { after: before, notes: [`${CLAUDE_KEY}: no library skills disabled`] }
     const next = structuredClone(settings)
     const so = { ...(next[CLAUDE_KEY] as Json) }
     for (const k of hits) delete so[k]
@@ -276,7 +275,9 @@ const OC_TARGET: TargetId = 'opencodeSkillPermissions'
  */
 function opencodeDenied(src: Sources, ctx: BuildContext | undefined): Set<string> {
   if (ctx?.retiring || src.manifest?.offTools?.includes('opencode')) return new Set()
-  return new Set(librarySkillNames(src).filter((n) => !isEnabled(src.manifest, 'skills', n, 'opencode')))
+  return new Set(
+    librarySkillNames(src).filter((n) => !isEnabled(src.manifest, 'skills', n, 'opencode'))
+  )
 }
 
 /** permission.skill as a per-skill object ({} if absent). A string applies to every skill and is kept as "*". undefined if not usable */
@@ -336,7 +337,8 @@ export const opencodeSkillPermissions: TargetDef = {
     const rule = opencodeRule(config)
     if (!rule) {
       const bad = isObj(config[OC_KEY]) ? `${OC_KEY}.${OC_SUB}` : OC_KEY
-      if (!deny.size) return { after: before, notes: [`${bad} is not a per-skill object — left untouched`] }
+      if (!deny.size)
+        return { after: before, notes: [`${bad} is not a per-skill object — left untouched`] }
       return { after: before, notes: [], error: `${bad} is not an object` }
     }
     const lib = new Set(librarySkillNames(src))
@@ -350,12 +352,17 @@ export const opencodeSkillPermissions: TargetDef = {
     const numeric = owned.filter((k) => /^(0|[1-9]\d*)$/.test(k))
     const numericNote =
       numeric.length && Object.keys(kept).length
-        ? [`${OC_KEY}.${OC_SUB}: ${numeric.join(', ')} can't be placed last (numeric name) — a later wildcard rule may still show it`]
+        ? [
+            `${OC_KEY}.${OC_SUB}: ${numeric.join(', ')} can't be placed last (numeric name) — a later wildcard rule may still show it`
+          ]
         : []
     if (JSON.stringify(Object.entries(nextRule)) === JSON.stringify(Object.entries(rule)))
       return {
         after: before,
-        notes: [`${OC_KEY}.${OC_SUB}: ${owned.length} library skill(s) denied — already in place`, ...numericNote],
+        notes: [
+          `${OC_KEY}.${OC_SUB}: ${owned.length} library skill(s) denied — already in place`,
+          ...numericNote
+        ],
         owned
       }
 

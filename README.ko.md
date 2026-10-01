@@ -56,7 +56,6 @@ brew install --cask doominkim/tap/illithid
 
 또는 위에서 DMG를 받으세요.
 
-
 ## 그 밖의 기능
 
 - **마켓**: 룰, 스킬, MCP 서버를 검색하고 설치합니다.

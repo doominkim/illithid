@@ -6,8 +6,25 @@ import { basename, join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shellEnvReady } from './shellEnv'
-import { decideHandoff, readRunningVersion, shouldWaitForLock, waitForLock, writeRunningVersion } from './singleInstance'
-import { backupCleanupOnStart, prepareLibraryOnStart, pullOnStartAndSync, recentSessions, registerIpc, resolveHome, runSearchIndex, snapshotOnQuit, startLibraryWatch, syncOnStart } from './ipc'
+import {
+  decideHandoff,
+  readRunningVersion,
+  shouldWaitForLock,
+  waitForLock,
+  writeRunningVersion
+} from './singleInstance'
+import {
+  backupCleanupOnStart,
+  prepareLibraryOnStart,
+  pullOnStartAndSync,
+  recentSessions,
+  registerIpc,
+  resolveHome,
+  runSearchIndex,
+  snapshotOnQuit,
+  startLibraryWatch,
+  syncOnStart
+} from './ipc'
 
 /** userData folder names from previous app names (`<appData>/<name>`, most recent first) */
 const LEGACY_USER_DATA_DIRS = ['harnesssync']
@@ -112,13 +129,28 @@ function createWindow(): void {
 
   const win = mainWindow
   win.webContents.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown' || input.alt || !(process.platform === 'darwin' ? input.meta : input.control)) return
-    const action = input.code === 'Minus' || input.code === 'NumpadSubtract' || input.key === '-' ? -1
-      : input.code === 'Equal' || input.code === 'NumpadAdd' || input.key === '+' || input.key === '=' ? 1
-        : input.code === 'Digit0' || input.code === 'Numpad0' ? 0 : null
+    if (
+      input.type !== 'keyDown' ||
+      input.alt ||
+      !(process.platform === 'darwin' ? input.meta : input.control)
+    )
+      return
+    const action =
+      input.code === 'Minus' || input.code === 'NumpadSubtract' || input.key === '-'
+        ? -1
+        : input.code === 'Equal' ||
+            input.code === 'NumpadAdd' ||
+            input.key === '+' ||
+            input.key === '='
+          ? 1
+          : input.code === 'Digit0' || input.code === 'Numpad0'
+            ? 0
+            : null
     if (action === null) return
     event.preventDefault()
-    win.webContents.setZoomLevel(action === 0 ? 0 : Math.max(-3, Math.min(3, win.webContents.getZoomLevel() + action)))
+    win.webContents.setZoomLevel(
+      action === 0 ? 0 : Math.max(-3, Math.min(3, win.webContents.getZoomLevel() + action))
+    )
   })
   win.on('ready-to-show', () => {
     if (!TEST_MODE) win.show()
@@ -168,7 +200,8 @@ void acquireSingleInstance().then((locked) => {
   if (!DEV_SERVER) writeRunningVersion(app.getPath('userData'), VERSION)
   app.on('second-instance', (_event, _argv, _cwd, data) => {
     if (quitting) return
-    if (decideHandoff(VERSION, (data as { version?: unknown } | null)?.version) === 'yield') app.quit()
+    if (decideHandoff(VERSION, (data as { version?: unknown } | null)?.version) === 'yield')
+      app.quit()
     else showMainWindow()
   })
   void app.whenReady().then(startApp)
@@ -197,7 +230,8 @@ function startApp(): void {
       showMainWindow,
       () => recentSessions(10),
       (w) => {
-        if (is.dev && process.env['ELECTRON_RENDERER_URL']) void w.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#tray`)
+        if (is.dev && process.env['ELECTRON_RENDERER_URL'])
+          void w.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#tray`)
         else void w.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'tray' })
       },
       join(__dirname, '../preload/index.js')

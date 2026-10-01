@@ -52,9 +52,22 @@ function NavItem({
   label: string
 }): React.JSX.Element {
   return (
-    <UnstyledButton className="ac-nav" data-active={active || undefined} data-menu={menu} onClick={onClick}>
+    <UnstyledButton
+      className="ac-nav"
+      data-active={active || undefined}
+      data-menu={menu}
+      onClick={onClick}
+    >
       <span className="ac-nav-icon">{icon}</span>
-      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
         {label}
       </span>
       {right}
@@ -66,7 +79,11 @@ function NavItem({
 function NotInitializedHint(): React.JSX.Element | null {
   const { t } = useTranslation()
   const { status } = useSync()
-  const hints = [...new Set((status?.notInitialized ?? []).map((x) => `${x.tool}:${x.reason ?? 'notInitialized'}`))]
+  const hints = [
+    ...new Set(
+      (status?.notInitialized ?? []).map((x) => `${x.tool}:${x.reason ?? 'notInitialized'}`)
+    )
+  ]
   if (!hints.length) return null
   return (
     <Stack gap={2} mt={-4} mb={10} px={4} data-testid="sync-not-initialized">
@@ -98,7 +115,9 @@ function SyncButton(): React.JSX.Element {
       color={color}
       justify="flex-start"
       className="ac-sync"
-      leftSection={n || busy ? <RefreshCw size={14} /> : <span className="ac-sync-dot" aria-hidden="true" />}
+      leftSection={
+        n || busy ? <RefreshCw size={14} /> : <span className="ac-sync-dot" aria-hidden="true" />
+      }
       disabled={!n && !busy}
       loading={busy}
       onClick={() => openPreview()}
@@ -111,7 +130,11 @@ function SyncButton(): React.JSX.Element {
   )
 }
 
-export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }): React.JSX.Element {
+export function Sidebar({
+  onWorkspaceChange
+}: {
+  onWorkspaceChange: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const { request, navigate } = useNav()
   const { config } = useConfig()
@@ -153,7 +176,12 @@ export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }
       <Stack gap={2}>
         {PRIMARY.filter((m) => m !== 'market' || marketOn).map((m) =>
           m === 'artifacts' ? (
-            <Box key="sep" pt={10} mt={8} style={{ borderTop: '1px solid var(--ac-border-subtle)' }}>
+            <Box
+              key="sep"
+              pt={10}
+              mt={8}
+              style={{ borderTop: '1px solid var(--ac-border-subtle)' }}
+            >
               {menuItem(m)}
             </Box>
           ) : (
@@ -161,7 +189,6 @@ export function Sidebar({ onWorkspaceChange }: { onWorkspaceChange: () => void }
           )
         )}
       </Stack>
-
 
       <Box style={{ flex: 1 }} />
 

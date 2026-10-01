@@ -77,7 +77,12 @@ function togglePopover(): void {
   const b = tray.getBounds()
   const area = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea
   // Right edge under the icon's right edge, opening to the left; kept on screen
-  const x = Math.round(Math.min(Math.max(b.x + b.width - POPOVER.width, area.x + 8), area.x + area.width - POPOVER.width - 8))
+  const x = Math.round(
+    Math.min(
+      Math.max(b.x + b.width - POPOVER.width, area.x + 8),
+      area.x + area.width - POPOVER.width - 8
+    )
+  )
   popover.setPosition(x, Math.round(b.y + b.height + 4))
   popover.show()
   popover.focus()

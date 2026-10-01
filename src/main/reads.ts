@@ -125,7 +125,12 @@ function opencodeSkillsState(home: string, env: Env): { state: SyncState; error?
 }
 
 /** Library skills disabled by the tool's own settings (skillOverrides etc.) -> needsSync. On a target error, the whole tool is error */
-function markSkillOverrides(home: string, env: Env, state: SkillsData['state'], reasons: Reasons): void {
+function markSkillOverrides(
+  home: string,
+  env: Env,
+  state: SkillsData['state'],
+  reasons: Reasons
+): void {
   const ids = Object.values(SKILL_OVERRIDE_TARGET_OF)
   let changes: FileChange[]
   let sources: ReturnType<typeof readSources>
@@ -157,7 +162,11 @@ function markSkillOverrides(home: string, env: Env, state: SkillsData['state'], 
 /** Skills installed from the Market (market.json entries whose skill still exists) */
 function marketSkills(home: string): Record<string, string> {
   try {
-    return Object.fromEntries(marketLiveOrigins(home).filter((o) => o.kind === 'skill').map((o) => [o.name, o.id]))
+    return Object.fromEntries(
+      marketLiveOrigins(home)
+        .filter((o) => o.kind === 'skill')
+        .map((o) => [o.name, o.id])
+    )
   } catch {
     return {}
   }
@@ -167,7 +176,9 @@ export function skills(home: string, env: Env): SkillsData {
   const names = canonicalSkills(home)
   // A tool not in use has no sync plan at all; like the other tools it gets no state rather than an error
   const oc = toolsInUse(home).includes('opencode') ? opencodeSkillsState(home, env) : undefined
-  const state: SkillsData['state'] = Object.fromEntries(names.map((n) => [n, oc ? { opencode: oc.state } : {}]))
+  const state: SkillsData['state'] = Object.fromEntries(
+    names.map((n) => [n, oc ? { opencode: oc.state } : {}])
+  )
   const reasons: Reasons = {}
   if (oc?.error) for (const n of names) noteReason(reasons, n, 'opencode', oc.error)
   let syncError: string | undefined
@@ -185,7 +196,8 @@ export function skills(home: string, env: Env): SkillsData {
   markSkillOverrides(home, env, state, reasons)
   let geminiOff: string[] = []
   try {
-    if (toolsInUse(home).includes('gemini')) geminiOff = geminiDisabledSkillsOf(home, readSources(home))
+    if (toolsInUse(home).includes('gemini'))
+      geminiOff = geminiDisabledSkillsOf(home, readSources(home))
   } catch {
     geminiOff = []
   }
@@ -252,7 +264,10 @@ export function agents(home: string, env: Env): AgentsData {
 
 // ---------------------------------------------------------------- MCP
 
-const MCP_TARGETS: { tool: ToolId; id: TargetId }[] = TOOL_IDS.map((tool) => ({ tool, id: MCP_TARGET_OF[tool] }))
+const MCP_TARGETS: { tool: ToolId; id: TargetId }[] = TOOL_IDS.map((tool) => ({
+  tool,
+  id: MCP_TARGET_OF[tool]
+}))
 
 const SECRET_NAME = /(key|token|secret|passw|bearer|auth|credential)/i
 const LONG_OPAQUE = /^[A-Za-z0-9_\-+=]{32,}$/
@@ -386,7 +401,13 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /** Codex generated images live in a folder named after the session: attach that session's title from the index */
 function withSessionTitles(home: string, list: Artifact[]): Artifact[] {
-  const ids = [...new Set(list.filter((a) => a.tool === 'codex' && a.project && SESSION_ID.test(a.project)).map((a) => a.project!))]
+  const ids = [
+    ...new Set(
+      list
+        .filter((a) => a.tool === 'codex' && a.project && SESSION_ID.test(a.project))
+        .map((a) => a.project!)
+    )
+  ]
   let titles: Map<string, string>
   try {
     titles = sessionTitles(home, 'codex', ids)
@@ -394,7 +415,9 @@ function withSessionTitles(home: string, list: Artifact[]): Artifact[] {
     return list
   }
   return list.map((a) =>
-    a.tool === 'codex' && a.project && titles.has(a.project) ? { ...a, sessionId: a.project, sessionTitle: titles.get(a.project) } : a
+    a.tool === 'codex' && a.project && titles.has(a.project)
+      ? { ...a, sessionId: a.project, sessionTitle: titles.get(a.project) }
+      : a
   )
 }
 
@@ -440,20 +463,31 @@ async function searchIndex(
   return { sessions: s, docs: indexAllDocs(home) }
 }
 
-
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Range from the renderer: only whole positive days and YYYY-MM-DD strings pass */
 function rangeArg(v: unknown): { days?: number; from?: string; to?: string } {
-  const r = (v && typeof v === 'object' ? v : {}) as { days?: unknown; from?: unknown; to?: unknown }
+  const r = (v && typeof v === 'object' ? v : {}) as {
+    days?: unknown
+    from?: unknown
+    to?: unknown
+  }
   return {
-    ...(typeof r.days === 'number' && Number.isInteger(r.days) && r.days > 0 ? { days: r.days } : {}),
+    ...(typeof r.days === 'number' && Number.isInteger(r.days) && r.days > 0
+      ? { days: r.days }
+      : {}),
     ...(typeof r.from === 'string' && DAY_RE.test(r.from) ? { from: r.from } : {}),
     ...(typeof r.to === 'string' && DAY_RE.test(r.to) ? { to: r.to } : {})
   }
 }
 
-export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onProgress?: (p: unknown) => void): unknown {
+export function runOp(
+  op: Op,
+  home: string,
+  env: Env,
+  args: unknown[] = [],
+  onProgress?: (p: unknown) => void
+): unknown {
   switch (op) {
     case 'searchIndex':
       return searchIndex(home, onProgress)
@@ -472,8 +506,18 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
       return modelList(home, rangeArg(args[0]))
     case 'modelDetail': {
       const k = args[0] as { tool?: unknown; model?: unknown; effort?: unknown } | undefined
-      if (!k || typeof k.tool !== 'string' || typeof k.model !== 'string' || typeof k.effort !== 'string') return null
-      return modelDetail(home, { tool: k.tool, model: k.model, effort: k.effort }, rangeArg(args[1]))
+      if (
+        !k ||
+        typeof k.tool !== 'string' ||
+        typeof k.model !== 'string' ||
+        typeof k.effort !== 'string'
+      )
+        return null
+      return modelDetail(
+        home,
+        { tool: k.tool, model: k.model, effort: k.effort },
+        rangeArg(args[1])
+      )
     }
     case 'sessionModels': {
       const [tool, id] = args
@@ -488,7 +532,11 @@ export function runOp(op: Op, home: string, env: Env, args: unknown[] = [], onPr
     case 'usageSummary': {
       const [kind, names] = args
       if ((kind !== 'skill' && kind !== 'mcp') || !Array.isArray(names)) return null
-      return usageSummaries(home, kind, names.filter((n): n is string => typeof n === 'string' && !!n).slice(0, 2000))
+      return usageSummaries(
+        home,
+        kind,
+        names.filter((n): n is string => typeof n === 'string' && !!n).slice(0, 2000)
+      )
     }
     case 'searchDocs': {
       const [q, filters] = args as [unknown, DocSearchFilters | undefined]

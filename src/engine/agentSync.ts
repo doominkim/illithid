@@ -3,7 +3,16 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { TOOL_IDS, toolHomeOverride, type ToolId } from './agents'
 import { agentExts, agentNameOk, agentToolDir, agentToolPath, renderAgent } from './agentRender'
 import { appConfigDir, syncTools } from './config'
-import { dropPending, importedBackupDest, importStamp, moveToImportedBackup, pendingOf, retireHash, retireOriginal, retireSkipReason } from './pendingRetire'
+import {
+  dropPending,
+  importedBackupDest,
+  importStamp,
+  moveToImportedBackup,
+  pendingOf,
+  retireHash,
+  retireOriginal,
+  retireSkipReason
+} from './pendingRetire'
 import { deliverFile } from './deliver'
 import { listAgents, readAgentDoc } from './library'
 import { isEnabled, MANIFEST_FILE, readPlanManifest } from './manifest'
@@ -27,7 +36,8 @@ import { ConcurrentChangeError } from './write'
  *                   -> moved to backups/imported once the app file is in place
  * Tools not in use (config.toolsInUse) are left out entirely.
  */
-export type AgentSyncAction = 'copy' | 'update' | 'inSync' | 'skip' | 'deleteCandidate' | 'replaceImported' | 'retireImported'
+export type AgentSyncAction =
+  'copy' | 'update' | 'inSync' | 'skip' | 'deleteCandidate' | 'replaceImported' | 'retireImported'
 
 export interface AgentSyncItem {
   tool: ToolId
@@ -79,7 +89,10 @@ function renderAll(home: string, names: string[]): Map<string, Map<ToolId, strin
     try {
       const doc = readAgentDoc(home, name)
       // Names a tool can't accept (agentNameOk) are left out of that tool's map
-      out.set(name, new Map(TOOL_IDS.filter((t) => agentNameOk(t, name)).map((t) => [t, renderAgent(t, doc)])))
+      out.set(
+        name,
+        new Map(TOOL_IDS.filter((t) => agentNameOk(t, name)).map((t) => [t, renderAgent(t, doc)]))
+      )
     } catch {
       out.set(name, null)
     }
@@ -109,7 +122,9 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
       const base = { tool, name, path, source }
       const st = lstatOrNull(path)
       const regular = !!st && st.isFile() && !st.isSymbolicLink()
-      const pending = isEnabled(mf.manifest, 'agents', name, tool) ? pendingOf(home, appState, 'agent', tool, name) : []
+      const pending = isEnabled(mf.manifest, 'agents', name, tool)
+        ? pendingOf(home, appState, 'agent', tool, name)
+        : []
       // Imported originals elsewhere (listed before the slot item; run once the app file is in place)
       for (const p of pending) {
         if (p.path === path) continue
@@ -147,9 +162,17 @@ export function planAgentSync(home: string, _env: Env = process.env): AgentSyncI
       const twin = agentExts(tool)
         .slice(1)
         .map((e) => join(dirname(path), name + e))
-        .find((p) => lstatOrNull(p) && !pending.some((x) => x.path === p && retireHash(p) === x.hash))
+        .find(
+          (p) => lstatOrNull(p) && !pending.some((x) => x.path === p && retireHash(p) === x.hash)
+        )
       if (twin) {
-        if (regular && managed[name]) items.push({ ...base, action: 'deleteCandidate', reason: 'userFileSameName', currentHash: fileHash(path) })
+        if (regular && managed[name])
+          items.push({
+            ...base,
+            action: 'deleteCandidate',
+            reason: 'userFileSameName',
+            currentHash: fileHash(path)
+          })
         else items.push({ ...base, action: 'skip', reason: 'userOwned', path: twin })
         continue
       }
@@ -359,7 +382,12 @@ export function applyAgentSync(home: string, env: Env, items: AgentSyncItem[]): 
     const slot = agentToolPath(home, it.tool, it.name)
     const rec = state.agents![it.tool]?.[it.name]
     const slotSt = lstatOrNull(slot)
-    if (!rec || !slotSt?.isFile() || slotSt.isSymbolicLink() || fileHash(slot) !== rec.contentHash) {
+    if (
+      !rec ||
+      !slotSt?.isFile() ||
+      slotSt.isSymbolicLink() ||
+      fileHash(slot) !== rec.contentHash
+    ) {
       out(it, 'skipped', { reason: 'noAppCopy' })
       continue
     }
@@ -371,7 +399,11 @@ export function applyAgentSync(home: string, env: Env, items: AgentSyncItem[]): 
       }
       dropPending(state, [p])
       writeState(home, state)
-      out(it, r.status === 'moved' ? 'done' : 'unchanged', r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' })
+      out(
+        it,
+        r.status === 'moved' ? 'done' : 'unchanged',
+        r.status === 'moved' ? { backupPath: r.backupPath } : { reason: 'originalGone' }
+      )
     } catch (e) {
       out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
     }
@@ -384,7 +416,10 @@ export function applyAgentSync(home: string, env: Env, items: AgentSyncItem[]): 
  * Otherwise leave it (skipped as userOwned on the next sync) and report userOwned. Disabled tools, tools with a record, tools not in use
  * and imported originals awaiting replacement (pendingRetire) are not touched.
  */
-export function adoptAgentFiles(home: string, name: string): { adopted: ToolId[]; userOwned: ToolId[] } {
+export function adoptAgentFiles(
+  home: string,
+  name: string
+): { adopted: ToolId[]; userOwned: ToolId[] } {
   const out = { adopted: [] as ToolId[], userOwned: [] as ToolId[] }
   const st = readState(home)
   if (st.error) return out
@@ -401,7 +436,10 @@ export function adoptAgentFiles(home: string, name: string): { adopted: ToolId[]
     if (!cur || !cur.isFile() || cur.isSymbolicLink()) continue
     const hash = sha256(renderAgent(tool, doc))
     if (fileHash(path) === hash) {
-      state.agents![tool] = { ...(state.agents![tool] ?? {}), [name]: { contentHash: hash, at: new Date().toISOString() } }
+      state.agents![tool] = {
+        ...(state.agents![tool] ?? {}),
+        [name]: { contentHash: hash, at: new Date().toISOString() }
+      }
       out.adopted.push(tool)
     } else out.userOwned.push(tool)
   }

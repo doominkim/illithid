@@ -44,7 +44,10 @@ export function ToolIcon({
   size = 18,
   className,
   ...rest
-}: { tool: IconToolId; size?: number; className?: string } & Record<`data-${string}`, unknown>): React.JSX.Element {
+}: { tool: IconToolId; size?: number; className?: string } & Record<
+  `data-${string}`,
+  unknown
+>): React.JSX.Element {
   return (
     <span
       className={className}

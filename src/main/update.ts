@@ -57,10 +57,21 @@ export async function checkForUpdate(home: string, explicit = false): Promise<Up
   }
   try {
     const u = await latestUpdate(fetchFn, currentVersion())
-    const skipped = !explicit && !!u && !!cfg.updateSkip && compareVersions(u.version, cfg.updateSkip) <= 0
+    const skipped =
+      !explicit && !!u && !!cfg.updateSkip && compareVersions(u.version, cfg.updateSkip) <= 0
     const forced = process.env['ILLITHID_UPDATE_INSTALL']
-    const install = !app.isPackaged && (forced === 'brew' || forced === 'dmg') ? forced : installKind()
-    publish(u && !skipped ? { ...u, current: currentVersion(), install, command: install === 'brew' ? BREW_UPGRADE : null } : null)
+    const install =
+      !app.isPackaged && (forced === 'brew' || forced === 'dmg') ? forced : installKind()
+    publish(
+      u && !skipped
+        ? {
+            ...u,
+            current: currentVersion(),
+            install,
+            command: install === 'brew' ? BREW_UPGRADE : null
+          }
+        : null
+    )
   } catch (e) {
     // keep the previous result; Check now reports the failure
     if (explicit) throw e

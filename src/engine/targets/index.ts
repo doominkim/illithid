@@ -81,7 +81,10 @@ export function parseServerTable(id: TargetId, text: string): Record<string, unk
   if (!tool || !text.trim()) return {}
   const { format, key } = MCP_TABLE[tool]
   try {
-    const root = (format === 'toml' ? parseToml(text) : JSON.parse(text)) as Record<string, unknown> | null
+    const root = (format === 'toml' ? parseToml(text) : JSON.parse(text)) as Record<
+      string,
+      unknown
+    > | null
     const o = root?.[key]
     return o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, unknown>) : {}
   } catch {
@@ -93,7 +96,11 @@ export function parseServerTable(id: TargetId, text: string): Record<string, unk
 function stableJson(v: unknown): string {
   return JSON.stringify(v, (_k, x: unknown) =>
     x && typeof x === 'object' && !Array.isArray(x)
-      ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([p], [q]) => (p < q ? -1 : p > q ? 1 : 0)))
+      ? Object.fromEntries(
+          Object.entries(x as Record<string, unknown>).sort(([p], [q]) =>
+            p < q ? -1 : p > q ? 1 : 0
+          )
+        )
       : x
   )
 }

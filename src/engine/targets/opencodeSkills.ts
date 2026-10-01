@@ -79,18 +79,25 @@ export const opencodeSkills: TargetDef = {
     const want = librarySkillsPath(sources)
     // With no library skills, add no path and remove previously added app-owned paths
     if (ctx?.retiring || !hasLibrarySkills(want)) {
-      const rest = ((list as unknown[] | undefined) ?? []).filter((x) => !(typeof x === 'string' && owned.has(x)))
+      const rest = ((list as unknown[] | undefined) ?? []).filter(
+        (x) => !(typeof x === 'string' && owned.has(x))
+      )
       const removedN = ((list as unknown[] | undefined) ?? []).length - rest.length
-      if (!removedN) return { after: before, notes: ['0 library skills — not writing skills.paths'], owned: [] }
+      if (!removedN)
+        return { after: before, notes: ['0 library skills — not writing skills.paths'], owned: [] }
       if (rest.length) skills[SUB] = rest
       else delete skills[SUB]
       if (Object.keys(skills).length) next[KEY] = skills
       else delete next[KEY]
       const after = toJsonText(next, before)
       const { count, same } = untouchedKeysSame(config, next, KEY)
-      notes.push(`0 library skills — removed ${removedN} app-owned paths, kept ${rest.length} non-owned entries`)
+      notes.push(
+        `0 library skills — removed ${removedN} app-owned paths, kept ${rest.length} non-owned entries`
+      )
       notes.push(`${count} keys other than ${KEY} unchanged: ${same ? 'OK' : 'broken!'}`)
-      return same ? { after, notes, owned: [] } : { after, notes, owned: [], error: `keys other than ${KEY} changed` }
+      return same
+        ? { after, notes, owned: [] }
+        : { after, notes, owned: [], error: `keys other than ${KEY} changed` }
     }
     const out: unknown[] = []
     let placed = false

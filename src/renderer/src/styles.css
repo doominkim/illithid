@@ -260,7 +260,6 @@ body {
   --drawer-size: calc(100vw - 220px);
 }
 
-
 /* Markdown preview tone */
 .mantine-Typography-root {
   font-size: 13px;
@@ -373,13 +372,35 @@ body {
 }
 
 /* Memory panes respond to the available content width, including the sidebar. */
-.ac-memory-panes { display: flex; gap: 14px; min-width: 0; }
-.ac-memory-projects { width: clamp(160px, 22%, 280px); }
-.ac-memory-files { width: clamp(220px, 30%, 380px); }
-.ac-memory-codex { width: clamp(220px, 32%, 340px); }
+.ac-memory-panes {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+}
+.ac-memory-projects {
+  width: clamp(160px, 22%, 280px);
+}
+.ac-memory-files {
+  width: clamp(220px, 30%, 380px);
+}
+.ac-memory-codex {
+  width: clamp(220px, 32%, 340px);
+}
 @media (max-width: 1050px) {
-  .ac-memory-panes { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: minmax(160px, 40%) minmax(0, 1fr); }
-  .ac-memory-panes > .ac-card { width: auto; min-width: 0; min-height: 0; }
-  .ac-memory-preview { grid-column: 1 / -1; }
-  .ac-memory-codex { grid-column: 1 / -1; }
+  .ac-memory-panes {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    grid-template-rows: minmax(160px, 40%) minmax(0, 1fr);
+  }
+  .ac-memory-panes > .ac-card {
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+  .ac-memory-preview {
+    grid-column: 1 / -1;
+  }
+  .ac-memory-codex {
+    grid-column: 1 / -1;
+  }
 }

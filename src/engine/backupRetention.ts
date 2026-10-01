@@ -10,7 +10,13 @@
  */
 import { existsSync, lstatSync, readdirSync, type Stats } from 'node:fs'
 import { basename, join, relative, resolve, sep } from 'node:path'
-import { appConfigDir, DEFAULT_BACKUP_RETENTION, readConfig, type AppConfig, type BackupRetention } from './config'
+import {
+  appConfigDir,
+  DEFAULT_BACKUP_RETENTION,
+  readConfig,
+  type AppConfig,
+  type BackupRetention
+} from './config'
 
 /** Backup entries kept per skill in backups/skills/<tool>/<name> */
 export const SKILL_BACKUP_KEEP = 3
@@ -173,7 +179,12 @@ export function planBackupCleanup(
       .filter((x) => x.st?.isFile())
       .sort((a, b) => b.st!.mtimeMs - a.st!.mtimeMs)
     for (const { p, st } of tars.slice(keepRollback))
-      items.push({ kind: 'rollback', path: p, size: st!.size, at: new Date(st!.mtimeMs).toISOString() })
+      items.push({
+        kind: 'rollback',
+        path: p,
+        size: st!.size,
+        at: new Date(st!.mtimeMs).toISOString()
+      })
   }
 
   return { items, count: items.length, bytes: items.reduce((n, i) => n + i.size, 0) }
@@ -189,7 +200,13 @@ export function isCleanupTarget(home: string, kind: CleanupKind, path: string): 
   switch (kind) {
     case 'deleted':
     case 'workspaces':
-      return rel.length === 3 && rel[0] === 'backups' && rel[1] === kind && parseBackupStamp(name) !== undefined && rootsOk(home, 'backups', kind)
+      return (
+        rel.length === 3 &&
+        rel[0] === 'backups' &&
+        rel[1] === kind &&
+        parseBackupStamp(name) !== undefined &&
+        rootsOk(home, 'backups', kind)
+      )
     case 'skills':
       return (
         rel.length === 5 &&
@@ -199,7 +216,12 @@ export function isCleanupTarget(home: string, kind: CleanupKind, path: string): 
         rootsOk(home, 'backups', 'skills', rel[2], rel[3])
       )
     case 'rollback':
-      return rel.length === 2 && rel[0] === 'rollback' && name.endsWith('.tar') && rootsOk(home, 'rollback')
+      return (
+        rel.length === 2 &&
+        rel[0] === 'rollback' &&
+        name.endsWith('.tar') &&
+        rootsOk(home, 'rollback')
+      )
   }
 }
 
@@ -207,7 +229,11 @@ export function isCleanupTarget(home: string, kind: CleanupKind, path: string): 
  * Move plan items with mover (one at a time). Items that fail validation, no longer exist, or are still present after
  * the move are reported in failed. Never deletes anything itself
  */
-export async function applyBackupCleanup(home: string, plan: CleanupPlan, mover: CleanupMover): Promise<CleanupResult> {
+export async function applyBackupCleanup(
+  home: string,
+  plan: CleanupPlan,
+  mover: CleanupMover
+): Promise<CleanupResult> {
   const out: CleanupResult = { moved: 0, bytes: 0, failed: [] }
   for (const it of plan.items) {
     if (!isCleanupTarget(home, it.kind, it.path)) {
@@ -221,7 +247,10 @@ export async function applyBackupCleanup(home: string, plan: CleanupPlan, mover:
     try {
       await mover(it.path)
     } catch (e) {
-      out.failed.push({ path: it.path, reason: (e as NodeJS.ErrnoException).code ?? (e as Error).message ?? 'moveFailed' })
+      out.failed.push({
+        path: it.path,
+        reason: (e as NodeJS.ErrnoException).code ?? (e as Error).message ?? 'moveFailed'
+      })
       continue
     }
     if (existsSync(it.path) || lstatOrNull(it.path)) {

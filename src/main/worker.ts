@@ -2,7 +2,12 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { runOp, type Op } from './reads'
 
-const { op, home, env, args } = workerData as { op: Op; home: string; env: Record<string, string>; args?: unknown[] }
+const { op, home, env, args } = workerData as {
+  op: Op
+  home: string
+  env: Record<string, string>
+  args?: unknown[]
+}
 
 Promise.resolve()
   .then(() => runOp(op, home, env, args ?? [], (progress) => parentPort!.postMessage({ progress })))

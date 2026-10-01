@@ -1,10 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActionIcon, Alert, Badge, Box, Button, Code, Collapse, Group, Loader, SegmentedControl, Select, Stack, Switch, Text, UnstyledButton } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Code,
+  Collapse,
+  Group,
+  Loader,
+  SegmentedControl,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  UnstyledButton
+} from '@mantine/core'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ChevronDown, ChevronRight, Clock, Copy, FileText, FolderOpen, Hash, Layers, ListOrdered, MessageSquare, Play, RefreshCw, Wrench } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Copy,
+  FileText,
+  FolderOpen,
+  Hash,
+  Layers,
+  ListOrdered,
+  MessageSquare,
+  Play,
+  RefreshCw,
+  Wrench
+} from 'lucide-react'
 import { notifications } from '@mantine/notifications'
 import { useTranslation } from 'react-i18next'
-import type { SearchIndexView, Session, SessionModelShare, SessionSearchHit, SessionSearchResponse, TranscriptMessage, TranscriptView } from '../../../shared/api'
+import type {
+  SearchIndexView,
+  Session,
+  SessionModelShare,
+  SessionSearchHit,
+  SessionSearchResponse,
+  TranscriptMessage,
+  TranscriptView
+} from '../../../shared/api'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { Markdown } from '../components/Markdown'
@@ -30,10 +68,23 @@ function copy(text: string, ok: string, fail: string): void {
 }
 
 /** Left session list (virtual scroll) */
-function SessionList({ items, selected, onSelect }: { items: Session[]; selected: string | null; onSelect: (s: Session) => void }): React.JSX.Element {
+function SessionList({
+  items,
+  selected,
+  onSelect
+}: {
+  items: Session[]
+  selected: string | null
+  onSelect: (s: Session) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
-  const v = useVirtualizer({ count: items.length, getScrollElement: () => ref.current, estimateSize: () => 72, overscan: 8 })
+  const v = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => ref.current,
+    estimateSize: () => 72,
+    overscan: 8
+  })
   return (
     <div ref={ref} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
       <div style={{ height: v.getTotalSize(), position: 'relative' }}>
@@ -41,8 +92,24 @@ function SessionList({ items, selected, onSelect }: { items: Session[]; selected
           const s = items[row.index]
           const key = `${s.tool}:${s.id}`
           return (
-            <div key={key} className="mantine-NavLink-root" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: row.size, transform: `translateY(${row.start}px)` }}>
-              <UnstyledButton className="ac-row" data-active={key === selected || undefined} onClick={() => onSelect(s)} style={{ height: '100%', alignItems: 'flex-start' }}>
+            <div
+              key={key}
+              className="mantine-NavLink-root"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: row.size,
+                transform: `translateY(${row.start}px)`
+              }}
+            >
+              <UnstyledButton
+                className="ac-row"
+                data-active={key === selected || undefined}
+                onClick={() => onSelect(s)}
+                style={{ height: '100%', alignItems: 'flex-start' }}
+              >
                 <ToolIcon tool={s.tool} size={22} />
                 <Box style={{ flex: 1, minWidth: 0 }}>
                   <Text size="sm" fw={600} lineClamp={2} style={{ lineHeight: 1.35 }}>
@@ -56,7 +123,10 @@ function SessionList({ items, selected, onSelect }: { items: Session[]; selected
                     </Text>
                   </Group>
                 </Box>
-                <ChevronRight size={14} style={{ color: 'var(--ac-text-muted)', flexShrink: 0, marginTop: 4 }} />
+                <ChevronRight
+                  size={14}
+                  style={{ color: 'var(--ac-text-muted)', flexShrink: 0, marginTop: 4 }}
+                />
               </UnstyledButton>
             </div>
           )
@@ -66,24 +136,58 @@ function SessionList({ items, selected, onSelect }: { items: Session[]; selected
   )
 }
 
-
-type ResultRow = { kind: 'session'; s: Session; count: number } | { kind: 'hit'; s: Session; hit: SessionSearchHit }
+type ResultRow =
+  | { kind: 'session'; s: Session; count: number }
+  | { kind: 'hit'; s: Session; hit: SessionSearchHit }
 
 /** Content search results (session rows + matching message rows, virtual scroll) */
-function ResultList({ rows, selected, onSelect }: { rows: ResultRow[]; selected: string | null; onSelect: (s: Session, idx?: number) => void }): React.JSX.Element {
+function ResultList({
+  rows,
+  selected,
+  onSelect
+}: {
+  rows: ResultRow[]
+  selected: string | null
+  onSelect: (s: Session, idx?: number) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
-  const v = useVirtualizer({ count: rows.length, getScrollElement: () => ref.current, estimateSize: (i) => (rows[i].kind === 'session' ? 60 : 52), overscan: 8 })
+  const v = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => ref.current,
+    estimateSize: (i) => (rows[i].kind === 'session' ? 60 : 52),
+    overscan: 8
+  })
   return (
-    <div ref={ref} style={{ flex: 1, minHeight: 0, overflow: 'auto' }} data-testid="content-results">
+    <div
+      ref={ref}
+      style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+      data-testid="content-results"
+    >
       <div style={{ height: v.getTotalSize(), position: 'relative' }}>
         {v.getVirtualItems().map((vr) => {
           const r = rows[vr.index]
           const key = `${r.s.tool}:${r.s.id}`
           return (
-            <div key={vr.key} data-index={vr.index} ref={v.measureElement} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vr.start}px)` }}>
+            <div
+              key={vr.key}
+              data-index={vr.index}
+              ref={v.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${vr.start}px)`
+              }}
+            >
               {r.kind === 'session' ? (
-                <UnstyledButton className="ac-row" data-active={key === selected || undefined} onClick={() => onSelect(r.s)} style={{ alignItems: 'flex-start', borderBottom: 0, paddingBottom: 4 }}>
+                <UnstyledButton
+                  className="ac-row"
+                  data-active={key === selected || undefined}
+                  onClick={() => onSelect(r.s)}
+                  style={{ alignItems: 'flex-start', borderBottom: 0, paddingBottom: 4 }}
+                >
                   <ToolIcon tool={r.s.tool} size={20} />
                   <Box style={{ flex: 1, minWidth: 0 }}>
                     <Text size="sm" fw={600} lineClamp={1}>
@@ -97,11 +201,30 @@ function ResultList({ rows, selected, onSelect }: { rows: ResultRow[]; selected:
                   </Box>
                 </UnstyledButton>
               ) : (
-                <UnstyledButton className="ac-row" data-testid="content-hit" data-index={r.hit.idx} onClick={() => onSelect(r.s, r.hit.idx)} style={{ padding: '4px 14px 8px 46px', borderBottom: 0, alignItems: 'flex-start' }}>
-                  <Text size="xs" c={r.hit.role === 'user' ? 'var(--ac-accent)' : 'dimmed'} fw={600} style={{ flexShrink: 0, lineHeight: 1.45 }}>
+                <UnstyledButton
+                  className="ac-row"
+                  data-testid="content-hit"
+                  data-index={r.hit.idx}
+                  onClick={() => onSelect(r.s, r.hit.idx)}
+                  style={{
+                    padding: '4px 14px 8px 46px',
+                    borderBottom: 0,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <Text
+                    size="xs"
+                    c={r.hit.role === 'user' ? 'var(--ac-accent)' : 'dimmed'}
+                    fw={600}
+                    style={{ flexShrink: 0, lineHeight: 1.45 }}
+                  >
                     {r.hit.role === 'user' ? t('sessions.user') : t('sessions.ai')}
                   </Text>
-                  <Text size="xs" lineClamp={2} style={{ lineHeight: 1.45, wordBreak: 'break-all' }}>
+                  <Text
+                    size="xs"
+                    lineClamp={2}
+                    style={{ lineHeight: 1.45, wordBreak: 'break-all' }}
+                  >
                     <Snippet text={r.hit.snippet} marks={r.hit.marks} />
                   </Text>
                 </UnstyledButton>
@@ -119,7 +242,10 @@ function useSearchIndex(): SearchIndexView | null {
   const [v, setV] = useState<SearchIndexView | null>(null)
   useEffect(() => {
     let alive = true
-    void window.api.sessionIndexStatus().then((x) => alive && setV(x), () => {})
+    void window.api.sessionIndexStatus().then(
+      (x) => alive && setV(x),
+      () => {}
+    )
     const off = window.api.onSearchIndexEvent((x) => setV(x))
     return () => {
       alive = false
@@ -131,24 +257,49 @@ function useSearchIndex(): SearchIndexView | null {
 
 /** Session tool filter icons (all = Layers) */
 function toolFilterIcon(v: string): React.JSX.Element {
-  return v === ALL ? <Layers size={13} /> : <ToolIcon tool={v as (typeof TOOLS)[number]} size={13} />
+  return v === ALL ? (
+    <Layers size={13} />
+  ) : (
+    <ToolIcon tool={v as (typeof TOOLS)[number]} size={13} />
+  )
 }
 /** A single chat bubble */
-function Bubble({ m, highlight, refCb }: { m: TranscriptMessage; highlight: boolean; refCb: (el: HTMLDivElement | null) => void }): React.JSX.Element {
+function Bubble({
+  m,
+  highlight,
+  refCb
+}: {
+  m: TranscriptMessage
+  highlight: boolean
+  refCb: (el: HTMLDivElement | null) => void
+}): React.JSX.Element {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const isUser = m.role === 'user'
   if (m.kind === 'tool') {
     return (
       <Box ref={refCb} px="sm" data-index={m.index}>
-        <UnstyledButton onClick={() => setOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--ac-text-muted)', fontSize: 12 }}>
+        <UnstyledButton
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: 'var(--ac-text-muted)',
+            fontSize: 12
+          }}
+        >
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <Wrench size={12} />
           <span>{t('sessions.toolCall', { tool: '' }).replace(/[:：]\s*$/, '')}</span>
           <span style={{ opacity: 0.7 }}>{m.text.slice(0, 100).replace(/\n/g, ' ')}</span>
         </UnstyledButton>
         <Collapse expanded={open}>
-          <Code block mt={4} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 11.5 }}>
+          <Code
+            block
+            mt={4}
+            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 11.5 }}
+          >
             {m.text}
           </Code>
         </Collapse>
@@ -193,7 +344,13 @@ function Bubble({ m, highlight, refCb }: { m: TranscriptMessage; highlight: bool
 const MINOR_SHARE = 0.01
 
 /** "Models in this session: a 48% · b 46% · and 1 under 1%" — each model opens its Stats detail */
-function SessionModels({ tool, id }: { tool: Session['tool']; id: string }): React.JSX.Element | null {
+function SessionModels({
+  tool,
+  id
+}: {
+  tool: Session['tool']
+  id: string
+}): React.JSX.Element | null {
   const { t } = useTranslation()
   const { navigate } = useNav()
   const [rows, setRows] = useState<SessionModelShare[] | null>(null)
@@ -244,12 +401,26 @@ function SessionModels({ tool, id }: { tool: Session['tool']; id: string }): Rea
 /** Center: header + transcript, right: Contents */
 const PAGE = 80
 
-function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: number } }): React.JSX.Element {
+function Detail({
+  s,
+  jumpTo
+}: {
+  s: Session
+  jumpTo?: { index: number; nonce: number }
+}): React.JSX.Element {
   const { t } = useTranslation()
-  const first = useApi<TranscriptView>(`transcript:${s.tool}:${s.id}`, () => window.api.sessionTranscript(s.tool, s.id, { limit: PAGE }))
+  const first = useApi<TranscriptView>(`transcript:${s.tool}:${s.id}`, () =>
+    window.api.sessionTranscript(s.tool, s.id, { limit: PAGE })
+  )
   const [older, setOlder] = useState<TranscriptMessage[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
-  const tr = useMemo<typeof first>(() => (first.data ? { ...first, data: { ...first.data, messages: [...older, ...first.data.messages] } } : first), [first, older])
+  const tr = useMemo<typeof first>(
+    () =>
+      first.data
+        ? { ...first, data: { ...first.data, messages: [...older, ...first.data.messages] } }
+        : first,
+    [first, older]
+  )
   const loadMore = async (): Promise<void> => {
     const oldest = tr.data?.messages[0]?.index
     if (oldest === undefined || oldest <= 0) return
@@ -277,7 +448,10 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
     requestAnimationFrame(() => {
       const r2 = el.getBoundingClientRect()
       const b2 = box.getBoundingClientRect()
-      box.scrollTop = Math.max(0, box.scrollTop + (r2.top - b2.top) - Math.max(0, (b2.height - r2.height) / 2))
+      box.scrollTop = Math.max(
+        0,
+        box.scrollTop + (r2.top - b2.top) - Math.max(0, (b2.height - r2.height) / 2)
+      )
     })
     setHighlight(index)
     setTimeout(() => setHighlight(null), 1600)
@@ -301,6 +475,7 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
   }
   useEffect(() => {
     if (pendingJump === null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the jump once its message is rendered
     if (scrollTo(pendingJump)) setPendingJump(null)
   })
   // Search result click: load the transcript, then jump to that message
@@ -358,7 +533,8 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
   }, [tr.data])
   useEffect(() => {
     const list = contentsRef.current
-    const row = active === null ? null : list?.querySelector<HTMLElement>(`[data-index="${active}"]`)
+    const row =
+      active === null ? null : list?.querySelector<HTMLElement>(`[data-index="${active}"]`)
     if (!list || !row) return
     const l = list.getBoundingClientRect()
     const r = row.getBoundingClientRect()
@@ -369,7 +545,16 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
 
   return (
     <Box style={{ flex: 1, minWidth: 0, display: 'flex', gap: 14 }}>
-      <Box className="ac-card" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Box
+        className="ac-card"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         <Box p="md" style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}>
           <Group justify="space-between" wrap="nowrap" align="flex-start">
             <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
@@ -379,7 +564,13 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
               </Text>
             </Group>
             {resume && (
-              <Button size="xs" leftSection={<Play size={12} />} style={{ flexShrink: 0 }} onClick={() => copy(resume, t('common.copied'), t('common.copyFailed'))} data-testid="resume-copy">
+              <Button
+                size="xs"
+                leftSection={<Play size={12} />}
+                style={{ flexShrink: 0 }}
+                onClick={() => copy(resume, t('common.copied'), t('common.copyFailed'))}
+                data-testid="resume-copy"
+              >
                 {t('sessions.continue')}
               </Button>
             )}
@@ -414,9 +605,23 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
           </Group>
           <SessionModels tool={s.tool} id={s.id} />
           <Group gap={6} mt={8} wrap="nowrap">
-            <Code style={{ flex: 1, minWidth: 0, padding: '6px 10px', whiteSpace: 'nowrap', overflowX: 'auto' }}>{resume ?? t('sessions.noResume')}</Code>
+            <Code
+              style={{
+                flex: 1,
+                minWidth: 0,
+                padding: '6px 10px',
+                whiteSpace: 'nowrap',
+                overflowX: 'auto'
+              }}
+            >
+              {resume ?? t('sessions.noResume')}
+            </Code>
             {resume && (
-              <ActionIcon variant="default" onClick={() => copy(resume, t('common.copied'), t('common.copyFailed'))} aria-label={t('common.copy')}>
+              <ActionIcon
+                variant="default"
+                onClick={() => copy(resume, t('common.copied'), t('common.copyFailed'))}
+                aria-label={t('common.copy')}
+              >
                 <Copy size={13} />
               </ActionIcon>
             )}
@@ -436,7 +641,13 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
             </Badge>
           )}
         </Group>
-        <Box ref={scrollRef} onScroll={spy} style={{ flex: 1, minHeight: 0, overflow: 'auto', overflowAnchor: 'none' }} p="md" data-testid="transcript-scroll">
+        <Box
+          ref={scrollRef}
+          onScroll={spy}
+          style={{ flex: 1, minHeight: 0, overflow: 'auto', overflowAnchor: 'none' }}
+          p="md"
+          data-testid="transcript-scroll"
+        >
           {tr.error ? (
             <ErrorAlert message={tr.error} />
           ) : !tr.data ? (
@@ -448,19 +659,46 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
           ) : (
             <Stack gap="sm">
               {hasMore && (
-                <Button variant="default" size="xs" loading={loadingMore} onClick={() => void loadMore()} data-testid="transcript-more">
+                <Button
+                  variant="default"
+                  size="xs"
+                  loading={loadingMore}
+                  onClick={() => void loadMore()}
+                  data-testid="transcript-more"
+                >
                   {t('sessions.loadMore', { n: Math.min(PAGE, tr.data.messages[0].index) })}
                 </Button>
               )}
               {tr.data.messages.map((m) => (
-                <Bubble key={m.index} m={m} highlight={highlight === m.index} refCb={(el) => (el ? refs.current.set(m.index, el) : refs.current.delete(m.index))} />
+                <Bubble
+                  key={m.index}
+                  m={m}
+                  highlight={highlight === m.index}
+                  refCb={(el) =>
+                    el ? refs.current.set(m.index, el) : refs.current.delete(m.index)
+                  }
+                />
               ))}
             </Stack>
           )}
         </Box>
       </Box>
-      <Box className="ac-card" style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Group gap={8} px="md" py={10} style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}>
+      <Box
+        className="ac-card"
+        style={{
+          width: 260,
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        <Group
+          gap={8}
+          px="md"
+          py={10}
+          style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}
+        >
           <ListOrdered size={14} style={{ color: 'var(--ac-text-muted)' }} />
           <Text size="sm" fw={600}>
             {t('sessions.contents')}
@@ -487,7 +725,14 @@ function Detail({ s, jumpTo }: { s: Session; jumpTo?: { index: number; nonce: nu
                 style={{ alignItems: 'flex-start', padding: '8px 12px' }}
               >
                 {/* Not a circle: two- and three-digit numbers must fit */}
-                <Badge size="xs" variant="light" fw={600} miw={20} px={5} style={{ flexShrink: 0, marginTop: 2 }}>
+                <Badge
+                  size="xs"
+                  variant="light"
+                  fw={600}
+                  miw={20}
+                  px={5}
+                  style={{ flexShrink: 0, marginTop: 2 }}
+                >
                   {i + 1}
                 </Badge>
                 <Text size="xs" lineClamp={2} style={{ lineHeight: 1.4 }}>
@@ -518,6 +763,7 @@ function Sessions(): React.JSX.Element {
   const contentQ = mode === 'content' ? query.trim() : ''
   // Clear previous results immediately when the query or tool changes (kept on re-search after indexing finishes)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- drop results of the previous query at once
     setFound(null)
   }, [contentQ, tool])
   // Content search: 300ms after input, and again when indexing finishes
@@ -525,10 +771,12 @@ function Sessions(): React.JSX.Element {
     if (!contentQ) return
     let alive = true
     const timer = setTimeout(() => {
-      void window.api.sessionSearch(contentQ, tool === ALL ? {} : { tool: tool as Session['tool'] }).then(
-        (r) => alive && setFound(r),
-        () => alive && setFound({ results: [], mode: 'fts', limited: false, ms: 0 })
-      )
+      void window.api
+        .sessionSearch(contentQ, tool === ALL ? {} : { tool: tool as Session['tool'] })
+        .then(
+          (r) => alive && setFound(r),
+          () => alive && setFound({ results: [], mode: 'fts', limited: false, ms: 0 })
+        )
     }, 300)
     return () => {
       alive = false
@@ -539,7 +787,10 @@ function Sessions(): React.JSX.Element {
   const filtered = useMemo(() => {
     const q = mode === 'title' ? query.trim().toLowerCase() : ''
     return (data?.sessions ?? []).filter(
-      (s) => (tool === ALL || s.tool === tool) && (!hideSub || !s.parentId) && (!q || includesCI(s.title, q) || includesCI(s.project, q) || includesCI(s.cwd, q))
+      (s) =>
+        (tool === ALL || s.tool === tool) &&
+        (!hideSub || !s.parentId) &&
+        (!q || includesCI(s.title, q) || includesCI(s.project, q) || includesCI(s.cwd, q))
     )
   }, [data, tool, query, hideSub, mode])
   /** Content search results to list rows (uses the latest title and parent info from the session list) */
@@ -549,7 +800,15 @@ function Sessions(): React.JSX.Element {
     const rows: ResultRow[] = []
     let n = 0
     for (const r of found.results) {
-      const s: Session = byKey.get(`${r.tool}:${r.id}`) ?? { tool: r.tool, id: r.id, title: r.title, project: r.project, updatedAt: r.updatedAt, parentId: r.parentId, path: '' }
+      const s: Session = byKey.get(`${r.tool}:${r.id}`) ?? {
+        tool: r.tool,
+        id: r.id,
+        title: r.title,
+        project: r.project,
+        updatedAt: r.updatedAt,
+        parentId: r.parentId,
+        path: ''
+      }
       if ((tool !== ALL && s.tool !== tool) || (hideSub && s.parentId)) continue
       n++
       rows.push({ kind: 'session', s, count: r.count })
@@ -558,6 +817,7 @@ function Sessions(): React.JSX.Element {
     return { rows, sessions: n }
   }, [found, data, tool, hideSub])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- select the first row while nothing is selected
     if (!selected && filtered[0]) setSelected(`${filtered[0].tool}:${filtered[0].id}`)
   }, [filtered, selected])
 
@@ -572,28 +832,58 @@ function Sessions(): React.JSX.Element {
 
   return (
     <Stack gap={0} h="100%" style={{ minHeight: 0 }}>
-      <PageHeader title={t('nav.sessions')} count={data.sessions.length} actions={<ReloadButton />} />
+      <PageHeader
+        title={t('nav.sessions')}
+        count={data.sessions.length}
+        actions={<ReloadButton />}
+      />
       {data.errors.map((e) => (
         <Alert key={e.tool} color="red" variant="light" radius="md" mb="sm">
           {t('sessions.scanError', { tool: TOOL_NAME[e.tool], message: e.message })}
         </Alert>
       ))}
       <Box style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
-        <Box className="ac-card" style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Box
+          className="ac-card"
+          style={{
+            width: 300,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
           <Stack gap={6} p="sm" style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}>
             <Group justify="space-between" wrap="nowrap">
               <Group gap={6}>
                 <Badge variant="default" size="sm" fw={600} c="dimmed" data-testid="session-count">
-                  {t('common.shown', { shown: showResults ? (resultRows?.sessions ?? 0) : filtered.length, total: data.sessions.length })}
+                  {t('common.shown', {
+                    shown: showResults ? (resultRows?.sessions ?? 0) : filtered.length,
+                    total: data.sessions.length
+                  })}
                 </Badge>
               </Group>
-              <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => window.dispatchEvent(new Event('ac-reload'))} aria-label={t('common.reload')} style={{ display: 'none' }}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                onClick={() => window.dispatchEvent(new Event('ac-reload'))}
+                aria-label={t('common.reload')}
+                style={{ display: 'none' }}
+              >
                 <RefreshCw size={12} />
               </ActionIcon>
             </Group>
             <Group gap={6} wrap="nowrap">
               <Box style={{ flex: 1, minWidth: 0 }}>
-                <SearchInput value={query} onChange={setQuery} placeholder={mode === 'content' ? t('sessions.searchContent') : t('sessions.search')} w="100%" />
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder={
+                    mode === 'content' ? t('sessions.searchContent') : t('sessions.search')
+                  }
+                  w="100%"
+                />
               </Box>
               <SegmentedControl
                 size="xs"
@@ -613,7 +903,10 @@ function Sessions(): React.JSX.Element {
                 allowDeselect={false}
                 value={tool}
                 onChange={(v) => setTool(v ?? ALL)}
-                data={[{ value: ALL, label: t('sessions.allTools') }, ...TOOLS.map((x) => ({ value: x, label: TOOL_NAME[x] }))]}
+                data={[
+                  { value: ALL, label: t('sessions.allTools') },
+                  ...TOOLS.map((x) => ({ value: x, label: TOOL_NAME[x] }))
+                ]}
                 leftSection={toolFilterIcon(tool)}
                 renderOption={({ option }) => (
                   <Group gap={6} wrap="nowrap">
@@ -622,11 +915,22 @@ function Sessions(): React.JSX.Element {
                   </Group>
                 )}
               />
-              <Switch size="xs" label={t('sessions.hideSubagents')} checked={hideSub} onChange={(e) => setHideSub(e.currentTarget.checked)} />
+              <Switch
+                size="xs"
+                label={t('sessions.hideSubagents')}
+                checked={hideSub}
+                onChange={(e) => setHideSub(e.currentTarget.checked)}
+              />
             </Group>
           </Stack>
           {index?.running && index.progress && index.progress.total > 0 && (
-            <Group gap={6} px="sm" py={4} style={{ borderBottom: '1px solid var(--ac-border-subtle)' }} data-testid="index-progress">
+            <Group
+              gap={6}
+              px="sm"
+              py={4}
+              style={{ borderBottom: '1px solid var(--ac-border-subtle)' }}
+              data-testid="index-progress"
+            >
               <Loader size={10} />
               <Text size="xs" c="dimmed">
                 {index.progress.done} / {index.progress.total}
