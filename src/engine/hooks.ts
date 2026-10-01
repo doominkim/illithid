@@ -23,6 +23,7 @@ import {
   actionMatcher,
   ENV_NAME_RE,
   HOOK_ACTION_INFO,
+  PROTECT_PATTERN_RE,
   hookSupport,
   isHookAction,
   type HookAction
@@ -135,6 +136,12 @@ export function validateHookDoc(v: unknown): string[] {
         errors.push(`options.${k} must be one of ${info.choices[k].join(', ')}`)
       else if (k === 'urlEnv' && val && !ENV_NAME_RE.test(val as string))
         errors.push('options.urlEnv must be an environment variable name')
+      else if (
+        v.action === 'protect' &&
+        k === 'patterns' &&
+        !(val as string[]).every((p) => PROTECT_PATTERN_RE.test(p))
+      )
+        errors.push('options.patterns: file patterns may use letters, digits and . _ - / * ?')
     }
   if (
     v.action === 'script' &&

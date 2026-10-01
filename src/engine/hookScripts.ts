@@ -82,6 +82,40 @@ function notifyLines(doc: HookDoc, name: string): string[] {
   return out
 }
 
+/** JSON string escaping in sh: control characters dropped, backslash and quote escaped, line breaks as \\n */
+const JESC = `jesc() { printf '%s' "$1" | tr -d '\\001-\\011\\013-\\037' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g' | awk 'BEGIN{ORS=""} NR>1{print "\\\\n"} {print}'; }`
+
+/**
+ * context: what the agent should know when a session starts — the git branch and uncommitted changes, and the hook's note.
+ * Claude Code and Codex read plain stdout; Gemini CLI wants hookSpecificOutput.additionalContext, Copilot additionalContext
+ */
+function contextLines(tool: HookTool, doc: HookDoc): string[] {
+  const out = ["text=''"]
+  if (doc.options.git !== false)
+    out.push(
+      '# symbolic-ref also names a branch with no commits yet; a detached HEAD shows its commit',
+      'if branch=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null); then',
+      '  text="Git branch: $branch"',
+      '  st=$(git status --short 2>/dev/null | head -n 20)',
+      '  [ -n "$st" ] && text="$text',
+      'Uncommitted changes:',
+      '$st"',
+      'fi'
+    )
+  const note = doc.body.trim()
+  if (note) out.push(`note=${q(note)}`, 'text="${text:+$text', '', '}$note"')
+  out.push('[ -n "$text" ] || exit 0')
+  if (tool === 'gemini')
+    out.push(
+      JESC,
+      `printf '{"hookSpecificOutput":{"additionalContext":"%s"}}\\n' "$(jesc "$text")"`
+    )
+  else if (tool === 'copilot')
+    out.push(JESC, `printf '{"additionalContext":"%s"}\\n' "$(jesc "$text")"`)
+  else out.push(`printf '%s\\n' "$text"`)
+  return out
+}
+
 /** Times one session may be sent back before the check lets the agent finish */
 export const VERIFY_MAX_TRIES = 3
 
@@ -97,11 +131,7 @@ function verifyLines(tool: HookTool, name: string, doc: HookDoc): string[] {
   const own = String(doc.options.command || '').trim()
   const reply =
     tool === 'copilot'
-      ? [
-          `jesc() { printf '%s' "$1" | tr -d '\\001-\\011\\013-\\037' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g' | awk 'BEGIN{ORS=""} NR>1{print "\\\\n"} {print}'; }`,
-          `printf '{"decision":"block","reason":"%s"}\\n' "$(jesc "$reason")"`,
-          'exit 0'
-        ]
+      ? [JESC, `printf '{"decision":"block","reason":"%s"}\\n' "$(jesc "$reason")"`, 'exit 0']
       : [`printf '%s\\n' "$reason" >&2`, 'exit 2']
   return [
     'active=$(field stop_hook_active); [ -n "$active" ] || active=$(field stopHookActive)',
@@ -151,14 +181,45 @@ export function renderActionScript(tool: HookTool, name: string, doc: HookDoc): 
       break
     }
     case 'format': {
+      if (doc.when === 'stop')
+        // Once per reply, on every changed or new file of the git work tree (names with spaces kept whole)
+        out.push(
+          'git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0',
+          '{ git diff --name-only --diff-filter=ACMR HEAD 2>/dev/null; git ls-files --others --exclude-standard; } | sort -u > "${TMPDIR:-/tmp}/illithid-fmt-$$"',
+          '[ -s "${TMPDIR:-/tmp}/illithid-fmt-$$" ] || { rm -f "${TMPDIR:-/tmp}/illithid-fmt-$$"; exit 0; }',
+          `tr '\\n' '\\0' < "\${TMPDIR:-/tmp}/illithid-fmt-$$" | xargs -0 ${String(o.command)} >/dev/null 2>&1`,
+          'rm -f "${TMPDIR:-/tmp}/illithid-fmt-$$"'
+        )
+      else
+        out.push(
+          ...argGetter(tool),
+          `file=$(arg ${FILE_ARG[tool]})`,
+          '[ -n "$file" ] || exit 0',
+          `${String(o.command)} "$file" >/dev/null 2>&1`
+        )
+      break
+    }
+    case 'protect': {
       out.push(
         ...argGetter(tool),
         `file=$(arg ${FILE_ARG[tool]})`,
         '[ -n "$file" ] || exit 0',
-        `${String(o.command)} "$file" >/dev/null 2>&1`
+        'base=$(basename "$file")'
       )
+      // Patterns are plain globs (PROTECT_PATTERN_RE): unquoted so * and ? match
+      for (const p of o.patterns as string[]) {
+        const why = `echo ${q(`Protected by Illithid (${name}): `)}"$file"${q(` matches ${p}`)} >&2; exit 2`
+        out.push(
+          p.includes('/')
+            ? `case "$file" in */${p} | ${p}) ${why} ;; esac`
+            : `case "$base" in ${p}) ${why} ;; esac`
+        )
+      }
       break
     }
+    case 'context':
+      out.push(...contextLines(tool, doc))
+      break
     case 'log': {
       out.push(
         `log=${homePath(String(o.path))}`,

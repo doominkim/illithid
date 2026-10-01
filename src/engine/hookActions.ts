@@ -11,17 +11,32 @@
  */
 import { defaultHookEvent, type HookTiming, type HookTool } from './hookEvents'
 
-export const HOOK_ACTIONS = ['notify', 'verify', 'guard', 'format', 'log', 'ask', 'script'] as const
+export const HOOK_ACTIONS = [
+  'notify',
+  'verify',
+  'protect',
+  'context',
+  'guard',
+  'ask',
+  'format',
+  'log',
+  'script'
+] as const
 export type HookAction = (typeof HOOK_ACTIONS)[number]
 
 /** Why a tool can't run an action at a timing */
-export type HookSupport = 'ok' | 'wrongTiming' | 'noEvent' | 'noFilePath' | 'claudeOnly'
+export type HookSupport =
+  'ok' | 'wrongTiming' | 'noEvent' | 'noFilePath' | 'claudeOnly' | 'noContext'
 
 export interface HookActionInfo {
   /** Timings the action makes sense at; the first is the default */
   timings: readonly HookTiming[]
   /** Tools that can't run it at all, and why */
   unsupported?: Partial<Record<HookTool, Exclude<HookSupport, 'ok' | 'wrongTiming' | 'noEvent'>>>
+  /** Tools that can't run it at one timing, and why (checked before unsupported) */
+  unsupportedAt?: Partial<
+    Record<HookTiming, Partial<Record<HookTool, Exclude<HookSupport, 'ok' | 'wrongTiming'>>>>
+  >
   /** Matcher per tool (tool name pattern) */
   matcher?: Partial<Record<HookTool, string>>
   /** Matcher per tool at one timing (overrides matcher) */
@@ -61,6 +76,20 @@ const EDIT: Partial<Record<HookTool, string>> = {
 
 export const DEFAULT_GUARD_PATTERNS = ['rm -rf /', 'git push --force', 'git reset --hard']
 
+/** File globs protect matches (a pattern with / is matched against the path, others against the file name) */
+export const DEFAULT_PROTECT_PATTERNS = [
+  '.env',
+  '.env.*',
+  '*.pem',
+  '*.key',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  '.git/*'
+]
+/** Characters a protect pattern may use (it is written into the script unquoted, as a glob) */
+export const PROTECT_PATTERN_RE = /^[A-Za-z0-9._*?/-]+$/
+
 /** "Waiting for you" notifications per tool (notification type filters). Codex has no notification event */
 const WAITING: Partial<Record<HookTool, string>> = {
   claude: 'permission_prompt|idle_prompt',
@@ -99,16 +128,30 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
   },
   // command: '' = pick the project's test command (npm test, pytest, go test, cargo test)
   verify: { timings: ['stop'], timeout: 300, defaults: { command: '' } },
+  // Codex edits through apply_patch (no file path); Copilot's edit/create path key is not documented
+  protect: {
+    timings: ['before-tool'],
+    matcher: EDIT,
+    unsupported: { codex: 'noFilePath', copilot: 'noFilePath' },
+    defaults: { patterns: DEFAULT_PROTECT_PATTERNS }
+  },
+  // git: the branch and uncommitted changes; the hook body is added as a note. Grok ignores session start output
+  context: {
+    timings: ['session-start'],
+    unsupported: { grok: 'noContext' },
+    defaults: { git: true }
+  },
   guard: {
     timings: ['before-tool'],
     matcher: SHELL,
     defaults: { patterns: DEFAULT_GUARD_PATTERNS }
   },
+  // after-tool: the edited file; stop: once on every file changed in the git work tree (works without a file path)
   format: {
-    timings: ['after-tool'],
+    timings: ['after-tool', 'stop'],
     matcher: EDIT,
-    unsupported: { codex: 'noFilePath' },
-    defaults: { command: 'npx --yes prettier --write' }
+    unsupportedAt: { 'after-tool': { codex: 'noFilePath' } },
+    defaults: { command: 'npx --yes prettier --write --ignore-unknown' }
   },
   log: {
     timings: ALL_TIMINGS,
@@ -137,7 +180,7 @@ export function isHookAction(v: unknown): v is HookAction {
 export function hookSupport(action: HookAction, when: HookTiming, tool: HookTool): HookSupport {
   const info = HOOK_ACTION_INFO[action]
   if (!info.timings.includes(when)) return 'wrongTiming'
-  const no = info.unsupported?.[tool]
+  const no = info.unsupportedAt?.[when]?.[tool] ?? info.unsupported?.[tool]
   if (no) return no
   return defaultHookEvent(tool, when) ? 'ok' : 'noEvent'
 }

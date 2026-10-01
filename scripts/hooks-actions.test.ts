@@ -7,7 +7,9 @@ import { basename, join } from 'node:path'
 import {
   hookEventInfo,
   hookOptions,
+  hookSupport,
   hookTriggers,
+  validateHookDoc,
   renderActionScript,
   renderAskPrompt,
   type HookAction,
@@ -396,4 +398,88 @@ test("REQ-HOOKS-ACTIONS-12 check before finishing picks the project's test comma
   const t = hookTriggers(doc('verify', 'stop'))
   assert.deepEqual(t.copilot, { event: 'agentStop', timeout: 300 })
   assert.deepEqual(t.gemini, { event: 'AfterAgent', timeout: 300 })
+})
+
+test('REQ-HOOKS-ACTIONS-13 protect files: edits to .env, lock files and .git are blocked with a reason; other files pass', () => {
+  const d = doc('protect', 'before-tool')
+  const edit = (tool: HookTool, file: string): unknown =>
+    tool === 'grok'
+      ? { toolName: 'search_replace', toolInput: { file_path: file } }
+      : { tool_name: tool === 'gemini' ? 'write_file' : 'Edit', tool_input: { file_path: file } }
+  for (const tool of ['claude', 'gemini', 'grok'] as const) {
+    const script = renderActionScript(tool, 'protect', d)
+    const env = run(script, tool, edit(tool, '/p/app/.env'))
+    assert.equal(env.code, 2, tool)
+    assert.match(env.err, /Protected by Illithid \(protect\): \/p\/app\/\.env/)
+    assert.equal(run(script, tool, edit(tool, '/p/app/config/.env.local')).code, 2, tool)
+    assert.equal(run(script, tool, edit(tool, '/p/app/yarn.lock')).code, 2, tool)
+    assert.equal(run(script, tool, edit(tool, '/p/app/.git/config')).code, 2, tool)
+    assert.equal(run(script, tool, edit(tool, '/p/app/src/env.ts')).code, 0, tool)
+  }
+  // Codex and Copilot don't tell hooks the edited file reliably
+  assert.equal(hookSupport('protect', 'before-tool', 'codex'), 'noFilePath')
+  assert.equal(hookSupport('protect', 'before-tool', 'copilot'), 'noFilePath')
+  // Patterns are file globs only
+  assert.ok(validateHookDoc({ ...d, options: { patterns: ['a; rm -rf /'] } }).length > 0)
+})
+
+test("REQ-HOOKS-ACTIONS-14 session start: the branch, uncommitted changes and a note reach the agent in each tool's format", () => {
+  const repo = mkdtempSync(join(tmpdir(), 'illithid-ctx-'))
+  spawnSync('git', ['init', '-q', '-b', 'feat/x'], { cwd: repo })
+  writeFileSync(join(repo, 'a.ts'), 'x\n')
+  const d = { ...doc('context', 'session-start'), body: 'Run npm test before you finish.' }
+  const claude = run(renderActionScript('claude', 'ctx', d), 'claude', {}, { cwd: repo })
+  assert.equal(claude.code, 0)
+  assert.match(claude.out, /Git branch: feat\/x/)
+  assert.match(claude.out, /\?\? a\.ts/)
+  assert.match(claude.out, /Run npm test before you finish\./)
+  const gemini = JSON.parse(
+    run(renderActionScript('gemini', 'ctx', d), 'gemini', {}, { cwd: repo }).out
+  ) as {
+    hookSpecificOutput: { additionalContext: string }
+  }
+  assert.match(gemini.hookSpecificOutput.additionalContext, /Git branch: feat\/x\n/)
+  const copilot = JSON.parse(
+    run(renderActionScript('copilot', 'ctx', d), 'copilot', {}, { cwd: repo }).out
+  ) as {
+    additionalContext: string
+  }
+  assert.match(copilot.additionalContext, /Run npm test/)
+  assert.equal(hookSupport('context', 'session-start', 'grok'), 'noContext')
+  // Outside a repo with no note: nothing is said
+  const empty = mkdtempSync(join(tmpdir(), 'illithid-ctx-empty-'))
+  assert.equal(
+    run(
+      renderActionScript('claude', 'ctx', doc('context', 'session-start')),
+      'claude',
+      {},
+      { cwd: empty }
+    ).out,
+    ''
+  )
+})
+
+test('REQ-HOOKS-ACTIONS-15 format at the end of a reply runs once on the changed files, so Codex and Copilot can use it too', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'illithid-fmt-stop-'))
+  spawnSync('git', ['init', '-q'], { cwd: repo })
+  writeFileSync(join(repo, 'a.ts'), 'a\n')
+  spawnSync('git', ['add', '.'], { cwd: repo })
+  spawnSync('git', ['-c', 'user.email=a@b', '-c', 'user.name=a', 'commit', '-qm', 'x'], {
+    cwd: repo
+  })
+  writeFileSync(join(repo, 'a.ts'), 'a2\n')
+  writeFileSync(join(repo, 'new file.ts'), 'b\n')
+  const bin = fakeBin('fmt')
+  const d = doc('format', 'stop', { command: 'fmt --write' })
+  assert.equal(
+    run(renderActionScript('codex', 'fmt', d), 'codex', {}, { env: { PATH: bin.path }, cwd: repo })
+      .code,
+    0
+  )
+  const calls = bin.calls('fmt')
+  assert.equal(calls.length, 1)
+  assert.deepEqual(calls[0].slice(0, 1), ['--write'])
+  assert.deepEqual(calls[0].slice(1).sort(), ['a.ts', 'new file.ts'])
+  assert.equal(hookSupport('format', 'stop', 'codex'), 'ok')
+  assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')
 })
