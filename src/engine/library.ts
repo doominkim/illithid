@@ -1216,7 +1216,6 @@ export function validatePermissions(v: unknown): string[] {
   checkList('bash', v.bash)
   if (v.bashAsk !== undefined) checkList('bashAsk', v.bashAsk)
   if (v.bashDeny !== undefined) checkList('bashDeny', v.bashDeny)
-  if (v.mcp !== undefined && !Array.isArray(v.mcp)) errs.push('mcp must be an array')
   if (!errs.length) errs.push(...ruleProblems(permissionRules(v as unknown as Allowlist)))
   if (!isObj(v.claudeOnly)) errs.push('claudeOnly must be an object')
   else {

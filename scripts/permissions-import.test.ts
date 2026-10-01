@@ -23,7 +23,7 @@ const variantOf = (home: string, source: string): Record<string, unknown> => {
   return plan.permissions[0].variants[0].allowlist as unknown as Record<string, unknown>
 }
 
-test('REQ-PERM-IMPORT-1 Claude Code permissions come in as command and MCP rules; other entries stay Claude-only', () => {
+test('REQ-PERM-IMPORT-1 Claude Code Bash permissions come in as command rules; other entries stay Claude-only', () => {
   const home = demoHome(['claude'])
   mkdirSync(join(home, '.claude'), { recursive: true })
   const settings = join(home, '.claude/settings.json')
@@ -41,12 +41,11 @@ test('REQ-PERM-IMPORT-1 Claude Code permissions come in as command and MCP rules
     bash: [['git', 'status'], { argv: ['npm', 'test'], claudeExact: true }],
     bashAsk: [['rm']],
     bashDeny: [['git', 'push', '--force']],
-    mcp: [
-      { decision: 'allow', server: 'context7', tool: '*' },
-      { decision: 'ask', server: 'postgres', tool: '*' },
-      { decision: 'deny', server: 'github', tool: 'delete_repository' }
-    ],
-    claudeOnly: { allow: ['WebFetch'], deny: ['Read(./.env)'] }
+    claudeOnly: {
+      allow: ['WebFetch', 'mcp__context7'],
+      deny: ['mcp__github__delete_repository', 'Read(./.env)'],
+      ask: ['mcp__postgres__*']
+    }
   })
   applyImport(home, [{ kind: 'permissions', name: 'permissions' }], 'tool:claude')
   assert.ok(readPermissions(home))
@@ -54,7 +53,7 @@ test('REQ-PERM-IMPORT-1 Claude Code permissions come in as command and MCP rules
   const after = JSON.parse(readFileSync(settings, 'utf8')) as {
     permissions: Record<string, string[]>
   }
-  // The same rules go back out (mcp__postgres__* is written as mcp__postgres: every tool of the server)
+  // The same rules go back out
   assert.deepEqual(after.permissions.allow.sort(), [
     'Bash(git status:*)',
     'Bash(npm test)',
@@ -66,7 +65,7 @@ test('REQ-PERM-IMPORT-1 Claude Code permissions come in as command and MCP rules
     'Read(./.env)',
     'mcp__github__delete_repository'
   ])
-  assert.deepEqual(after.permissions.ask.sort(), ['Bash(rm:*)', 'mcp__postgres'])
+  assert.deepEqual(after.permissions.ask.sort(), ['Bash(rm:*)', 'mcp__postgres__*'])
   // Nothing new to import afterwards
   assert.equal(planImport(home, 'tool:claude').permissions.length, 0)
 })
@@ -89,7 +88,7 @@ test('REQ-PERM-IMPORT-2 Codex prompt and forbidden prefix rules come in as ask a
   assert.deepEqual(v.bashDeny, [['git', 'push', '--force']])
 })
 
-test('REQ-PERM-IMPORT-3 Gemini CLI policy rules come in; the file Illithid writes is skipped', () => {
+test('REQ-PERM-IMPORT-3 Gemini CLI shell policy rules come in; the file Illithid writes is skipped', () => {
   const home = demoHome(['gemini'])
   mkdirSync(join(home, '.gemini/policies'), { recursive: true })
   writeFileSync(
@@ -123,10 +122,11 @@ test('REQ-PERM-IMPORT-3 Gemini CLI policy rules come in; the file Illithid write
   assert.deepEqual(v.bash, [])
   assert.deepEqual(v.bashAsk, [['npm']])
   assert.deepEqual(v.bashDeny, [['git', 'push', '--force']])
-  assert.deepEqual(v.mcp, [{ decision: 'deny', server: 'github', tool: 'delete_repository' }])
+  // MCP tool rules aren't kept (permissions cover shell commands)
+  assert.equal(v.mcp, undefined)
 })
 
-test('REQ-PERM-IMPORT-4 Grok CLI [permission] rules come in as command and MCP rules', () => {
+test('REQ-PERM-IMPORT-4 Grok CLI [permission] Bash rules come in as command rules', () => {
   const home = demoHome(['grok'])
   mkdirSync(join(home, '.grok'), { recursive: true })
   writeFileSync(
@@ -143,8 +143,5 @@ test('REQ-PERM-IMPORT-4 Grok CLI [permission] rules come in as command and MCP r
   assert.deepEqual(v.bash, [{ argv: ['git', 'status'], claudeExact: true }])
   assert.deepEqual(v.bashAsk, [['git', 'push']])
   assert.deepEqual(v.bashDeny, [['rm', '-rf']])
-  assert.deepEqual(v.mcp, [
-    { decision: 'allow', server: 'docs', tool: '*' },
-    { decision: 'deny', server: 'sales', tool: 'delete_account' }
-  ])
+  assert.equal(v.mcp, undefined)
 })

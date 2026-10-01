@@ -98,35 +98,3 @@ test(
     }
   }
 )
-
-test(
-  'REQ-PERM-UI-2 block one MCP tool from the MCP tab; Claude Code and Codex follow',
-  { timeout: 180000 },
-  async () => {
-    const { home, app } = await launch(['claude', 'codex'])
-    try {
-      const page = await app.firstWindow()
-      await page.locator('[data-menu="permissions"]').click()
-      await page.getByTestId('perm-tab-mcp').click()
-      await page.getByTestId('perm-mcp-new').click()
-      await page.getByTestId('perm-mcp-server').click()
-      await page.getByRole('option', { name: 'github', exact: true }).click()
-      await page.getByTestId('perm-mcp-tool').fill('delete_repository')
-      await page.getByTestId('perm-mcp-create').click()
-      await page.getByTestId('perm-mcp-group-deny').getByText('delete_repository').waitFor()
-      await page
-        .locator('[data-testid="sync-button"][data-state="synced"]')
-        .waitFor({ timeout: 30000 })
-      const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
-        permissions: { deny: string[] }
-      }
-      assert.deepEqual(claude.permissions.deny, ['mcp__github__delete_repository'])
-      assert.match(
-        readFileSync(join(home, '.codex/config.toml'), 'utf8'),
-        /disabled_tools = \["delete_repository"\]/
-      )
-    } finally {
-      await app.close()
-    }
-  }
-)

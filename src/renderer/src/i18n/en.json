@@ -967,21 +967,7 @@
     "copilotHook": "Blocked by an Illithid check hook (Copilot keeps no block rules)",
     "copilotNo": "Copilot can't keep ask or allow rules",
     "grokViaClaude": "Grok CLI reads these from Claude Code's settings",
-    "codexPrefix": "Codex matches the start of the command, so this also covers longer commands",
-    "tabCommands": "Commands",
-    "tabMcp": "MCP tools",
-    "mcpNew": "New MCP rule",
-    "mcpEmpty": "No MCP tool rules yet",
-    "mcpEmptyHint": "Block, ask about or allow one MCP tool, or every tool of a server.",
-    "server": "MCP server",
-    "tool": "Tool",
-    "toolHint": "Leave empty for every tool of the server.",
-    "allMcpTools": "All tools",
-    "mcpHint": "Codex applies MCP rules to the servers Illithid manages, and keeps its own default for Allow. Copilot keeps no MCP rules.",
-    "codexMcpAllow": "Codex keeps its own approval default for allowed tools",
-    "codexMcpUnmanaged": "Codex: only for servers Illithid manages",
-    "geminiUnderscore": "Gemini CLI rejects server names with \"_\"",
-    "copilotMcpNo": "Copilot keeps no MCP rules"
+    "codexPrefix": "Codex matches the start of the command, so this also covers longer commands"
   },
   "scripts": {
     "search": "Search scripts",

@@ -31,8 +31,7 @@ const RULES: PermissionRules = {
     { decision: 'allow', argv: ['npm', 'test'], exact: true },
     { decision: 'ask', argv: ['rm'], exact: false },
     { decision: 'deny', argv: ['git', 'push', '--force'], exact: false }
-  ],
-  mcp: []
+  ]
 }
 
 test('REQ-PERM-SYNC-1 Claude Code gets allow, ask and deny Bash rules next to its own keys', () => {
@@ -108,7 +107,7 @@ test('REQ-PERM-SYNC-3 Gemini CLI gets its own policy file: a word-bounded regex 
   assert.ok(!re.test('git push --force-with-lease'))
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
   // No rules left: the app's file goes empty
-  savePermissionRules(home, { commands: [], mcp: [] })
+  savePermissionRules(home, { commands: [] })
   sync(home)
   assert.equal((parseToml(readFileSync(file, 'utf8')) as { rule?: unknown[] }).rule, undefined)
 })
@@ -136,8 +135,7 @@ test('REQ-PERM-SYNC-4 Copilot keeps no deny rules, so deny rules become an Illit
   assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
   // No deny rules: the check hook and its copy go
   savePermissionRules(home, {
-    commands: RULES.commands.filter((r) => r.decision !== 'deny'),
-    mcp: []
+    commands: RULES.commands.filter((r) => r.decision !== 'deny')
   })
   sync(home)
   assert.equal(existsSync(copy), false)
@@ -145,48 +143,4 @@ test('REQ-PERM-SYNC-4 Copilot keeps no deny rules, so deny rules become an Illit
     JSON.parse(readFileSync(join(home, '.copilot/hooks/illithid.json'), 'utf8')).hooks,
     {}
   )
-})
-
-test('REQ-PERM-SYNC-5 MCP tool rules: Claude mcp__ rules, Codex disabled_tools / enabled / prompt, Gemini mcpName rules', () => {
-  const home = demoHome(['claude', 'codex', 'gemini'])
-  savePermissionRules(home, {
-    commands: [],
-    mcp: [
-      { decision: 'deny', server: 'github', tool: 'delete_repository' },
-      { decision: 'deny', server: 'playwright', tool: '*' },
-      { decision: 'ask', server: 'postgres', tool: '*' },
-      { decision: 'ask', server: 'github', tool: 'merge_pull_request' },
-      { decision: 'allow', server: 'context7', tool: '*' }
-    ]
-  })
-  sync(home)
-  const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
-    permissions: Record<string, string[]>
-  }
-  assert.deepEqual(claude.permissions.deny, ['mcp__github__delete_repository', 'mcp__playwright'])
-  assert.deepEqual(claude.permissions.ask, ['mcp__postgres', 'mcp__github__merge_pull_request'])
-  assert.deepEqual(claude.permissions.allow, ['mcp__context7'])
-
-  const codex = JSON.parse(
-    JSON.stringify(parseToml(readFileSync(join(home, '.codex/config.toml'), 'utf8')))
-  ) as { mcp_servers: Record<string, Record<string, unknown>> }
-  const s = codex.mcp_servers
-  assert.deepEqual(s.github.disabled_tools, ['delete_repository'])
-  assert.deepEqual(s.github.tools, { merge_pull_request: { approval_mode: 'prompt' } })
-  assert.equal(s.playwright.enabled, false)
-  assert.equal(s.postgres.default_tools_approval_mode, 'prompt')
-  // Allow keeps Codex's own default (its approval modes don't map one to one)
-  assert.equal(s.context7.default_tools_approval_mode, undefined)
-
-  const policy = JSON.parse(
-    JSON.stringify(parseToml(readFileSync(join(home, '.gemini/policies/illithid.toml'), 'utf8')))
-  ) as { rule: Record<string, unknown>[] }
-  assert.deepEqual(policy.rule, [
-    { mcpName: 'github', toolName: 'delete_repository', decision: 'deny', priority: 300 },
-    { mcpName: 'playwright', decision: 'deny', priority: 300 },
-    { mcpName: 'postgres', decision: 'ask_user', priority: 200 },
-    { mcpName: 'github', toolName: 'merge_pull_request', decision: 'ask_user', priority: 200 },
-    { mcpName: 'context7', decision: 'allow', priority: 100 }
-  ])
-  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
 })

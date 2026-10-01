@@ -38,37 +38,32 @@ test('REQ-PERM-MODEL-1 an existing permissions.json reads as allow rules, and sa
     { decision: 'allow', argv: ['git', 'status'], exact: false },
     { decision: 'allow', argv: ['npm', 'test'], exact: true }
   ])
-  assert.deepEqual(rules.mcp, [])
 
   const next: PermissionRules = {
     commands: [
       ...rules.commands,
       { decision: 'deny', argv: ['git', 'push', '--force'], exact: false, note: 'never' },
       { decision: 'ask', argv: ['rm'], exact: false }
-    ],
-    mcp: [{ decision: 'ask', server: 'github', tool: 'delete_repository' }]
+    ]
   }
   savePermissionRules(home, next)
   assert.deepEqual(json(home), {
     bash: [['git', 'status'], { argv: ['npm', 'test'], claudeExact: true }],
     bashAsk: [['rm']],
     bashDeny: [{ argv: ['git', 'push', '--force'], note: 'never' }],
-    mcp: [{ decision: 'ask', server: 'github', tool: 'delete_repository' }],
     claudeOnly: { allow: ['WebFetch'], deny: [], ask: ['Edit'] },
     _comment: 'mine'
   })
   // Read back grouped: allow, ask, deny
   assert.deepEqual(permissionRules(readPermissions(home)!), {
-    commands: [next.commands[0], next.commands[1], next.commands[3], next.commands[2]],
-    mcp: next.mcp
+    commands: [next.commands[0], next.commands[1], next.commands[3], next.commands[2]]
   })
 })
 
 test('REQ-PERM-MODEL-2 with no permissions.json, saving rules creates one', () => {
   const home = demoHome()
   savePermissionRules(home, {
-    commands: [{ decision: 'deny', argv: ['git', 'reset', '--hard'], exact: false }],
-    mcp: []
+    commands: [{ decision: 'deny', argv: ['git', 'reset', '--hard'], exact: false }]
   })
   assert.deepEqual(json(home), {
     bash: [],
@@ -80,26 +75,16 @@ test('REQ-PERM-MODEL-2 with no permissions.json, saving rules creates one', () =
 test('REQ-PERM-MODEL-3 broken or conflicting rules are refused and nothing is written', () => {
   const home = demoHome()
   savePermissionRules(home, {
-    commands: [{ decision: 'allow', argv: ['ls'], exact: false }],
-    mcp: []
+    commands: [{ decision: 'allow', argv: ['ls'], exact: false }]
   })
   const before = readFileSync(file(home), 'utf8')
   const bad: PermissionRules[] = [
-    { commands: [{ decision: 'deny', argv: [], exact: false }], mcp: [] },
-    { commands: [{ decision: 'nope' as 'deny', argv: ['x'], exact: false }], mcp: [] },
+    { commands: [{ decision: 'deny', argv: [], exact: false }] },
+    { commands: [{ decision: 'nope' as 'deny', argv: ['x'], exact: false }] },
     {
       commands: [
         { decision: 'allow', argv: ['git', 'push'], exact: false },
         { decision: 'deny', argv: ['git', 'push'], exact: false }
-      ],
-      mcp: []
-    },
-    { commands: [], mcp: [{ decision: 'deny', server: '', tool: 'x' }] },
-    {
-      commands: [],
-      mcp: [
-        { decision: 'ask', server: 'gh', tool: '*' },
-        { decision: 'deny', server: 'gh', tool: '*' }
       ]
     }
   ]

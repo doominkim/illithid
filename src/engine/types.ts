@@ -13,19 +13,11 @@ export type Env = Record<string, string | undefined>
  */
 export type AllowlistEntry = string[] | { argv: string[]; claudeExact?: boolean; note?: string }
 
-/** MCP tool rule; tool '*' = every tool of the server */
-export interface McpPermissionEntry {
-  decision: 'allow' | 'ask' | 'deny'
-  server: string
-  tool: string
-}
-
-/** permissions.json. bash is the allow list (as before); ask, deny and MCP rules were added beside it so older versions still read it */
+/** permissions.json. bash is the allow list (as before); ask and deny rules were added beside it so older versions still read it */
 export interface Allowlist {
   bash: AllowlistEntry[]
   bashAsk?: AllowlistEntry[]
   bashDeny?: AllowlistEntry[]
-  mcp?: McpPermissionEntry[]
   claudeOnly: {
     allow: string[]
     deny: string[]

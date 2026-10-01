@@ -86,14 +86,7 @@ import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
 import { mcpEntries, outsideBlockMulti, sha256, stripJsonComments } from './text'
 import { LEGACY_TOML_MCP_MARKERS, TOML_MCP_MARKERS } from './targets/codexMcp'
 import { GROK_MEMORY_RULE_FILE } from './ruleSync'
-import type {
-  Allowlist,
-  AllowlistEntry,
-  McpCodexOptions,
-  McpPermissionEntry,
-  McpServer,
-  McpSource
-} from './types'
+import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
 
@@ -342,7 +335,6 @@ export interface PermissionsVariant extends PortabilityInfo {
     ask: number
     bashAsk?: number
     bashDeny?: number
-    mcp?: number
   }
   sources: ImportSourceRef[]
   warnings: string[]
@@ -1850,15 +1842,14 @@ function materialize(
 
 // ---------------------------------------------------------------- Permission conversion
 
-/** Command and MCP rules gathered from a tool, before they become permissions.json */
+/** Command rules gathered from a tool, before they become permissions.json */
 interface RuleLists {
   bash: AllowlistEntry[]
   bashAsk: AllowlistEntry[]
   bashDeny: AllowlistEntry[]
-  mcp: McpPermissionEntry[]
 }
 
-const emptyRuleLists = (): RuleLists => ({ bash: [], bashAsk: [], bashDeny: [], mcp: [] })
+const emptyRuleLists = (): RuleLists => ({ bash: [], bashAsk: [], bashDeny: [] })
 type Decision = 'allow' | 'ask' | 'deny'
 const LIST_OF: Record<Decision, 'bash' | 'bashAsk' | 'bashDeny'> = {
   allow: 'bash',
@@ -1866,15 +1857,12 @@ const LIST_OF: Record<Decision, 'bash' | 'bashAsk' | 'bashDeny'> = {
   deny: 'bashDeny'
 }
 
-/** Rules → permissions.json shape (empty optional lists left out; MCP rules allow, ask, deny) */
+/** Rules → permissions.json shape (empty optional lists left out) */
 function rulesAllowlist(l: RuleLists, claudeOnly: Allowlist['claudeOnly']): Allowlist {
-  const order: Decision[] = ['allow', 'ask', 'deny']
-  const mcp = order.flatMap((d) => l.mcp.filter((m) => m.decision === d))
   return {
     bash: l.bash,
     ...(l.bashAsk.length ? { bashAsk: l.bashAsk } : {}),
     ...(l.bashDeny.length ? { bashDeny: l.bashDeny } : {}),
-    ...(mcp.length ? { mcp } : {}),
     claudeOnly
   }
 }
@@ -1884,7 +1872,6 @@ const hasRules = (a: Allowlist): boolean =>
     a.bash.length ||
     a.bashAsk?.length ||
     a.bashDeny?.length ||
-    a.mcp?.length ||
     a.claudeOnly.allow.length ||
     a.claudeOnly.deny.length ||
     a.claudeOnly.ask?.length
@@ -1905,15 +1892,6 @@ function bashPattern(inner: string): AllowlistEntry | null {
   return prefix !== null ? words : { argv: words, claudeExact: true }
 }
 
-/** `<server>__<tool>`, `<server>__*` or `<server>` → MCP rule target */
-function mcpTarget(s: string): { server: string; tool: string } | null {
-  const i = s.indexOf('__')
-  const server = i === -1 ? s : s.slice(0, i)
-  const tool = i === -1 ? '*' : s.slice(i + 2)
-  if (!server || !tool || (tool.includes('*') && tool !== '*')) return null
-  return { server, tool }
-}
-
 function parseClaudePermissions(perms: Json): { allowlist: Allowlist; warnings: string[] } {
   const warnings: string[] = []
   const lists = emptyRuleLists()
@@ -1930,16 +1908,11 @@ function parseClaudePermissions(perms: Json): { allowlist: Allowlist; warnings: 
         lists[LIST_OF[d]].push(entry)
         continue
       }
-      const mcp = e.startsWith('mcp__') ? mcpTarget(e.slice(5)) : null
-      if (mcp) {
-        lists.mcp.push({ decision: d, ...mcp })
-        continue
-      }
       only[d].push(e)
     }
   if (list('ask').some((x) => x.startsWith('mcp__')))
     warnings.push(
-      'mcp__ entries in ask may also come from server definitions (codex.toolApprovals) — Illithid writes each one once'
+      'mcp__ entries in ask can also be generated from server definitions (codex.toolApprovals) — Illithid writes each one once'
     )
   const allowlist = rulesAllowlist(lists, {
     allow: only.allow,
@@ -1969,7 +1942,7 @@ function parseCodexRules(text: string): RuleLists {
   return out
 }
 
-/** ~/.gemini/policies/*.toml (except the file Illithid writes) → rules. Regex and argument rules can't be carried over */
+/** ~/.gemini/policies/*.toml (except the file Illithid writes) → command rules. Regex, argument and other-tool rules can't be carried over */
 function parseGeminiPolicies(dir: string, notes: string[]): { lists: RuleLists; files: string[] } {
   const lists = emptyRuleLists()
   const files: string[] = []
@@ -1996,13 +1969,7 @@ function parseGeminiPolicies(dir: string, notes: string[]): { lists: RuleLists; 
         const argv = r.commandPrefix.split(/\s+/).filter(Boolean)
         if (argv.length) lists[LIST_OF[d]].push(argv)
         else skipped++
-      } else if (typeof r.mcpName === 'string' && !r.commandPrefix && !r.commandRegex)
-        lists.mcp.push({
-          decision: d,
-          server: r.mcpName,
-          tool: typeof r.toolName === 'string' ? r.toolName : '*'
-        })
-      else skipped++
+      } else skipped++
     }
   }
   if (skipped)
@@ -2012,18 +1979,15 @@ function parseGeminiPolicies(dir: string, notes: string[]): { lists: RuleLists; 
   return { lists, files }
 }
 
-/** ~/.grok/config.toml [permission] (deny/ask/allow strings and rules) → rules */
+/** ~/.grok/config.toml [permission] (deny/ask/allow strings and bash rules) → command rules */
 function parseGrokPermission(perm: Json, notes: string[]): RuleLists {
   const lists = emptyRuleLists()
   let skipped = 0
   const add = (d: Decision, e: string): void => {
     const bash = /^Bash\((.+)\)$/.exec(e)
     const entry = bash ? bashPattern(bash[1]) : null
-    if (entry) return void lists[LIST_OF[d]].push(entry)
-    const tool = /^MCPTool\((.+)\)$/.exec(e)?.[1] ?? (e.startsWith('mcp__') ? e.slice(5) : null)
-    const mcp = tool ? mcpTarget(tool) : null
-    if (mcp) return void lists.mcp.push({ decision: d, ...mcp })
-    skipped++
+    if (entry) lists[LIST_OF[d]].push(entry)
+    else skipped++
   }
   for (const d of ['allow', 'ask', 'deny'] as const)
     for (const e of Array.isArray(perm[d]) ? perm[d] : []) if (typeof e === 'string') add(d, e)
@@ -2034,7 +1998,6 @@ function parseGrokPermission(perm: Json, notes: string[]): RuleLists {
     }
     const d = r.action as Decision
     if (r.tool === 'bash' && typeof r.pattern === 'string') add(d, `Bash(${r.pattern})`)
-    else if (r.tool === 'mcp' && typeof r.pattern === 'string') add(d, `MCPTool(${r.pattern})`)
     else skipped++
   }
   if (skipped)
@@ -2058,8 +2021,7 @@ function permissionsVariant(
       deny: allowlist.claudeOnly.deny.length,
       ask: allowlist.claudeOnly.ask?.length ?? 0,
       bashAsk: allowlist.bashAsk?.length ?? 0,
-      bashDeny: allowlist.bashDeny?.length ?? 0,
-      mcp: allowlist.mcp?.length ?? 0
+      bashDeny: allowlist.bashDeny?.length ?? 0
     },
     sources: [ref],
     warnings,

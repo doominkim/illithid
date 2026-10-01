@@ -563,7 +563,7 @@ export {
   ruleProblems,
   withPermissionRules
 } from './permissions'
-export type { CommandRule, McpRule, PermissionDecision, PermissionRules } from './permissions'
+export type { CommandRule, PermissionDecision, PermissionRules } from './permissions'
 export {
   createScript,
   saveScript,

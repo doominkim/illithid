@@ -967,21 +967,7 @@
     "copilotHook": "由 Illithid 检查钩子阻止 (Copilot 无法保存阻止规则)",
     "copilotNo": "Copilot 无法保存询问或允许规则",
     "grokViaClaude": "Grok CLI 从 Claude Code 的设置中读取这些规则",
-    "codexPrefix": "Codex 按命令开头匹配，因此也包括更长的命令",
-    "tabCommands": "命令",
-    "tabMcp": "MCP 工具",
-    "mcpNew": "新建 MCP 规则",
-    "mcpEmpty": "还没有 MCP 工具规则",
-    "mcpEmptyHint": "阻止、询问或允许某个 MCP 工具，或服务器的所有工具。",
-    "server": "MCP 服务器",
-    "tool": "工具",
-    "toolHint": "留空则适用于服务器的所有工具。",
-    "allMcpTools": "所有工具",
-    "mcpHint": "Codex 只对 Illithid 管理的服务器写入 MCP 规则，允许规则沿用其默认设置。Copilot 无法保存 MCP 规则。",
-    "codexMcpAllow": "Codex 对允许的工具沿用自身的审批默认值",
-    "codexMcpUnmanaged": "Codex: 仅适用于 Illithid 管理的服务器",
-    "geminiUnderscore": "Gemini CLI 不接受名称中带 \"_\" 的服务器",
-    "copilotMcpNo": "Copilot 无法保存 MCP 规则"
+    "codexPrefix": "Codex 按命令开头匹配，因此也包括更长的命令"
   },
   "scripts": {
     "search": "搜索脚本",

@@ -67,7 +67,6 @@ import {
   type HookSyncItem,
   readPermissions,
   permissionRules,
-  listMcpServers,
   readScripts,
   scriptsDir,
   hookNames,
@@ -720,15 +719,14 @@ export function permissions(home: string, env: Env): PermissionsData {
   } catch (e) {
     return {
       file: dir,
-      rules: { commands: [], mcp: [] },
+      rules: { commands: [] },
       claudeOnly: 0,
       tools: {},
       guards: [],
-      servers: [],
       error: `${dir}: ${(e as Error).message}`
     }
   }
-  const rules = allowlist ? permissionRules(allowlist) : { commands: [], mcp: [] }
+  const rules = allowlist ? permissionRules(allowlist) : { commands: [] }
   const inUse = toolsInUse(home)
   const ids = Object.values(PERMISSION_TARGET).filter((id): id is TargetId => !!id)
   let changes: FileChange[] = []
@@ -805,8 +803,7 @@ export function permissions(home: string, env: Env): PermissionsData {
       : 0,
     tools,
     ...(Object.keys(reasons).length ? { reasons } : {}),
-    guards,
-    servers: listMcpServers(home)
+    guards
   }
 }
 

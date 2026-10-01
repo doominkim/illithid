@@ -1,9 +1,9 @@
 /**
- * Permission rules as the app edits them: one list of shell command rules and one of MCP tool rules, each allow / ask / deny.
- * Stored in permissions.json beside the older allow-only shape (types.ts Allowlist): bash = allow, bashAsk, bashDeny, mcp.
+ * Permission rules as the app edits them: one list of shell command rules, each allow / ask / deny.
+ * Stored in permissions.json beside the older allow-only shape (types.ts Allowlist): bash = allow, bashAsk, bashDeny.
  * Dependency-free so the renderer can use it too.
  */
-import type { Allowlist, AllowlistEntry, McpPermissionEntry } from './types'
+import type { Allowlist, AllowlistEntry } from './types'
 
 export const PERMISSION_DECISIONS = ['deny', 'ask', 'allow'] as const
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number]
@@ -17,11 +17,8 @@ export interface CommandRule {
   note?: string
 }
 
-export type McpRule = McpPermissionEntry
-
 export interface PermissionRules {
   commands: CommandRule[]
-  mcp: McpRule[]
 }
 
 const LIST_OF: Record<PermissionDecision, 'bash' | 'bashAsk' | 'bashDeny'> = {
@@ -54,8 +51,7 @@ export function permissionRules(a: Allowlist): PermissionRules {
   return {
     commands: (['allow', 'ask', 'deny'] as const).flatMap((d) =>
       (a[LIST_OF[d]] ?? []).map((e) => entryRule(d, e))
-    ),
-    mcp: (a.mcp ?? []).map((m) => ({ decision: m.decision, server: m.server, tool: m.tool }))
+    )
   }
 }
 
@@ -64,26 +60,22 @@ export function withPermissionRules(a: Allowlist, rules: PermissionRules): Allow
   const out: Allowlist = { ...a, bash: [] }
   delete out.bashAsk
   delete out.bashDeny
-  delete out.mcp
   for (const d of ['allow', 'ask', 'deny'] as const) {
     const list = rules.commands.filter((r) => r.decision === d).map(ruleEntry)
     if (d === 'allow') out.bash = list
     else if (list.length) out[LIST_OF[d]] = list
   }
-  if (rules.mcp.length)
-    out.mcp = rules.mcp.map((m) => ({ decision: m.decision, server: m.server, tool: m.tool }))
   // Keep the key order of a hand-written file: bash first, claudeOnly and the rest after
-  const { bash, bashAsk, bashDeny, mcp, ...rest } = out
+  const { bash, bashAsk, bashDeny, ...rest } = out
   return {
     bash,
     ...(bashAsk ? { bashAsk } : {}),
     ...(bashDeny ? { bashDeny } : {}),
-    ...(mcp ? { mcp } : {}),
     ...rest
   } as Allowlist
 }
 
-/** Problems with a rule set (empty when fine): bad values, or the same command / MCP tool under two rules */
+/** Problems with a rule set (empty when fine): bad values, or the same command under two rules */
 export function ruleProblems(rules: PermissionRules): string[] {
   const errs: string[] = []
   const seen = new Map<string, number>()
@@ -99,16 +91,6 @@ export function ruleProblems(rules: PermissionRules): string[] {
     const key = JSON.stringify([r.argv, !!r.exact])
     if (seen.has(key)) errs.push(`commands[${i}]: same command as commands[${seen.get(key)}]`)
     else seen.set(key, i)
-  })
-  const seenMcp = new Map<string, number>()
-  rules.mcp.forEach((m, i) => {
-    if (!(PERMISSION_DECISIONS as readonly string[]).includes(m.decision))
-      errs.push(`mcp[${i}]: unknown decision`)
-    if (typeof m.server !== 'string' || !m.server.trim()) errs.push(`mcp[${i}]: server is empty`)
-    if (typeof m.tool !== 'string' || !m.tool.trim()) errs.push(`mcp[${i}]: tool is empty`)
-    const key = `${m.server}\u0000${m.tool}`
-    if (seenMcp.has(key)) errs.push(`mcp[${i}]: same tool as mcp[${seenMcp.get(key)}]`)
-    else seenMcp.set(key, i)
   })
   return errs
 }
