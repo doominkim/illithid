@@ -88,10 +88,9 @@ test(
       assert.deepEqual(claude().permissions?.deny, [])
       assert.equal(existsSync(copilotCheck), false)
 
-      // A rule matches commands that start with it, shown as a trailing *; turning the * off makes it exact
+      // A rule matches commands that start with it, shown as a trailing *; Exact match drops the *
       await row('git push --force').getByText('git push --force *', { exact: true }).waitFor()
-      await page.getByTestId('perm-star').click()
-      await page.locator('[data-testid="perm-star"][aria-pressed="false"]').waitFor()
+      await page.getByTestId('perm-match').getByText('Exact match', { exact: true }).click()
       await page.getByTestId('perm-save').click()
       await row('git push --force').getByText('git push --force', { exact: true }).waitFor()
       await synced()
@@ -162,10 +161,10 @@ test(
         .getByTestId('perm-group-commands')
         .fill('git push --force\ngit status\ngit clean -fd')
       await line('git status').getByText('Allow', { exact: true }).waitFor()
-      await line('git status').getByTestId('perm-line-star').click()
       await line('git status')
-        .locator('[data-testid="perm-line-star"][aria-pressed="false"]')
-        .waitFor()
+        .getByTestId('perm-line-match')
+        .getByText('Exact', { exact: true })
+        .click()
       await page.getByTestId('perm-group-save').click()
       const renamed = page.locator('[data-testid="perm-group"][data-group="git danger"]')
       await renamed.getByText('git clean -fd').waitFor()
