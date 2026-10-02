@@ -9,6 +9,7 @@ import {
   SegmentedControl,
   Select,
   Stack,
+  Tabs,
   Text,
   Textarea,
   TextInput,
@@ -28,14 +29,16 @@ import { useTranslation } from 'react-i18next'
 import { commandLine, parseCommand, type PermissionDecision } from '../../../engine/permissions'
 import type { CommandRule, PermissionRules, RuleGroup, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyState } from '../components/EmptyState'
-import { ErrorAlert, Loading } from '../components/Layout'
+import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { ToolPills } from '../components/ToolPills'
+import { ToolToggleRow } from '../components/ToolToggleRow'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav } from '../lib/nav'
@@ -117,6 +120,7 @@ function Permissions(): React.JSX.Element {
   const [groupSel, setGroupSel] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [ruleTab, setRuleTab] = useState<string | null>('preview')
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
   const busy = useToggleBusy()
 
@@ -133,6 +137,7 @@ function Permissions(): React.JSX.Element {
   const openRule = (key: string | null): void => {
     setGroupSel(null)
     setSelected(key)
+    setRuleTab('preview')
   }
   const openGroup = (name: string | null): void => {
     setSelected(null)
@@ -189,13 +194,13 @@ function Permissions(): React.JSX.Element {
         if (!st || st === 'notApplicable') {
           // Copilot keeps no ask or allow rules
           if (tool === 'copilot' && st && r.decision !== 'deny')
-            return [tool, { on: false, hint: t('permissions.copilotNo') }]
+            return [tool, { on: false, na: true, hint: t('permissions.copilotNo') }]
           return [tool, { on: false, na: true }]
         }
         if (st === 'viaClaude')
           return [tool, { on: isOn(r, 'claude'), via: true, hint: t('permissions.grokViaClaude') }]
         if (tool === 'copilot' && r.decision !== 'deny')
-          return [tool, { on: false, hint: t('permissions.copilotNo') }]
+          return [tool, { on: false, na: true, hint: t('permissions.copilotNo') }]
         if (!isOn(r, tool)) return [tool, { on: false, pending: st === 'needsSync' }]
         const hint =
           st === 'error'
@@ -227,7 +232,7 @@ function Permissions(): React.JSX.Element {
           return [
             tool,
             tool === 'copilot' && st
-              ? { on: false, hint: t('permissions.copilotNo') }
+              ? { on: false, na: true, hint: t('permissions.copilotNo') }
               : { on: false, na: true }
           ]
         const on = can.filter((r) => isOn(r, tool)).length
@@ -311,6 +316,7 @@ function Permissions(): React.JSX.Element {
       subtitle={r.description || undefined}
       right={
         <ToolPills
+          showNa
           pills={pillsOf(r)}
           size={18}
           onToggle={(tool) => toggleRule(r, tool)}
@@ -349,6 +355,12 @@ function Permissions(): React.JSX.Element {
       <Toolbar
         left={
           <SearchInput value={query} onChange={setQuery} placeholder={t('permissions.search')} />
+        }
+        right={
+          <ShownCount
+            shown={sections.reduce((n, s) => n + s.rows.length, 0)}
+            total={commands.length}
+          />
         }
       />
       <Stack gap="lg">
@@ -402,6 +414,7 @@ function Permissions(): React.JSX.Element {
                   <Box style={{ flex: 1 }} />
                   <Box data-testid="perm-group-tools" pr={ROW_PAD}>
                     <ToolPills
+                      showNa
                       pills={groupPills(commands.filter((r) => r.group === g.name))}
                       size={18}
                       onToggle={(tool) => toggleGroup(g, tool)}
@@ -454,32 +467,64 @@ function Permissions(): React.JSX.Element {
         onClose={() => setSelected(null)}
         title={current ? ruleTitle(current) : ''}
         meta={<MetaItem icon={<FileText size={14} />}>{data.file}</MetaItem>}
+        copyPath={data.file}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="perm-delete"
       >
         {current && (
           <Stack gap="lg">
-            <ToolPills
+            <ToolToggleRow
               pills={pillsOf(current)}
-              size={20}
               onToggle={(tool) => toggleRule(current, tool)}
               busy={busy.of(ruleKey(current))}
+              testId="perm-detail-tools"
             />
-            <RuleForm
-              key={selected}
-              initial={current}
-              taken={commands.filter((r) => r !== current)}
-              groups={groups}
-              onSubmit={async (rule) => {
-                const ok = await save(
-                  { groups, commands: commands.map((r) => (r === current ? rule : r)) },
-                  t('permissions.saved')
-                )
-                if (ok) setSelected(ruleKey(rule))
-              }}
-              submitLabel={t('common.save')}
-              submitTestId="perm-save"
-            />
+            <Tabs value={ruleTab} onChange={setRuleTab} keepMounted={false}>
+              <Tabs.List mb="md">
+                <Tabs.Tab value="preview" data-testid="perm-tab-preview">
+                  {t('detail.source')}
+                </Tabs.Tab>
+                <Tabs.Tab value="edit" data-testid="perm-tab-edit">
+                  {t('detail.edit')}
+                </Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="preview">
+                <Box className="ac-card" p="md" data-testid="perm-preview">
+                  <Fields
+                    rows={[
+                      [t('permissions.command'), <Code key="c">{ruleTitle(current)}</Code>],
+                      [
+                        t('permissions.decisionLabel'),
+                        t(`permissions.decision.${current.decision}`)
+                      ],
+                      [
+                        t('permissions.matchLabel'),
+                        t(current.exact ? 'permissions.matchExact' : 'permissions.matchPrefix')
+                      ],
+                      [t('permissions.group'), current.group || t('common.none')],
+                      [t('permissions.description'), current.description || t('common.none')]
+                    ]}
+                  />
+                </Box>
+              </Tabs.Panel>
+              <Tabs.Panel value="edit">
+                <RuleForm
+                  key={selected}
+                  initial={current}
+                  taken={commands.filter((r) => r !== current)}
+                  groups={groups}
+                  onSubmit={async (rule) => {
+                    const ok = await save(
+                      { groups, commands: commands.map((r) => (r === current ? rule : r)) },
+                      t('permissions.saved')
+                    )
+                    if (ok) setSelected(ruleKey(rule))
+                  }}
+                  submitLabel={t('common.save')}
+                  submitTestId="perm-save"
+                />
+              </Tabs.Panel>
+            </Tabs>
           </Stack>
         )}
       </DetailSheet>
@@ -687,7 +732,7 @@ function RuleForm({
         value={description}
         onChange={(e) => setDescription(e.currentTarget.value)}
       />
-      <Group justify="flex-end" gap="xs">
+      <FormFooter>
         <Button
           size="xs"
           loading={busy}
@@ -697,7 +742,7 @@ function RuleForm({
         >
           {submitLabel}
         </Button>
-      </Group>
+      </FormFooter>
     </Stack>
   )
 }
@@ -850,7 +895,7 @@ function GroupForm({
           ))}
         </Stack>
       )}
-      <Group justify="flex-end" gap="xs">
+      <FormFooter>
         {onCancel && (
           <Button size="xs" variant="default" onClick={onCancel}>
             {t('common.cancel')}
@@ -865,7 +910,7 @@ function GroupForm({
         >
           {submitLabel}
         </Button>
-      </Group>
+      </FormFooter>
     </Stack>
   )
 }

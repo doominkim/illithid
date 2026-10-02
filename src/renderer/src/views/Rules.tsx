@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Badge, Box, Button, Group, Modal, Stack, Tabs, TextInput } from '@mantine/core'
+import { Badge, Box, Button, Group, Stack, Tabs, TextInput } from '@mantine/core'
 import { Download, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import type { ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
@@ -13,7 +14,7 @@ import { ErrorAlert, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
@@ -193,7 +194,10 @@ function Rules(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setSelected(null)
+                setCreating(true)
+              }}
               data-testid="rule-new"
             >
               {t('rules.new')}
@@ -213,7 +217,12 @@ function Rules(): React.JSX.Element {
       />
       <Toolbar
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('rules.search')} />}
-        right={<ViewToggle value={view} onChange={setView} />}
+        right={
+          <>
+            <ShownCount shown={files.length} total={data.files.length} />
+            <ViewToggle value={view} onChange={setView} />
+          </>
+        }
       />
       {data.files.length === 0 ? (
         <EmptyLibrary onImport={() => setImportOpen(true)} />
@@ -351,14 +360,8 @@ function Rules(): React.JSX.Element {
         onImported={reload}
         kind="rule"
       />
-      <Modal
-        opened={creating}
-        onClose={() => setCreating(false)}
-        title={t('rules.new')}
-        centered
-        radius="lg"
-      >
-        <Stack gap="md">
+      <DetailSheet opened={creating} onClose={() => setCreating(false)} title={t('rules.new')}>
+        <Stack gap="md" maw={640}>
           <TextInput
             label={t('common.name')}
             description={t('rules.nameHint')}
@@ -368,20 +371,21 @@ function Rules(): React.JSX.Element {
             data-autofocus
             data-testid="rule-new-name"
           />
-          <Group justify="flex-end" gap="xs">
-            <Button variant="default" onClick={() => setCreating(false)}>
+          <FormFooter>
+            <Button size="xs" variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
             <Button
+              size="xs"
               disabled={!newName.trim()}
               onClick={() => void create()}
               data-testid="rule-new-ok"
             >
               {t('common.create')}
             </Button>
-          </Group>
+          </FormFooter>
         </Stack>
-      </Modal>
+      </DetailSheet>
       <ConfirmModal
         opened={confirmDelete}
         onClose={() => setConfirmDelete(false)}

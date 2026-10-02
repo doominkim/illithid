@@ -80,6 +80,10 @@ test(
 
       // Change it to Ask: Copilot can't ask, so its check hook goes
       await row('git push --force').click()
+      // Like the other menus: the tool row, a preview, then the edit tab
+      await page.getByTestId('perm-detail-tools').waitFor()
+      await page.getByTestId('perm-preview').getByText('Block').waitFor()
+      await page.getByTestId('perm-tab-edit').click()
       await page.getByTestId('perm-decision').getByText('Ask', { exact: true }).click()
       await page.getByTestId('perm-save').click()
       await row('git push --force').getByTestId('perm-badge-ask').waitFor()
@@ -111,7 +115,7 @@ test(
 
       // Guard hooks block commands too: listed here, one click to the hook
       await page.getByTestId('perm-guard-hooks').getByText('guard-before-tool').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
     } finally {
       await app.close()
     }

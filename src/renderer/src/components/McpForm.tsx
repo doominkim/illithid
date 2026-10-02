@@ -15,6 +15,7 @@ import {
 } from '@mantine/core'
 import { Plus, Save, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { FormFooter } from './FormFooter'
 import type { McpServer } from '../../../shared/api'
 
 interface KV {
@@ -33,6 +34,9 @@ interface Props {
 
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const ENV_REF_RE = /^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/
+
+/** Monospace for the value only, not the label */
+const MONO = { input: { fontFamily: 'var(--mantine-font-family-monospace)' } }
 
 /** Bearer value in the edit form: ${VAR} for env vars, MASK for keychain tokens */
 function initialBearer(def?: McpServer): string {
@@ -112,12 +116,24 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
     if (r) setWarnings(r.warnings)
   }
 
-  const kvEditor = (label: string, rows: KV[], set: (r: KV[]) => void): React.JSX.Element => (
+  const kvEditor = (
+    label: string,
+    rows: KV[],
+    set: (r: KV[]) => void,
+    hint?: string
+  ): React.JSX.Element => (
     <Box>
       <Group justify="space-between" mb={4}>
-        <Text size="sm" fw={500}>
-          {label}
-        </Text>
+        <Stack gap={0}>
+          <Text size="sm" fw={500}>
+            {label}
+          </Text>
+          {hint && (
+            <Text size="xs" c="dimmed">
+              {hint}
+            </Text>
+          )}
+        </Stack>
         <Button
           size="compact-xs"
           variant="subtle"
@@ -144,7 +160,7 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
               onChange={(e) =>
                 set(rows.map((x, j) => (j === i ? { ...x, v: e.currentTarget.value } : x)))
               }
-              ff="monospace"
+              styles={MONO}
               autoComplete="off"
             />
             <ActionIcon
@@ -163,7 +179,11 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
   )
 
   return (
-    <Box className="ac-card" p="lg">
+    <Box
+      className={isNew ? undefined : 'ac-card'}
+      p={isNew ? 0 : 'lg'}
+      maw={isNew ? 640 : undefined}
+    >
       <Stack gap="md">
         <Group grow align="flex-start">
           <TextInput
@@ -195,7 +215,7 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
               label={t('mcp.command')}
               value={command}
               onChange={(e) => setCommand(e.currentTarget.value)}
-              ff="monospace"
+              styles={MONO}
               data-testid="mcp-command"
             />
             <Textarea
@@ -215,21 +235,22 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
               label={t('mcp.url')}
               value={url}
               onChange={(e) => setUrl(e.currentTarget.value)}
-              ff="monospace"
+              styles={MONO}
               data-testid="mcp-url"
             />
             <PasswordInput
               label={t('mcp.bearer')}
               value={bearer}
               onChange={(e) => setBearer(e.currentTarget.value)}
-              ff="monospace"
+              styles={MONO}
               autoComplete="off"
             />
-            {kvEditor(t('mcp.headers'), headers, setHeaders)}
+            {kvEditor(t('mcp.headers'), headers, setHeaders, t('mcp.headersHint'))}
           </>
         )}
         <NumberInput
           label={t('mcp.timeout')}
+          description={t('mcp.timeoutHint')}
           value={timeoutMs}
           onChange={setTimeoutMs}
           min={0}
@@ -247,22 +268,23 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
             </Stack>
           </Alert>
         )}
-        <Group justify="flex-end" gap="xs">
+        <FormFooter>
           {onCancel && (
-            <Button variant="default" onClick={onCancel}>
+            <Button size="xs" variant="default" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           )}
           <Button
-            leftSection={<Save size={13} />}
+            size="xs"
+            leftSection={isNew ? undefined : <Save size={13} />}
             disabled={!valid}
             loading={saving}
             onClick={() => void save()}
             data-testid="mcp-save"
           >
-            {t('common.save')}
+            {isNew ? t('common.create') : t('common.save')}
           </Button>
-        </Group>
+        </FormFooter>
       </Stack>
     </Box>
   )

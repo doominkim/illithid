@@ -471,3 +471,14 @@ body {
   outline: 2px solid var(--ac-accent);
   outline-offset: 2px;
 }
+
+/* Cancel / submit of a form: stays at the bottom of the sheet while the form scrolls */
+.ac-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 12px 0;
+  margin-top: 4px;
+  background: var(--mantine-color-body);
+  border-top: 1px solid var(--ac-border-subtle);
+}

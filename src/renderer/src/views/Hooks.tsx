@@ -53,6 +53,7 @@ import type {
   ToolId
 } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary } from '../components/EmptyState'
 import { EmptyState } from '../components/EmptyState'
@@ -61,7 +62,7 @@ import { ImportModal } from '../components/ImportModal'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { MarkdownEditor } from '../components/MarkdownEditor'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { TimingArt, type TimingArtId } from '../components/TimingArt'
@@ -384,7 +385,7 @@ function Hooks(): React.JSX.Element {
       <Badge variant="default" size="xs" fw={500} c="dimmed">
         {t(whenKey(h.when, hookScope(h.action, h.options)))}
       </Badge>
-      <Badge variant="light" size="xs" fw={500}>
+      <Badge variant="default" size="xs" fw={500} c="dimmed">
         {t(`hooks.actions.${h.action}.title`)}
       </Badge>
       {h.importedFrom && (
@@ -393,7 +394,7 @@ function Hooks(): React.JSX.Element {
           withArrow
           openDelay={300}
         >
-          <Badge variant="outline" color="gray" size="xs" fw={500} data-testid="hook-tag-imported">
+          <Badge variant="default" size="xs" fw={500} c="dimmed" data-testid="hook-tag-imported">
             {t('hooks.imported')}
           </Badge>
         </Tooltip>
@@ -470,7 +471,12 @@ function Hooks(): React.JSX.Element {
             />
           </>
         }
-        right={<ViewToggle value={view} onChange={setView} />}
+        right={
+          <>
+            <ShownCount shown={list.length} total={data.hooks.length} />
+            <ViewToggle value={view} onChange={setView} />
+          </>
+        }
       />
       {data.hooks.length === 0 ? (
         <EmptyLibrary onImport={() => setImportOpen(true)} />
@@ -491,6 +497,7 @@ function Hooks(): React.JSX.Element {
               onSwitch={(v) => void toggleAll(h, v)}
               footerRight={
                 <ToolPills
+                  showNa
                   pills={pillsOf(h)}
                   size={18}
                   onToggle={(tool) => void toggle(h, tool)}
@@ -513,6 +520,7 @@ function Hooks(): React.JSX.Element {
               subtitle={h.description || summary(h)}
               right={
                 <ToolPills
+                  showNa
                   pills={pillsOf(h)}
                   size={18}
                   onToggle={(tool) => void toggle(h, tool)}
@@ -924,7 +932,6 @@ function HookDetail({
   onChanged: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const summary = useSummary()
   const [edit, setEdit] = useState<HookEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [tab, setTab] = useState<string | null>('preview')
@@ -983,9 +990,6 @@ function HookDetail({
           </Text>
         )}
       </Stack>
-      <Text size="md" data-testid="hook-summary">
-        {summary({ ...hook, body: doc.body })}
-      </Text>
       {edited.map(([tool, file]) => (
         <Alert
           key={tool}
@@ -1011,7 +1015,7 @@ function HookDetail({
       <Tabs value={tab} onChange={setTab} keepMounted={false}>
         <Tabs.List mb="md">
           <Tabs.Tab value="preview" data-testid="hook-tab-preview">
-            {t('hooks.tabOverview')}
+            {t('detail.source')}
           </Tabs.Tab>
           <Tabs.Tab value="edit" data-testid="hook-tab-edit">
             {t('detail.edit')}
@@ -1100,7 +1104,7 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
   )
   return (
     <Stack gap="md">
-      <Box className="ac-card" p="md">
+      <Box className="ac-card" p="md" data-testid="hook-overview">
         <Fields rows={rows} />
       </Box>
       {doc.action === 'script' &&
@@ -1885,7 +1889,7 @@ function NewHookForm({
         w={240}
         data-testid="hook-new-timeout"
       />
-      <Group justify="flex-end" gap="xs">
+      <FormFooter>
         <Button size="xs" variant="default" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
@@ -1898,7 +1902,7 @@ function NewHookForm({
         >
           {t('common.create')}
         </Button>
-      </Group>
+      </FormFooter>
     </Stack>
   )
 }

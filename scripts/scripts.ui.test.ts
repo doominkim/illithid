@@ -46,6 +46,9 @@ test(
       await page.getByTestId('script-new-name').fill('lint')
       await page.getByTestId('script-new-description').fill('Lint the edited file')
       await page.getByTestId('script-create').click()
+      // Preview first, like the other menus; editing is its own tab
+      await page.getByTestId('script-preview').waitFor()
+      await page.getByTestId('script-tab-edit').click()
       const content = '#!/bin/sh\n# description: Lint the edited file\nexit 0\n'
       await page.getByTestId('detail-sheet').locator('textarea').first().fill(content)
       await page.getByTestId('editor-save').click()
@@ -59,7 +62,7 @@ test(
       await page.getByTestId('hook-new-use').click()
       await page.getByRole('option', { name: 'lint', exact: true }).click()
       await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
       await synced()
       assert.equal(
         readFileSync(join(home, '.claude/hooks/illithid/script-stop/run.sh'), 'utf8'),
@@ -71,7 +74,7 @@ test(
       await page.locator('[data-menu="scripts"]').click()
       await page.getByText('lint', { exact: true }).first().click()
       await page.getByTestId('script-users').getByText('script-stop').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
     } finally {
       await app.close()
     }
@@ -169,6 +172,7 @@ test(
       await page.getByTestId('script-new-name').fill('fmt')
       await page.getByTestId('script-new-description').fill('Format')
       await page.getByTestId('script-create').click()
+      await page.getByTestId('script-tab-edit').click()
       await page.getByTestId('script-files').waitFor()
       // Show in Finder sits with the header icons; no hook list or argument note while nothing uses it
       await page.getByTestId('detail-sheet').getByTestId('script-reveal').waitFor()
@@ -193,7 +197,7 @@ test(
       await page.getByTestId('hook-new-use').click()
       await page.getByRole('option', { name: 'fmt/', exact: true }).click()
       await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
       await page.getByTestId('hook-overview-files').getByText('lib/util.sh').waitFor()
       await synced()
       const copy = join(home, '.claude/hooks/illithid/_scripts/fmt')
@@ -210,6 +214,7 @@ test(
       // A file script turns into a folder script
       await page.locator('[data-menu="scripts"]').click()
       await page.getByText('lint', { exact: true }).first().click()
+      await page.getByTestId('script-tab-edit').click()
       await page.getByTestId('script-to-folder').click()
       await page.getByTestId('confirm-ok').click()
       await page.getByTestId('script-files').waitFor()

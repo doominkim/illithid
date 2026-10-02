@@ -71,11 +71,13 @@ test(
       await page.getByText('notify-stop', { exact: true }).first().click()
 
       // Detail: a one-line summary; outside the real HOME the library syncs at once
-      await page.getByTestId('hook-summary').getByText('When a reply finishes').waitFor()
+      await page.getByTestId('hook-overview').getByText('When a reply finishes').waitFor()
       // Like the other menus, the tool switches come first
       const top = async (id: string): Promise<number> =>
         (await page.getByTestId(id).boundingBox())!.y
-      assert.ok((await top('hook-detail-tools')) < (await top('hook-summary')))
+      assert.ok((await top('hook-detail-tools')) < (await top('hook-tab-preview')))
+      // No summary line repeating the overview
+      assert.equal(await page.getByTestId('hook-summary').count(), 0)
       await synced()
       const copy = join(home, '.claude/hooks/illithid/notify-stop/run.sh')
       const claude = (): {
@@ -181,7 +183,7 @@ test(
         .click()
       await page.getByTestId('hook-instruction').fill('Keep working until the tests pass.')
       await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })
@@ -298,7 +300,7 @@ test(
       await page.getByTestId('hook-new-timeout').fill('15')
       assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'script-before-tool')
       await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
       // The overview shows the script itself, not just its file name
       await page.getByTestId('hook-overview-script').getByText('echo checked >&2').waitFor()
       // Syncing happens only from the sidebar button

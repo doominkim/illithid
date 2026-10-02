@@ -1,4 +1,5 @@
 import { Badge, Box, Group, Stack, Text, Title } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 
 interface HeaderProps {
   title: React.ReactNode
@@ -57,6 +58,16 @@ export function Toolbar({
         </Group>
       )}
     </Group>
+  )
+}
+
+/** Toolbar result count: "shown / total" (first slot on the right) */
+export function ShownCount({ shown, total }: { shown: number; total: number }): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Text size="sm" c="dimmed" data-testid="shown-count">
+      {t('common.shown', { shown, total })}
+    </Text>
   )
 }
 

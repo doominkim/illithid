@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Group,
-  Modal,
   Select,
   SimpleGrid,
   Stack,
@@ -17,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import type { AgentDoc, ToolId } from '../../../shared/api'
 import { effortsFor, MODEL_CATALOG } from '../../../shared/modelCatalog'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { ImportModal } from '../components/ImportModal'
@@ -25,7 +25,7 @@ import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
@@ -171,7 +171,10 @@ function Agents(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setSelected(null)
+                setCreating(true)
+              }}
               data-testid="agent-new"
             >
               {t('agents.new')}
@@ -198,9 +201,7 @@ function Agents(): React.JSX.Element {
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('agents.search')} />}
         right={
           <>
-            <Text size="sm" c="dimmed">
-              {t('common.shown', { shown: visible.length, total: rows.length })}
-            </Text>
+            <ShownCount shown={visible.length} total={rows.length} />
             <ViewToggle value={view} onChange={setView} />
           </>
         }
@@ -300,18 +301,12 @@ function Agents(): React.JSX.Element {
         onImported={reload}
         kind="agent"
       />
-      <Modal
-        opened={creating}
-        onClose={() => setCreating(false)}
-        title={t('agents.new')}
-        centered
-        radius="lg"
-      >
-        <Stack gap="md">
+      <DetailSheet opened={creating} onClose={() => setCreating(false)} title={t('agents.new')}>
+        <Stack gap="md" maw={640}>
           <TextInput
             label={t('common.name')}
             description={t('skills.nameHint')}
-            placeholder="reviewer"
+            placeholder="my-agent"
             value={newName}
             onChange={(e) => setNewName(e.currentTarget.value)}
             data-autofocus
@@ -323,16 +318,20 @@ function Agents(): React.JSX.Element {
             autosize
             minRows={2}
           />
-          <Group justify="flex-end" gap="xs">
-            <Button variant="default" onClick={() => setCreating(false)}>
+          <FormFooter>
+            <Button size="xs" variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim() || !newDesc.trim()} onClick={() => void create()}>
+            <Button
+              size="xs"
+              disabled={!newName.trim() || !newDesc.trim()}
+              onClick={() => void create()}
+            >
               {t('common.create')}
             </Button>
-          </Group>
+          </FormFooter>
         </Stack>
-      </Modal>
+      </DetailSheet>
       <ConfirmModal
         opened={confirmDelete}
         onClose={() => setConfirmDelete(false)}
@@ -499,17 +498,17 @@ function AgentEditor({
       </Tabs.List>
       <Tabs.Panel value="preview">
         <Stack gap="md">
-          <SimpleGrid cols={cols} spacing="md">
-            {shown.map((tool) => (
-              <ToolSummary key={tool} tool={tool} value={doc.tools[tool] ?? {}} />
-            ))}
-          </SimpleGrid>
           <Box className="ac-card" p="lg">
             <Text size="sm" fw={600} c="dimmed" mb="xs">
               {t('agents.instructions')}
             </Text>
             <Markdown text={doc.body} />
           </Box>
+          <SimpleGrid cols={cols} spacing="md">
+            {shown.map((tool) => (
+              <ToolSummary key={tool} tool={tool} value={doc.tools[tool] ?? {}} />
+            ))}
+          </SimpleGrid>
         </Stack>
       </Tabs.Panel>
       <Tabs.Panel value="edit">

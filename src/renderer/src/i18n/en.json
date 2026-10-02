@@ -136,7 +136,9 @@
     "saved": "MCP saved",
     "deleted": "MCP removed (kept in .trash)",
     "deleteTitle": "Delete MCP",
-    "deleteBody": "Move {{name}} to .trash."
+    "deleteBody": "Move {{name}} to .trash.",
+    "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the Keychain.",
+    "timeoutHint": "How long to wait for the server. Left empty: the tool's default."
   },
   "agents": {
     "model": "Model",
@@ -268,7 +270,9 @@
     "turnOn": "{{tool}}: off — click to turn on",
     "copyPath": "Copy path",
     "deleteItem": "Delete…",
-    "reveal": "Show in Finder"
+    "reveal": "Show in Finder",
+    "notApplicable": "can't take this",
+    "pendingSync": "Waits for the next sync"
   },
   "editor": {
     "lines": "{{n}} lines",
@@ -891,8 +895,8 @@
         "desc": "Write a rule in plain words; an AI checks each event against it and lets it through or stops it"
       },
       "script": {
-        "title": "Write your own",
-        "desc": "Run your own shell script with the tool's raw input"
+        "title": "Run a command or script",
+        "desc": "Run a command or shell script with the tool's raw input"
       },
       "verify": {
         "title": "Check before finishing",
@@ -974,7 +978,6 @@
     },
     "pending": "Not in the tools yet",
     "pendingHint": "Sync to write this hook into the tools.",
-    "tabOverview": "Overview",
     "tabAdvanced": "Advanced",
     "noTools": "No tool in use can run this hook.",
     "show": "Show",
@@ -1037,8 +1040,8 @@
     "importedFrom": "Imported from {{tool}}"
   },
   "permissions": {
-    "new": "New rule",
-    "search": "Search rules",
+    "new": "New permission",
+    "search": "Search permissions",
     "created": "Rule added",
     "saved": "Rule saved",
     "deleted": "Rule deleted",
@@ -1109,7 +1112,6 @@
     "nameHint": "Saved as scripts/<name>.sh",
     "nameTaken": "A script with this name exists",
     "description": "Description",
-    "mine": "My scripts",
     "kindLabel": "Kind",
     "kindFile": "Single file",
     "kindFolder": "Folder",

@@ -136,11 +136,13 @@
     "saved": "MCP 저장됨",
     "deleted": "MCP 삭제 (.trash 보관)",
     "deleteTitle": "MCP 삭제",
-    "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다."
+    "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
+    "headersHint": "서버에 보낼 HTTP 헤더. ${VAR} 는 환경 변수를 읽고, 그 밖의 값은 키체인에 보관합니다.",
+    "timeoutHint": "서버 응답을 기다리는 최대 시간. 비우면 툴 기본값."
   },
   "agents": {
     "model": "모델",
-    "effort": "effort",
+    "effort": "추론 강도",
     "description": "설명",
     "instructions": "지시문",
     "search": "에이전트 검색",
@@ -268,7 +270,9 @@
     "turnOn": "{{tool}}: 꺼짐 — 누르면 켜짐",
     "copyPath": "경로 복사",
     "deleteItem": "삭제…",
-    "reveal": "Finder 에서 열기"
+    "reveal": "Finder 에서 열기",
+    "notApplicable": "쓸 수 없음",
+    "pendingSync": "다음 동기화를 기다리는 중"
   },
   "editor": {
     "lines": "{{n}}줄",
@@ -891,8 +895,8 @@
         "desc": "규칙을 말로 쓰면 AI 가 이벤트마다 규칙에 맞는지 보고 통과시키거나 막습니다"
       },
       "script": {
-        "title": "직접 작성",
-        "desc": "툴 입력을 그대로 받는 셸 스크립트를 직접 씁니다"
+        "title": "명령·스크립트 실행",
+        "desc": "툴 입력을 그대로 받는 명령이나 셸 스크립트를 실행합니다"
       },
       "verify": {
         "title": "끝내기 전 검사",
@@ -974,7 +978,6 @@
     },
     "pending": "툴에 아직 반영 안 됨",
     "pendingHint": "동기화하면 이 훅이 툴 설정에 들어갑니다.",
-    "tabOverview": "개요",
     "tabAdvanced": "고급",
     "noTools": "사용 중인 툴 중 이 훅을 실행할 수 있는 툴이 없습니다.",
     "show": "보기",
@@ -1037,8 +1040,8 @@
     "importedFrom": "{{tool}} 에서 가져옴"
   },
   "permissions": {
-    "new": "새 규칙",
-    "search": "규칙 검색",
+    "new": "새 권한",
+    "search": "권한 검색",
     "created": "규칙을 추가했습니다",
     "saved": "규칙을 저장했습니다",
     "deleted": "규칙을 삭제했습니다",
@@ -1109,7 +1112,6 @@
     "nameHint": "scripts/<이름>.sh 로 저장됩니다",
     "nameTaken": "같은 이름의 스크립트가 있습니다",
     "description": "설명",
-    "mine": "내 스크립트",
     "kindLabel": "형태",
     "kindFile": "파일 하나",
     "kindFolder": "폴더",

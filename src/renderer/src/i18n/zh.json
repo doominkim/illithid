@@ -136,7 +136,9 @@
     "saved": "MCP 已保存",
     "deleted": "MCP 已删除（保留在 .trash）",
     "deleteTitle": "删除 MCP",
-    "deleteBody": "将 {{name}} 移到 .trash。"
+    "deleteBody": "将 {{name}} 移到 .trash。",
+    "headersHint": "发送给服务器的 HTTP 头。${VAR} 读取环境变量，其他值保存在钥匙串中。",
+    "timeoutHint": "等待服务器响应的最长时间。留空则用工具默认值。"
   },
   "agents": {
     "model": "模型",
@@ -268,7 +270,9 @@
     "turnOn": "{{tool}}：关 — 点击开启",
     "copyPath": "复制路径",
     "deleteItem": "删除…",
-    "reveal": "在 Finder 中显示"
+    "reveal": "在 Finder 中显示",
+    "notApplicable": "不可用",
+    "pendingSync": "等待下次同步"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -891,8 +895,8 @@
         "desc": "用自然语言写规则，AI 会检查每个事件是否符合规则，并放行或阻止"
       },
       "script": {
-        "title": "自己编写",
-        "desc": "编写直接接收工具原始输入的 shell 脚本"
+        "title": "运行命令或脚本",
+        "desc": "运行直接接收工具输入的命令或 shell 脚本"
       },
       "verify": {
         "title": "结束前检查",
@@ -974,7 +978,6 @@
     },
     "pending": "尚未写入工具",
     "pendingHint": "同步后此钩子会写入工具设置。",
-    "tabOverview": "概览",
     "tabAdvanced": "高级",
     "noTools": "正在使用的工具中没有能运行此钩子的。",
     "show": "显示",
@@ -1037,8 +1040,8 @@
     "importedFrom": "从 {{tool}} 导入"
   },
   "permissions": {
-    "new": "新建规则",
-    "search": "搜索规则",
+    "new": "新建权限",
+    "search": "搜索权限",
     "created": "已添加规则",
     "saved": "已保存规则",
     "deleted": "已删除规则",
@@ -1109,7 +1112,6 @@
     "nameHint": "保存为 scripts/<名称>.sh",
     "nameTaken": "已有同名脚本",
     "description": "描述",
-    "mine": "我的脚本",
     "kindLabel": "类型",
     "kindFile": "单个文件",
     "kindFolder": "文件夹",

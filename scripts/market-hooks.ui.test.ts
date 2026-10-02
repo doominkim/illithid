@@ -81,7 +81,7 @@ test(
       await page.getByTestId('market-hook-entries').getByText('echo started').waitFor()
       await page.getByTestId('market-install').click()
       // Opens the new hook
-      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-tab-preview').waitFor()
       const doc = readFileSync(join(home, LIB, 'hooks/session-logger/HOOK.md'), 'utf8')
       assert.match(doc, /when: session-start/)
       assert.match(doc, /action: script/)

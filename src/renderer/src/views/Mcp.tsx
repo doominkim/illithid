@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Badge, Box, Button, Code, Group, Stack, Tabs } from '@mantine/core'
-import { Download, Globe, Plus, Terminal } from 'lucide-react'
+import { Download, Globe, Plus, Terminal, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import {
@@ -18,7 +18,7 @@ import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { McpForm } from '../components/McpForm'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
@@ -179,6 +179,7 @@ function Mcp(): React.JSX.Element {
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('mcp.search')} />}
         right={
           <>
+            <ShownCount shown={servers.length} total={data.servers.length} />
             <SortToggle value={sort} onChange={setSort} />
             <ViewToggle value={view} onChange={setView} />
           </>
@@ -262,10 +263,9 @@ function Mcp(): React.JSX.Element {
         title={current?.name ?? ''}
         tags={current && transportTag(current)}
         meta={
-          current && (
-            <MetaItem icon={current.url ? <Globe size={14} /> : <Terminal size={14} />}>
-              {endpoint(current) || none}
-            </MetaItem>
+          current &&
+          data.dir && (
+            <MetaItem icon={<FileText size={14} />}>{`${data.dir}/${current.name}.json`}</MetaItem>
           )
         }
         copyPath={current && data.dir ? `${data.dir}/${current.name}.json` : undefined}
@@ -292,9 +292,9 @@ function Mcp(): React.JSX.Element {
                 <Box className="ac-card" p="lg">
                   <Fields
                     rows={[
-                      [t('mcp.transport'), current.transport ?? '-'],
-                      [t('mcp.url'), current.url ?? '-'],
-                      [t('mcp.command'), current.command ?? '-'],
+                      [t('mcp.transport'), current.transport ?? none],
+                      [t('mcp.url'), current.url ?? none],
+                      [t('mcp.command'), current.command ?? none],
                       [
                         t('mcp.args'),
                         current.args?.length ? <Code>{current.args.join(' ')}</Code> : none

@@ -1,21 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  Badge,
-  Box,
-  Button,
-  Group,
-  Modal,
-  Stack,
-  Tabs,
-  Text,
-  Textarea,
-  TextInput
-} from '@mantine/core'
+import { Badge, Box, Button, Group, Stack, Tabs, Text, Textarea, TextInput } from '@mantine/core'
 import { Download, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
 import type { SkillDoc, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { FileEditor } from '../components/FileEditor'
@@ -25,7 +15,7 @@ import { ErrorAlert, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { Markdown } from '../components/Markdown'
 import { MarkdownEditor } from '../components/MarkdownEditor'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
@@ -190,7 +180,10 @@ function Skills(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setSelected(null)
+                setCreating(true)
+              }}
               data-testid="skill-new"
             >
               {t('skills.new')}
@@ -217,9 +210,7 @@ function Skills(): React.JSX.Element {
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('skills.search')} />}
         right={
           <>
-            <Text size="sm" c="dimmed">
-              {t('common.shown', { shown: visible.length, total: rows.length })}
-            </Text>
+            <ShownCount shown={visible.length} total={rows.length} />
             <SortToggle value={sort} onChange={setSort} />
             <ViewToggle value={view} onChange={setView} />
           </>
@@ -329,14 +320,8 @@ function Skills(): React.JSX.Element {
         onImported={reload}
         kind="skill"
       />
-      <Modal
-        opened={creating}
-        onClose={() => setCreating(false)}
-        title={t('skills.new')}
-        centered
-        radius="lg"
-      >
-        <Stack gap="md">
+      <DetailSheet opened={creating} onClose={() => setCreating(false)} title={t('skills.new')}>
+        <Stack gap="md" maw={640}>
           <TextInput
             label={t('common.name')}
             description={t('skills.nameHint')}
@@ -352,16 +337,20 @@ function Skills(): React.JSX.Element {
             autosize
             minRows={2}
           />
-          <Group justify="flex-end" gap="xs">
-            <Button variant="default" onClick={() => setCreating(false)}>
+          <FormFooter>
+            <Button size="xs" variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
             </Button>
-            <Button disabled={!newName.trim() || !newDesc.trim()} onClick={() => void create()}>
+            <Button
+              size="xs"
+              disabled={!newName.trim() || !newDesc.trim()}
+              onClick={() => void create()}
+            >
               {t('common.create')}
             </Button>
-          </Group>
+          </FormFooter>
         </Stack>
-      </Modal>
+      </DetailSheet>
       <ConfirmModal
         opened={confirmDelete}
         onClose={() => setConfirmDelete(false)}

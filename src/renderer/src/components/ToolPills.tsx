@@ -17,7 +17,8 @@ interface Props {
 }
 
 /**
- * Tool pill row: on opaque / off dimmed with a slash / problem amber ring / pending dot. Tools not in use on this device are not shown.
+ * Tool pill row: on opaque / off dimmed with a slash / problem amber ring / pending dot (its tooltip says it waits for the sync).
+ * With showNa, a tool that can't take the item keeps its slot, dimmed and not clickable. Tools not in use on this device are not shown.
  * Every pill has a tooltip with the tool name and state, so off is never told by color alone
  */
 export function ToolPills({
@@ -55,10 +56,14 @@ export function ToolPills({
             {icon}
           </span>
         )
-        const state = onToggle
-          ? t(p.on ? 'detail.turnOff' : 'detail.turnOn', { tool: name })
-          : `${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`
-        const label = p.hint ? `${state}\n${p.hint}` : state
+        const state = p.na
+          ? `${name}: ${t('detail.notApplicable')}`
+          : onToggle
+            ? t(p.on ? 'detail.turnOff' : 'detail.turnOn', { tool: name })
+            : `${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`
+        const label = [state, p.pending ? t('detail.pendingSync') : '', p.hint ?? '']
+          .filter(Boolean)
+          .join('\n')
         return (
           <Tooltip
             key={tool}
@@ -67,7 +72,7 @@ export function ToolPills({
             openDelay={300}
             style={{ whiteSpace: 'pre-line' }}
           >
-            {onToggle ? (
+            {onToggle && !p.na ? (
               <UnstyledButton
                 disabled={!toggle}
                 onClick={(e) => {
@@ -84,7 +89,7 @@ export function ToolPills({
               <span
                 style={{ display: 'inline-flex' }}
                 role="img"
-                aria-label={`${name}: ${t(p.on ? 'detail.on' : 'detail.off')}`}
+                aria-label={`${name}: ${t(p.na ? 'detail.notApplicable' : p.on ? 'detail.on' : 'detail.off')}`}
               >
                 {pill}
               </span>

@@ -136,11 +136,13 @@
     "saved": "MCP を保存",
     "deleted": "MCP 削除（.trash に保管）",
     "deleteTitle": "MCP を削除",
-    "deleteBody": "{{name}} を .trash に移します。"
+    "deleteBody": "{{name}} を .trash に移します。",
+    "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はキーチェーンに保管します。",
+    "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。"
   },
   "agents": {
     "model": "モデル",
-    "effort": "effort",
+    "effort": "推論の強さ",
     "description": "説明",
     "instructions": "指示文",
     "search": "エージェントを検索",
@@ -268,7 +270,9 @@
     "turnOn": "{{tool}}: オフ — クリックでオン",
     "copyPath": "パスをコピー",
     "deleteItem": "削除…",
-    "reveal": "Finder で表示"
+    "reveal": "Finder で表示",
+    "notApplicable": "使えません",
+    "pendingSync": "次の同期待ち"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -891,8 +895,8 @@
         "desc": "ルールを言葉で書くと、AI がイベントごとにルールに合うか確認して通すか止めます"
       },
       "script": {
-        "title": "自分で書く",
-        "desc": "ツールの入力をそのまま受け取るシェルスクリプトを書きます"
+        "title": "コマンド・スクリプト実行",
+        "desc": "ツールの入力をそのまま受け取るコマンドやシェルスクリプトを実行します"
       },
       "verify": {
         "title": "終える前に確認",
@@ -974,7 +978,6 @@
     },
     "pending": "まだツールに反映されていません",
     "pendingHint": "同期するとこのフックがツールの設定に入ります。",
-    "tabOverview": "概要",
     "tabAdvanced": "上級",
     "noTools": "使用中のツールでこのフックを実行できるものがありません。",
     "show": "表示",
@@ -1037,8 +1040,8 @@
     "importedFrom": "{{tool}} から取り込み"
   },
   "permissions": {
-    "new": "新しいルール",
-    "search": "ルールを検索",
+    "new": "新しい権限",
+    "search": "権限を検索",
     "created": "ルールを追加しました",
     "saved": "ルールを保存しました",
     "deleted": "ルールを削除しました",
@@ -1109,7 +1112,6 @@
     "nameHint": "scripts/<名前>.sh として保存されます",
     "nameTaken": "同じ名前のスクリプトがあります",
     "description": "説明",
-    "mine": "自分のスクリプト",
     "kindLabel": "種類",
     "kindFile": "ファイル1つ",
     "kindFolder": "フォルダ",

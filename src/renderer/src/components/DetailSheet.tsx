@@ -66,7 +66,8 @@ export function DetailSheet({
       transitionProps={{ duration: 0 }}
       styles={{
         content: { height: '100%', display: 'flex', flexDirection: 'column' },
-        body: { padding: 0, flex: 1, minHeight: 0, overflowY: 'auto' }
+        // A stable gutter keeps the header in place whether or not the sheet scrolls
+        body: { padding: 0, flex: 1, minHeight: 0, overflowY: 'auto', scrollbarGutter: 'stable' }
       }}
     >
       <Box p={28} pt={48} mx="auto" maw={maw} data-testid="detail-sheet">

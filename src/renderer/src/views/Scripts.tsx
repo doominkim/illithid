@@ -12,14 +12,15 @@ import {
   SegmentedControl,
   Select,
   Stack,
+  Tabs,
   Text,
   TextInput,
   Tooltip
 } from '@mantine/core'
 import {
+  Download,
   FileCode,
   Folder,
-  FolderInput,
   FolderOpen,
   FolderTree,
   Plus,
@@ -29,12 +30,13 @@ import {
 import { useTranslation } from 'react-i18next'
 import { LIBRARY_SCRIPT_RE, SCRIPT_TEMPLATE } from '../../../engine/scriptNames'
 import { ConfirmModal } from '../components/ConfirmModal'
+import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { FileEditor } from '../components/FileEditor'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
 import { MarkdownEditor } from '../components/MarkdownEditor'
-import { PageHeader, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
 import { includesCI } from '../lib/format'
@@ -94,22 +96,22 @@ function Scripts(): React.JSX.Element {
           <>
             <Button
               size="xs"
-              variant="default"
-              leftSection={<FolderInput size={13} />}
-              onClick={() =>
-                void window.api.pickDirectory().then((dir) => dir && setImportFrom(dir))
-              }
-              data-testid="script-import"
-            >
-              {t('scripts.importFolder')}
-            </Button>
-            <Button
-              size="xs"
               leftSection={<Plus size={13} />}
               onClick={() => setSelected(NEW)}
               data-testid="script-new"
             >
               {t('scripts.new')}
+            </Button>
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<Download size={13} />}
+              onClick={() =>
+                void window.api.pickDirectory().then((dir) => dir && setImportFrom(dir))
+              }
+              data-testid="script-import"
+            >
+              {t('common.import')}
             </Button>
             <ReloadButton />
           </>
@@ -122,12 +124,10 @@ function Scripts(): React.JSX.Element {
       )}
       <Toolbar
         left={<SearchInput value={query} onChange={setQuery} placeholder={t('scripts.search')} />}
+        right={<ShownCount shown={list.length} total={data.scripts.length} />}
       />
       <Stack gap="lg">
         <Stack gap={8}>
-          <Text size="sm" fw={600} c="dimmed">
-            {t('scripts.mine')}
-          </Text>
           {data.scripts.length === 0 ? (
             <Text size="sm" c="dimmed" data-testid="scripts-empty">
               {t('scripts.emptyHint')}
@@ -185,7 +185,7 @@ function Scripts(): React.JSX.Element {
       <DetailSheet
         opened={!!current}
         onClose={() => setSelected(null)}
-        title={current?.name ?? ''}
+        title={current ? (current.kind === 'folder' ? `${current.name}/` : current.name) : ''}
         description={current?.description || undefined}
         meta={
           current && (
@@ -217,11 +217,31 @@ function Scripts(): React.JSX.Element {
                 </ListCard>
               </Stack>
             )}
-            {current.kind === 'folder' ? (
-              <FolderScript key={current.name} script={current} onChanged={reload} />
-            ) : (
-              <FileScript key={current.name} script={current} onSave={save} onChanged={reload} />
+            {current.problem && (
+              <Alert color="yellow" variant="light" title={t('scripts.problemTitle')}>
+                {t(`scripts.problem.${current.problem}`)}
+              </Alert>
             )}
+            <Tabs key={current.name} defaultValue="preview" keepMounted={false}>
+              <Tabs.List mb="md">
+                <Tabs.Tab value="preview" data-testid="script-tab-preview">
+                  {t('detail.source')}
+                </Tabs.Tab>
+                <Tabs.Tab value="edit" data-testid="script-tab-edit">
+                  {t('detail.edit')}
+                </Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="preview">
+                <ScriptPreview script={current} />
+              </Tabs.Panel>
+              <Tabs.Panel value="edit">
+                {current.kind === 'folder' ? (
+                  <FolderScript script={current} onChanged={reload} />
+                ) : (
+                  <FileScript script={current} onSave={save} onChanged={reload} />
+                )}
+              </Tabs.Panel>
+            </Tabs>
           </Stack>
         )}
       </DetailSheet>
@@ -259,6 +279,38 @@ function Scripts(): React.JSX.Element {
 /** Display path of a script: its .sh file or its folder */
 const scriptPathOf = (dir: string, s: ScriptView): string =>
   s.kind === 'folder' ? `${dir}/${s.name}/` : `${dir}/${s.name}.sh`
+
+/** What the hooks run, read-only: the script, or a folder script's entry and its other files */
+function ScriptPreview({ script }: { script: ScriptView }): React.JSX.Element {
+  const { t } = useTranslation()
+  const others = (script.files ?? []).filter((f) => f !== script.entry && f !== 'SCRIPT.md')
+  return (
+    <Stack gap="md" data-testid="script-preview">
+      <Stack gap={6}>
+        {script.kind === 'folder' && (
+          <Text size="sm" fw={600} c="dimmed">
+            {script.entry}
+          </Text>
+        )}
+        <Code block style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {script.content}
+        </Code>
+      </Stack>
+      {others.length > 0 && (
+        <Stack gap={6}>
+          <Text size="sm" fw={600} c="dimmed">
+            {t('hooks.folderFiles')}
+          </Text>
+          <Group gap={6}>
+            {others.map((f) => (
+              <Code key={f}>{f}</Code>
+            ))}
+          </Group>
+        </Stack>
+      )}
+    </Stack>
+  )
+}
 
 /** A file script: its editor, and turning it into a folder script */
 function FileScript({
@@ -327,9 +379,9 @@ function FolderScript({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const name = script.name
   const shown = files.includes(rel) ? rel : (script.entry ?? files[0])
-  const infoDirty = description !== script.description || entry !== script.entry
-  const saveInfo = async (): Promise<void> => {
-    const r = await runWrite(window.api.scriptInfoSave(name, { description, entry }), {
+  // Description and entry save as they change: the one save button is the file editor's
+  const saveInfo = async (info: { description?: string; entry?: string }): Promise<void> => {
+    const r = await runWrite(window.api.scriptInfoSave(name, info), {
       success: t('scripts.saved')
     })
     if (r) onChanged()
@@ -358,30 +410,28 @@ function FolderScript({
   const canAdd = !!newFile.trim() && !files.includes(newFile.trim())
   return (
     <Stack gap="md" data-testid="script-files">
-      {script.problem && (
-        <Alert color="yellow" variant="light" title={t('scripts.problemTitle')}>
-          {t(`scripts.problem.${script.problem}`)}
-        </Alert>
-      )}
       <Group gap="sm" align="flex-end">
         <TextInput
           label={t('scripts.description')}
           value={description}
           onChange={(e) => setDescription(e.currentTarget.value)}
+          onBlur={() => description !== script.description && void saveInfo({ description })}
           style={{ flex: 1 }}
+          data-testid="script-description"
         />
         <Select
           label={t('scripts.entry')}
           data={editable}
           value={entry}
-          onChange={(v) => v && setEntry(v)}
+          onChange={(v) => {
+            if (!v || v === entry) return
+            setEntry(v)
+            void saveInfo({ entry: v })
+          }}
           allowDeselect={false}
           w={220}
           data-testid="script-entry"
         />
-        <Button size="sm" disabled={!infoDirty} onClick={() => void saveInfo()}>
-          {t('common.save')}
-        </Button>
       </Group>
       <FileEditor
         id={name}
@@ -623,7 +673,7 @@ function NewScriptForm({
         onChange={(e) => setDescription(e.currentTarget.value)}
         data-testid="script-new-description"
       />
-      <Group justify="flex-end" gap="xs">
+      <FormFooter>
         <Button size="xs" variant="default" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
@@ -636,7 +686,7 @@ function NewScriptForm({
         >
           {t('common.create')}
         </Button>
-      </Group>
+      </FormFooter>
     </Stack>
   )
 }
