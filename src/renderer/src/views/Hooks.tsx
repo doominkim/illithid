@@ -1575,9 +1575,12 @@ function NewHookForm({
   const libScripts = useApi('scripts', () => window.api.scripts()).data?.scripts ?? []
 
   const action: HookAction = mode
-  // The timing never changes by itself: one AI judgment can't use is kept and flagged instead
-  const timingOk = HOOK_ACTION_INFO[action].timings.includes(when)
-  const pickMode = (m: 'script' | 'ask'): void => setMode(m)
+  // The timing comes first and decides what can be done: AI judgment is offered only where it can run
+  const askAllowed = HOOK_ACTION_INFO.ask.timings.includes(when)
+  const pickWhen = (w: HookTiming): void => {
+    setWhen(w)
+    if (!HOOK_ACTION_INFO.ask.timings.includes(w)) setMode('script')
+  }
   const autoName = (() => {
     const base = `${mode}-${when}`
     let n = base
@@ -1590,7 +1593,6 @@ function NewHookForm({
   const atToolCall = when === 'before-tool' || when === 'after-tool'
   const valid =
     nameOk &&
-    timingOk &&
     (mode === 'ask' ? !!instruction.trim() : !!use || !!script.trim()) &&
     (timeout === '' || typeof timeout === 'number')
   const create = async (): Promise<void> => {
@@ -1640,18 +1642,11 @@ function NewHookForm({
       />
       <Select
         label={t('hooks.timingLabel')}
-        data={HOOK_TIMINGS.map((x) => ({
-          value: x,
-          label: HOOK_ACTION_INFO[action].timings.includes(x)
-            ? t(`hooks.timing.${x}`)
-            : `${t(`hooks.timing.${x}`)} (${t('hooks.askNoTiming')})`,
-          disabled: !HOOK_ACTION_INFO[action].timings.includes(x)
-        }))}
+        data={HOOK_TIMINGS.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
         value={when}
-        onChange={(v) => v && setWhen(v as HookTiming)}
+        onChange={(v) => v && pickWhen(v as HookTiming)}
         allowDeselect={false}
         description={t(`hooks.timingHint.${when}`)}
-        error={timingOk ? undefined : t('hooks.askTimingError')}
         data-testid="hook-new-timing"
       />
       {mode === 'script' && (
@@ -1668,10 +1663,10 @@ function NewHookForm({
         </Text>
         <SegmentedControl
           value={mode}
-          onChange={(v) => pickMode(v as 'script' | 'ask')}
+          onChange={(v) => setMode(v as 'script' | 'ask')}
           data={[
             { value: 'script', label: t('hooks.doScript') },
-            { value: 'ask', label: t('hooks.doAsk') }
+            ...(askAllowed ? [{ value: 'ask', label: t('hooks.doAsk') }] : [])
           ]}
           data-testid="hook-new-mode"
         />

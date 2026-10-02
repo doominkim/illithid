@@ -1008,9 +1008,7 @@
     "doScript": "コマンド・スクリプトを実行",
     "doAsk": "AI に判断させる",
     "doScriptHint": "スクリプトは stdin でツールのイベント JSON を受け取ります。止めるには stderr に理由を書いて exit 2 で終了します。",
-    "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。",
-    "askNoTiming": "AI 判断は不可",
-    "askTimingError": "AI 判断は応答完了・ツール実行前・プロンプト送信のときだけ使えます。この中から選んでください。"
+    "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。"
   },
   "permissions": {
     "new": "新しいルール",
