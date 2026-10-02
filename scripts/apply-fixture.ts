@@ -100,6 +100,7 @@ const MODES: Record<TargetId, number> = {
   claudeSkillOverrides: 0o640, // same file as claudePermissions
   codexSkillConfig: 0o600, // same file as codexMcp
   opencodeSkillPermissions: 0o644,
+  opencodeMcpPermissions: 0o644, // same file as opencodeMcp (not a default target)
   geminiRules: 0o644, // not a default target
   geminiMcp: 0o600, // not a default target
   copilotMcp: 0o600, // not a default target

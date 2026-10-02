@@ -128,3 +128,37 @@ test('REQ-MCP-PERM-4 broken rules are refused', () => {
       code: 'invalidSchema'
     })
 })
+
+test('REQ-MCP-PERM-5 OpenCode gets permission keys, each server catch-all before its tools (the last match wins); the rest stays', () => {
+  const home = demoHome(['opencode'])
+  withServers(home)
+  sync(home)
+  const file = join(home, '.config/opencode/opencode.json')
+  // A rule of the user's stays where it is
+  const config = JSON.parse(readFileSync(file, 'utf8'))
+  config.permission = { edit: 'ask', ...(config.permission ?? {}) }
+  writeFileSync(file, JSON.stringify(config, null, 2))
+  sync(home)
+  const perm = JSON.parse(readFileSync(file, 'utf8')).permission as Record<string, unknown>
+  const mcpKeys = Object.entries(perm).filter(([k]) => /^(kaneo|gh)_/.test(k))
+  assert.deepEqual(mcpKeys, [
+    ['gh_*', 'deny'],
+    ['gh_get_issue', 'allow'],
+    ['gh_search', 'ask'],
+    ['kaneo_*', 'allow'],
+    ['kaneo_delete_task', 'deny'],
+    ['kaneo_update_task', 'ask']
+  ])
+  assert.equal(perm.edit, 'ask')
+  assert.ok(Object.keys(perm).indexOf('edit') < Object.keys(perm).indexOf('gh_*'))
+  // Rules gone: their keys go, the user's stays
+  mcpSave(home, 'gh', { transport: 'stdio', command: 'npx', args: ['-y', 'gh-mcp'] })
+  mcpSave(home, 'kaneo', { transport: 'http', url: 'https://kaneo.example/mcp' })
+  sync(home)
+  const after = JSON.parse(readFileSync(file, 'utf8')).permission as Record<string, unknown>
+  assert.deepEqual(
+    Object.keys(after).filter((k) => /^(kaneo|gh)_/.test(k)),
+    []
+  )
+  assert.equal(after.edit, 'ask')
+})

@@ -107,6 +107,7 @@ export type ExtraTargetId =
   | 'claudeSkillOverrides'
   | 'codexSkillConfig'
   | 'opencodeSkillPermissions'
+  | 'opencodeMcpPermissions'
   | 'geminiRules'
   | 'geminiMcp'
   | 'copilotMcp'

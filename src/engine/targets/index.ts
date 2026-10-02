@@ -16,6 +16,7 @@ import { geminiRules } from './geminiRules'
 import { opencodeMcp } from './opencodeMcp'
 import { opencodeRules } from './opencodeRules'
 import { opencodeSkills } from './opencodeSkills'
+import { opencodeMcpPermissions } from './opencodeMcpPermissions'
 import { SKILL_OVERRIDE_TARGETS } from './skillOverrides'
 
 /** The 6 default targets (run in this order). Default targets for plan() and apply() */
@@ -37,6 +38,7 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   opencodeRules,
   opencodeSkills,
   ...SKILL_OVERRIDE_TARGETS,
+  opencodeMcpPermissions,
   geminiRules,
   geminiMcp,
   copilotMcp,
