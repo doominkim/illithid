@@ -1208,9 +1208,6 @@ function ScriptEditors({
   return (
     <Stack gap={8}>
       <SectionLabel>{t('hooks.scripts')}</SectionLabel>
-      <Text size="xs" c="dimmed">
-        {t('hooks.argHint')}
-      </Text>
       <Select
         aria-label={t('hooks.useLabel')}
         data={[
@@ -1732,11 +1729,6 @@ function NewHookForm({
           ]}
           data-testid="hook-new-mode"
         />
-        {mode === 'script' && (
-          <Text size="xs" c="dimmed">
-            {t('hooks.doScriptHint')}
-          </Text>
-        )}
       </Stack>
       {mode === 'script' ? (
         <Stack gap="sm">
@@ -1764,16 +1756,6 @@ function NewHookForm({
                 styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
                 data-testid="hook-new-script"
               />
-              <Box className="ac-card" p="sm">
-                <Stack gap={6}>
-                  <Text size="xs" c="dimmed">
-                    {t('hooks.argHint')}
-                  </Text>
-                  <Fields
-                    rows={runs.map((tool) => [TOOL_NAME[tool], t(`hooks.toolInput.${tool}`)])}
-                  />
-                </Stack>
-              </Box>
             </>
           )}
         </Stack>

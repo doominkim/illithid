@@ -852,7 +852,6 @@
       "copilot": "0 以外の終了コードまたは JSON permissionDecision: deny (エラーでも止まる)",
       "grok": "exit 2 または JSON decision: deny"
     },
-    "argHint": "スクリプトの最初の引数にツール名 (claude, codex, gemini, copilot, grok) が入ります。",
     "codexTrust": "Codex は新しいフックや変更したフックを /hooks で信頼するまで実行しません。",
     "grokViaClaude": "Grok は Claude Code の設定からこのフックを実行します",
     "scripts": "スクリプト",
@@ -1001,7 +1000,6 @@
     "doLabel": "すること",
     "doScript": "コマンド・スクリプトを実行",
     "doAsk": "自然言語のルールで確認",
-    "doScriptHint": "スクリプトは stdin でツールのイベント JSON を受け取ります。止めるには stderr に理由を書いて exit 2 で終了します。",
     "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。",
     "when": {
       "before-tool": {

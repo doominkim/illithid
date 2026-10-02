@@ -852,7 +852,6 @@
       "copilot": "Any non-zero exit or JSON permissionDecision: deny (errors also stop the tool)",
       "grok": "exit 2 or JSON decision: deny"
     },
-    "argHint": "The script gets the tool name (claude, codex, gemini, copilot, grok) as its first argument.",
     "codexTrust": "Codex runs a new or changed hook only after you trust it in /hooks.",
     "grokViaClaude": "Grok runs this hook from Claude Code's settings",
     "scripts": "Scripts",
@@ -1001,7 +1000,6 @@
     "doLabel": "What to do",
     "doScript": "Run a command or script",
     "doAsk": "Check with a plain-language rule",
-    "doScriptHint": "Your script gets the tool's event as JSON on stdin. Exit 2 with a reason on stderr to stop what triggered it.",
     "timeoutAllHint": "Seconds, the same for every tool. Empty = each tool's default.",
     "when": {
       "before-tool": {

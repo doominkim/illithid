@@ -852,7 +852,6 @@
       "copilot": "0 이 아닌 종료 코드 또는 JSON permissionDecision: deny (오류가 나도 막음)",
       "grok": "exit 2 또는 JSON decision: deny"
     },
-    "argHint": "스크립트 첫 인자로 툴 이름(claude, codex, gemini, copilot, grok)이 들어옵니다.",
     "codexTrust": "Codex 는 새로 쓰거나 바뀐 훅을 /hooks 에서 신뢰해야 실행합니다.",
     "grokViaClaude": "Grok 은 Claude Code 설정에서 이 훅을 실행합니다",
     "scripts": "스크립트",
@@ -1001,7 +1000,6 @@
     "doLabel": "할 일",
     "doScript": "명령·스크립트 실행",
     "doAsk": "자연어 규칙으로 검사",
-    "doScriptHint": "스크립트는 stdin 으로 툴의 이벤트 JSON 을 받습니다. 막으려면 stderr 에 이유를 쓰고 exit 2 로 끝내세요.",
     "timeoutAllHint": "초 단위, 모든 툴에 같은 값. 비우면 툴 기본값.",
     "when": {
       "before-tool": {

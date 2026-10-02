@@ -852,7 +852,6 @@
       "copilot": "非零退出码或 JSON permissionDecision: deny (出错也会阻止)",
       "grok": "exit 2 或 JSON decision: deny"
     },
-    "argHint": "脚本的第一个参数是工具名称 (claude, codex, gemini, copilot, grok)。",
     "codexTrust": "Codex 只有在 /hooks 中信任后才会运行新的或已更改的钩子。",
     "grokViaClaude": "Grok 通过 Claude Code 的设置运行此钩子",
     "scripts": "脚本",
@@ -1001,7 +1000,6 @@
     "doLabel": "要做什么",
     "doScript": "运行命令或脚本",
     "doAsk": "用自然语言规则检查",
-    "doScriptHint": "脚本通过 stdin 接收工具的事件 JSON。要阻止，在 stderr 写原因并以 exit 2 结束。",
     "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。",
     "when": {
       "before-tool": {
