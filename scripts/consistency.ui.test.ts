@@ -52,13 +52,19 @@ test(
         await page.locator(`[data-menu="${menu}"]`).click()
         await page.getByTestId('shown-count').waitFor()
         await page.getByTestId(newId).click()
-        const sheet = page.getByTestId('detail-sheet')
-        const footer = sheet.locator('.ac-form-footer')
+        const footer = page.locator('.ac-form-footer')
         await footer.waitFor()
         // The buttons are on screen without scrolling, however long the form
         const box = (await footer.boundingBox())!
         const height = await page.evaluate(() => window.innerHeight)
         assert.ok(box.y + box.height <= height + 1, `${menu}: footer below the window`)
+        // A bar across the whole sheet, at its bottom edge
+        const width = await page.evaluate(() => window.innerWidth)
+        assert.ok(
+          box.width >= width - 220 - 24,
+          `${menu}: footer ${box.width}px wide, not the sheet's`
+        )
+        assert.ok(Math.abs(box.y + box.height - height) <= 2, `${menu}: footer not at the bottom`)
         assert.equal(
           await page.locator('.mantine-Modal-content').count(),
           0,
@@ -73,7 +79,7 @@ test(
       const sheet = page.getByTestId('detail-sheet')
       await sheet.getByLabel('Name').fill('my-skill')
       await sheet.getByRole('textbox').nth(1).fill('Does a thing')
-      await sheet.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
+      await page.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
       await page.getByText('my-skill', { exact: true }).first().waitFor()
       assert.ok(existsSync(join(home, LIB, 'skills/my-skill/SKILL.md')))
     } finally {
@@ -207,7 +213,7 @@ test(
       await sheet.getByLabel('Name').fill('release')
       await sheet.getByRole('textbox').nth(1).fill('Cut a release')
       await page.getByTestId('skill-new-body').fill('# Release\n\n1. Tag\n')
-      await sheet.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
+      await page.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
       await until(() => existsSync(join(home, LIB, 'skills/release/SKILL.md')))
       assert.ok(file('skills/release/SKILL.md').endsWith('---\n\n# Release\n\n1. Tag\n'))
       await page.keyboard.press('Escape')
@@ -217,7 +223,7 @@ test(
       await sheet.getByLabel('Name').fill('checker')
       await sheet.getByRole('textbox').nth(1).fill('Checks things')
       await page.getByTestId('agent-new-body').fill('Review the diff.\n')
-      await sheet.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
+      await page.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
       await until(() => existsSync(join(home, LIB, 'agents/checker.md')))
       assert.ok(file('agents/checker.md').endsWith('---\n\nReview the diff.\n'))
       await page.keyboard.press('Escape')

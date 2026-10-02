@@ -472,13 +472,18 @@ body {
   outline-offset: 2px;
 }
 
-/* Cancel / submit of a form: stays at the bottom of the sheet while the form scrolls */
-.ac-form-footer {
+/* A form's cancel / submit: a bar across the bottom of the sheet, in view however long the form */
+.ac-sheet-footer {
   position: sticky;
   bottom: 0;
+  margin-top: auto;
   z-index: 2;
+}
+.ac-sheet-footer:empty {
+  display: none;
+}
+.ac-form-footer {
   padding: 12px 0;
-  margin-top: 4px;
-  background: var(--mantine-color-body);
-  border-top: 1px solid var(--ac-border-subtle);
+  background: var(--ac-bg);
+  border-top: 1px solid var(--ac-border);
 }
