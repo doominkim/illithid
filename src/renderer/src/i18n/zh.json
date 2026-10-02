@@ -1031,7 +1031,7 @@
       "allow": "代理不询问直接运行。"
     },
     "decisionLabel": "处理方式",
-    "exact": "精确",
+    "exact": "完全匹配",
     "exactLabel": "仅与此命令完全相同时",
     "exactHint": "关闭时也包括以此开头的命令 (git push --force origin main)。",
     "command": "命令",
