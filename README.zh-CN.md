@@ -32,7 +32,7 @@
 
 ## 配置一次，同步到各个智能体
 
-编辑共享配置，预览改动，然后应用到你使用的工具。可以为每个工具选择启用哪些规则、技能、子智能体和 MCP 服务器。
+编辑共享配置，预览改动，然后应用到你使用的工具。可以为每个工具选择启用哪些规则、技能、子智能体、MCP 服务器、钩子和权限。
 
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="演示: 编辑规则并预览后应用到 5 个工具"></p>
 
@@ -41,6 +41,18 @@
 导入你已在使用的配置，并选择需要管理的工具。应用前可以查看所有改动，原始文件会在交由 Illithid 管理前备份。
 
 <p align="center"><img src="docs/demo/tools.gif" width="960" alt="与 Claude Code 一起开启 Grok CLI，再预览关闭 Codex 时会清理的项目"></p>
+
+## 用钩子自动检查
+
+钩子只需写一次，就会以各自的格式在 Claude Code、Codex、Gemini CLI、GitHub Copilot 和 Grok CLI 中运行。选择运行时机，然后运行你自己的脚本，或用自然语言规则检查结果。共用的脚本放在库中，也可以是带辅助文件的文件夹。
+
+<p align="center"><img src="docs/demo/hooks.gif" width="960" alt="新建一个在回复结束时检查测试是否通过的钩子，并应用到各工具"></p>
+
+## 决定智能体可以运行哪些命令
+
+只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI 和 GitHub Copilot 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。
+
+<p align="center"><img src="docs/demo/permissions.gif" width="960" alt="一个阻止强制推送和硬重置、允许 git status 的 git 分组，应用到 4 个工具"></p>
 
 ## 根据使用记录比较模型
 

@@ -32,7 +32,7 @@
 
 ## 一度設定して、各エージェントに同期
 
-共有設定を一度編集し、変更をプレビューしてから使用するツールに反映できます。各ツールに適用するルール、スキル、サブエージェント、MCP サーバーを選べます。
+共有設定を一度編集し、変更をプレビューしてから使用するツールに反映できます。各ツールに適用するルール、スキル、サブエージェント、MCP サーバー、フック、権限を選べます。
 
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="デモ: ルールを編集して 5 つのツールにプレビュー・反映"></p>
 
@@ -41,6 +41,18 @@
 既存の設定を取り込み、使用するツールを選べます。適用前にすべての変更を確認でき、元のファイルは Illithid が管理を始める前にバックアップされます。
 
 <p align="center"><img src="docs/demo/tools.gif" width="960" alt="Claude Code と一緒に Grok CLI をオンにし、Codex をオフにするときに片付く項目をプレビュー"></p>
+
+## フックでチェックを自動化
+
+フックを一度作れば、Claude Code、Codex、Gemini CLI、GitHub Copilot、Grok CLI でそれぞれの形式で実行されます。実行するタイミングを選び、自分のスクリプトを実行するか、自然言語のルールで結果を確認できます。共有スクリプトはライブラリに置き、補助ファイルを含むフォルダとしても作れます。
+
+<p align="center"><img src="docs/demo/hooks.gif" width="960" alt="応答の終了時にテストが通るか確認する新しいフックを作り、ツールに反映"></p>
+
+## エージェントが実行できるコマンドを決める
+
+シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。
+
+<p align="center"><img src="docs/demo/permissions.gif" width="960" alt="force push と hard reset をブロックし git status を許可する git グループを 4 つのツールに反映"></p>
 
 ## 使用履歴からモデルを比較
 

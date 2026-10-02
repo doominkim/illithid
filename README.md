@@ -32,7 +32,7 @@
 
 ## Configure once. Keep your agents in sync.
 
-Edit your shared setup once, preview the changes, and apply them to the tools you use. Choose which rules, skills, subagents, and MCP servers each tool receives.
+Edit your shared setup once, preview the changes, and apply them to the tools you use. Choose which rules, skills, subagents, MCP servers, hooks, and permissions each tool receives.
 
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="Demo: edit a rule, preview the change and apply it to five tools"></p>
 
@@ -41,6 +41,18 @@ Edit your shared setup once, preview the changes, and apply them to the tools yo
 Import the configuration you already use. Choose your tools and review every change before applying it. Imported originals are backed up before Illithid starts managing them.
 
 <p align="center"><img src="docs/demo/tools.gif" width="960" alt="Turning Grok CLI on next to Claude Code, then previewing what leaves Codex when it is turned off"></p>
+
+## Automate checks with hooks.
+
+Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot, and Grok CLI, each in its own format. Pick when it runs, then run your own script or check the work with a plain-language rule. Keep shared scripts in the library; a script can be a folder with its own helper files.
+
+<p align="center"><img src="docs/demo/hooks.gif" width="960" alt="A new hook that checks, when a reply finishes, that the tests pass, applied to the tools"></p>
+
+## Decide which commands agents can run.
+
+Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, and GitHub Copilot, each in its own format. Group related commands, and turn a rule off for a single tool.
+
+<p align="center"><img src="docs/demo/permissions.gif" width="960" alt="A git group that blocks force pushes and hard resets and allows git status, applied to four tools"></p>
 
 ## Understand your model usage.
 

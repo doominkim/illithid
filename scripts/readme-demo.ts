@@ -7,7 +7,8 @@
  * - Scenes, each cut into its own GIF (docs/demo/<scene>.gif): rules (edit → all five tools), skills (off for Gemini),
  *   agents (models per tool), mcp (off for Copilot, then the usage chart), market (install two skills), sessions
  *   (a session's requests), artifacts (tool filter, full-text search), stats
- *   (cost against response time per model on seeded sessions, tool and period filters, a cost detail), tools
+ *   (cost against response time per model on seeded sessions, tool and period filters, a cost detail), hooks (a
+ *   plain-language check when a reply finishes → apply), permissions (a git group: two blocked, one allowed → apply), tools
  *   (Grok CLI on → the Claude combo dialog → apply; Codex off → the preview lists what leaves, cancelled).
  * - Checks on disk that tool files only change on Apply and that the edit reached every tool, then encodes the full
  *   docs/demo/illithid-demo.mp4 and the per-scene GIFs. The market scene uses the network (public GET APIs).
@@ -388,6 +389,57 @@ async function sequence(page: Page, home: string): Promise<Record<string, boolea
     await cost.waitFor({ timeout: 10_000 })
     await moveTo(page, cost)
     await page.waitForTimeout(2200)
+    await page.keyboard.press('Escape')
+  })
+
+  // Hooks: a plain-language check when a reply finishes → Sync → the preview → Apply
+  await scene(page, 'hooks', async () => {
+    await clickSlow(page, page.locator('[data-menu="hooks"]'), 300)
+    await waitLoaded(page)
+    await clickSlow(page, page.getByTestId('hook-new'), 700)
+    const tile = (name: string): Locator =>
+      page.getByTestId('hook-new-timing').getByRole('radio', { name, exact: true })
+    await moveTo(page, tile('Before a shell command'))
+    await page.waitForTimeout(500)
+    await clickSlow(page, tile('When a reply finishes'), 600)
+    await clickSlow(
+      page,
+      page
+        .getByTestId('hook-new-mode')
+        .getByText('Check with a plain-language rule', { exact: true }),
+      600
+    )
+    const rule = page.getByTestId('hook-instruction')
+    await moveTo(page, rule)
+    await rule.click()
+    await page.keyboard.type('Keep working until the tests pass.', { delay: 40 })
+    await page.waitForTimeout(500)
+    await clickSlow(page, page.getByTestId('hook-create'), 900)
+    await applyViaPreview(page, ['claude', 'gemini'], 1500)
+    await page.waitForTimeout(700)
+    await page.keyboard.press('Escape')
+  })
+
+  // Permissions: a group that blocks two git commands and allows one → Sync → the preview → Apply
+  await scene(page, 'permissions', async () => {
+    await clickSlow(page, page.locator('[data-menu="permissions"]'), 300)
+    await waitLoaded(page)
+    await clickSlow(page, page.getByTestId('perm-new'), 700)
+    const field = async (id: string, text: string, delay: number): Promise<void> => {
+      const el = page.getByTestId(id)
+      await moveTo(page, el)
+      await el.click()
+      await page.keyboard.type(text, { delay })
+    }
+    await field('perm-group-name', 'git', 60)
+    await field('perm-group-description', 'Hard to undo', 45)
+    await field('perm-group-commands', 'git push --force\ngit reset --hard\ngit status', 35)
+    await page.waitForTimeout(500)
+    const status = page.getByTestId('perm-line').filter({ hasText: 'git status' })
+    await clickSlow(page, status.getByText('Allow', { exact: true }), 800)
+    await clickSlow(page, page.getByTestId('perm-create'), 900)
+    await applyViaPreview(page, ['claude', 'codex', 'gemini', 'copilot'], 1500)
+    await page.waitForTimeout(900)
     await page.keyboard.press('Escape')
   })
 

@@ -32,7 +32,7 @@
 
 ## 한 번 설정하고, 여러 에이전트에 동기화
 
-공통 설정을 한 번 수정하고, 변경 내용을 미리 본 뒤 사용하는 툴에 적용하세요. 룰, 스킬, 서브에이전트, MCP 서버를 툴별로 선택할 수 있습니다.
+공통 설정을 한 번 수정하고, 변경 내용을 미리 본 뒤 사용하는 툴에 적용하세요. 룰, 스킬, 서브에이전트, MCP 서버, 훅, 권한을 툴별로 선택할 수 있습니다.
 
 <p align="center"><img src="docs/demo/rules.gif" width="960" alt="데모: 룰을 고쳐 5개 툴에 미리보기 후 반영"></p>
 
@@ -41,6 +41,18 @@
 기존 설정을 가져오고, 사용할 툴을 선택하세요. 적용 전에 모든 변경을 확인할 수 있고, 가져온 원본은 Illithid가 관리하기 전에 백업됩니다.
 
 <p align="center"><img src="docs/demo/tools.gif" width="960" alt="Claude Code 와 함께 Grok CLI 켜기, Codex 를 끌 때 치워지는 항목 미리보기"></p>
+
+## 훅으로 검사 자동화하기
+
+훅을 한 번 만들면 Claude Code, Codex, Gemini CLI, GitHub Copilot, Grok CLI 에서 각 툴의 형식으로 실행됩니다. 실행 시점을 고르고, 직접 쓴 스크립트를 실행하거나 자연어 규칙으로 결과를 검사하세요. 여러 훅이 함께 쓰는 스크립트는 라이브러리에 두고, 보조 파일이 있는 폴더로도 만들 수 있습니다.
+
+<p align="center"><img src="docs/demo/hooks.gif" width="960" alt="응답이 끝났을 때 테스트 통과 여부를 검사하는 새 훅을 만들어 툴에 반영"></p>
+
+## 에이전트가 실행할 수 있는 명령 정하기
+
+셸 명령을 허용, 물어보기, 막기 중 하나로 한 번 정하면 Illithid가 Claude Code, Codex, Gemini CLI, GitHub Copilot 에 각 툴의 형식으로 규칙을 씁니다. 관련 명령을 그룹으로 묶고, 특정 툴에서만 규칙을 끌 수 있습니다.
+
+<p align="center"><img src="docs/demo/permissions.gif" width="960" alt="강제 push 와 hard reset 은 막고 git status 는 허용하는 git 그룹을 4개 툴에 반영"></p>
 
 ## 내 사용 기록으로 모델 비교
 
