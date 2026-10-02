@@ -1619,6 +1619,25 @@ function NewHookForm({
 
   return (
     <Stack gap="md" maw={640}>
+      <TextInput
+        label={t('common.name')}
+        value={name}
+        onChange={(e) => setTypedName(e.currentTarget.value)}
+        error={
+          name && !NAME_RE.test(name)
+            ? t('mcp.nameInvalid')
+            : taken.includes(name)
+              ? t('hooks.nameTaken')
+              : undefined
+        }
+        data-testid="hook-new-name"
+      />
+      <TextInput
+        label={t('hooks.description')}
+        value={description}
+        onChange={(e) => setDescription(e.currentTarget.value)}
+        data-testid="hook-new-description"
+      />
       <Select
         label={t('hooks.timingLabel')}
         data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
@@ -1730,24 +1749,6 @@ function NewHookForm({
         allowDecimal={false}
         w={240}
         data-testid="hook-new-timeout"
-      />
-      <TextInput
-        label={t('hooks.description')}
-        value={description}
-        onChange={(e) => setDescription(e.currentTarget.value)}
-      />
-      <TextInput
-        label={t('common.name')}
-        value={name}
-        onChange={(e) => setTypedName(e.currentTarget.value)}
-        error={
-          name && !NAME_RE.test(name)
-            ? t('mcp.nameInvalid')
-            : taken.includes(name)
-              ? t('hooks.nameTaken')
-              : undefined
-        }
-        data-testid="hook-new-name"
       />
       <Group justify="flex-end" gap="xs">
         <Button size="xs" variant="default" onClick={onCancel}>
