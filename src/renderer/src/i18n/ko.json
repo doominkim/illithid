@@ -1106,7 +1106,6 @@
     "deleteBody": "{{name}} 을 .trash 로 옮깁니다.",
     "deleteUsed": "{{name}} 을 .trash 로 옮깁니다. 이 스크립트를 쓰는 훅 {{count}}개는 각자 사본을 전용 스크립트로 갖습니다.",
     "empty": "스크립트가 없습니다",
-    "emptyHint": "아직 내 스크립트가 없습니다. 새로 쓰거나 폴더를 가져오세요.",
     "users": "쓰는 훅",
     "usedBy": "훅 {{count}}개",
     "nameHint": "scripts/<이름>.sh 로 저장됩니다",

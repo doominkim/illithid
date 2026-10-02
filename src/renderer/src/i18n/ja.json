@@ -1106,7 +1106,6 @@
     "deleteBody": "{{name}} を .trash に移します。",
     "deleteUsed": "{{name}} を .trash に移します。使っているフック {{count}} 件はそれぞれコピーを専用スクリプトとして持ちます。",
     "empty": "スクリプトはまだありません",
-    "emptyHint": "まだ自分のスクリプトがありません。新しく書くか、フォルダを取り込んでください。",
     "users": "使っているフック",
     "usedBy": "フック {{count}} 件",
     "nameHint": "scripts/<名前>.sh として保存されます",

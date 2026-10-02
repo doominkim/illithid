@@ -1106,7 +1106,6 @@
     "deleteBody": "Moves {{name}} to .trash.",
     "deleteUsed": "Moves {{name}} to .trash. The {{count}} hooks using it each keep a copy as their own script.",
     "empty": "No scripts yet",
-    "emptyHint": "No scripts of your own yet. Write one, or import a folder.",
     "users": "Hooks using it",
     "usedBy": "{{count}} hooks",
     "nameHint": "Saved as scripts/<name>.sh",

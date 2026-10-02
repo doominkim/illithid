@@ -32,6 +32,7 @@ import { LIBRARY_SCRIPT_RE, SCRIPT_TEMPLATE } from '../../../engine/scriptNames'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { FormFooter } from '../components/FormFooter'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
+import { EmptyLibrary, EmptyState } from '../components/EmptyState'
 import { FileEditor } from '../components/FileEditor'
 import { ErrorAlert, Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
@@ -67,6 +68,8 @@ function Scripts(): React.JSX.Element {
   const list = data.scripts.filter(
     (s) => !q || includesCI(s.name, q) || includesCI(s.description, q)
   )
+  const pickFolder = (): void =>
+    void window.api.pickDirectory().then((dir) => dir && setImportFrom(dir))
   const save = async (text: string): Promise<boolean> => {
     if (!current) return false
     const r = await runWrite(window.api.scriptSave(current.name, text), {
@@ -106,9 +109,7 @@ function Scripts(): React.JSX.Element {
               size="xs"
               variant="default"
               leftSection={<Download size={13} />}
-              onClick={() =>
-                void window.api.pickDirectory().then((dir) => dir && setImportFrom(dir))
-              }
+              onClick={pickFolder}
               data-testid="script-import"
             >
               {t('common.import')}
@@ -129,13 +130,11 @@ function Scripts(): React.JSX.Element {
       <Stack gap="lg">
         <Stack gap={8}>
           {data.scripts.length === 0 ? (
-            <Text size="sm" c="dimmed" data-testid="scripts-empty">
-              {t('scripts.emptyHint')}
-            </Text>
+            <div data-testid="scripts-empty">
+              <EmptyLibrary onImport={pickFolder} />
+            </div>
           ) : list.length === 0 ? (
-            <Text size="sm" c="dimmed">
-              {t('common.noResults')}
-            </Text>
+            <EmptyState title={t('common.noResults')} />
           ) : (
             <ListCard>
               {list.map((s) => (

@@ -1106,7 +1106,6 @@
     "deleteBody": "将 {{name}} 移到 .trash。",
     "deleteUsed": "将 {{name}} 移到 .trash。使用它的 {{count}} 个钩子会各自保留一份副本作为专用脚本。",
     "empty": "还没有脚本",
-    "emptyHint": "还没有自己的脚本。新建一个，或导入文件夹。",
     "users": "使用它的钩子",
     "usedBy": "{{count}} 个钩子",
     "nameHint": "保存为 scripts/<名称>.sh",
