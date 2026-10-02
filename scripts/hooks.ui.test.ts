@@ -253,6 +253,10 @@ test(
       assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'script-before-tool')
       await page.getByTestId('hook-create').click()
       await page.getByTestId('hook-summary').waitFor()
+      // The overview shows the script itself, not just its file name
+      await page.getByTestId('hook-overview-script').getByText('echo checked >&2').waitFor()
+      // Syncing happens only from the sidebar button
+      assert.equal(await page.getByTestId('hook-sync').count(), 0)
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })

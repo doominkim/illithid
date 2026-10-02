@@ -973,7 +973,6 @@
     },
     "pending": "Not in the tools yet",
     "pendingHint": "Sync to write this hook into the tools.",
-    "syncNow": "Review and sync",
     "tabOverview": "Overview",
     "tabAdvanced": "Advanced",
     "noTools": "No tool in use can run this hook.",

@@ -973,7 +973,6 @@
     },
     "pending": "尚未写入工具",
     "pendingHint": "同步后此钩子会写入工具设置。",
-    "syncNow": "检查并同步",
     "tabOverview": "概览",
     "tabAdvanced": "高级",
     "noTools": "正在使用的工具中没有能运行此钩子的。",

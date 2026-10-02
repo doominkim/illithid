@@ -16,7 +16,7 @@ import {
   Textarea,
   TextInput
 } from '@mantine/core'
-import { Download, FolderOpen, Layers, Plus, RefreshCw, Undo2 } from 'lucide-react'
+import { Download, FolderOpen, Layers, Plus, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   actionMatcher,
@@ -72,7 +72,6 @@ import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { problemText } from '../lib/problemReason'
 import { useReload } from '../lib/reload'
-import { useSync } from '../lib/sync'
 import { useToggleBusy } from '../lib/toggleBusy'
 import {
   grokReadsFromClaude,
@@ -827,7 +826,6 @@ function HookDetail({
 }): React.JSX.Element {
   const { t } = useTranslation()
   const summary = useSummary()
-  const { openPreview } = useSync()
   const [edit, setEdit] = useState<HookEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [tab, setTab] = useState<string | null>('preview')
@@ -863,7 +861,6 @@ function HookDetail({
     isHookTool(tool)
   ) as [HookTool, string][]
   const runTools = tools.filter((tool) => edit.runs[tool])
-  const waiting = runTools.some((tool) => hook.tools[tool] === 'needsSync')
 
   return (
     <Stack gap="lg">
@@ -899,19 +896,6 @@ function HookDetail({
           busy={busy}
           testId="hook-detail-tools"
         />
-        {waiting && (
-          <Group>
-            <Button
-              size="compact-xs"
-              variant="default"
-              leftSection={<RefreshCw size={12} />}
-              onClick={() => openPreview()}
-              data-testid="hook-sync"
-            >
-              {t('hooks.syncNow')}
-            </Button>
-          </Group>
-        )}
         <Unsupported
           action={doc.action}
           when={doc.when}
@@ -1013,6 +997,15 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
       <Box className="ac-card" p="md">
         <Fields rows={rows} />
       </Box>
+      {doc.action === 'script' &&
+        Object.entries(edit.scripts).map(([file, content]) => (
+          <Stack key={file} gap={6} data-testid="hook-overview-script">
+            <SectionLabel>{o.use ? String(o.use) : file}</SectionLabel>
+            <Code block style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+              {content}
+            </Code>
+          </Stack>
+        ))}
       {doc.body.trim() && (
         <Stack gap={6}>
           <SectionLabel>

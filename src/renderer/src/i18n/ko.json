@@ -973,7 +973,6 @@
     },
     "pending": "툴에 아직 반영 안 됨",
     "pendingHint": "동기화하면 이 훅이 툴 설정에 들어갑니다.",
-    "syncNow": "확인하고 동기화",
     "tabOverview": "개요",
     "tabAdvanced": "고급",
     "noTools": "사용 중인 툴 중 이 훅을 실행할 수 있는 툴이 없습니다.",
