@@ -6,6 +6,7 @@ import {
   spliceBlockMulti,
   type MarkerPair
 } from '../text'
+import { allowlistFor } from '../permissions'
 import type { Allowlist, TargetDef } from '../types'
 
 /** App marker (M7d) */
@@ -92,7 +93,7 @@ export const codexRules: TargetDef = {
         notes: ['library has no permissions.json — this target is left untouched']
       }
     }
-    const { body, skipped } = buildCodexRulesBody(sources.allowlist, before)
+    const { body, skipped } = buildCodexRulesBody(allowlistFor(sources.allowlist, 'codex'), before)
     const after = spliceBlockMulti(before, RULES_MARKERS, LEGACY_RULES_MARKERS, body)
     const outsideLines = outsideBlockMulti(after, ALL_RULES_MARKERS)
       .split('\n')

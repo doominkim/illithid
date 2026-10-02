@@ -6,6 +6,7 @@ import {
   toJsonText,
   untouchedKeysSame
 } from '../text'
+import { allowlistFor } from '../permissions'
 import { type Allowlist, type AllowlistEntry, type McpSource, type TargetDef } from '../types'
 
 type Json = Record<string, unknown>
@@ -61,7 +62,11 @@ export const claudePermissions: TargetDef = {
       }
     }
     const settings = parseJsonObject(before)
-    const next = buildClaudePermissions(sources.allowlist, sources.mcp, settings)
+    const next = buildClaudePermissions(
+      allowlistFor(sources.allowlist, 'claude'),
+      sources.mcp,
+      settings
+    )
     const after = toJsonText(next, before)
     const { count, same } = untouchedKeysSame(settings, next, 'permissions')
     const notes = [`${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`]

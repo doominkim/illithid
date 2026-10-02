@@ -7,6 +7,7 @@
  * Checked 2026-10-01: geminicli.com/docs/reference/policy-engine/
  */
 import { normalizeEntry } from '../text'
+import { allowlistFor } from '../permissions'
 import { TargetError, type Allowlist, type TargetDef } from '../types'
 
 export const GEMINI_POLICY_HEADER =
@@ -55,7 +56,9 @@ export const geminiPolicy: TargetDef = {
         '.gemini/policies/illithid.toml exists and is not the app’s — not written'
       )
     // Gemini turned off or no permissions.json: the app's file stays, with no rules
-    const after = geminiPolicyText(retiring || !sources.hasPermissions ? null : sources.allowlist)
+    const after = geminiPolicyText(
+      retiring || !sources.hasPermissions ? null : allowlistFor(sources.allowlist, 'gemini')
+    )
     if (!before.trim() && after === geminiPolicyText(null))
       return { after: before, notes: ['no command rules'] }
     return { after, notes: [`${(after.match(/^\[\[rule\]\]$/gm) ?? []).length} rules`] }

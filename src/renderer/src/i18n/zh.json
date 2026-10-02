@@ -1035,8 +1035,6 @@
     "copilotNo": "Copilot 无法保存询问或允许规则",
     "grokViaClaude": "Grok CLI 从 Claude Code 的设置中读取这些规则",
     "codexPrefix": "Codex 按命令开头匹配，因此也包括更长的命令",
-    "newGroup": "新建分组",
-    "groupCreated": "已添加分组",
     "groupSaved": "已保存分组",
     "groupDeleted": "已删除分组",
     "groupDeleteTitle": "删除分组",
@@ -1044,13 +1042,15 @@
     "ungrouped": "未分组",
     "group": "分组",
     "groupName": "分组名称",
+    "groupNameHint": "可选。留空时不加入分组，说明会附在每条规则上。",
     "groupNamePlaceholder": "git",
     "groupNameTaken": "已有同名分组",
     "groupDecision": "新命令的默认处理",
     "groupCommands": "命令",
     "groupCommandsHint": "每行一条命令。可在下方为每行单独设置处理方式。",
     "expand": "展开",
-    "collapse": "折叠"
+    "collapse": "折叠",
+    "groupPartial": "{{count}} 条规则中 {{on}} 条开启"
   },
   "scripts": {
     "search": "搜索脚本",

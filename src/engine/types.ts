@@ -21,6 +21,8 @@ export type AllowlistEntry =
       note?: string
       /** Name of the rule's group (permissions.ts) */
       group?: string
+      /** Tools the rule is turned off for (ToolId) */
+      off?: string[]
     }
 
 /** permissions.json. bash is the allow list (as before); ask and deny rules were added beside it so older versions still read it */

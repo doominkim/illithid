@@ -171,3 +171,33 @@ test('REQ-PERM-SYNC-5 groups and descriptions change nothing the tools get', () 
       f
     )
 })
+
+test('REQ-PERM-SYNC-6 a rule turned off for a tool leaves that tool only', () => {
+  const home = demoHome(['claude', 'codex', 'gemini', 'copilot'])
+  savePermissionRules(home, {
+    commands: [
+      {
+        decision: 'deny',
+        argv: ['git', 'push', '--force'],
+        exact: false,
+        off: ['claude', 'copilot']
+      },
+      { decision: 'deny', argv: ['git', 'reset', '--hard'], exact: false, off: ['codex', 'gemini'] }
+    ]
+  })
+  sync(home)
+  const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+    permissions: { deny: string[] }
+  }
+  assert.deepEqual(claude.permissions.deny, ['Bash(git reset --hard:*)'])
+  const codex = readFileSync(join(home, '.codex/rules/default.rules'), 'utf8')
+  assert.match(codex, /"push", "--force"/)
+  assert.doesNotMatch(codex, /"reset"/)
+  const gemini = readFileSync(join(home, '.gemini/policies/illithid.toml'), 'utf8')
+  assert.match(gemini, /git push --force/)
+  assert.doesNotMatch(gemini, /git reset/)
+  const copilot = readFileSync(join(home, '.copilot/hooks/illithid/_permissions/run.sh'), 'utf8')
+  assert.match(copilot, /git reset --hard/)
+  assert.doesNotMatch(copilot, /git push --force/)
+  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+})
