@@ -111,6 +111,7 @@ export type ExtraTargetId =
   | 'grokCompat'
   | 'claudeHooks'
   | 'codexHooks'
+  | 'codexHooksJson'
   | 'geminiHooks'
   | 'copilotHooks'
   | 'grokHooks'

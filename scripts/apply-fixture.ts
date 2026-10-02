@@ -107,6 +107,7 @@ const MODES: Record<TargetId, number> = {
   grokCompat: 0o600, // same file as grokMcp (not a default target)
   claudeHooks: 0o640, // same file as claudePermissions (not a default target)
   codexHooks: 0o600, // same file as codexMcp (not a default target)
+  codexHooksJson: 0o600, // not a default target
   geminiHooks: 0o600, // same file as geminiMcp (not a default target)
   copilotHooks: 0o600, // not a default target
   grokHooks: 0o600, // not a default target

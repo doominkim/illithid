@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { deletedBackupRoot } from './deleteCopies'
 import { buildContext, plan, planTarget } from './plan'
 import { readPlanSources } from './sources'
-import { HOOK_TARGET_TOOL } from './targets/hooks'
+import { HOOK_RETIRE_TOOL } from './targets/hooks'
 import { ALL_TARGETS, MCP_TARGET_TOOL, toolServerDefs } from './targets'
 import { activeWorkspaceId } from './config'
 import { dropPending } from './pendingRetire'
@@ -167,8 +167,8 @@ export function apply(
           state,
           c.retired.map((path) => ({
             // Imported hook originals in settings.json, or opencode.json instructions entries
-            kind: HOOK_TARGET_TOOL[c.id] ? ('hook' as const) : ('instruction' as const),
-            tool: HOOK_TARGET_TOOL[c.id] ?? ('opencode' as const),
+            kind: HOOK_RETIRE_TOOL[c.id] ? ('hook' as const) : ('instruction' as const),
+            tool: HOOK_RETIRE_TOOL[c.id] ?? ('opencode' as const),
             path,
             workspace: activeWorkspaceId(home)
           }))

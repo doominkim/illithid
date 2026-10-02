@@ -237,3 +237,51 @@ test('REQ-HOOKS-IMPORT-5 a hooks folder that is not a hook (no HOOK.md) keeps it
   assert.equal(readHook(home, 'copilot-sessionstart-2').doc.when, 'session-start')
   assert.equal(readFileSync(join(leftover, 'hook.json'), 'utf8'), '{}')
 })
+
+test('REQ-HOOKS-IMPORT-6 a Codex hooks.json hook comes in turned on, and the next sync swaps its original for the app entry', () => {
+  const home = demoHome(['codex'])
+  const hooksJson = join(home, '.codex/hooks.json')
+  mkdirSync(join(home, '.codex'), { recursive: true })
+  writeFileSync(
+    hooksJson,
+    JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'echo hi', timeout: 10 }] }],
+        Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }]
+      }
+    })
+  )
+  const plan = planImport(home, 'tool:codex')
+  const c = plan.hooks.find((x) => x.name === 'codex-sessionstart')!
+  assert.deepEqual(c.variants[0].warnings, ['inlineCommand'])
+  applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:codex')
+  assert.equal(readManifest(home).manifest.hooks[c.name].codex, undefined)
+  // Until the sync, the original is what runs
+  assert.equal(pendingSyncCount(home, baseEnv(home)) > 0, true)
+  approved(home)
+  // The original left hooks.json; the hook not imported stays
+  assert.deepEqual(json(hooksJson), {
+    hooks: { Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }] }
+  })
+  const toml = readFileSync(join(home, '.codex/config.toml'), 'utf8')
+  assert.match(toml, /\/\.codex\/hooks\/illithid\/codex-sessionstart\/run\.sh' codex"/)
+  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+  // The record is gone: a later sync leaves hooks.json alone
+  approved(home)
+  assert.deepEqual(Object.keys(json(hooksJson).hooks as object), ['Stop'])
+})
+
+test('REQ-HOOKS-IMPORT-7 a Codex hook written in config.toml (outside the app block) still comes in turned off', () => {
+  const home = demoHome(['codex'])
+  mkdirSync(join(home, '.codex'), { recursive: true })
+  const toml = join(home, '.codex/config.toml')
+  const original =
+    '[[hooks.SessionStart]]\n\n[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = "echo hi"\n'
+  writeFileSync(toml, original)
+  const [c] = planImport(home, 'tool:codex').hooks
+  assert.ok(c.variants[0].warnings.includes('originalKept'))
+  applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:codex')
+  assert.equal(readManifest(home).manifest.hooks[c.name].codex, false)
+  approved(home)
+  assert.ok(readFileSync(toml, 'utf8').startsWith(original))
+})

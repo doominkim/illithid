@@ -6,10 +6,10 @@
  * instead of making a new one (joins).
  *
  * Originals:
- * - Claude Code, Gemini CLI: recorded in state.json pendingRetire (kind hook) — the next approved sync removes the original entry from
- *   settings.json as it writes the app entry, so the tool never runs it twice and never goes without it
- * - Codex, GitHub Copilot, Grok CLI: the originals live in files the app does not edit (hooks.json, other hooks/*.json, tables outside
- *   the app block). They are left alone and the hook comes in turned off for that tool (originalKept)
+ * - Claude Code, Gemini CLI, Codex hooks.json: recorded in state.json pendingRetire (kind hook) — the next approved sync removes the
+ *   original entry as it writes the app entry, so the tool never runs it twice and never goes without it
+ * - Codex config.toml (outside the app block), GitHub Copilot, Grok CLI: the originals live in files the app does not edit (other
+ *   hooks/*.json, tables outside the app block). They are left alone and the hook comes in turned off for that tool (originalKept)
  * A copy of each original entry is saved to backups/imported at import time.
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -30,7 +30,13 @@ import { LibraryError } from './libpath'
 import { setToggle } from './manifest'
 import { addPending, importedBackupRoot, importStamp, type PendingRetire } from './pendingRetire'
 import { readState, writeState } from './state'
-import { appHookName, hookEntryHash, PROMPT_MARK, TOML_HOOK_MARKERS } from './targets/hooks'
+import {
+  appHookName,
+  CODEX_HOOKS_JSON,
+  hookEntryHash,
+  PROMPT_MARK,
+  TOML_HOOK_MARKERS
+} from './targets/hooks'
 import { outsideBlockMulti } from './text'
 import type { ToolId } from './toolIds'
 
@@ -40,6 +46,14 @@ const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
 /** Tools whose original entries the next sync replaces (the app edits their settings.json entry by entry) */
 export const HOOK_REPLACE_TOOLS: readonly HookTool[] = ['claude', 'gemini']
+
+/** Whether the next sync replaces this original: Claude Code and Gemini CLI settings, and Codex hooks.json */
+function replacesOriginal(home: string, tool: HookTool, configPath: string): boolean {
+  return (
+    HOOK_REPLACE_TOOLS.includes(tool) ||
+    (tool === 'codex' && configPath === join(home, CODEX_HOOKS_JSON))
+  )
+}
 
 export type HookImportWarning = 'inlineCommand' | 'originalKept' | 'toolVariable'
 
@@ -194,7 +208,7 @@ function scanTool(home: string, tool: HookTool, notes: string[]): FoundEntry[] {
       return fromJson(p, (o) => nested(tool, o.hooks, p))
     }
     case 'codex': {
-      const hooksJson = join(home, '.codex/hooks.json')
+      const hooksJson = join(home, CODEX_HOOKS_JSON)
       const toml = join(home, '.codex/config.toml')
       let fromToml: FoundEntry[] = []
       if (existsSync(toml))
@@ -290,7 +304,7 @@ export function hookImportCandidates(
     const warnings: HookImportWarning[] = []
     if (!ask && !scriptPath) warnings.push('inlineCommand')
     if (/\b(CLAUDE|GEMINI|CODEX)_[A-Z_]*DIR\b/.test(e.command)) warnings.push('toolVariable')
-    if (!HOOK_REPLACE_TOOLS.includes(tool)) warnings.push('originalKept')
+    if (!replacesOriginal(home, tool, e.configPath)) warnings.push('originalKept')
     const timeout = seconds(tool, e.handler)
     const trigger: HookTrigger = {
       event: e.event,
@@ -417,7 +431,7 @@ export function applyHookCandidate(
     { mode: 0o600 }
   )
   const name = v.joins ?? c.name
-  if (HOOK_REPLACE_TOOLS.includes(tool)) {
+  if (replacesOriginal(home, tool, v.configPath)) {
     // The next approved sync removes the original as it writes the app entry
     const st = readState(home)
     if (st.error) throw new LibraryError('configError', `state.json: ${st.error}`)

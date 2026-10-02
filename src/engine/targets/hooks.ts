@@ -5,10 +5,12 @@
  * - claudeHooks   ~/.claude/settings.json      hooks.<Event>[] = { matcher?, hooks: [{ type, command, timeout }] }
  * - geminiHooks   ~/.gemini/settings.json      same shape, plus `name`; timeout in milliseconds
  * - codexHooks    ~/.codex/config.toml         [[hooks.<Event>]] tables inside the app marker block
+ * - codexHooksJson ~/.codex/hooks.json         never written to, only imported originals leave it as their hook goes in
  * - copilotHooks  ~/.copilot/hooks/illithid.json  the whole file: { version: 1, hooks: { <event>: [{ type, bash, matcher?, timeoutSec? }] } }
  * - grokHooks     ~/.grok/hooks/illithid.json     the whole file: { hooks: { <Event>: [{ matcher?, hooks: [...] }] } }
  */
 import { createHash } from 'node:crypto'
+import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { HOOK_CATALOG, type HookTool } from '../hookEvents'
 import { hookCommand, hooksForTool, toolTimeout, type ToolHook } from '../hookRender'
@@ -397,6 +399,39 @@ export const codexHooks: TargetDef = {
   }
 }
 
+export const CODEX_HOOKS_JSON = '.codex/hooks.json'
+
+/**
+ * ~/.codex/hooks.json — the user's file. The app adds nothing here (its entries go in config.toml); an imported original leaves
+ * it in the same sync that writes its library hook into config.toml
+ */
+export const codexHooksJson: TargetDef = {
+  id: 'codexHooksJson',
+  tool: 'codex',
+  rel: CODEX_HOOKS_JSON,
+  optional: true,
+  seed: '',
+  region: () => null,
+  build(before, ctx): BuildResult {
+    const prefix = `${join(ctx.home ?? '', CODEX_HOOKS_JSON)}#`
+    const records = (ctx.pendingRetire ?? []).filter(
+      (p) => p.kind === 'hook' && p.tool === 'codex' && p.path.startsWith(prefix)
+    )
+    if (!records.length || !before.trim())
+      return { after: before, notes: ['no imported originals'], owned: [] }
+    const settings = parseJsonObject(before)
+    const names = new Set(wanted('codex', ctx).map((h) => h.hook.name))
+    const replacing = new Set(records.filter((p) => names.has(p.name)).map((p) => p.hash))
+    const cleaned = dropImported(settings.hooks, replacing)
+    const retired = records.filter((p) => !cleaned.present.has(p.hash)).map((p) => p.path)
+    const after = replacing.size
+      ? toJsonText({ ...settings, hooks: cleaned.table }, before)
+      : before
+    const notes = [`${retired.length} imported originals replaced`]
+    return retired.length ? { after, notes, owned: [], retired } : { after, notes, owned: [] }
+  }
+}
+
 export const HOOK_TARGETS: readonly TargetDef[] = [
   claudeHooks,
   codexHooks,
@@ -416,6 +451,12 @@ export const HOOK_TARGET_OF: Readonly<Record<HookTool, TargetId>> = {
 export const HOOK_TARGET_TOOL: Partial<Record<TargetId, HookTool>> = Object.fromEntries(
   Object.entries(HOOK_TARGET_OF).map(([tool, id]) => [id, tool])
 )
+
+/** Targets that retire imported hook originals → their tool */
+export const HOOK_RETIRE_TOOL: Partial<Record<TargetId, HookTool>> = {
+  ...HOOK_TARGET_TOOL,
+  codexHooksJson: 'codex'
+}
 
 /** App hook entries per hook name in a target file ({} for a missing file, null when it can't be read) */
 export function hookTable(id: TargetId, text: string): Map<string, string> | null {
