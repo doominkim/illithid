@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an improvement and explain the workflow it would help.
+title: '[Feature]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues before submitting. English, Korean, Japanese, and Chinese requests are welcome.
+        Use synthetic examples and avoid sharing credentials, private configuration, or conversation content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to do, and where does the current behavior get in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Describe the behavior you would like and who would benefit.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or current workaround
+  - type: input
+    id: affected-tools
+    attributes:
+      label: Affected tools
+      description: List any coding agents involved, if relevant.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Optional. Include redacted mockups or synthetic examples.

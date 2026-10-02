@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting
+    url: https://github.com/doominkim/illithid/blob/main/SECURITY.md
+    about: Follow the security policy before sharing a suspected vulnerability.
+  - name: Installation and usage
+    url: https://github.com/doominkim/illithid#readme
+    about: Read the installation instructions and FAQ.

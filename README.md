@@ -103,3 +103,8 @@ English, Korean, Japanese and Chinese.
 ## License
 
 [MIT](LICENSE)
+
+## Contributing and support
+
+Use the [issue forms](https://github.com/doominkim/illithid/issues/new/choose) to report bugs or suggest features.
+See [Contributing](CONTRIBUTING.md) for development setup and validation, the [Code of Conduct](CODE_OF_CONDUCT.md) for community standards, and the [Security Policy](SECURITY.md) for vulnerability reporting.

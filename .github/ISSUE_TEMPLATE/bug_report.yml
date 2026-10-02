@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a reproducible problem in Illithid.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues before submitting. English, Korean, Japanese, and Chinese reports are welcome.
+        This issue and its attachments will be public. Remove tokens, credentials, private paths, repository names, and conversation content.
+        For suspected vulnerabilities, follow the [security policy](https://github.com/doominkim/illithid/blob/main/SECURITY.md).
+  - type: input
+    id: app-version
+    attributes:
+      label: Illithid version
+      placeholder: e.g. 0.2.30
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: e.g. macOS 15.7
+    validations:
+      required: true
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Processor architecture
+      options:
+        - Apple Silicon (arm64)
+        - Intel (x64)
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Homebrew
+        - DMG from GitHub Releases
+        - Built from source
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: affected-tools
+    attributes:
+      label: Affected tools and versions
+      description: List the coding agents involved, or enter "None" for an app-only issue.
+      placeholder: e.g. Claude Code (version), Codex (version)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the affected screen or action. Use minimal, synthetic configuration when possible.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted error messages or screenshots
+      description: Optional. Share only the relevant excerpt, not full configuration files or session logs. Review screenshots for sensitive content.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I have removed secrets and private information from the report and attachments.
+          required: true
