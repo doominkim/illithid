@@ -1010,6 +1010,25 @@
         "edit": "ファイル編集後",
         "all": "すべての作業の実行後"
       }
+    },
+    "tiles": {
+      "groups": {
+        "talk": "会話",
+        "edit": "ファイル編集",
+        "shell": "コマンド実行",
+        "all": "すべての作業",
+        "other": "セッション・通知"
+      },
+      "before-tool": {
+        "edit": "編集前",
+        "shell": "実行前",
+        "all": "実行前"
+      },
+      "after-tool": {
+        "edit": "編集後",
+        "shell": "実行後",
+        "all": "実行後"
+      }
     }
   },
   "permissions": {

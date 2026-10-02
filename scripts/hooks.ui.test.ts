@@ -127,16 +127,23 @@ test(
       await page.locator('[data-menu="hooks"]').click()
       await page.getByTestId('hook-new').click()
       // The timing stays when switching to AI judgment
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before any action' }).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'Before any action', exact: true })
+        .click()
       await page
         .getByTestId('hook-new-mode')
         .getByText('Check with a plain-language rule', { exact: true })
         .click()
-      assert.equal(await page.getByTestId('hook-new-timing').inputValue(), 'Before any action')
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'Before any action', checked: true })
+        .waitFor()
       // A timing AI judgment can't use: the option isn't offered, and the form falls back to a script
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'After a file edit' }).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'After a file edit', exact: true })
+        .click()
       assert.equal(
         await page
           .getByTestId('hook-new-mode')
@@ -145,8 +152,10 @@ test(
         0
       )
       await page.getByTestId('hook-new-script').waitFor()
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before any action' }).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'Before any action', exact: true })
+        .click()
       await page
         .getByTestId('hook-new-mode')
         .getByText('Check with a plain-language rule', { exact: true })
@@ -154,11 +163,15 @@ test(
       assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
       await page.getByTestId('hook-option-judge').waitFor()
       // Judging before every tool call is slow: the form says so
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before any action' }).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'Before any action', exact: true })
+        .click()
       await page.getByTestId('hook-ask-slow').waitFor()
-      await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'When a reply finishes' }).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'When a reply finishes', exact: true })
+        .click()
       await page.getByTestId('hook-instruction').fill('Keep working until the tests pass.')
       await page.getByTestId('hook-create').click()
       await page.getByTestId('hook-summary').waitFor()
@@ -244,18 +257,30 @@ test(
       // No recipe cards: the form is there at once
       assert.equal(await page.locator('[data-card^="hook-action-"]').count(), 0)
       await page.getByTestId('hook-new-script').waitFor()
-      await page.getByTestId('hook-new-timing').click()
-      // Request and reply first, then each target's before and after side by side
-      assert.deepEqual((await page.getByRole('option').allInnerTexts()).slice(0, 6), [
-        'When you send a prompt',
-        'When a reply finishes',
-        'Before a file edit',
-        'After a file edit',
-        'Before a shell command',
-        'After a shell command'
-      ])
+      // Timings are tiles: request and reply first, then each target's before and after side by side
+      const tiles = page.getByTestId('hook-new-timing').getByRole('radio')
+      assert.deepEqual(
+        (await tiles.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).slice(
+          0,
+          6
+        ),
+        [
+          'When you send a prompt',
+          'When a reply finishes',
+          'Before a file edit',
+          'After a file edit',
+          'Before a shell command',
+          'After a shell command'
+        ]
+      )
+      // Inside a group, a tile reads just before or after
+      assert.equal(await tiles.nth(4).innerText(), 'Before')
       // Timing and target are one choice
-      await page.getByRole('option', { name: 'Before a shell command' }).click()
+      await tiles.nth(4).click()
+      await page
+        .getByTestId('hook-new-timing')
+        .getByRole('radio', { name: 'Before a shell command', checked: true })
+        .waitFor()
       const script = '#!/bin/sh\necho checked >&2\nexit 0\n'
       await page.getByTestId('hook-new-script').fill(script)
       await page.getByTestId('hook-new-timeout').fill('15')

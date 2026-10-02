@@ -1010,6 +1010,25 @@
         "edit": "파일 수정 후",
         "all": "모든 작업 실행 후"
       }
+    },
+    "tiles": {
+      "groups": {
+        "talk": "대화",
+        "edit": "파일 수정",
+        "shell": "명령 실행",
+        "all": "모든 작업",
+        "other": "세션·알림"
+      },
+      "before-tool": {
+        "edit": "수정 전",
+        "shell": "실행 전",
+        "all": "실행 전"
+      },
+      "after-tool": {
+        "edit": "수정 후",
+        "shell": "실행 후",
+        "all": "실행 후"
+      }
     }
   },
   "permissions": {

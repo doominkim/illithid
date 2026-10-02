@@ -1010,6 +1010,25 @@
         "edit": "文件修改后",
         "all": "所有操作执行后"
       }
+    },
+    "tiles": {
+      "groups": {
+        "talk": "对话",
+        "edit": "文件修改",
+        "shell": "命令执行",
+        "all": "所有操作",
+        "other": "会话与通知"
+      },
+      "before-tool": {
+        "edit": "修改前",
+        "shell": "执行前",
+        "all": "执行前"
+      },
+      "after-tool": {
+        "edit": "修改后",
+        "shell": "执行后",
+        "all": "执行后"
+      }
     }
   },
   "permissions": {

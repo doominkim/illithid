@@ -1010,6 +1010,25 @@
         "edit": "After a file edit",
         "all": "After any action"
       }
+    },
+    "tiles": {
+      "groups": {
+        "talk": "Conversation",
+        "edit": "File edits",
+        "shell": "Shell commands",
+        "all": "Any action",
+        "other": "Session & alerts"
+      },
+      "before-tool": {
+        "edit": "Before",
+        "shell": "Before",
+        "all": "Before"
+      },
+      "after-tool": {
+        "edit": "After",
+        "shell": "After",
+        "all": "After"
+      }
     }
   },
   "permissions": {

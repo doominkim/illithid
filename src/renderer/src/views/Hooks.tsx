@@ -7,6 +7,7 @@ import {
   Checkbox,
   Code,
   Group,
+  Input,
   NumberInput,
   SegmentedControl,
   Select,
@@ -62,6 +63,7 @@ import { MarkdownEditor } from '../components/MarkdownEditor'
 import { PageHeader, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
+import { TimingArt, type TimingArtId } from '../components/TimingArt'
 import { ToolIcon } from '../components/ToolIcon'
 import { ToolPills } from '../components/ToolPills'
 import { ToolToggleRow } from '../components/ToolToggleRow'
@@ -103,22 +105,55 @@ function whenKey(when: HookTiming, scope: Scope): string {
     : `hooks.timing.${when}`
 }
 
-/** Timing and target as one choice, in the order people meet them */
-const WHEN_CHOICES: readonly (readonly [HookTiming, Scope])[] = [
-  ['prompt', 'all'],
-  ['stop', 'all'],
-  ['before-tool', 'edit'],
-  ['after-tool', 'edit'],
-  ['before-tool', 'shell'],
-  ['after-tool', 'shell'],
-  ['before-tool', 'all'],
-  ['after-tool', 'all'],
-  ['notification', 'all'],
-  ['session-start', 'all'],
-  ['session-end', 'all']
+type Choice = readonly [HookTiming, Scope]
+
+/** Timing and target as one choice, grouped and in the order people meet them */
+const TIMING_GROUPS: readonly (readonly [string, readonly Choice[]])[] = [
+  [
+    'talk',
+    [
+      ['prompt', 'all'],
+      ['stop', 'all']
+    ]
+  ],
+  [
+    'edit',
+    [
+      ['before-tool', 'edit'],
+      ['after-tool', 'edit']
+    ]
+  ],
+  [
+    'shell',
+    [
+      ['before-tool', 'shell'],
+      ['after-tool', 'shell']
+    ]
+  ],
+  [
+    'all',
+    [
+      ['before-tool', 'all'],
+      ['after-tool', 'all']
+    ]
+  ],
+  [
+    'other',
+    [
+      ['notification', 'all'],
+      ['session-start', 'all'],
+      ['session-end', 'all']
+    ]
+  ]
 ]
 
-/** One select for when a script or plain-language check runs and on what. `action` limits it to the timings it can use */
+const isToolTiming = (w: HookTiming): w is 'before-tool' | 'after-tool' =>
+  w === 'before-tool' || w === 'after-tool'
+
+const artOf = ([w, sc]: Choice): TimingArtId =>
+  isToolTiming(w) ? `${sc}-${w === 'before-tool' ? 'before' : 'after'}` : (w as TimingArtId)
+
+/** When a script or plain-language check runs and on what, as tiles. `action` limits it to the timings it can use */
 function WhenSelect({
   action,
   when,
@@ -133,25 +168,77 @@ function WhenSelect({
   testId: string
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const choices = WHEN_CHOICES.filter(
-    ([w]) => !action || HOOK_ACTION_INFO[action].timings.includes(w)
-  )
-  const key = (w: HookTiming, sc: Scope): string =>
-    w === 'before-tool' || w === 'after-tool' ? `${w}:${sc}` : w
+  const groups = TIMING_GROUPS.map(
+    ([id, choices]) =>
+      [
+        id,
+        choices.filter(([w]) => !action || HOOK_ACTION_INFO[action].timings.includes(w))
+      ] as const
+  ).filter(([, choices]) => choices.length)
+  const flat = groups.flatMap(([, choices]) => choices)
+  const on = ([w, sc]: Choice): boolean => w === when && (!isToolTiming(w) || sc === target)
+  const pick = (c: Choice, focus?: HTMLElement | null): void => {
+    onChange(c[0], c[1])
+    focus?.focus()
+  }
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key]
+    if (step === undefined && e.key !== 'Home' && e.key !== 'End') return
+    e.preventDefault()
+    const i = flat.findIndex(on)
+    const next =
+      e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? flat.length - 1
+          : (i + (step ?? 0) + flat.length) % flat.length
+    const tiles = e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')
+    pick(flat[next], tiles[next])
+  }
   return (
-    <Select
+    <Input.Wrapper
       label={t('hooks.timingLabel')}
-      data={choices.map(([w, sc]) => ({ value: key(w, sc), label: t(whenKey(w, sc)) }))}
-      value={key(when, target)}
-      onChange={(v) => {
-        if (!v) return
-        const [w, sc] = v.split(':') as [HookTiming, Scope | undefined]
-        onChange(w, sc ?? 'all')
-      }}
-      allowDeselect={false}
       description={t(`hooks.timingHint.${when}`)}
-      data-testid={testId}
-    />
+      inputWrapperOrder={['label', 'input', 'description']}
+    >
+      <div
+        className="ac-timing"
+        role="radiogroup"
+        aria-label={t('hooks.timingLabel')}
+        onKeyDown={onKey}
+        data-testid={testId}
+        style={{ margin: '8px 0' }}
+      >
+        {groups.map(([id, choices]) => (
+          <div key={id} role="group" aria-label={t(`hooks.tiles.groups.${id}`)}>
+            <div className="ac-timing-group-label">{t(`hooks.tiles.groups.${id}`)}</div>
+            <div className="ac-timing-tiles">
+              {choices.map((c) => (
+                <button
+                  key={c.join(':')}
+                  type="button"
+                  role="radio"
+                  className="ac-timing-tile"
+                  aria-checked={on(c)}
+                  aria-label={t(whenKey(c[0], c[1]))}
+                  tabIndex={on(c) ? 0 : -1}
+                  onClick={() => pick(c)}
+                >
+                  <span className="ac-timing-box">
+                    <TimingArt id={artOf(c)} />
+                  </span>
+                  <span className="ac-timing-title">
+                    {isToolTiming(c[0])
+                      ? t(`hooks.tiles.${c[0]}.${c[1]}`)
+                      : t(`hooks.timing.${c[0]}`)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Input.Wrapper>
   )
 }
 const ALL = 'all'
