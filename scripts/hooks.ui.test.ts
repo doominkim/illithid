@@ -89,6 +89,9 @@ test(
 
       // Edit: the options form; every tool's script is generated again
       await page.getByTestId('hook-tab-edit').click()
+      await page.getByTestId('hook-option-message').waitFor()
+      // The description says what the hook is for: no notes field
+      assert.equal(await page.getByLabel('Notes', { exact: true }).count(), 0)
       await page.getByTestId('hook-option-message').fill('Finished')
       await page.getByTestId('hook-save').click()
       await page.getByText('Hook saved').waitFor()

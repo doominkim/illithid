@@ -963,7 +963,6 @@
     "instruction": "规则",
     "instructionHint": "AI 会根据此规则和事件决定放行还是阻止。",
     "instructionExample": "如果测试还没通过，就继续工作。",
-    "notes": "备注",
     "scriptStarter": "从模板脚本开始。创建后再编辑。",
     "nameTaken": "已有同名钩子",
     "unsupported": {

@@ -1116,14 +1116,10 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
           </Group>
         </Stack>
       )}
-      {doc.body.trim() && (
+      {(doc.action === 'ask' || doc.action === 'context') && doc.body.trim() && (
         <Stack gap={6}>
           <SectionLabel>
-            {doc.action === 'ask'
-              ? t('hooks.instruction')
-              : doc.action === 'context'
-                ? t('hooks.contextNote')
-                : t('hooks.notes')}
+            {doc.action === 'ask' ? t('hooks.instruction') : t('hooks.contextNote')}
           </SectionLabel>
           <Box className="ac-card" p="md">
             <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
@@ -1219,17 +1215,8 @@ function HookEditForm({
           />
           {doc.action === 'ask' ? (
             <InstructionField value={body} onChange={setBody} />
-          ) : doc.action === 'context' ? (
-            <ContextNoteField value={body} onChange={setBody} />
           ) : (
-            <Textarea
-              label={t('hooks.notes')}
-              value={body}
-              onChange={(e) => setBody(e.currentTarget.value)}
-              autosize
-              minRows={2}
-              maxRows={10}
-            />
+            doc.action === 'context' && <ContextNoteField value={body} onChange={setBody} />
           )}
           <Group justify="flex-end" gap="xs">
             <Button

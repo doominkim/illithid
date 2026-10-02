@@ -963,7 +963,6 @@
     "instruction": "Rule",
     "instructionHint": "An AI reads this rule with the event and lets it through or stops it.",
     "instructionExample": "If the tests have not passed yet, keep working.",
-    "notes": "Notes",
     "scriptStarter": "Starts with a template script. Edit it after creating.",
     "nameTaken": "A hook with this name exists",
     "unsupported": {

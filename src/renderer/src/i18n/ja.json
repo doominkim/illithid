@@ -963,7 +963,6 @@
     "instruction": "ルール",
     "instructionHint": "AI がこのルールとイベントを見て、通すか止めるかを決めます。",
     "instructionExample": "テストがまだ通っていなければ作業を続けて。",
-    "notes": "メモ",
     "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",
     "nameTaken": "同じ名前のフックがあります",
     "unsupported": {

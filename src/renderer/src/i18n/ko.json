@@ -963,7 +963,6 @@
     "instruction": "규칙",
     "instructionHint": "AI 가 이 규칙과 이벤트를 보고 통과시킬지 막을지 정합니다.",
     "instructionExample": "테스트가 아직 통과하지 않았으면 작업을 계속해.",
-    "notes": "메모",
     "scriptStarter": "템플릿 스크립트로 시작합니다. 만든 뒤 고치세요.",
     "nameTaken": "같은 이름의 훅이 있습니다",
     "unsupported": {
