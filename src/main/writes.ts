@@ -93,8 +93,6 @@ import {
   deleteScript,
   convertHookToLibraryScript,
   renderUniversalScript,
-  isScriptRecipe,
-  recipeDoc,
   type PermissionRules
 } from '../engine'
 import { previewSwitch } from '../engine'
@@ -709,12 +707,6 @@ export const lib = {
   },
   scriptCreate: (home: string, name: string, content?: string) => {
     createScript(home, name, content)
-    return { name }
-  },
-  scriptFromRecipe: (home: string, action: string, name: string) => {
-    if (!isScriptRecipe(action))
-      throw new LibraryError('invalidSchema', 'not a recipe with a script')
-    createScript(home, name, renderUniversalScript(name, recipeDoc(action)))
     return { name }
   },
   scriptSave: (home: string, name: string, content: string) => {

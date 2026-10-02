@@ -69,11 +69,6 @@ import {
   permissionRules,
   readScripts,
   scriptsDir,
-  SCRIPT_RECIPES,
-  recipeDoc,
-  renderActionScript,
-  renderAskPrompt,
-  renderUniversalScript,
   hookNames,
   readHook,
   type HookDoc,
@@ -829,27 +824,10 @@ export function scripts(home: string): ScriptsData {
     }
     return {
       dir,
-      scripts: readScripts(home).map((s) => ({ ...s, users: users.get(s.name) ?? [] })),
-      builtins: SCRIPT_RECIPES.map((action) => {
-        const doc = recipeDoc(action)
-        const perTool: Partial<Record<(typeof HOOK_TOOLS)[number], string>> = {}
-        for (const tool of HOOK_TOOLS)
-          if (hookSupport(action, doc.when, tool) === 'ok')
-            // Claude Code judges with its prompt hook: show the prompt it gets
-            perTool[tool] =
-              action === 'ask' && tool === 'claude'
-                ? renderAskPrompt(doc)
-                : renderActionScript(tool, action, doc)
-        return {
-          action,
-          users: hooksWith.filter((h) => h.action === action).map((h) => h.name),
-          universal: renderUniversalScript(action, doc),
-          perTool
-        }
-      })
+      scripts: readScripts(home).map((s) => ({ ...s, users: users.get(s.name) ?? [] }))
     }
   } catch (e) {
-    return { dir, scripts: [], builtins: [], error: `${dir} read failed: ${(e as Error).message}` }
+    return { dir, scripts: [], error: `${dir} read failed: ${(e as Error).message}` }
   }
 }
 
