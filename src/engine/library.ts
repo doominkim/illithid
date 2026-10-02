@@ -1469,6 +1469,8 @@ export function createHookToolScript(home: string, name: string, tool: HookTool)
   const p = hookScriptPath(home, name, file)
   if (existsSync(assertInsideLibrary(home, p))) throw new LibraryError('exists', `${file} exists`)
   const use = usedScript(doc)
+  if (use && readScript(home, use)?.kind === 'folder')
+    throw new LibraryError('invalidSchema', "a folder script's other files can't come along")
   const shared = use
     ? (readScript(home, use)?.content ?? HOOK_SCRIPT_TEMPLATE)
     : readFileSync(assertInsideLibrary(home, hookScriptPath(home, name, SHARED_SCRIPT)), 'utf8')
@@ -1710,6 +1712,28 @@ export function importScriptFolder(
     join(dir, SCRIPT_DOC),
     renderScriptDoc({ description: own?.description ?? '', entry: found, body: own?.body ?? '' })
   )
+  return target
+}
+
+/** A folder script takes the content of another folder (a tool's edited copy). The old version goes to the trash */
+export function replaceScriptFolder(home: string, name: string, from: string): string {
+  folderScriptDoc(home, name)
+  const scan = scanScriptFolder(from)
+  if (scan.problem)
+    throw new LibraryError('invalidSchema', `the folder can't be a script: ${scan.problem}`)
+  const dir = scriptDirPath(home, name)
+  const target = assertInsideLibrary(home, dir)
+  const tmp = assertInsideLibrary(
+    home,
+    join(scriptsDir(home), appTmpName(name, String(Date.now())))
+  )
+  try {
+    cpSync(from, tmp, { recursive: true, errorOnExist: true, force: false })
+    moveToTrash(home, target)
+    renameSync(tmp, target)
+  } finally {
+    if (existsSync(tmp)) rmSync(tmp, { recursive: true, force: true })
+  }
   return target
 }
 

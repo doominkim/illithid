@@ -4,16 +4,21 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import { spawnSync } from 'node:child_process'
 import {
+  createFolderScript,
   createHook,
   createHookToolScript,
   deleteHook,
+  keepHookCopy,
   pendingSyncCount,
   readHook,
   saveHookDoc,
   setToggle,
-  syncAll
+  syncAll,
+  writeScriptFile
 } from '../src/engine'
+import { hooks as hooksView } from '../src/main/reads'
 import { applyPreview } from '../src/main/preview'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
@@ -230,4 +235,125 @@ test('REQ-HOOKS-SYNC-7 the apply preview lists hook entries and script copies; a
     readFileSync(join(home, '.config/illithid/backups/hooks/claude/guard/run.sh'), 'utf8'),
     'edited in the tool\n'
   )
+})
+
+const FOLDER_RUN = '#!/bin/sh\n. "$(dirname "$0")/lib/util.sh"\nsay_done "$1" "$2"\n'
+const UTIL = 'say_done() { echo "done $1 $2"; }\n'
+const folderCopy = (home: string, tool: string, name = 'fmt'): string =>
+  join(home, `.${tool}/hooks/illithid/_scripts/${name}`)
+
+/** A folder script "fmt" (run.sh calls lib/util.sh) used by hooks a (stop) and b (session start) */
+function folderScriptHome(): string {
+  const home = demoHome(['claude', 'gemini'])
+  createFolderScript(home, 'fmt', { content: FOLDER_RUN })
+  writeScriptFile(home, 'fmt', 'lib/util.sh', UTIL)
+  createHook(home, 'a', {
+    description: '',
+    when: 'stop',
+    action: 'script',
+    options: { use: 'fmt' }
+  })
+  createHook(home, 'b', {
+    description: '',
+    when: 'session-start',
+    action: 'script',
+    options: { use: 'fmt' }
+  })
+  return home
+}
+
+test('REQ-HOOKS-SYNC-8 a folder script reaches each tool once, whole; the hooks using it run its entry, which finds its files', () => {
+  const home = folderScriptHome()
+  const rows = applyPreview(home, baseEnv(home))
+    .items.filter((x) => x.tool === 'claude' && x.kind === 'hookScript')
+    .map((x) => `${x.action}:${x.name}`)
+  assert.deepEqual(rows, ['add:_scripts/fmt'])
+  sync(home)
+  for (const tool of ['claude', 'gemini']) {
+    const dir = folderCopy(home, tool)
+    assert.equal(readFileSync(join(dir, 'run.sh'), 'utf8'), FOLDER_RUN)
+    assert.equal(readFileSync(join(dir, 'lib/util.sh'), 'utf8'), UTIL)
+    assert.ok(existsSync(join(dir, 'SCRIPT.md')))
+    assert.equal(statSync(join(dir, 'run.sh')).mode & 0o111, 0o111)
+    // No copy per hook
+    assert.equal(existsSync(join(home, `.${tool}/hooks/illithid/a`)), false)
+  }
+  const claude = json(join(home, '.claude/settings.json')) as {
+    hooks: Record<string, { hooks: { command: string }[] }[]>
+  }
+  const cmd = claude.hooks.Stop[0].hooks[0].command
+  assert.equal(cmd, `'${join(folderCopy(home, 'claude'), 'run.sh')}' claude a`)
+  assert.equal(
+    claude.hooks.SessionStart[0].hooks[0].command,
+    `'${join(folderCopy(home, 'claude'), 'run.sh')}' claude b`
+  )
+  // The entry runs in place and finds lib/util.sh next to it
+  const r = spawnSync('/bin/sh', ['-c', cmd], { encoding: 'utf8', cwd: tmpdir() })
+  assert.equal(r.stdout, 'done claude a\n')
+  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+  // Editing a file of the script reaches the copies
+  writeScriptFile(home, 'fmt', 'lib/util.sh', 'say_done() { echo "v2 $1"; }\n')
+  assert.ok(pendingSyncCount(home, baseEnv(home)) > 0)
+  sync(home)
+  assert.equal(
+    readFileSync(join(folderCopy(home, 'gemini'), 'lib/util.sh'), 'utf8'),
+    'say_done() { echo "v2 $1"; }\n'
+  )
+  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+})
+
+test('REQ-HOOKS-SYNC-9 a folder copy edited in a tool is kept back into the library, or restored by an approved apply with a backup', () => {
+  const home = folderScriptHome()
+  sync(home)
+  const util = join(folderCopy(home, 'claude'), 'lib/util.sh')
+  writeFileSync(util, 'say_done() { echo "edited"; }\n')
+  // The hooks using it show the edit
+  const view = hooksView(home, baseEnv(home))
+  assert.deepEqual(
+    view.hooks.filter((h) => h.edited?.claude).map((h) => [h.name, h.edited!.claude]),
+    [
+      ['a', 'run.sh'],
+      ['b', 'run.sh']
+    ]
+  )
+  keepHookCopy(home, 'claude', 'a', 'run.sh')
+  assert.equal(
+    readFileSync(join(home, '.illithid/workspaces/default/scripts/fmt/lib/util.sh'), 'utf8'),
+    'say_done() { echo "edited"; }\n'
+  )
+  sync(home)
+  assert.equal(
+    readFileSync(join(folderCopy(home, 'gemini'), 'lib/util.sh'), 'utf8'),
+    'say_done() { echo "edited"; }\n'
+  )
+  // Edited again: automatic syncs leave it, an approved apply restores it after a backup
+  writeFileSync(util, 'again\n')
+  sync(home)
+  assert.equal(readFileSync(util, 'utf8'), 'again\n')
+  sync(home, true)
+  assert.equal(readFileSync(util, 'utf8'), 'say_done() { echo "edited"; }\n')
+  assert.equal(
+    readFileSync(
+      join(home, '.config/illithid/backups/hooks/claude/_scripts/fmt/lib/util.sh'),
+      'utf8'
+    ),
+    'again\n'
+  )
+})
+
+test('REQ-HOOKS-SYNC-10 a folder copy no hook in the tool uses any more is removed with a backup', () => {
+  const home = folderScriptHome()
+  sync(home)
+  setToggle(home, 'hooks', 'a', 'claude', false)
+  sync(home)
+  // b still uses it
+  assert.ok(existsSync(folderCopy(home, 'claude')))
+  setToggle(home, 'hooks', 'b', 'claude', false)
+  sync(home)
+  assert.equal(existsSync(folderCopy(home, 'claude')), false)
+  assert.ok(existsSync(folderCopy(home, 'gemini')))
+  assert.ok(existsSync(join(home, '.config/illithid/backups/deleted')))
+  assert.equal(pendingSyncCount(home, baseEnv(home)), 0)
+  // A tool-only script would lose the folder's other files
+  assert.throws(() => createHookToolScript(home, 'a', 'gemini'), { code: 'invalidSchema' })
 })

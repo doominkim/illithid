@@ -12,7 +12,7 @@ import { tools, type ToolId } from './agents'
 import { agentToolDir } from './agentRender'
 import { planAgentSync } from './agentSync'
 import { isHookTool } from './hookEvents'
-import { hookCopyRoot } from './hookRender'
+import { hookCopyRoot, SCRIPT_COPY_DIR } from './hookRender'
 import { planHookSync } from './hookSync'
 import { appConfigDir } from './config'
 import { claudeRulesPaths, copyRuleFile, copyRulesDir, planRuleSync } from './ruleSync'
@@ -226,11 +226,13 @@ export function deleteSyncCandidates(
           continue
         }
         const cur = lstatSync(it.path, { throwIfNoEntry: false })
+        // A folder script's shared copy is a folder; a hook's copy is a file
+        const folder = it.hook === SCRIPT_COPY_DIR
         if (
           !cur ||
           cur.isSymbolicLink() ||
-          !cur.isFile() ||
-          fileHash(it.path) !== it.currentHash ||
+          (folder ? !cur.isDirectory() : !cur.isFile()) ||
+          (folder ? dirContentHash(it.path) : fileHash(it.path)) !== it.currentHash ||
           req.currentHash !== it.currentHash
         ) {
           refuse('changedSinceCheck')

@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { HOOK_CATALOG, type HookTool } from '../hookEvents'
-import { hookCommand, hooksForTool, toolTimeout, type ToolHook } from '../hookRender'
+import { hooksForTool, toolHookCommand, toolTimeout, type ToolHook } from '../hookRender'
 import {
   blockBodyMulti,
   parseJsonObject,
@@ -38,13 +38,20 @@ import { parsePlainJsonConfig, toSettingsText } from './geminiMcp'
 type Json = Record<string, unknown>
 const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.isArray(v)
 
-/** `/.<tool home>/hooks/illithid/<hook>/<file>' <tool>` at the end of an app command */
+/**
+ * The end of an app command: `/.<tool home>/hooks/illithid/<hook>/<file>' <tool>`, or a folder script's shared copy
+ * `/.<tool home>/hooks/illithid/_scripts/<script>/<entry>' <tool> <hook>`
+ */
+const appCommand = (dir: string, tool: HookTool): RegExp =>
+  new RegExp(
+    `/\\.${dir}/hooks/illithid/(?:_scripts/[^']+' ${tool} ([a-z0-9][a-z0-9._-]{0,63})|([^/']+)/[^/']+' ${tool})$`
+  )
 const APP_COMMAND: Readonly<Record<HookTool, RegExp>> = {
-  claude: /\/\.claude\/hooks\/illithid\/([^/']+)\/[^/']+' claude$/,
-  codex: /\/\.codex\/hooks\/illithid\/([^/']+)\/[^/']+' codex$/,
-  gemini: /\/\.gemini\/hooks\/illithid\/([^/']+)\/[^/']+' gemini$/,
-  copilot: /\/\.copilot\/hooks\/illithid\/([^/']+)\/[^/']+' copilot$/,
-  grok: /\/\.grok\/hooks\/illithid\/([^/']+)\/[^/']+' grok$/
+  claude: appCommand('claude', 'claude'),
+  codex: appCommand('codex', 'codex'),
+  gemini: appCommand('gemini', 'gemini'),
+  copilot: appCommand('copilot', 'copilot'),
+  grok: appCommand('grok', 'grok')
 }
 
 /** Identity of one original handler (event + matcher + handler) — stays the same as long as the user doesn't edit it */
@@ -98,7 +105,8 @@ function dropImported(
 /** Hook name an app command belongs to, or null for the user's commands */
 export function appHookName(tool: HookTool, command: unknown): string | null {
   if (typeof command !== 'string' || !command.startsWith("'")) return null
-  return APP_COMMAND[tool].exec(command)?.[1] ?? null
+  const m = APP_COMMAND[tool].exec(command)
+  return m ? (m[1] ?? m[2] ?? null) : null
 }
 
 /** Which hook a config entry belongs to: the hook of its command(s) when every command is the app's, else null */
@@ -164,7 +172,7 @@ function renderEntry(home: string, tool: HookTool, h: ToolHook): Json {
         }
       ]
     }
-  const command = hookCommand(home, tool, h.hook.name, h.file)
+  const command = toolHookCommand(home, tool, h)
   if (tool === 'copilot')
     return {
       type: 'command',
@@ -349,7 +357,7 @@ function codexBody(home: string, hooks: ToolHook[]): string {
       '',
       `[[hooks.${event}.hooks]]`,
       'type = "command"',
-      `command = ${tomlString(hookCommand(home, 'codex', h.hook.name, h.file))}`
+      `command = ${tomlString(toolHookCommand(home, 'codex', h))}`
     )
     if (timeout !== undefined) out.push(`timeout = ${timeout}`)
     out.push('')

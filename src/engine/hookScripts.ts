@@ -459,10 +459,17 @@ export function renderAskPrompt(doc: HookDoc): string {
 export function toolScript(
   tool: HookTool,
   hook: LibraryHook
-): { file: string; content: string } | null {
+): { file: string; content: string; folder?: string } | null {
   const { doc } = hook
   // Claude Code judges with its own prompt hook; the other tools run the judging script
   if (doc.action === 'ask' && tool === 'claude') return null
+  // A folder library script: the entry of its shared copy (a tool-only script of the hook still wins)
+  if (doc.action === 'script' && hook.folder && !doc.toolScripts?.[tool])
+    return {
+      file: hook.folder.entry,
+      content: hook.scripts['run.sh'] ?? '',
+      folder: hook.folder.name
+    }
   if (doc.action === 'script') {
     const file = scriptForTool(doc, tool)
     return { file, content: hook.scripts[file] ?? '' }

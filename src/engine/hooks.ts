@@ -84,6 +84,8 @@ export interface LibraryHook {
   doc: HookDoc
   /** Script action: script file name → content. Empty for the other actions */
   scripts: Record<string, string>
+  /** Script action running a folder library script: the tools run its entry from one shared copy */
+  folder?: { name: string; entry: string }
 }
 
 export function hooksDir(home: string): string {
@@ -315,7 +317,11 @@ export function readHook(home: string, name: string): LibraryHook {
   if (use) {
     const lib = readScript(home, use)
     if (!lib) throw new Error(`hooks/${name}: library script ${use} not found`)
+    if (lib.problem)
+      throw new Error(`hooks/${name}: library script ${use} can't be copied (${lib.problem})`)
     scripts[SHARED_SCRIPT] = lib.content
+    if (lib.kind === 'folder')
+      return { name, doc, scripts, folder: { name: use, entry: lib.entry ?? SHARED_SCRIPT } }
   }
   return { name, doc, scripts }
 }

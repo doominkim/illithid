@@ -166,7 +166,7 @@ function readFolderScript(home: string, name: string): LibraryScript {
     name,
     kind: 'folder',
     description: doc?.description ?? '',
-    entry,
+    entry: found ?? entry,
     files: scan.files,
     content: found ? readFileSync(join(dir, found), 'utf8') : '',
     ...(problem ? { problem } : {})

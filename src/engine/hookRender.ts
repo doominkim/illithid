@@ -48,6 +48,20 @@ export function hookCommand(home: string, tool: HookTool, hook: string, file: st
   return `${shellQuote(hookCopyPath(home, tool, hook, file))} ${tool}`
 }
 
+/** Shared copies of folder library scripts: `<copy root>/_scripts/<script>/` (not a valid hook name, so no clash) */
+export const SCRIPT_COPY_DIR = '_scripts'
+
+export function scriptCopyDir(home: string, tool: HookTool, script: string): string {
+  return join(hookCopyRoot(home, tool), SCRIPT_COPY_DIR, script)
+}
+
+/** The command a tool runs for a hook: its own copy, or a folder script's entry with the hook name after the tool */
+export function toolHookCommand(home: string, tool: HookTool, h: ToolHook): string {
+  return h.folder
+    ? `${shellQuote(join(scriptCopyDir(home, tool, h.folder), h.file))} ${tool} ${h.hook.name}`
+    : hookCommand(home, tool, h.hook.name, h.file)
+}
+
 /** Whether a command runs an app-owned script copy of this tool */
 export function isAppHookCommand(home: string, tool: HookTool, command: unknown): boolean {
   return typeof command === 'string' && command.startsWith(`'${hookCopyRoot(home, tool)}/`)
@@ -70,6 +84,8 @@ export interface ToolHook {
   file: string
   /** command: script content; prompt: the prompt */
   content: string
+  /** command: the folder library script whose shared copy holds `file` (its entry) */
+  folder?: string
 }
 
 /** Whether a hook runs in a tool: the tool can run it and it is on in illithid.json */
@@ -120,7 +136,14 @@ export function hooksForTool(
       const trigger = hookTriggers(h.doc)[tool]!
       const script = toolScript(tool, h)
       return script
-        ? { hook: h, trigger, kind: 'command', file: script.file, content: script.content }
+        ? {
+            hook: h,
+            trigger,
+            kind: 'command',
+            file: script.file,
+            content: script.content,
+            ...(script.folder ? { folder: script.folder } : {})
+          }
         : { hook: h, trigger, kind: 'prompt', file: '', content: renderAskPrompt(h.doc) }
     })
     .sort((a, b) => a.hook.name.localeCompare(b.hook.name))

@@ -651,7 +651,7 @@ export function hooks(home: string, env: Env): HooksData {
     copies.some(
       (x) =>
         x.tool === tool &&
-        x.hook === name &&
+        (x.hook === name || !!x.folder?.users.includes(name)) &&
         (x.action === 'copy' || x.action === 'update' || x.action === 'deleteCandidate')
     )
   const view: HookView[] = list.map((h) => {
@@ -684,7 +684,11 @@ export function hooks(home: string, env: Env): HooksData {
     }
     const edited: Partial<Record<ToolId, string>> = {}
     for (const x of copies)
-      if (x.hook === h.name && x.action === 'update' && x.drift) edited[x.tool] = x.file
+      if (x.action === 'update' && x.drift) {
+        // A folder script's copy is the hooks' that run it; keeping it takes their entry
+        if (x.folder?.users.includes(h.name)) edited[x.tool] = x.folder.entry
+        else if (x.hook === h.name) edited[x.tool] = x.file
+      }
     return {
       ...(Object.keys(edited).length ? { edited } : {}),
       name: h.name,

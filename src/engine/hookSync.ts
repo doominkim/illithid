@@ -9,18 +9,38 @@
  * - skip            not a regular file (notRegularFile)
  * - deleteCandidate a recorded copy whose hook was removed, turned off or no longer runs this file → moved to backups/deleted
  */
-import { copyFileSync, lstatSync, mkdirSync, readFileSync, type Stats } from 'node:fs'
+import {
+  chmodSync,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  type Stats
+} from 'node:fs'
 import { dirname, join } from 'node:path'
 import { toolHomeOverride } from './agents'
 import { appConfigDir, syncTools } from './config'
-import { deliverFile } from './deliver'
+import { deliverDir, deliverFile } from './deliver'
 import { HOOK_TOOLS, isHookTool, type HookTool } from './hookEvents'
-import { hookCopyPath, hookCopyRoot, hooksForTool, PERMISSION_HOOK } from './hookRender'
+import {
+  hookCopyPath,
+  hookCopyRoot,
+  hooksForTool,
+  PERMISSION_HOOK,
+  SCRIPT_COPY_DIR,
+  scriptCopyDir
+} from './hookRender'
 import { HOOK_FILE, hooksDir, readHooks, SHARED_SCRIPT, usedScript } from './hooks'
 import { toolScript } from './hookScripts'
 import { LibraryError } from './libpath'
-import { convertHookToScript, saveHookScript, saveScript } from './library'
-import { scriptPath } from './scripts'
+import { convertHookToScript, replaceScriptFolder, saveHookScript, saveScript } from './library'
+import { scriptDirPath, scriptPath } from './scripts'
+import { dirContentHash } from './skills'
 import { MANIFEST_FILE, readPlanManifest } from './manifest'
 import { readState, writeState, type AppState } from './state'
 import { sha256 } from './text'
@@ -48,6 +68,8 @@ export interface HookSyncItem {
   drift?: boolean
   stateStale?: boolean
   reason?: string
+  /** A folder library script's shared copy (`_scripts/<script>`): its entry, and the hooks in this tool that run it */
+  folder?: { entry: string; users: string[] }
 }
 
 export interface HookSyncResult {
@@ -84,6 +106,28 @@ function permissionsOrNull(home: string): Allowlist | null {
 
 const executable = (st: Stats): boolean => (st.mode & 0o111) === 0o111
 
+const isDirCopy = (st: Stats | null): boolean => !!st && st.isDirectory() && !st.isSymbolicLink()
+
+/** Move a directory (rename, or copy and remove across file systems) */
+function moveDir(from: string, to: string): void {
+  try {
+    renameSync(from, to)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
+    cpSync(from, to, { recursive: true, verbatimSymlinks: true })
+    rmSync(from, { recursive: true, force: true })
+  }
+}
+
+/** Whether a folder copy's entry can run */
+function entryRuns(dir: string, entry: string): boolean {
+  try {
+    return executable(statSync(join(dir, entry)))
+  } catch {
+    return false
+  }
+}
+
 /** Plan. Read-only */
 export function planHookSync(home: string, env: Env = process.env): HookSyncItem[] {
   const mf = readPlanManifest(home)
@@ -97,9 +141,17 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
     if (toolHomeOverride(home, tool, env)) continue
     const managed = managedAll[tool] ?? {}
     const wanted = new Set<string>()
+    // Folder library scripts: one shared copy per tool, whatever the number of hooks running it
+    const folders = new Map<string, { entry: string; users: string[] }>()
     for (const th of hooksForTool(home, tool, hooks, mf.manifest, perms)) {
       // Prompt hooks (ask) have no script copy
       if (th.kind !== 'command') continue
+      if (th.folder) {
+        const f = folders.get(th.folder) ?? { entry: th.file, users: [] }
+        f.users.push(th.hook.name)
+        folders.set(th.folder, f)
+        continue
+      }
       const name = `${th.hook.name}/${th.file}`
       wanted.add(name)
       const path = hookCopyPath(home, tool, th.hook.name, th.file)
@@ -143,12 +195,69 @@ export function planHookSync(home: string, env: Env = process.env): HookSyncItem
           ...(currentHash !== sourceHash && rec?.contentHash !== currentHash ? { drift: true } : {})
         })
     }
+    for (const [script, folder] of [...folders].sort(([a], [b]) => a.localeCompare(b))) {
+      const name = `${SCRIPT_COPY_DIR}/${script}`
+      wanted.add(name)
+      const path = scriptCopyDir(home, tool, script)
+      const source = scriptDirPath(home, script)
+      const sourceHash = dirContentHash(source)
+      const base = {
+        tool,
+        name,
+        hook: SCRIPT_COPY_DIR,
+        file: script,
+        path,
+        source,
+        sourceHash,
+        folder
+      }
+      const st = lstatOrNull(path)
+      if (!st) {
+        items.push({ ...base, action: 'copy' })
+        continue
+      }
+      if (!isDirCopy(st)) {
+        items.push({ ...base, action: 'skip', reason: 'notDirectory' })
+        continue
+      }
+      const currentHash = dirContentHash(path)
+      const rec = managed[name]
+      if (currentHash === sourceHash && entryRuns(path, folder.entry))
+        items.push({
+          ...base,
+          action: 'inSync',
+          currentHash,
+          ...(rec?.contentHash !== currentHash ? { stateStale: true } : {})
+        })
+      else
+        items.push({
+          ...base,
+          action: 'update',
+          currentHash,
+          ...(currentHash !== sourceHash && rec?.contentHash !== currentHash ? { drift: true } : {})
+        })
+    }
     // Recorded copies no longer run by this tool
     for (const name of Object.keys(managed).sort()) {
       if (wanted.has(name)) continue
       const [hook, file] = name.split('/')
       const path = hookCopyPath(home, tool, hook, file)
       const st = lstatOrNull(path)
+      if (hook === SCRIPT_COPY_DIR) {
+        if (isDirCopy(st))
+          items.push({
+            tool,
+            name,
+            hook,
+            file,
+            action: 'deleteCandidate',
+            path,
+            source: scriptDirPath(home, file),
+            currentHash: dirContentHash(path),
+            reason: existsSync(scriptDirPath(home, file)) ? 'disabled' : 'removedFromLibrary'
+          })
+        continue
+      }
       if (st?.isFile() && !st.isSymbolicLink())
         items.push({
           tool,
@@ -237,6 +346,10 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
       } else out(it, 'unchanged')
       continue
     }
+    if (f.folder) {
+      applyFolderCopy(home, f, it, out, record)
+      continue
+    }
     try {
       const content = contentOf(f.tool, f.hook, f.file)
       if (content === undefined || sha256(content) !== f.sourceHash) {
@@ -267,6 +380,60 @@ export function applyHookSync(home: string, env: Env, items: HookSyncItem[]): Ho
   return results
 }
 
+/** Copy or update a folder script's shared copy (an edited one is backed up first) */
+function applyFolderCopy(
+  home: string,
+  f: HookSyncItem,
+  it: HookSyncItem,
+  out: (
+    it: HookSyncItem,
+    status: HookSyncResult['status'],
+    extra?: Partial<HookSyncResult>
+  ) => void,
+  record: (tool: HookTool, name: string, contentHash: string) => void
+): void {
+  try {
+    if (dirContentHash(f.source) !== f.sourceHash) {
+      out(it, 'refused', { reason: 'changedSinceCheck' })
+      return
+    }
+    if (f.action === 'update') {
+      const st = lstatOrNull(f.path)
+      if (!isDirCopy(st) || dirContentHash(f.path) !== f.currentHash) {
+        out(it, 'refused', { reason: 'changedSinceCheck' })
+        return
+      }
+    }
+    let backupPath: string | undefined
+    const aside = f.action === 'update' ? hookBackupPath(home, f.tool, f.name) : undefined
+    if (aside) {
+      mkdirSync(dirname(aside), { recursive: true, mode: 0o700 })
+      rmSync(aside, { recursive: true, force: true })
+    }
+    const r = deliverDir(f.source, f.path, {
+      expectedHash: f.sourceHash,
+      ...(aside
+        ? { vacate: () => moveDir(f.path, aside), restore: () => moveDir(aside, f.path) }
+        : {})
+    })
+    if (!r.ok) {
+      out(it, 'failed', { reason: r.reason === 'hashMismatch' ? 'copyHashMismatch' : r.reason })
+      return
+    }
+    // Keep only the backup of an edited copy
+    if (aside && f.drift) backupPath = aside
+    else if (aside) rmSync(aside, { recursive: true, force: true })
+    chmodSync(join(f.path, f.folder!.entry), HOOK_SCRIPT_MODE)
+    record(f.tool, f.name, f.sourceHash!)
+    out(it, 'done', {
+      ...(backupPath ? { backupPath } : {}),
+      ...(f.drift ? { reason: 'restored' } : {})
+    })
+  } catch (e) {
+    out(it, 'failed', { reason: (e as NodeJS.ErrnoException).code ?? (e as Error).name })
+  }
+}
+
 /**
  * Keep a tool's edited script copy as the library version. A script hook gets it as that script; a built-in action hook becomes a
  * script hook running it (the edit is a script now). It reaches the other tools on the next sync.
@@ -277,6 +444,12 @@ export function keepHookCopy(home: string, tool: HookTool, hook: string, file: s
   const runs = h ? toolScript(tool, h) : null
   if (!h || !runs || runs.file !== file)
     throw new LibraryError('notFound', 'not a script this tool runs')
+  // A folder script: the whole shared copy goes back into the library
+  if (runs.folder) {
+    const dir = scriptCopyDir(home, tool, runs.folder)
+    if (!isDirCopy(lstatOrNull(dir))) throw new LibraryError('notFound', 'no copy in the tool')
+    return replaceScriptFolder(home, runs.folder, dir)
+  }
   const path = hookCopyPath(home, tool, hook, file)
   const st = lstatOrNull(path)
   if (!st?.isFile() || st.isSymbolicLink())
