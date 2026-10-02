@@ -27,13 +27,12 @@ import {
   NOTIFY_CHANNELS,
   NOTIFY_URL_ENV,
   PROTECT_PATTERN_RE,
-  SCRIPT_TARGETS,
   type NotifyChannel,
+  type ScriptTarget,
   type HookAction,
   type HookSupport
 } from '../../../engine/hookActions'
 import {
-  HOOK_TIMINGS,
   defaultHookEvent,
   HOOK_CATALOG,
   HOOK_TOOLS,
@@ -87,6 +86,75 @@ import { LIBRARY_SCRIPT_RE, SCRIPT_TEMPLATE } from '../../../engine/scriptNames'
 import { useViewMode } from '../lib/viewMode'
 
 const NEW = '__new__'
+
+type Scope = ScriptTarget
+
+/** What a hook reacts to at a tool call: its own target, or what its recipe is for */
+function hookScope(action: HookAction, options: Options): Scope {
+  if (action === 'script' || action === 'ask') return (options.target as Scope) || 'all'
+  if (action === 'guard') return 'shell'
+  if (action === 'protect' || action === 'format') return 'edit'
+  return 'all'
+}
+
+/** i18n key of a timing as people see it: tool-call timings name the action (a shell command, a file edit, any action) */
+function whenKey(when: HookTiming, scope: Scope): string {
+  return when === 'before-tool' || when === 'after-tool'
+    ? `hooks.when.${when}.${scope}`
+    : `hooks.timing.${when}`
+}
+
+/** Timing and target as one choice, in the order people meet them */
+const WHEN_CHOICES: readonly (readonly [HookTiming, Scope])[] = [
+  ['prompt', 'all'],
+  ['before-tool', 'shell'],
+  ['before-tool', 'edit'],
+  ['before-tool', 'all'],
+  ['after-tool', 'shell'],
+  ['after-tool', 'edit'],
+  ['after-tool', 'all'],
+  ['stop', 'all'],
+  ['notification', 'all'],
+  ['session-start', 'all'],
+  ['session-end', 'all']
+]
+
+/** One select for when a script or plain-language check runs and on what. `action` limits it to the timings it can use */
+function WhenSelect({
+  action,
+  when,
+  target,
+  onChange,
+  testId
+}: {
+  action?: 'script' | 'ask'
+  when: HookTiming
+  target: Scope
+  onChange: (when: HookTiming, target: Scope) => void
+  testId: string
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const choices = WHEN_CHOICES.filter(
+    ([w]) => !action || HOOK_ACTION_INFO[action].timings.includes(w)
+  )
+  const key = (w: HookTiming, sc: Scope): string =>
+    w === 'before-tool' || w === 'after-tool' ? `${w}:${sc}` : w
+  return (
+    <Select
+      label={t('hooks.timingLabel')}
+      data={choices.map(([w, sc]) => ({ value: key(w, sc), label: t(whenKey(w, sc)) }))}
+      value={key(when, target)}
+      onChange={(v) => {
+        if (!v) return
+        const [w, sc] = v.split(':') as [HookTiming, Scope | undefined]
+        onChange(w, sc ?? 'all')
+      }}
+      allowDeselect={false}
+      description={t(`hooks.timingHint.${when}`)}
+      data-testid={testId}
+    />
+  )
+}
 const ALL = 'all'
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
@@ -123,7 +191,7 @@ function useSummary(): (h: {
       log: String(o.path),
       script: String(o.use || '')
     }
-    const head = `${t(`hooks.timing.${h.when}`)} → ${t(`hooks.actions.${h.action}.title`)}`
+    const head = `${t(whenKey(h.when, hookScope(h.action, h.options)))} → ${t(`hooks.actions.${h.action}.title`)}`
     const d = detail[h.action]
     return d ? `${head}: ${d}` : head
   }
@@ -220,14 +288,14 @@ function Hooks(): React.JSX.Element {
       (!q ||
         includesCI(h.name, q) ||
         includesCI(h.description, q) ||
-        includesCI(t(`hooks.timing.${h.when}`), q) ||
+        includesCI(t(whenKey(h.when, hookScope(h.action, h.options))), q) ||
         includesCI(t(`hooks.actions.${h.action}.title`), q))
   )
   const current = data.hooks.find((h) => h.name === selected)
   const tags = (h: HookView): React.ReactNode => (
     <>
       <Badge variant="default" size="xs" fw={500} c="dimmed">
-        {t(`hooks.timing.${h.when}`)}
+        {t(whenKey(h.when, hookScope(h.action, h.options)))}
       </Badge>
       <Badge variant="light" size="xs" fw={500}>
         {t(`hooks.actions.${h.action}.title`)}
@@ -668,20 +736,6 @@ function OptionFields({
           data-testid="hook-option-command"
         />
       )
-    case 'script':
-      return when === 'before-tool' || when === 'after-tool' ? (
-        <Stack gap={4}>
-          <Text size="sm" fw={500}>
-            {t('hooks.opt.target')}
-          </Text>
-          <SegmentedControl
-            value={String(value.target || 'all')}
-            onChange={(v) => set('target', v)}
-            data={SCRIPT_TARGETS.map((x) => ({ value: x, label: t(`hooks.opt.targets.${x}`) }))}
-            data-testid="hook-option-target"
-          />
-        </Stack>
-      ) : null
     case 'log':
       return (
         <TextInput
@@ -915,7 +969,7 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
   const o = doc.options
   const yesNo = (v: boolean): string => (v ? t('detail.on') : t('detail.off'))
   const rows: [string, React.ReactNode][] = [
-    [t('hooks.timingLabel'), t(`hooks.timing.${doc.when}`)],
+    [t('hooks.timingLabel'), t(whenKey(doc.when, hookScope(doc.action, doc.options)))],
     [t('hooks.actionLabel'), t(`hooks.actions.${doc.action}.title`)]
   ]
   if (doc.action === 'notify')
@@ -1027,16 +1081,32 @@ function HookEditForm({
             onChange={(e) => setDescription(e.currentTarget.value)}
             data-testid="hook-description"
           />
-          <Select
-            label={t('hooks.timingLabel')}
-            data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
-            value={when}
-            onChange={(v) => v && setWhen(v as HookTiming)}
-            allowDeselect={false}
-            disabled={timings.length < 2}
-            description={t(`hooks.timingHint.${when}`)}
-            data-testid="hook-when"
-          />
+          {doc.action === 'script' || doc.action === 'ask' ? (
+            <WhenSelect
+              action={doc.action}
+              when={when}
+              target={hookScope(doc.action, options)}
+              onChange={(w, sc) => {
+                setWhen(w)
+                setOptions({ ...options, target: sc })
+              }}
+              testId="hook-when"
+            />
+          ) : (
+            <Select
+              label={t('hooks.timingLabel')}
+              data={timings.map((x) => ({
+                value: x,
+                label: t(whenKey(x, hookScope(doc.action, options)))
+              }))}
+              value={when}
+              onChange={(v) => v && setWhen(v as HookTiming)}
+              allowDeselect={false}
+              disabled={timings.length < 2}
+              description={t(`hooks.timingHint.${when}`)}
+              data-testid="hook-when"
+            />
+          )}
           <OptionFields
             action={doc.action}
             when={when}
@@ -1559,10 +1629,10 @@ function NewHookForm({
   const { t } = useTranslation()
   const [mode, setMode] = useState<'script' | 'ask'>('script')
   const [when, setWhen] = useState<HookTiming>('stop')
-  const [scriptOptions, setScriptOptions] = useState<Options>({
-    ...HOOK_ACTION_INFO.script.defaults
-  })
+  const scriptOptions: Options = HOOK_ACTION_INFO.script.defaults
   const [askOptions, setAskOptions] = useState<Options>({ ...HOOK_ACTION_INFO.ask.defaults })
+  // At a tool call: every action, shell commands or file edits
+  const [target, setTarget] = useState<Scope>('all')
   // script: '' = written here, else a library script
   const [use, setUse] = useState('')
   const [script, setScript] = useState(SCRIPT_TEMPLATE)
@@ -1605,8 +1675,8 @@ function NewHookForm({
         action,
         options:
           mode === 'ask'
-            ? askOptions
-            : { ...scriptOptions, target: atToolCall ? scriptOptions.target : 'all', use },
+            ? { ...askOptions, target: atToolCall ? target : 'all' }
+            : { ...scriptOptions, target: atToolCall ? target : 'all', use },
         body: mode === 'ask' ? instruction : '',
         ...(mode === 'script' && !use ? { script } : {}),
         ...(seconds
@@ -1640,23 +1710,15 @@ function NewHookForm({
         onChange={(e) => setDescription(e.currentTarget.value)}
         data-testid="hook-new-description"
       />
-      <Select
-        label={t('hooks.timingLabel')}
-        data={HOOK_TIMINGS.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
-        value={when}
-        onChange={(v) => v && pickWhen(v as HookTiming)}
-        allowDeselect={false}
-        description={t(`hooks.timingHint.${when}`)}
-        data-testid="hook-new-timing"
+      <WhenSelect
+        when={when}
+        target={target}
+        onChange={(w, sc) => {
+          pickWhen(w)
+          setTarget(sc)
+        }}
+        testId="hook-new-timing"
       />
-      {mode === 'script' && (
-        <OptionFields
-          action="script"
-          when={when}
-          value={scriptOptions}
-          onChange={setScriptOptions}
-        />
-      )}
       <Stack gap={4}>
         <Text size="sm" fw={500}>
           {t('hooks.doLabel')}

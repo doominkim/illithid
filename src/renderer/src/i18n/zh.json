@@ -805,10 +805,10 @@
     "deleteBody": "将 {{name}} 及其脚本移到 .trash。工具配置中的条目会在下次同步时移除。",
     "allTools": "全部工具",
     "timing": {
-      "before-tool": "工具运行前",
-      "after-tool": "工具运行后",
-      "prompt": "提交提示",
-      "stop": "回复完成",
+      "before-tool": "操作执行前",
+      "after-tool": "操作执行后",
+      "prompt": "发送消息时",
+      "stop": "回复结束时",
       "session-start": "会话开始",
       "session-end": "会话结束",
       "notification": "等待你时"
@@ -885,8 +885,8 @@
         "desc": "把时间、工具和文件夹追加到日志文件"
       },
       "ask": {
-        "title": "让 AI 判断",
-        "desc": "用自然语言写规则，AI 读取事件后判断是否继续"
+        "title": "用自然语言规则检查",
+        "desc": "用自然语言写规则，AI 会检查每个事件是否符合规则，并放行或阻止"
       },
       "script": {
         "title": "自己编写",
@@ -951,21 +951,15 @@
         "snapshot": "保存到 refs/illithid/checkpoints，不改动文件、暂存区和分支。保留最近 50 个。恢复: git restore --source <检查点> -- .",
         "commit": "把所有更改提交到当前分支 (git add -A)。请检查 .gitignore，避免提交机密。"
       },
-      "judge": "判断用的 CLI",
+      "judge": "用于检查的 CLI",
       "judgeSame": "工具本身",
-      "judgeHint": "Claude Code 用内置的 prompt 钩子直接判断。其他工具会再运行一次这个 CLI 来判断 (较慢，会消耗订阅用量)。",
+      "judgeHint": "Claude Code 用内置的 prompt 钩子直接检查。其他工具会再运行一次这个 CLI 来检查 (较慢，会消耗订阅用量)。",
       "model": "模型",
       "modelHint": "留空则使用 CLI 的默认模型。",
-      "judgeSlow": "放在工具运行前时，每条命令都要等待判断。非必要请使用“回复完成”。",
-      "target": "针对哪些调用",
-      "targets": {
-        "all": "所有调用",
-        "shell": "Shell 命令",
-        "edit": "文件编辑"
-      }
+      "judgeSlow": "放在操作执行前时，每条命令都要等待检查。非必要请使用“回复结束时”。"
     },
-    "instruction": "指令",
-    "instructionHint": "AI 会读取此指令和事件，判断是否可以继续。",
+    "instruction": "规则",
+    "instructionHint": "AI 会根据此规则和事件决定放行还是阻止。",
     "instructionExample": "如果测试还没通过，就继续工作。",
     "notes": "备注",
     "scriptStarter": "从模板脚本开始。创建后再编辑。",
@@ -1006,9 +1000,21 @@
     "contextNoteExample": "结束前运行 npm test。不要编辑生成的文件。",
     "doLabel": "要做什么",
     "doScript": "运行命令或脚本",
-    "doAsk": "让 AI 判断",
+    "doAsk": "用自然语言规则检查",
     "doScriptHint": "脚本通过 stdin 接收工具的事件 JSON。要阻止，在 stderr 写原因并以 exit 2 结束。",
-    "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。"
+    "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。",
+    "when": {
+      "before-tool": {
+        "shell": "命令执行前",
+        "edit": "文件修改前",
+        "all": "所有操作执行前"
+      },
+      "after-tool": {
+        "shell": "命令执行后",
+        "edit": "文件修改后",
+        "all": "所有操作执行后"
+      }
+    }
   },
   "permissions": {
     "new": "新建规则",

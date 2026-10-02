@@ -805,10 +805,10 @@
     "deleteBody": "{{name}} とスクリプトを .trash に移動します。ツール設定の項目は次の同期で削除されます。",
     "allTools": "すべてのツール",
     "timing": {
-      "before-tool": "ツール実行前",
-      "after-tool": "ツール実行後",
-      "prompt": "プロンプト送信",
-      "stop": "応答完了",
+      "before-tool": "作業の実行前",
+      "after-tool": "作業の実行後",
+      "prompt": "メッセージを送るとき",
+      "stop": "応答が終わったとき",
       "session-start": "セッション開始",
       "session-end": "セッション終了",
       "notification": "入力待ち"
@@ -885,8 +885,8 @@
         "desc": "時刻・ツール・フォルダをログファイルに追記します"
       },
       "ask": {
-        "title": "AI に判断させる",
-        "desc": "ルールを言葉で書くと、AI がイベントを読んで続けるかを判断します"
+        "title": "自然言語のルールで確認",
+        "desc": "ルールを言葉で書くと、AI がイベントごとにルールに合うか確認して通すか止めます"
       },
       "script": {
         "title": "自分で書く",
@@ -951,21 +951,15 @@
         "snapshot": "ファイル・インデックス・ブランチはそのままで refs/illithid/checkpoints に保存します。最新 50 件を保持します。戻す: git restore --source <チェックポイント> -- .",
         "commit": "変更をすべて現在のブランチにコミットします (git add -A)。秘密情報がコミットされないよう .gitignore を確認してください。"
       },
-      "judge": "判断する CLI",
+      "judge": "確認する CLI",
       "judgeSame": "そのツール自身",
-      "judgeHint": "Claude Code は内蔵の prompt フックですぐ判断します。他のツールはこの CLI をもう一度実行して判断します (遅く、プランの使用量を使います)。",
+      "judgeHint": "Claude Code は内蔵の prompt フックですぐ確認します。他のツールはこの CLI をもう一度実行して確認します (遅く、プランの使用量を使います)。",
       "model": "モデル",
       "modelHint": "空なら CLI の既定モデルを使います。",
-      "judgeSlow": "ツール実行前にすると、すべてのコマンドが判断を待ちます。必要でなければ「応答完了」を使ってください。",
-      "target": "対象の呼び出し",
-      "targets": {
-        "all": "すべての呼び出し",
-        "shell": "シェルコマンド",
-        "edit": "ファイル編集"
-      }
+      "judgeSlow": "作業の実行前にすると、すべてのコマンドが確認を待ちます。必要でなければ「応答が終わったとき」を使ってください。"
     },
-    "instruction": "指示",
-    "instructionHint": "AI がこの指示とイベントを読み、続けてよいか判断します。",
+    "instruction": "ルール",
+    "instructionHint": "AI がこのルールとイベントを見て、通すか止めるかを決めます。",
     "instructionExample": "テストがまだ通っていなければ作業を続けて。",
     "notes": "メモ",
     "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",
@@ -1006,9 +1000,21 @@
     "contextNoteExample": "終える前に npm test を実行して。生成ファイルは編集しないで。",
     "doLabel": "すること",
     "doScript": "コマンド・スクリプトを実行",
-    "doAsk": "AI に判断させる",
+    "doAsk": "自然言語のルールで確認",
     "doScriptHint": "スクリプトは stdin でツールのイベント JSON を受け取ります。止めるには stderr に理由を書いて exit 2 で終了します。",
-    "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。"
+    "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。",
+    "when": {
+      "before-tool": {
+        "shell": "コマンド実行前",
+        "edit": "ファイル編集前",
+        "all": "すべての作業の実行前"
+      },
+      "after-tool": {
+        "shell": "コマンド実行後",
+        "edit": "ファイル編集後",
+        "all": "すべての作業の実行後"
+      }
+    }
   },
   "permissions": {
     "new": "新しいルール",

@@ -805,10 +805,10 @@
     "deleteBody": "{{name}} 과 스크립트를 .trash 로 옮깁니다. 툴 설정의 항목은 다음 동기화 때 제거됩니다.",
     "allTools": "전체 툴",
     "timing": {
-      "before-tool": "툴 실행 전",
-      "after-tool": "툴 실행 후",
-      "prompt": "프롬프트 제출",
-      "stop": "응답 완료",
+      "before-tool": "작업 실행 전",
+      "after-tool": "작업 실행 후",
+      "prompt": "메시지를 보낼 때",
+      "stop": "응답이 끝났을 때",
       "session-start": "세션 시작",
       "session-end": "세션 종료",
       "notification": "입력 기다릴 때"
@@ -885,8 +885,8 @@
         "desc": "시각, 툴, 폴더를 로그 파일에 한 줄씩 남깁니다"
       },
       "ask": {
-        "title": "AI 에게 판단 맡기기",
-        "desc": "규칙을 말로 쓰면 AI 가 이벤트를 읽고 계속할지 판단합니다"
+        "title": "자연어 규칙으로 검사",
+        "desc": "규칙을 말로 쓰면 AI 가 이벤트마다 규칙에 맞는지 보고 통과시키거나 막습니다"
       },
       "script": {
         "title": "직접 작성",
@@ -951,21 +951,15 @@
         "snapshot": "파일, 스테이징, 브랜치는 그대로 두고 refs/illithid/checkpoints 에 저장합니다. 최근 50개를 보관합니다. 되돌리기: git restore --source <체크포인트> -- .",
         "commit": "바뀐 파일을 모두 현재 브랜치에 커밋합니다 (git add -A). 비밀값이 커밋되지 않게 .gitignore 를 확인하세요."
       },
-      "judge": "판단할 CLI",
+      "judge": "검사할 CLI",
       "judgeSame": "그 툴 자신",
-      "judgeHint": "Claude Code 는 내장 prompt 훅으로 바로 판단합니다. 다른 툴은 이 CLI 를 한 번 더 실행해서 판단합니다 (느리고 구독 사용량을 씀).",
+      "judgeHint": "Claude Code 는 내장 prompt 훅으로 바로 검사합니다. 다른 툴은 이 CLI 를 한 번 더 실행해서 검사합니다 (느리고 구독 사용량을 씀).",
       "model": "모델",
       "modelHint": "비우면 CLI 기본 모델을 씁니다.",
-      "judgeSlow": "툴 실행 전에 걸면 모든 명령이 판단을 기다립니다. 꼭 필요하지 않으면 \"응답 완료\" 를 쓰세요.",
-      "target": "어떤 호출에",
-      "targets": {
-        "all": "모든 툴 호출",
-        "shell": "셸 명령",
-        "edit": "파일 편집"
-      }
+      "judgeSlow": "작업 실행 전에 걸면 모든 명령이 검사를 기다립니다. 꼭 필요하지 않으면 \"응답이 끝났을 때\" 를 쓰세요."
     },
-    "instruction": "지시문",
-    "instructionHint": "AI 가 이 지시문과 이벤트를 읽고 계속해도 되는지 판단합니다.",
+    "instruction": "규칙",
+    "instructionHint": "AI 가 이 규칙과 이벤트를 보고 통과시킬지 막을지 정합니다.",
     "instructionExample": "테스트가 아직 통과하지 않았으면 작업을 계속해.",
     "notes": "메모",
     "scriptStarter": "템플릿 스크립트로 시작합니다. 만든 뒤 고치세요.",
@@ -1006,9 +1000,21 @@
     "contextNoteExample": "끝내기 전에 npm test 를 돌려. 생성된 파일은 고치지 마.",
     "doLabel": "할 일",
     "doScript": "명령·스크립트 실행",
-    "doAsk": "AI 에게 판단 맡기기",
+    "doAsk": "자연어 규칙으로 검사",
     "doScriptHint": "스크립트는 stdin 으로 툴의 이벤트 JSON 을 받습니다. 막으려면 stderr 에 이유를 쓰고 exit 2 로 끝내세요.",
-    "timeoutAllHint": "초 단위, 모든 툴에 같은 값. 비우면 툴 기본값."
+    "timeoutAllHint": "초 단위, 모든 툴에 같은 값. 비우면 툴 기본값.",
+    "when": {
+      "before-tool": {
+        "shell": "명령 실행 전",
+        "edit": "파일 수정 전",
+        "all": "모든 작업 실행 전"
+      },
+      "after-tool": {
+        "shell": "명령 실행 후",
+        "edit": "파일 수정 후",
+        "all": "모든 작업 실행 후"
+      }
+    }
   },
   "permissions": {
     "new": "새 규칙",

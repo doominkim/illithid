@@ -71,7 +71,7 @@ test(
       await page.getByText('notify-stop', { exact: true }).first().click()
 
       // Detail: a one-line summary; outside the real HOME the library syncs at once
-      await page.getByTestId('hook-summary').getByText('Reply finished').waitFor()
+      await page.getByTestId('hook-summary').getByText('When a reply finishes').waitFor()
       await synced()
       const copy = join(home, '.claude/hooks/illithid/notify-stop/run.sh')
       const claude = (): {
@@ -128,25 +128,37 @@ test(
       await page.getByTestId('hook-new').click()
       // The timing stays when switching to AI judgment
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before a tool runs' }).click()
-      await page.getByTestId('hook-new-mode').getByText('Let AI judge', { exact: true }).click()
-      assert.equal(await page.getByTestId('hook-new-timing').inputValue(), 'Before a tool runs')
+      await page.getByRole('option', { name: 'Before any action' }).click()
+      await page
+        .getByTestId('hook-new-mode')
+        .getByText('Check with a plain-language rule', { exact: true })
+        .click()
+      assert.equal(await page.getByTestId('hook-new-timing').inputValue(), 'Before any action')
       // A timing AI judgment can't use: the option isn't offered, and the form falls back to a script
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'After a tool runs' }).click()
-      assert.equal(await page.getByTestId('hook-new-mode').getByText('Let AI judge').count(), 0)
+      await page.getByRole('option', { name: 'After a file edit' }).click()
+      assert.equal(
+        await page
+          .getByTestId('hook-new-mode')
+          .getByText('Check with a plain-language rule')
+          .count(),
+        0
+      )
       await page.getByTestId('hook-new-script').waitFor()
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before a tool runs' }).click()
-      await page.getByTestId('hook-new-mode').getByText('Let AI judge', { exact: true }).click()
+      await page.getByRole('option', { name: 'Before any action' }).click()
+      await page
+        .getByTestId('hook-new-mode')
+        .getByText('Check with a plain-language rule', { exact: true })
+        .click()
       assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
       await page.getByTestId('hook-option-judge').waitFor()
       // Judging before every tool call is slow: the form says so
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before a tool runs' }).click()
+      await page.getByRole('option', { name: 'Before any action' }).click()
       await page.getByTestId('hook-ask-slow').waitFor()
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Reply finished' }).click()
+      await page.getByRole('option', { name: 'When a reply finishes' }).click()
       await page.getByTestId('hook-instruction').fill('Keep working until the tests pass.')
       await page.getByTestId('hook-create').click()
       await page.getByTestId('hook-summary').waitFor()
@@ -233,11 +245,8 @@ test(
       assert.equal(await page.locator('[data-card^="hook-action-"]').count(), 0)
       await page.getByTestId('hook-new-script').waitFor()
       await page.getByTestId('hook-new-timing').click()
-      await page.getByRole('option', { name: 'Before a tool runs' }).click()
-      await page
-        .getByTestId('hook-option-target')
-        .getByText('Shell commands', { exact: true })
-        .click()
+      // Timing and target are one choice
+      await page.getByRole('option', { name: 'Before a shell command' }).click()
       const script = '#!/bin/sh\necho checked >&2\nexit 0\n'
       await page.getByTestId('hook-new-script').fill(script)
       await page.getByTestId('hook-new-timeout').fill('15')
