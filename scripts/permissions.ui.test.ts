@@ -90,7 +90,12 @@ test(
 
       // A rule matches commands that start with it, shown as a trailing *; Exact match drops the *
       await row('git push --force').getByText('git push --force *', { exact: true }).waitFor()
+      await page.getByTestId('perm-argv').getByText('*', { exact: true }).waitFor()
       await page.getByTestId('perm-match').getByText('Exact match', { exact: true }).click()
+      await page
+        .getByTestId('perm-argv')
+        .getByText('*', { exact: true })
+        .waitFor({ state: 'detached' })
       await page.getByTestId('perm-save').click()
       await row('git push --force').getByText('git push --force', { exact: true }).waitFor()
       await synced()
@@ -161,10 +166,13 @@ test(
         .getByTestId('perm-group-commands')
         .fill('git push --force\ngit status\ngit clean -fd')
       await line('git status').getByText('Allow', { exact: true }).waitFor()
+      // A prefix line reads with a trailing *; picking Exact drops it
+      await line('git status').getByText('git status *', { exact: true }).waitFor()
       await line('git status')
         .getByTestId('perm-line-match')
         .getByText('Exact', { exact: true })
         .click()
+      await line('git status').getByText('git status', { exact: true }).waitFor()
       await page.getByTestId('perm-group-save').click()
       const renamed = page.locator('[data-testid="perm-group"][data-group="git danger"]')
       await renamed.getByText('git clean -fd').waitFor()

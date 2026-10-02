@@ -652,6 +652,7 @@ function RuleForm({
             {argv.map((a, i) => (
               <Code key={i}>{a}</Code>
             ))}
+            {!exact && <Code c="dimmed">*</Code>}
           </Group>
         )}
       </Stack>
@@ -826,7 +827,7 @@ function GroupForm({
           {lines.map(({ key, rule, dup }, i) => (
             <Group key={`${i}:${key}`} gap="xs" wrap="nowrap" data-testid="perm-line">
               <Box style={{ flex: 1, minWidth: 0 }}>
-                <Code>{commandLine(rule.argv)}</Code>
+                <Code>{`${commandLine(rule.argv)}${rule.exact ? '' : ' *'}`}</Code>
                 {dup && (
                   <Text size="xs" c="red" data-testid="perm-line-duplicate">
                     {t('permissions.duplicate')}
