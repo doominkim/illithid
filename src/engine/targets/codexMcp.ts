@@ -7,6 +7,7 @@ import {
   toggleNotes,
   type MarkerPair
 } from '../text'
+import { codexMcpSettings } from '../mcpPermissions'
 import { isSecretRef, type SecretBackend } from '../secrets'
 import type { Env, McpSource, TargetDef } from '../types'
 import { bareEnvName, httpHeaders, isServerError, renderValue, secretValue } from './mcpRender'
@@ -106,13 +107,13 @@ export function buildCodexMcpBody(
         // Codex can't prefix header values. A Bearer env var uses its dedicated key.
         if (s.bearerEnv) out.push(`bearer_token_env_var = ${tomlString(s.bearerEnv)}`)
       }
-      const cx = s.codex ?? {}
-      if (cx.defaultToolsApprovalMode) {
-        out.push(`default_tools_approval_mode = ${tomlString(cx.defaultToolsApprovalMode)}`)
-      }
-      if (cx.enabledTools) {
+      // Tool rules over the Codex-only options (mcpPermissions.ts)
+      const cx = codexMcpSettings(s)
+      if (cx.defaultMode) out.push(`default_tools_approval_mode = ${tomlString(cx.defaultMode)}`)
+      if (cx.enabledTools)
         out.push(`enabled_tools = [${cx.enabledTools.map(tomlString).join(', ')}]`)
-      }
+      if (cx.disabledTools)
+        out.push(`disabled_tools = [${cx.disabledTools.map(tomlString).join(', ')}]`)
       // Codex only accepts literals for stdio env — env vars and secrets are resolved in place.
       if (s.transport === 'stdio' && s.env) {
         out.push('', `[mcp_servers.${key}.env]`)
@@ -139,8 +140,10 @@ export function buildCodexMcpBody(
           for (const [k, envName] of envMapped) out.push(`${k} = ${tomlString(envName)}`)
         }
       }
-      for (const [tool, mode] of Object.entries(cx.toolApprovals ?? {})) {
-        out.push('', `[mcp_servers.${key}.tools.${tool}]`, `approval_mode = ${tomlString(mode)}`)
+      for (const [tool, mode] of Object.entries(cx.approvals)) {
+        // A tool name that isn't a bare TOML key (a dot, say) is quoted
+        const toolKey = /^[A-Za-z0-9_-]+$/.test(tool) ? tool : tomlString(tool)
+        out.push('', `[mcp_servers.${key}.tools.${toolKey}]`, `approval_mode = ${tomlString(mode)}`)
       }
     } catch (e) {
       if (!isServerError(e)) throw e

@@ -51,6 +51,7 @@ import {
   type PermissionRules
 } from './permissions'
 import type { Allowlist, McpServer } from './types'
+import { mcpPermissionProblems } from './mcpPermissions'
 import type { HookAction } from './hookActions'
 import { isHookTool, type HookTiming, type HookTool } from './hookEvents'
 import {
@@ -1072,6 +1073,7 @@ export function validateMcpServer(def: unknown): { errors: string[]; warnings: s
       errors.push('bearerToken and headers.Authorization cannot be used together')
   }
   if (d.codex !== undefined && !isObj(d.codex)) errors.push('codex must be an object')
+  errors.push(...mcpPermissionProblems(d.permissions))
   if (d._ !== undefined && typeof d._ !== 'string' && !isObj(d._))
     errors.push('_ (meta) must be a string or object')
   return { errors, warnings }

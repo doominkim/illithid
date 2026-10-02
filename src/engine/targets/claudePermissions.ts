@@ -7,6 +7,7 @@ import {
   untouchedKeysSame
 } from '../text'
 import { allowlistFor } from '../permissions'
+import { claudeMcpRules } from '../mcpPermissions'
 import { type Allowlist, type AllowlistEntry, type McpSource, type TargetDef } from '../types'
 
 type Json = Record<string, unknown>
@@ -23,16 +24,20 @@ export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, set
       const { argv, claudeExact } = normalizeEntry(e)
       return `Bash(${argv.join(' ')}${claudeExact ? '' : ':*'})`
     })
-  next.permissions.allow = [...bash(allowlist.bash), ...allowlist.claudeOnly.allow]
-  next.permissions.deny = [...bash(allowlist.bashDeny), ...allowlist.claudeOnly.deny]
-  // Mirrors Codex MCP tool approval (approve/prompt/writes) into Claude permissions.ask,
-  // so both tools gate the same MCP write tools the same way (gate alignment 2026-09-20).
-  const ask: string[] = bash(allowlist.bashAsk)
-  for (const [name, s] of mcpEntries(mcp)) {
-    for (const [tool, mode] of Object.entries(s.codex?.toolApprovals ?? {})) {
-      if (mode !== 'auto') ask.push(`mcp__${name}__${tool}`)
-    }
-  }
+  // MCP servers' tool rules (and Codex-only approvals, mirrored as ask so both tools gate the same tools)
+  const mcpRules = mcpEntries(mcp).map(([name, s]) => claudeMcpRules(name, s))
+  const fromMcp = (d: 'allow' | 'ask' | 'deny'): string[] => mcpRules.flatMap((r) => r[d])
+  next.permissions.allow = [
+    ...bash(allowlist.bash),
+    ...fromMcp('allow'),
+    ...allowlist.claudeOnly.allow
+  ]
+  next.permissions.deny = [
+    ...bash(allowlist.bashDeny),
+    ...fromMcp('deny'),
+    ...allowlist.claudeOnly.deny
+  ]
+  const ask: string[] = [...bash(allowlist.bashAsk), ...fromMcp('ask')]
   ask.push(...(allowlist.claudeOnly.ask ?? []))
   // The same entry can come from a rule and from a server's Codex approvals: write it once
   const once = (list: string[]): string[] => [...new Set(list)]

@@ -6,7 +6,8 @@
  * `--force-with-lease`), so each rule is a regex that ends at a word boundary: `^git push --force(\s|$)`; exact → `^…$`.
  * Checked 2026-10-01: geminicli.com/docs/reference/policy-engine/
  */
-import { normalizeEntry } from '../text'
+import { geminiMcpRules, type GeminiMcpRule } from '../mcpPermissions'
+import { mcpEntries, normalizeEntry } from '../text'
 import { allowlistFor } from '../permissions'
 import { TargetError, type Allowlist, type TargetDef } from '../types'
 
@@ -21,7 +22,10 @@ const DECISIONS = [
 
 const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-export function geminiPolicyText(allowlist: Allowlist | null): string {
+export function geminiPolicyText(
+  allowlist: Allowlist | null,
+  mcpRules: readonly GeminiMcpRule[] = []
+): string {
   const out = [GEMINI_POLICY_HEADER, '']
   for (const { key, decision, priority } of DECISIONS)
     for (const e of allowlist?.[key] ?? []) {
@@ -36,6 +40,16 @@ export function geminiPolicyText(allowlist: Allowlist | null): string {
         ''
       )
     }
+  // MCP servers' tool rules (mcpPermissions.ts)
+  for (const r of mcpRules)
+    out.push(
+      '[[rule]]',
+      `mcpName = ${JSON.stringify(r.mcpName)}`,
+      ...(r.toolName ? [`toolName = ${JSON.stringify(r.toolName)}`] : []),
+      `decision = "${r.decision}"`,
+      `priority = ${r.priority}`,
+      ''
+    )
   return out.join('\n')
 }
 
@@ -49,15 +63,19 @@ export const geminiPolicy: TargetDef = {
   seed: '',
   region: (text) => (ours(text) ? text : null),
   build(before, { sources, retiring }) {
-    if (!sources.hasPermissions && !before.trim())
-      return { after: before, notes: ['library has no permissions.json — nothing to write'] }
+    const mcpRules = retiring
+      ? []
+      : mcpEntries(sources.mcp).flatMap(([name, s]) => geminiMcpRules(name, s))
+    if (!sources.hasPermissions && !mcpRules.length && !before.trim())
+      return { after: before, notes: ['no command or MCP tool rules — nothing to write'] }
     if (before.trim() && !ours(before))
       throw new TargetError(
         '.gemini/policies/illithid.toml exists and is not the app’s — not written'
       )
     // Gemini turned off or no permissions.json: the app's file stays, with no rules
     const after = geminiPolicyText(
-      retiring || !sources.hasPermissions ? null : allowlistFor(sources.allowlist, 'gemini')
+      retiring || !sources.hasPermissions ? null : allowlistFor(sources.allowlist, 'gemini'),
+      mcpRules
     )
     if (!before.trim() && after === geminiPolicyText(null))
       return { after: before, notes: ['no command rules'] }

@@ -1,3 +1,4 @@
+import type { McpPermissions } from './mcpPermissions'
 import type { ToolId } from './agents'
 import type { LibraryHook } from './hooks'
 import type { Manifest } from './manifest'
@@ -61,6 +62,8 @@ export interface McpServer {
   /** Bearer token secret reference (`secret:<server>/headers/Authorization`). The value is the bare token; `Bearer ` is prepended on render */
   bearerToken?: string
   codex?: McpCodexOptions
+  /** Per-tool allow / ask / deny for every tool that supports it (mcpPermissions.ts) */
+  permissions?: McpPermissions
   [key: string]: unknown
 }
 
