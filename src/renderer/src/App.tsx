@@ -24,7 +24,15 @@ import type { ConfigView, ToolId, UpdateView } from '../../shared/api'
 import { clearApiCache, RefreshContext, useApi } from './lib/useApi'
 import { ReloadContext } from './lib/reload'
 import { ConfigContext } from './lib/config'
-import { type Menu, NavContext, type NavRequest, PRIMARY, SECONDARY } from './lib/nav'
+import {
+  type Menu,
+  NavContext,
+  type NavRequest,
+  PRIMARY,
+  SECONDARY,
+  saveMenu,
+  savedMenu
+} from './lib/nav'
 import { Sidebar } from './components/Sidebar'
 import Settings from './views/Settings'
 import Rules from './views/Rules'
@@ -75,7 +83,11 @@ const MENU_ICON: Record<Menu, React.ReactNode> = {
 const FILL_MENUS = new Set<string>(['artifacts', 'sessions', 'memory'])
 function App(): React.JSX.Element {
   const { t } = useTranslation()
-  const [request, setRequest] = useState<NavRequest>({ menu: 'rules', seq: 0 })
+  const [request, setRequest] = useState<NavRequest>(() => ({
+    menu: savedMenu() ?? 'rules',
+    seq: 0
+  }))
+  useEffect(() => saveMenu(request.menu), [request.menu])
   const [tick, setTick] = useState(0)
   const status = useApi('status', () => window.api.status())
   const mcp = useApi('mcp', () => window.api.mcp())

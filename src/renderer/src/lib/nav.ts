@@ -18,6 +18,26 @@ export const PRIMARY = [
 export const SECONDARY = ['backup', 'settings'] as const
 export type Menu = (typeof PRIMARY)[number] | (typeof SECONDARY)[number]
 
+/** The open menu survives a window reload (sessionStorage: this window only, gone when the app quits) */
+const NAV_KEY = 'illithid.nav.menu'
+
+export function savedMenu(): Menu | null {
+  try {
+    const m = sessionStorage.getItem(NAV_KEY)
+    return m && ([...PRIMARY, ...SECONDARY] as readonly string[]).includes(m) ? (m as Menu) : null
+  } catch {
+    return null
+  }
+}
+
+export function saveMenu(menu: Menu): void {
+  try {
+    sessionStorage.setItem(NAV_KEY, menu)
+  } catch {
+    // reload just starts on the default menu
+  }
+}
+
 /** Navigation request. With select, the target screen opens that item's detail */
 export interface NavRequest {
   menu: Menu
