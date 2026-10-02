@@ -157,3 +157,80 @@ test(
     }
   }
 )
+
+test(
+  'REQ-UI-NEW-BODY-1 a new rule, skill, agent and script take their content in the new form',
+  { timeout: 180000 },
+  async () => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-new-body-'))
+    buildDemoHome(home, { tools: 'all' })
+    const config = join(home, '.config/illithid/config.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(config, 'utf8')),
+        toolsInUse: ['claude'],
+        updateCheck: false,
+        marketEnabled: false,
+        ui: { language: 'en' }
+      })
+    )
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-new-body-ud-')),
+      ILLITHID_TEST: '1'
+    } as Record<string, string>
+    delete env.ELECTRON_RUN_AS_NODE
+    delete env.ELECTRON_RENDERER_URL
+    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    try {
+      const page = await app.firstWindow()
+      const file = (rel: string): string => readFileSync(join(home, LIB, rel), 'utf8')
+      const until = async (check: () => boolean): Promise<void> => {
+        for (let i = 0; i < 50 && !check(); i++) await page.waitForTimeout(100)
+        assert.ok(check())
+      }
+
+      await page.locator('[data-menu="rules"]').click()
+      await page.getByTestId('rule-new').click()
+      await page.getByTestId('rule-new-name').fill('zz-tone')
+      await page.getByTestId('rule-new-body').fill('# Tone\n\nBe brief.\n')
+      await page.getByTestId('rule-new-ok').click()
+      await until(() => existsSync(join(home, LIB, 'rules/zz-tone.md')))
+      assert.equal(file('rules/zz-tone.md'), '# Tone\n\nBe brief.\n')
+      await page.keyboard.press('Escape')
+
+      await page.locator('[data-menu="skills"]').click()
+      await page.getByTestId('skill-new').click()
+      const sheet = page.getByTestId('detail-sheet')
+      await sheet.getByLabel('Name').fill('release')
+      await sheet.getByRole('textbox').nth(1).fill('Cut a release')
+      await page.getByTestId('skill-new-body').fill('# Release\n\n1. Tag\n')
+      await sheet.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
+      await until(() => existsSync(join(home, LIB, 'skills/release/SKILL.md')))
+      assert.ok(file('skills/release/SKILL.md').endsWith('---\n\n# Release\n\n1. Tag\n'))
+      await page.keyboard.press('Escape')
+
+      await page.locator('[data-menu="agents"]').click()
+      await page.getByTestId('agent-new').click()
+      await sheet.getByLabel('Name').fill('checker')
+      await sheet.getByRole('textbox').nth(1).fill('Checks things')
+      await page.getByTestId('agent-new-body').fill('Review the diff.\n')
+      await sheet.locator('.ac-form-footer').getByRole('button', { name: 'Create' }).click()
+      await until(() => existsSync(join(home, LIB, 'agents/checker.md')))
+      assert.ok(file('agents/checker.md').endsWith('---\n\nReview the diff.\n'))
+      await page.keyboard.press('Escape')
+
+      await page.locator('[data-menu="scripts"]').click()
+      await page.getByTestId('script-new').click()
+      await page.getByTestId('script-new-name').fill('hello')
+      await page.getByTestId('script-new-body').fill('#!/bin/sh\necho hello\n')
+      await page.getByTestId('script-create').click()
+      await until(() => existsSync(join(home, LIB, 'scripts/hello.sh')))
+      assert.equal(file('scripts/hello.sh'), '#!/bin/sh\necho hello\n')
+    } finally {
+      await app.close()
+    }
+  }
+)

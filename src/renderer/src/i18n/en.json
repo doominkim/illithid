@@ -103,7 +103,8 @@
     "rename": "Rename",
     "renamed": "Renamed",
     "description": "Description",
-    "descriptionSaved": "Description saved"
+    "descriptionSaved": "Description saved",
+    "body": "Content"
   },
   "skills": {
     "search": "Search skills",
@@ -116,7 +117,7 @@
     "rename": "Rename",
     "renamed": "Renamed",
     "description": "Description",
-    "body": "Body",
+    "body": "Content (below the description in SKILL.md)",
     "files": "Files",
     "disabledInGemini": "Disabled in Gemini CLI settings"
   },
@@ -155,7 +156,8 @@
     "deleteTitle": "Delete agent",
     "deleteBody": "Move {{name}} to .trash.",
     "renamed": "Renamed",
-    "default": "Default"
+    "default": "Default",
+    "instructionsPlaceholder": "What this agent does and how"
   },
   "artifacts": {
     "open": "Open",
@@ -1145,6 +1147,7 @@
       "noEntry": "The file it runs is missing.",
       "badDoc": "SCRIPT.md can't be read."
     },
-    "fileExists": "A file with this path exists"
+    "fileExists": "A file with this path exists",
+    "body": "Script"
   }
 }

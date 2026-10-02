@@ -582,15 +582,29 @@ export function registerIpc(): void {
       W.wrap(() => W.lib.skillFileRead(home, str(name), str(rel))),
     skillFileSave: async (name, rel, content) =>
       libWrite(() => W.lib.skillFileSave(home, str(name), str(rel), str(content))),
-    skillCreate: async (name, description) =>
-      libWrite(() => W.lib.skillCreate(home, str(name), str(description))),
+    skillCreate: async (name, description, body) =>
+      libWrite(() =>
+        W.lib.skillCreate(
+          home,
+          str(name),
+          str(description),
+          typeof body === 'string' ? body : undefined
+        )
+      ),
     skillDelete: async (name) => libWrite(() => W.lib.skillDelete(home, str(name))),
     skillDoc: async (name) => W.wrap(() => W.lib.skillDoc(home, str(name))),
     skillDocSave: async (name, doc) =>
       libWrite(() => W.lib.skillDocSave(home, str(name), doc as never)),
     skillRename: async (from, to) => libWrite(() => W.lib.skillRename(home, str(from), str(to))),
-    agentCreate: async (name, description) =>
-      libWrite(() => W.lib.agentCreate(home, str(name), str(description))),
+    agentCreate: async (name, description, body) =>
+      libWrite(() =>
+        W.lib.agentCreate(
+          home,
+          str(name),
+          str(description),
+          typeof body === 'string' ? body : undefined
+        )
+      ),
     agentDelete: async (name) => libWrite(() => W.lib.agentDelete(home, str(name))),
     agentDoc: async (name) => W.wrap(() => W.lib.agentDoc(home, str(name))),
     agentDocSave: async (name, doc) =>
@@ -611,8 +625,15 @@ export function registerIpc(): void {
     scriptSave: async (name, content) =>
       libWrite(() => W.lib.scriptSave(home, str(name), str(content))),
     scriptDelete: async (name) => libWrite(() => W.lib.scriptDelete(home, str(name))),
-    scriptCreateFolder: async (name, description) =>
-      libWrite(() => W.lib.scriptCreateFolder(home, str(name), str(description))),
+    scriptCreateFolder: async (name, description, content) =>
+      libWrite(() =>
+        W.lib.scriptCreateFolder(
+          home,
+          str(name),
+          str(description),
+          typeof content === 'string' ? content : undefined
+        )
+      ),
     scriptFileRead: async (name, rel) =>
       W.wrap(() => W.lib.scriptFileRead(home, str(name), str(rel))),
     scriptFileSave: async (name, rel, content) =>

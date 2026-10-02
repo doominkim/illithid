@@ -14,6 +14,7 @@ import {
   Stack,
   Tabs,
   Text,
+  Textarea,
   TextInput,
   Tooltip
 } from '@mantine/core'
@@ -616,17 +617,19 @@ function NewScriptForm({
   const [kind, setKind] = useState<'file' | 'folder'>('file')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [body, setBody] = useState(SCRIPT_TEMPLATE)
   const [busy, setBusy] = useState(false)
   const nameOk = LIBRARY_SCRIPT_RE.test(name) && !taken.includes(name)
   const create = async (): Promise<void> => {
     setBusy(true)
-    const content = SCRIPT_TEMPLATE.replace(
-      '# description: \n',
-      `# description: ${description.trim()}\n`
-    )
+    // A file script keeps its description in its own comment line (the starter's empty one gets it)
+    const content =
+      kind === 'file'
+        ? body.replace(/^# description:[ \t]*$/m, `# description: ${description.trim()}`)
+        : body
     const r = await runWrite(
       kind === 'folder'
-        ? window.api.scriptCreateFolder(name, description.trim())
+        ? window.api.scriptCreateFolder(name, description.trim(), content)
         : window.api.scriptCreate(name, content),
       { success: t('scripts.created') }
     )
@@ -634,24 +637,7 @@ function NewScriptForm({
     if (r) onCreated(name)
   }
   return (
-    <Stack gap="md" maw={560}>
-      <Stack gap={4}>
-        <Text size="sm" fw={500}>
-          {t('scripts.kindLabel')}
-        </Text>
-        <SegmentedControl
-          value={kind}
-          onChange={(v) => setKind(v as 'file' | 'folder')}
-          data={[
-            { value: 'file', label: t('scripts.kindFile') },
-            { value: 'folder', label: t('scripts.kindFolder') }
-          ]}
-          data-testid="script-new-kind"
-        />
-        <Text size="xs" c="dimmed">
-          {t(kind === 'folder' ? 'scripts.kindFolderHint' : 'scripts.kindFileHint')}
-        </Text>
-      </Stack>
+    <Stack gap="md" maw={640}>
       <TextInput
         label={t('common.name')}
         description={t(kind === 'folder' ? 'scripts.nameHintFolder' : 'scripts.nameHint')}
@@ -672,6 +658,33 @@ function NewScriptForm({
         onChange={(e) => setDescription(e.currentTarget.value)}
         data-testid="script-new-description"
       />
+      <Stack gap={4}>
+        <Text size="sm" fw={500}>
+          {t('scripts.kindLabel')}
+        </Text>
+        <SegmentedControl
+          value={kind}
+          onChange={(v) => setKind(v as 'file' | 'folder')}
+          data={[
+            { value: 'file', label: t('scripts.kindFile') },
+            { value: 'folder', label: t('scripts.kindFolder') }
+          ]}
+          data-testid="script-new-kind"
+        />
+        <Text size="xs" c="dimmed">
+          {t(kind === 'folder' ? 'scripts.kindFolderHint' : 'scripts.kindFileHint')}
+        </Text>
+      </Stack>
+      <Textarea
+        label={kind === 'folder' ? 'run.sh' : t('scripts.body')}
+        value={body}
+        onChange={(e) => setBody(e.currentTarget.value)}
+        autosize
+        minRows={10}
+        maxRows={24}
+        styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+        data-testid="script-new-body"
+      />
       <FormFooter>
         <Button size="xs" variant="default" onClick={onCancel}>
           {t('common.cancel')}
@@ -679,7 +692,7 @@ function NewScriptForm({
         <Button
           size="xs"
           loading={busy}
-          disabled={!nameOk}
+          disabled={!nameOk || !body.trim()}
           onClick={() => void create()}
           data-testid="script-create"
         >

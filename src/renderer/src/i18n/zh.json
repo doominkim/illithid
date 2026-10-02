@@ -103,7 +103,8 @@
     "rename": "重命名",
     "renamed": "已重命名",
     "description": "说明",
-    "descriptionSaved": "已保存说明"
+    "descriptionSaved": "已保存说明",
+    "body": "正文"
   },
   "skills": {
     "search": "搜索技能",
@@ -116,7 +117,7 @@
     "rename": "重命名",
     "renamed": "已重命名",
     "description": "Description",
-    "body": "正文",
+    "body": "正文（SKILL.md 中说明下方的内容）",
     "files": "文件",
     "disabledInGemini": "已在 Gemini CLI 设置中停用"
   },
@@ -155,7 +156,8 @@
     "deleteTitle": "删除代理",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "renamed": "已重命名",
-    "default": "默认"
+    "default": "默认",
+    "instructionsPlaceholder": "这个代理做什么、怎么做"
   },
   "artifacts": {
     "open": "打开",
@@ -1145,6 +1147,7 @@
       "noEntry": "缺少执行文件。",
       "badDoc": "无法读取 SCRIPT.md。"
     },
-    "fileExists": "已存在相同路径的文件"
+    "fileExists": "已存在相同路径的文件",
+    "body": "脚本"
   }
 }

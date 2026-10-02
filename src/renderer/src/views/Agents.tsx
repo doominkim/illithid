@@ -78,6 +78,7 @@ function Agents(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newBody, setNewBody] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null)
   useNavSelect(setSelected)
@@ -139,7 +140,7 @@ function Agents(): React.JSX.Element {
     reload()
   }
   const create = async (): Promise<void> => {
-    const r = await runWrite(window.api.agentCreate(newName.trim(), newDesc.trim()), {
+    const r = await runWrite(window.api.agentCreate(newName.trim(), newDesc.trim(), newBody), {
       success: t('agents.created')
     })
     if (r !== null) {
@@ -147,6 +148,7 @@ function Agents(): React.JSX.Element {
       setSelected(newName.trim())
       setNewName('')
       setNewDesc('')
+      setNewBody('')
       reload()
     }
   }
@@ -317,6 +319,17 @@ function Agents(): React.JSX.Element {
             onChange={(e) => setNewDesc(e.currentTarget.value)}
             autosize
             minRows={2}
+          />
+          <Textarea
+            label={t('agents.instructions')}
+            value={newBody}
+            onChange={(e) => setNewBody(e.currentTarget.value)}
+            placeholder={t('agents.instructionsPlaceholder')}
+            autosize
+            minRows={10}
+            maxRows={24}
+            styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+            data-testid="agent-new-body"
           />
           <FormFooter>
             <Button size="xs" variant="default" onClick={() => setCreating(false)}>

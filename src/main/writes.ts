@@ -642,9 +642,10 @@ export const lib = {
   skillFileSave: (home: string, name: string, rel: string, content: string) => {
     writeSkillFile(home, name, rel, String(content))
   },
-  skillCreate: (home: string, name: string, description: string) => {
-    createSkill(home, name, String(description))
+  skillCreate: (home: string, name: string, description: string, body?: string) => {
+    createSkill(home, name, String(description), typeof body === 'string' ? body : undefined)
   },
+
   skillDelete: (home: string, name: string) => deleteSkill(home, name),
   skillDoc: (home: string, name: string) => readSkillDoc(home, name),
   skillDocSave: (home: string, name: string, doc: SkillDocInput) => {
@@ -655,8 +656,8 @@ export const lib = {
     })
   },
   skillRename: (home: string, from: string, to: string) => renameSkill(home, from, to),
-  agentCreate: (home: string, name: string, description: string) => {
-    createAgent(home, name, String(description))
+  agentCreate: (home: string, name: string, description: string, body?: string) => {
+    createAgent(home, name, String(description), typeof body === 'string' ? body : undefined)
   },
   agentDelete: (home: string, name: string) => deleteAgent(home, name),
   agentDoc: (home: string, name: string) => readAgentDoc(home, name),
@@ -722,8 +723,11 @@ export const lib = {
     return { name }
   },
   scriptDelete: (home: string, name: string) => deleteScript(home, name),
-  scriptCreateFolder: (home: string, name: string, description: string) => {
-    createFolderScript(home, name, { description: String(description ?? '') })
+  scriptCreateFolder: (home: string, name: string, description: string, content?: string) => {
+    createFolderScript(home, name, {
+      description: String(description ?? ''),
+      ...(typeof content === 'string' ? { content } : {})
+    })
     return { name }
   },
   scriptFileRead: (home: string, name: string, rel: string) => readScriptFile(home, name, rel),

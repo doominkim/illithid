@@ -419,14 +419,21 @@ function yamlString(v: string): string {
 }
 
 /** New skill: skills/<name>/SKILL.md (frontmatter name·description) */
-export function createSkill(home: string, name: string, description: string): string {
+/** New skill: SKILL.md with name and description, then the body (a heading when left out) */
+export function createSkill(
+  home: string,
+  name: string,
+  description: string,
+  body?: string
+): string {
   const dir = skillDir(home, name)
   if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
     throw new LibraryError('exists', 'a skill with the same name exists')
   if (typeof description !== 'string' || !description.trim())
     throw new LibraryError('invalidSchema', 'description is required')
-  const body = `---\nname: ${name}\ndescription: ${yamlString(description.trim())}\n---\n\n# ${name}\n\n`
-  return writeLibFile(home, join(dir, 'SKILL.md'), body)
+  const text = typeof body === 'string' && body.trim() ? body : `# ${name}\n\n`
+  const doc = `---\nname: ${name}\ndescription: ${yamlString(description.trim())}\n---\n\n${text}`
+  return writeLibFile(home, join(dir, 'SKILL.md'), doc)
 }
 
 export function deleteSkill(home: string, name: string): TrashResult {
@@ -847,14 +854,21 @@ export function writeAgentDoc(home: string, name: string, input: AgentDocInput):
 }
 
 /** New agent: agents/<name>.md (frontmatter name·description, blank body). Creates agents/ if missing */
-export function createAgent(home: string, name: string, description: string): string {
+/** New agent: frontmatter name and description, then the instructions (empty when left out) */
+export function createAgent(
+  home: string,
+  name: string,
+  description: string,
+  body?: string
+): string {
   const p = agentPath(home, name)
   if (existsSync(assertInsideLibrary(home, p)) || isLink(p))
     throw new LibraryError('exists', 'an agent with the same name exists')
   if (typeof description !== 'string' || !description.trim())
     throw new LibraryError('invalidSchema', 'description is required')
   const fm = [`name: ${name}`, ...setKey([], 'description', description.trim())]
-  return writeLibFile(home, p, `---\n${fm.join('\n')}\n---\n\n`)
+  const text = typeof body === 'string' ? body : ''
+  return writeLibFile(home, p, `---\n${fm.join('\n')}\n---\n\n${text}`)
 }
 
 /**

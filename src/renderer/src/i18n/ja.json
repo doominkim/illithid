@@ -103,7 +103,8 @@
     "rename": "名前を変更",
     "renamed": "名前を変更しました",
     "description": "説明",
-    "descriptionSaved": "説明を保存しました"
+    "descriptionSaved": "説明を保存しました",
+    "body": "本文"
   },
   "skills": {
     "search": "スキルを検索",
@@ -116,7 +117,7 @@
     "rename": "名前を変更",
     "renamed": "名前を変更しました",
     "description": "Description",
-    "body": "本文",
+    "body": "本文 (SKILL.md の説明の下)",
     "files": "ファイル",
     "disabledInGemini": "Gemini CLI の設定で無効"
   },
@@ -155,7 +156,8 @@
     "deleteTitle": "エージェントを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "renamed": "名前を変更しました",
-    "default": "デフォルト"
+    "default": "デフォルト",
+    "instructionsPlaceholder": "このエージェントが何をどうするか"
   },
   "artifacts": {
     "open": "開く",
@@ -1145,6 +1147,7 @@
       "noEntry": "実行ファイルがありません。",
       "badDoc": "SCRIPT.md を読めません。"
     },
-    "fileExists": "同じパスのファイルがあります"
+    "fileExists": "同じパスのファイルがあります",
+    "body": "スクリプト"
   }
 }

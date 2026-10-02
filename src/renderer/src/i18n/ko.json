@@ -103,7 +103,8 @@
     "rename": "이름 변경",
     "renamed": "이름을 바꿨습니다",
     "description": "설명",
-    "descriptionSaved": "설명을 저장했습니다"
+    "descriptionSaved": "설명을 저장했습니다",
+    "body": "본문"
   },
   "skills": {
     "search": "스킬 검색",
@@ -116,7 +117,7 @@
     "rename": "이름 변경",
     "renamed": "이름을 바꿨습니다",
     "description": "Description",
-    "body": "본문",
+    "body": "본문 (SKILL.md 의 설명 아래 내용)",
     "files": "파일",
     "disabledInGemini": "Gemini CLI 설정에서 꺼져 있음"
   },
@@ -155,7 +156,8 @@
     "deleteTitle": "에이전트 삭제",
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "renamed": "이름을 바꿨습니다",
-    "default": "기본값"
+    "default": "기본값",
+    "instructionsPlaceholder": "이 에이전트가 무엇을 어떻게 하는지"
   },
   "artifacts": {
     "open": "새 창에서 열기",
@@ -1145,6 +1147,7 @@
       "noEntry": "실행 파일이 없습니다.",
       "badDoc": "SCRIPT.md 를 읽을 수 없습니다."
     },
-    "fileExists": "같은 경로의 파일이 있습니다"
+    "fileExists": "같은 경로의 파일이 있습니다",
+    "body": "스크립트"
   }
 }

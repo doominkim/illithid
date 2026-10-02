@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Badge, Box, Button, Group, Stack, Tabs, TextInput } from '@mantine/core'
+import { Badge, Box, Button, Group, Stack, Tabs, Textarea, TextInput } from '@mantine/core'
 import { Download, FileText, FolderOpen, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
@@ -67,6 +67,7 @@ function Rules(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newBody, setNewBody] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -139,13 +140,18 @@ function Rules(): React.JSX.Element {
   const create = async (): Promise<void> => {
     const name = newName.trim().endsWith('.md') ? newName.trim() : `${newName.trim()}.md`
     const r = await runWrite(
-      window.api.ruleCreate(name, `# ${name.replace(/\.md$/, '')}\n\n`, newDesc.trim()),
+      window.api.ruleCreate(
+        name,
+        newBody.trim() ? newBody : `# ${name.replace(/\.md$/, '')}\n\n`,
+        newDesc.trim()
+      ),
       { success: t('rules.created') }
     )
     if (r !== null) {
       setCreating(false)
       setNewName('')
       setNewDesc('')
+      setNewBody('')
       setSelected(name)
       reload()
     }
@@ -386,6 +392,17 @@ function Rules(): React.JSX.Element {
             value={newDesc}
             onChange={(e) => setNewDesc(e.currentTarget.value)}
             data-testid="rule-new-description"
+          />
+          <Textarea
+            label={t('rules.body')}
+            value={newBody}
+            onChange={(e) => setNewBody(e.currentTarget.value)}
+            placeholder={'# My rule\n\n…'}
+            autosize
+            minRows={10}
+            maxRows={24}
+            styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+            data-testid="rule-new-body"
           />
           <FormFooter>
             <Button size="xs" variant="default" onClick={() => setCreating(false)}>

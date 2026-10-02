@@ -895,14 +895,14 @@ export interface Api {
   skillFiles(name: string): Promise<WriteResult<string[]>>
   skillFileRead(name: string, rel: string): Promise<WriteResult<string>>
   skillFileSave(name: string, rel: string, content: string): Promise<WriteResult | Refused>
-  skillCreate(name: string, description: string): Promise<WriteResult | Refused>
+  skillCreate(name: string, description: string, body?: string): Promise<WriteResult | Refused>
   skillDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   /** SKILL.md → description·body (other frontmatter keys are preserved) */
   skillDoc(name: string): Promise<WriteResult<SkillDoc>>
   skillDocSave(name: string, doc: SkillDocInput): Promise<WriteResult | Refused>
   /** Rename. Returns the new name on success */
   skillRename(from: string, to: string): Promise<WriteResult<{ name: string }> | Refused>
-  agentCreate(name: string, description: string): Promise<WriteResult | Refused>
+  agentCreate(name: string, description: string, body?: string): Promise<WriteResult | Refused>
   agentDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   /** agents/<name>.md → description·per-tool model/effort·instructions */
   agentDoc(name: string): Promise<WriteResult<AgentDoc>>
@@ -921,7 +921,8 @@ export interface Api {
   scriptDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   scriptCreateFolder(
     name: string,
-    description: string
+    description: string,
+    content?: string
   ): Promise<WriteResult<{ name: string }> | Refused>
   scriptFileRead(name: string, rel: string): Promise<WriteResult<string>>
   scriptFileSave(name: string, rel: string, content: string): Promise<WriteResult | Refused>

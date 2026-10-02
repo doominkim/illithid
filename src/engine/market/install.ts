@@ -27,6 +27,7 @@ import {
   saveHookDoc,
   saveHookScript,
   upsertMcpServer,
+  setRuleDescription,
   writeNewHook
 } from '../library'
 import { assertInsideLibrary } from '../libpath'
@@ -237,6 +238,8 @@ export function commitMcp(
 ): { name: string; warnings: string[] } {
   assertFree(home, 'mcp', name)
   const def = toMcpServer(server, choiceId, values)
+  // The registry description goes in the meta key `_`, which never reaches a tool
+  if (server.description?.trim()) def._ = { description: server.description.trim() }
   const r = upsertMcpServer(home, name, def, { secrets })
   applyInUseToggles(home, 'mcp', name)
   const [type, idx] = choiceId.split(':')
@@ -348,6 +351,8 @@ export function commitRule(
     createRule(home, file, prep.body)
     applyInUseToggles(home, 'rule', file)
   }
+  // The market's description goes beside the rule (rules/_meta.json), never into the file the tools get
+  if (prep.item.description?.trim()) setRuleDescription(home, file, prep.item.description)
   recordOrigin(home, {
     kind: 'rule',
     name: file,

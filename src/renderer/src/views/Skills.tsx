@@ -65,6 +65,7 @@ function Skills(): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newBody, setNewBody] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   /** Keep the detail open right after a rename until the list is reloaded */
   const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null)
@@ -145,7 +146,7 @@ function Skills(): React.JSX.Element {
     reload()
   }
   const create = async (): Promise<void> => {
-    const r = await runWrite(window.api.skillCreate(newName.trim(), newDesc.trim()), {
+    const r = await runWrite(window.api.skillCreate(newName.trim(), newDesc.trim(), newBody), {
       success: t('skills.created')
     })
     if (r !== null) {
@@ -153,6 +154,7 @@ function Skills(): React.JSX.Element {
       setSelected(newName.trim())
       setNewName('')
       setNewDesc('')
+      setNewBody('')
       reload()
     }
   }
@@ -336,6 +338,17 @@ function Skills(): React.JSX.Element {
             onChange={(e) => setNewDesc(e.currentTarget.value)}
             autosize
             minRows={2}
+          />
+          <Textarea
+            label={t('skills.body')}
+            value={newBody}
+            onChange={(e) => setNewBody(e.currentTarget.value)}
+            placeholder={'# my-skill\n\n…'}
+            autosize
+            minRows={10}
+            maxRows={24}
+            styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+            data-testid="skill-new-body"
           />
           <FormFooter>
             <Button size="xs" variant="default" onClick={() => setCreating(false)}>
