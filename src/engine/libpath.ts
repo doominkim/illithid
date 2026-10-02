@@ -22,6 +22,8 @@ export type LibraryErrorCode =
   | 'libraryMissing'
   /** The tool is not in use on this device (config.toolsInUse) — its files are not written */
   | 'toolNotInUse'
+  /** Hooks still use it (a folder script) */
+  | 'inUse'
 
 export class LibraryError extends Error {
   constructor(

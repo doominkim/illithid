@@ -6,14 +6,17 @@
  * Layout (M7d): rules/*.md · skills/<name>/ · agents/<name>.md · mcps/<server>.json · permissions.json · memory/ · illithid.json
  */
 import {
+  chmodSync,
   cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
-  rmSync
+  rmSync,
+  statSync
 } from 'node:fs'
 import { dirname, isAbsolute, join, normalize, relative, sep } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -66,7 +69,22 @@ import {
   type HookOptionValue
 } from './hooks'
 import { appTmpName, atomicWrite } from './write'
-import { LIBRARY_SCRIPT_RE, readScript, SCRIPT_TEMPLATE, scriptPath } from './scripts'
+import {
+  isFolderScript,
+  LIBRARY_SCRIPT_RE,
+  parseScriptDoc,
+  readScript,
+  renderScriptDoc,
+  scanScriptFolder,
+  SCRIPT_DOC,
+  SCRIPT_ENTRY,
+  SCRIPT_TEMPLATE,
+  scriptDirPath,
+  scriptEntryIn,
+  scriptPath,
+  scriptRelPath,
+  scriptsDir
+} from './scripts'
 
 export { LibraryError } from './libpath'
 export type { LibraryErrorCode } from './libpath'
@@ -1489,7 +1507,7 @@ export function convertHookToLibraryScript(
   )
 }
 
-// ---------------------------------------------------------------- library scripts (scripts/<name>.sh)
+// ---------------------------------------------------------------- library scripts (scripts/<name>.sh, scripts/<name>/)
 
 function libScriptPath(home: string, name: string): string {
   if (typeof name !== 'string' || !LIBRARY_SCRIPT_RE.test(name))
@@ -1497,25 +1515,202 @@ function libScriptPath(home: string, name: string): string {
   return scriptPath(home, name)
 }
 
+/** One name across both kinds: exists when either the file or the folder is there */
+function checkScriptFree(home: string, name: string): void {
+  const file = libScriptPath(home, name)
+  const dir = scriptDirPath(home, name)
+  for (const p of [file, dir])
+    if (existsSync(assertInsideLibrary(home, p)) || isLink(p))
+      throw new LibraryError('exists', 'a script with the same name exists')
+}
+
 /** New library script (a template when no content is given). exists if the name is taken */
 export function createScript(home: string, name: string, content?: string): string {
-  const p = libScriptPath(home, name)
-  if (existsSync(assertInsideLibrary(home, p)))
-    throw new LibraryError('exists', 'a script with the same name exists')
+  checkScriptFree(home, name)
   return writeLibFile(
     home,
-    p,
+    libScriptPath(home, name),
     typeof content === 'string' ? content : SCRIPT_TEMPLATE,
     HOOK_SCRIPT_MODE
   )
 }
 
+/** New folder script: SCRIPT.md and its entry (run.sh, a template when no content is given) */
+export function createFolderScript(
+  home: string,
+  name: string,
+  opts: { description?: string; content?: string }
+): string {
+  checkScriptFree(home, name)
+  const dir = scriptDirPath(home, name)
+  writeLibFile(
+    home,
+    join(dir, SCRIPT_ENTRY),
+    typeof opts.content === 'string' ? opts.content : SCRIPT_TEMPLATE,
+    HOOK_SCRIPT_MODE
+  )
+  return writeLibFile(
+    home,
+    join(dir, SCRIPT_DOC),
+    renderScriptDoc({ description: opts.description ?? '', entry: SCRIPT_ENTRY, body: '' })
+  )
+}
+
+/** A folder script's SCRIPT.md, or invalidSchema for a file script */
+function folderScriptDoc(home: string, name: string): { dir: string; doc: ScriptDocFields } {
+  libScriptPath(home, name)
+  if (!isFolderScript(home, name)) {
+    if (readScript(home, name))
+      throw new LibraryError('invalidSchema', 'a file script has no files')
+    throw new LibraryError('notFound', 'script not found')
+  }
+  const dir = scriptDirPath(home, name)
+  const doc = parseScriptDoc(readFileSync(assertInsideLibrary(home, join(dir, SCRIPT_DOC)), 'utf8'))
+  if (!doc) throw new LibraryError('invalidSchema', 'SCRIPT.md frontmatter cannot be read')
+  return { dir, doc }
+}
+type ScriptDocFields = NonNullable<ReturnType<typeof parseScriptDoc>>
+
+/** A path inside a folder script (no escape by `..` or a symlink) → absolute path */
+function scriptFilePath(home: string, dir: string, rel: string): string {
+  const r = scriptRelPath(rel)
+  if (!r) throw new LibraryError('outsideLibrary', 'path outside the script folder')
+  const abs = join(dir, r)
+  const realDir = assertInsideLibrary(home, dir)
+  const realAbs = assertInsideLibrary(home, abs)
+  const back = relative(realDir, realAbs)
+  if (!back || back.startsWith('..') || isAbsolute(back))
+    throw new LibraryError('outsideLibrary', 'path outside the script folder (symlink)')
+  return realAbs
+}
+
+/** Save the script: the file itself, or a folder script's entry */
 export function saveScript(home: string, name: string, content: string): string {
+  if (typeof content !== 'string') throw new LibraryError('invalidSchema', 'content must be text')
+  if (isFolderScript(home, name)) {
+    const { dir, doc } = folderScriptDoc(home, name)
+    return writeLibFile(home, scriptFilePath(home, dir, doc.entry), content, HOOK_SCRIPT_MODE)
+  }
   const p = libScriptPath(home, name)
   if (!existsSync(assertInsideLibrary(home, p)))
     throw new LibraryError('notFound', 'script not found')
-  if (typeof content !== 'string') throw new LibraryError('invalidSchema', 'content must be text')
   return writeLibFile(home, p, content, HOOK_SCRIPT_MODE)
+}
+
+export function readScriptFile(home: string, name: string, rel: string): string {
+  const { dir } = folderScriptDoc(home, name)
+  const p = scriptFilePath(home, dir, rel)
+  if (!existsSync(p)) throw new LibraryError('notFound', 'file not found')
+  return readFileSync(p, 'utf8')
+}
+
+/** Write a file in a folder script (made if missing; a new file starting with #! can run) */
+export function writeScriptFile(home: string, name: string, rel: string, content: string): string {
+  if (typeof content !== 'string') throw new LibraryError('invalidSchema', 'content must be text')
+  const { dir } = folderScriptDoc(home, name)
+  const p = scriptFilePath(home, dir, rel)
+  return writeLibFile(home, p, content, content.startsWith('#!') ? HOOK_SCRIPT_MODE : LIB_FILE_MODE)
+}
+
+/** Remove a file of a folder script (to the trash). SCRIPT.md and the entry stay */
+export function deleteScriptFile(home: string, name: string, rel: string): TrashResult {
+  const { dir, doc } = folderScriptDoc(home, name)
+  const r = scriptRelPath(rel)
+  if (r === SCRIPT_DOC || r === scriptRelPath(doc.entry))
+    throw new LibraryError('invalidSchema', 'SCRIPT.md and the entry stay')
+  const p = scriptFilePath(home, dir, rel)
+  if (!existsSync(p)) throw new LibraryError('notFound', 'file not found')
+  return moveToTrash(home, p)
+}
+
+/** A folder script's description and entry (the entry must be a file of the folder; it is made runnable) */
+export function saveScriptInfo(
+  home: string,
+  name: string,
+  info: { description?: string; entry?: string }
+): string {
+  const { dir, doc } = folderScriptDoc(home, name)
+  const entry = info.entry ?? doc.entry
+  const found = scriptEntryIn(scanScriptFolder(assertInsideLibrary(home, dir)).files, entry)
+  if (!found) throw new LibraryError('notFound', 'the entry is not a file of the script')
+  const p = scriptFilePath(home, dir, found)
+  if (!(statSync(p).mode & 0o100)) chmodSync(p, HOOK_SCRIPT_MODE)
+  return writeLibFile(
+    home,
+    join(dir, SCRIPT_DOC),
+    renderScriptDoc({
+      description: typeof info.description === 'string' ? info.description : doc.description,
+      entry: found,
+      body: doc.body
+    })
+  )
+}
+
+/** A file script becomes a folder script (<name>.sh → <name>/run.sh). Hooks using it keep it; the old file goes to the trash */
+export function scriptToFolder(home: string, name: string): string {
+  const lib = readScript(home, name)
+  if (!lib) throw new LibraryError('notFound', 'script not found')
+  if (lib.kind === 'folder') throw new LibraryError('invalidSchema', 'already a folder script')
+  const dir = scriptDirPath(home, name)
+  if (existsSync(assertInsideLibrary(home, dir)) || isLink(dir))
+    throw new LibraryError('exists', 'a folder with the same name exists')
+  writeLibFile(home, join(dir, SCRIPT_ENTRY), lib.content, HOOK_SCRIPT_MODE)
+  writeLibFile(
+    home,
+    join(dir, SCRIPT_DOC),
+    renderScriptDoc({ description: lib.description, entry: SCRIPT_ENTRY, body: '' })
+  )
+  moveToTrash(home, libScriptPath(home, name))
+  return dir
+}
+
+/**
+ * A folder comes in as a folder script (copied; the source stays). The entry is the given one, else its SCRIPT.md's, else run.sh.
+ * A folder the tools should not get (project folders, symlinks, too large) or with no such entry is refused
+ */
+export function importScriptFolder(
+  home: string,
+  name: string,
+  from: string,
+  entry?: string
+): string {
+  checkScriptFree(home, name)
+  let src: string
+  try {
+    src = realpathSync(from)
+    if (!statSync(src).isDirectory()) throw new Error('not a folder')
+  } catch {
+    throw new LibraryError('notFound', 'folder not found')
+  }
+  const own = existsSync(join(src, SCRIPT_DOC))
+    ? parseScriptDoc(readFileSync(join(src, SCRIPT_DOC), 'utf8'))
+    : null
+  const scan = scanScriptFolder(src)
+  if (scan.problem)
+    throw new LibraryError('invalidSchema', `the folder can't be a script: ${scan.problem}`)
+  const found = scriptEntryIn(scan.files, entry ?? own?.entry ?? SCRIPT_ENTRY)
+  if (!found) throw new LibraryError('invalidSchema', 'pick the file the hooks run')
+  const dir = scriptDirPath(home, name)
+  const target = assertInsideLibrary(home, dir)
+  const tmp = assertInsideLibrary(
+    home,
+    join(scriptsDir(home), appTmpName(name, String(Date.now())))
+  )
+  mkdirSync(scriptsDir(home), { recursive: true, mode: 0o755 })
+  try {
+    cpSync(src, tmp, { recursive: true, errorOnExist: true, force: false })
+    renameSync(tmp, target)
+  } finally {
+    if (existsSync(tmp)) rmSync(tmp, { recursive: true, force: true })
+  }
+  const run = join(target, found)
+  if (!(statSync(run).mode & 0o100)) chmodSync(run, HOOK_SCRIPT_MODE)
+  writeLibFile(
+    home,
+    join(dir, SCRIPT_DOC),
+    renderScriptDoc({ description: own?.description ?? '', entry: found, body: own?.body ?? '' })
+  )
+  return target
 }
 
 /** Hooks that run a library script, sorted. Hooks whose HOOK.md can't be read are left out */
@@ -1529,17 +1724,24 @@ export function scriptUsers(home: string, name: string): string[] {
   })
 }
 
-/** Delete a library script. Each hook using it first gets the content as its own run.sh, so it keeps working */
+/**
+ * Delete a library script. A file script: each hook using it first gets the content as its own run.sh, so it keeps working.
+ * A folder script can't become a run.sh, so it is refused while hooks use it
+ */
 export function deleteScript(home: string, name: string): TrashResult {
-  const p = libScriptPath(home, name)
   const lib = readScript(home, name)
   if (!lib) throw new LibraryError('notFound', 'script not found')
-  for (const h of scriptUsers(home, name)) {
+  const users = scriptUsers(home, name)
+  if (lib.kind === 'folder') {
+    if (users.length) throw new LibraryError('inUse', `used by hooks: ${users.join(', ')}`)
+    return moveToTrash(home, scriptDirPath(home, name))
+  }
+  for (const h of users) {
     const doc = readHookDocFile(home, h)
     writeLibFile(home, hookScriptPath(home, h, SHARED_SCRIPT), lib.content, HOOK_SCRIPT_MODE)
     writeHookDoc(home, h, { ...doc, options: { ...doc.options, use: '' } })
   }
-  return moveToTrash(home, p)
+  return moveToTrash(home, libScriptPath(home, name))
 }
 
 export function deleteHook(home: string, name: string): TrashResult {

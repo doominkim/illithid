@@ -583,9 +583,16 @@ export {
 export type { CommandRule, PermissionDecision, PermissionRules, RuleGroup } from './permissions'
 export {
   createScript,
+  createFolderScript,
   saveScript,
   deleteScript,
   scriptUsers,
+  readScriptFile,
+  writeScriptFile,
+  deleteScriptFile,
+  saveScriptInfo,
+  scriptToFolder,
+  importScriptFolder,
   convertHookToLibraryScript
 } from './library'
 export {
@@ -595,6 +602,7 @@ export {
   readScripts,
   scriptDescription,
   scriptNames,
-  scriptsDir
+  scriptsDir,
+  SCRIPT_FOLDER_LIMITS
 } from './scripts'
-export type { LibraryScript } from './scripts'
+export type { LibraryScript, ScriptProblem } from './scripts'
