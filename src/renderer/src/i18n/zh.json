@@ -962,7 +962,6 @@
     "notes": "备注",
     "scriptStarter": "从模板脚本开始。创建后再编辑。",
     "nameTaken": "已有同名钩子",
-    "runsIn": "运行于",
     "unsupported": {
       "wrongTiming": "{{tool}} 不能在此时机运行此动作",
       "noEvent": "{{tool}} 没有此时机的事件",

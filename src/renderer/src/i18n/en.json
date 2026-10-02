@@ -962,7 +962,6 @@
     "notes": "Notes",
     "scriptStarter": "Starts with a template script. Edit it after creating.",
     "nameTaken": "A hook with this name exists",
-    "runsIn": "Runs in",
     "unsupported": {
       "wrongTiming": "Not at this timing in {{tool}}",
       "noEvent": "No event for this timing in {{tool}}",

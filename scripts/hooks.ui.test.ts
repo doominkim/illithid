@@ -72,6 +72,10 @@ test(
 
       // Detail: a one-line summary; outside the real HOME the library syncs at once
       await page.getByTestId('hook-summary').getByText('When a reply finishes').waitFor()
+      // Like the other menus, the tool switches come first
+      const top = async (id: string): Promise<number> =>
+        (await page.getByTestId(id).boundingBox())!.y
+      assert.ok((await top('hook-detail-tools')) < (await top('hook-summary')))
       await synced()
       const copy = join(home, '.claude/hooks/illithid/notify-stop/run.sh')
       const claude = (): {
@@ -257,6 +261,8 @@ test(
       // No recipe cards: the form is there at once
       assert.equal(await page.locator('[data-card^="hook-action-"]').count(), 0)
       await page.getByTestId('hook-new-script').waitFor()
+      // Like the other menus, the form picks no tools: a new hook is on wherever it can run
+      assert.equal(await page.getByText('Runs in', { exact: true }).count(), 0)
       // Timings are tiles: request and reply first, then each target's before and after side by side
       const tiles = page.getByTestId('hook-new-timing').getByRole('radio')
       assert.deepEqual(

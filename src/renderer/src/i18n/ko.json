@@ -962,7 +962,6 @@
     "notes": "메모",
     "scriptStarter": "템플릿 스크립트로 시작합니다. 만든 뒤 고치세요.",
     "nameTaken": "같은 이름의 훅이 있습니다",
-    "runsIn": "실행할 툴",
     "unsupported": {
       "wrongTiming": "{{tool}} 은 이 시점에 이 동작을 실행할 수 없습니다",
       "noEvent": "{{tool}} 에는 이 시점의 이벤트가 없습니다",

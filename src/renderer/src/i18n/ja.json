@@ -962,7 +962,6 @@
     "notes": "メモ",
     "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",
     "nameTaken": "同じ名前のフックがあります",
-    "runsIn": "実行するツール",
     "unsupported": {
       "wrongTiming": "{{tool}} はこのタイミングでこの動作を実行できません",
       "noEvent": "{{tool}} にはこのタイミングのイベントがありません",

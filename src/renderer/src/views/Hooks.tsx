@@ -951,6 +951,26 @@ function HookDetail({
 
   return (
     <Stack gap="lg">
+      <Stack gap={8}>
+        <ToolToggleRow
+          pills={pills}
+          tools={runTools}
+          onToggle={onToggle}
+          busy={busy}
+          testId="hook-detail-tools"
+        />
+        <Unsupported
+          action={doc.action}
+          when={doc.when}
+          tools={tools}
+          testPrefix="hook-unsupported"
+        />
+        {hook.tools.codex !== undefined && edit.runs.codex && (
+          <Text size="xs" c="dimmed" data-testid="hook-codex-trust">
+            {t('hooks.codexTrust')}
+          </Text>
+        )}
+      </Stack>
       <Text size="md" data-testid="hook-summary">
         {summary({ ...hook, body: doc.body })}
       </Text>
@@ -975,26 +995,6 @@ function HookDetail({
           </Group>
         </Alert>
       ))}
-      <Stack gap={8}>
-        <ToolToggleRow
-          pills={pills}
-          tools={runTools}
-          onToggle={onToggle}
-          busy={busy}
-          testId="hook-detail-tools"
-        />
-        <Unsupported
-          action={doc.action}
-          when={doc.when}
-          tools={tools}
-          testPrefix="hook-unsupported"
-        />
-        {hook.tools.codex !== undefined && edit.runs.codex && (
-          <Text size="xs" c="dimmed" data-testid="hook-codex-trust">
-            {t('hooks.codexTrust')}
-          </Text>
-        )}
-      </Stack>
 
       <Tabs value={tab} onChange={setTab} keepMounted={false}>
         <Tabs.List mb="md">
@@ -1736,7 +1736,6 @@ function NewHookForm({
   })()
   const name = typedName ?? autoName
   const nameOk = NAME_RE.test(name) && !taken.includes(name)
-  const runs = tools.filter((tool) => hookSupport(action, when, tool) === 'ok')
   const atToolCall = when === 'before-tool' || when === 'after-tool'
   const valid =
     nameOk &&
@@ -1796,6 +1795,7 @@ function NewHookForm({
         }}
         testId="hook-new-timing"
       />
+      <Unsupported action={action} when={when} tools={tools} testPrefix="hook-new-unsupported" />
       <Stack gap={4}>
         <Text size="sm" fw={500}>
           {t('hooks.doLabel')}
@@ -1845,25 +1845,6 @@ function NewHookForm({
           <OptionFields action="ask" when={when} value={askOptions} onChange={setAskOptions} />
         </Stack>
       )}
-      <Stack gap={6}>
-        <Text size="sm" fw={500}>
-          {t('hooks.runsIn')}
-        </Text>
-        <Group gap={10}>
-          {runs.map((tool) => (
-            <Group key={tool} gap={4} wrap="nowrap">
-              <ToolIcon tool={tool} size={14} />
-              <Text size="sm">{TOOL_NAME[tool]}</Text>
-            </Group>
-          ))}
-          {runs.length === 0 && (
-            <Text size="sm" c="dimmed">
-              {t('common.none')}
-            </Text>
-          )}
-        </Group>
-        <Unsupported action={action} when={when} tools={tools} testPrefix="hook-new-unsupported" />
-      </Stack>
       <NumberInput
         label={t('hooks.timeout')}
         placeholder={t('hooks.timeoutDefault')}
