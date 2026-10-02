@@ -301,7 +301,8 @@
     "unsupported": "지원 안 함",
     "disabled": "마켓 꺼짐",
     "invalid": "잘못된 값",
-    "changed": "출처가 바뀜"
+    "changed": "출처가 바뀜",
+    "inUse": "사용 중"
   },
   "import": {
     "none": "가져올 항목이 없습니다.",
@@ -1030,7 +1031,8 @@
         "shell": "실행 후",
         "all": "실행 후"
       }
-    }
+    },
+    "folderFiles": "다른 파일"
   },
   "permissions": {
     "new": "새 규칙",
@@ -1118,6 +1120,40 @@
     "copied": "{{name}} 으로 복사했습니다",
     "allTools": "모든 툴 공통",
     "allToolsHint": "모든 툴에서 쓰는 스크립트 하나. 첫 인자($1)의 툴 이름으로 자기 부분을 고릅니다. 복사하면 이 내용이 저장됩니다.",
-    "toolHint": "{{tool}} 이 이 레시피로 실행하는 스크립트입니다."
+    "toolHint": "{{tool}} 이 이 레시피로 실행하는 스크립트입니다.",
+    "kindLabel": "형태",
+    "kindFile": "파일 하나",
+    "kindFolder": "폴더",
+    "kindFileHint": ".sh 파일 하나. 짧은 스크립트에 맞습니다.",
+    "kindFolderHint": "run.sh 와, 그 파일이 상대 경로로 부르는 다른 파일들을 담는 폴더. 툴에는 폴더째 들어갑니다.",
+    "nameHintFolder": "scripts/<이름>/ 폴더로 저장됩니다",
+    "entry": "실행 파일",
+    "entryHint": "훅이 실행하는 파일",
+    "fileNew": "새 파일 (폴더 안 경로)",
+    "fileAdd": "추가",
+    "fileAdded": "{{file}} 을 추가했습니다",
+    "fileDelete": "{{file}} 삭제",
+    "fileDeleteBody": "{{file}} 을 .trash 로 옮깁니다.",
+    "fileDeleted": "{{file}} 을 삭제했습니다 (.trash 에 보관)",
+    "reveal": "Finder 에서 열기",
+    "depsHint": "필요한 패키지(pip, npm 등)는 Illithid 가 설치하지 않습니다. 툴에서 실행될 수 있게 직접 준비하세요.",
+    "toFolder": "폴더로 바꾸기",
+    "toFolderHint": "다른 파일을 함께 두려면",
+    "toFolderBody": "{{name}}.sh 를 {{name}}/run.sh 로 옮겨 다른 파일을 함께 둘 수 있게 합니다. 이 스크립트를 쓰는 훅은 그대로 이어집니다.",
+    "toFolderDone": "폴더 스크립트로 바꿨습니다",
+    "importFolder": "폴더 가져오기",
+    "importEntryHint": "폴더 안 경로. 비우면 SCRIPT.md 의 값, 없으면 run.sh",
+    "importHint": "폴더를 라이브러리로 복사합니다. 원래 폴더는 그대로 둡니다.",
+    "imported": "{{name}} 을 가져왔습니다",
+    "deleteFolderUsed": "{{name}} 을 쓰는 훅이 {{count}}개 있어 지울 수 없습니다. 먼저 훅에서 다른 스크립트로 바꾸세요.",
+    "problemShort": "복사 안 됨",
+    "problemTitle": "툴에 복사되지 않는 스크립트입니다",
+    "problem": {
+      "ignoredFolder": ".git, node_modules, .venv, __pycache__ 가 들어 있습니다. 폴더에서 빼 주세요.",
+      "symlink": "심볼릭 링크가 들어 있습니다.",
+      "tooLarge": "파일이 200개 또는 5MB 를 넘습니다.",
+      "noEntry": "실행 파일이 없습니다.",
+      "badDoc": "SCRIPT.md 를 읽을 수 없습니다."
+    }
   }
 }

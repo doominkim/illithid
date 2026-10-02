@@ -604,6 +604,36 @@ export function registerIpc(): void {
     scriptSave: async (name, content) =>
       libWrite(() => W.lib.scriptSave(home, str(name), str(content))),
     scriptDelete: async (name) => libWrite(() => W.lib.scriptDelete(home, str(name))),
+    scriptCreateFolder: async (name, description) =>
+      libWrite(() => W.lib.scriptCreateFolder(home, str(name), str(description))),
+    scriptFileRead: async (name, rel) =>
+      W.wrap(() => W.lib.scriptFileRead(home, str(name), str(rel))),
+    scriptFileSave: async (name, rel, content) =>
+      libWrite(() => W.lib.scriptFileSave(home, str(name), str(rel), str(content))),
+    scriptFileDelete: async (name, rel) =>
+      libWrite(() => W.lib.scriptFileDelete(home, str(name), str(rel))),
+    scriptInfoSave: async (name, info) =>
+      libWrite(() =>
+        W.lib.scriptInfoSave(
+          home,
+          str(name),
+          info && typeof info === 'object' ? (info as Record<string, unknown>) : {}
+        )
+      ),
+    scriptToFolder: async (name) => libWrite(() => W.lib.scriptToFolder(home, str(name))),
+    scriptImportFolder: async (name, from, entry) =>
+      libWrite(() =>
+        W.lib.scriptImportFolder(
+          home,
+          str(name),
+          str(from),
+          typeof entry === 'string' ? entry : undefined
+        )
+      ),
+    scriptReveal: async (name) =>
+      W.wrap(() => {
+        shell.showItemInFolder(W.lib.scriptLocation(home, str(name)))
+      }),
     hookConvert: async (name, tool, script) =>
       libWrite(() =>
         W.lib.hookConvert(

@@ -301,7 +301,8 @@
     "unsupported": "不支持",
     "disabled": "市场已关闭",
     "invalid": "无效",
-    "changed": "来源已变更"
+    "changed": "来源已变更",
+    "inUse": "使用中"
   },
   "import": {
     "none": "没有可导入的项目。",
@@ -1030,7 +1031,8 @@
         "shell": "执行后",
         "all": "执行后"
       }
-    }
+    },
+    "folderFiles": "其他文件"
   },
   "permissions": {
     "new": "新建规则",
@@ -1118,6 +1120,40 @@
     "copied": "已复制为 {{name}}",
     "allTools": "所有工具通用",
     "allToolsHint": "所有工具共用的一个脚本，按第一个参数 ($1) 的工具名称选择自己的部分。复制时保存的就是这个内容。",
-    "toolHint": "{{tool}} 为此模板运行的脚本。"
+    "toolHint": "{{tool}} 为此模板运行的脚本。",
+    "kindLabel": "类型",
+    "kindFile": "单个文件",
+    "kindFolder": "文件夹",
+    "kindFileHint": "一个 .sh 文件，适合简短脚本。",
+    "kindFolderHint": "包含 run.sh 及其按相对路径调用的其他文件的文件夹。工具会获得整个文件夹。",
+    "nameHintFolder": "保存为 scripts/<名称>/ 文件夹",
+    "entry": "执行文件",
+    "entryHint": "钩子运行的文件",
+    "fileNew": "新文件（文件夹内路径）",
+    "fileAdd": "添加",
+    "fileAdded": "已添加 {{file}}",
+    "fileDelete": "删除 {{file}}",
+    "fileDeleteBody": "将 {{file}} 移到 .trash。",
+    "fileDeleted": "已删除 {{file}}（保存在 .trash）",
+    "reveal": "在 Finder 中显示",
+    "depsHint": "Illithid 不会安装依赖包（pip、npm 等）。请自行准备，确保能从工具中运行。",
+    "toFolder": "改为文件夹",
+    "toFolderHint": "以便放入其他文件",
+    "toFolderBody": "将 {{name}}.sh 移为 {{name}}/run.sh，以便放入其他文件。使用此脚本的钩子保持不变。",
+    "toFolderDone": "已改为文件夹脚本",
+    "importFolder": "导入文件夹",
+    "importEntryHint": "文件夹内路径。留空则用其 SCRIPT.md 中的值，否则为 run.sh",
+    "importHint": "将文件夹复制到库中，原文件夹保持不变。",
+    "imported": "已导入 {{name}}",
+    "deleteFolderUsed": "有 {{count}} 个钩子在使用 {{name}}，无法删除。请先将钩子改为其他脚本。",
+    "problemShort": "不会复制",
+    "problemTitle": "此脚本不会复制到工具",
+    "problem": {
+      "ignoredFolder": "包含 .git、node_modules、.venv 或 __pycache__，请移出文件夹。",
+      "symlink": "包含符号链接。",
+      "tooLarge": "超过 200 个文件或 5 MB。",
+      "noEntry": "缺少执行文件。",
+      "badDoc": "无法读取 SCRIPT.md。"
+    }
   }
 }

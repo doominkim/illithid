@@ -5,7 +5,6 @@ import {
   Button,
   Group,
   Modal,
-  Select,
   Stack,
   Tabs,
   Text,
@@ -19,6 +18,7 @@ import type { SkillDoc, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyLibrary, EmptyState } from '../components/EmptyState'
+import { FileEditor } from '../components/FileEditor'
 import { ImportModal } from '../components/ImportModal'
 import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Loading } from '../components/Layout'
@@ -527,74 +527,21 @@ function SkillEditor({
       </Tabs.Panel>
       {others.length > 0 && (
         <Tabs.Panel value="files">
-          <SkillFileEditor name={name} files={others} onSaved={onSaved} />
+          <FileEditor
+            id={name}
+            files={others}
+            read={(rel) => window.api.skillFileRead(name, rel)}
+            save={async (rel, next) => {
+              const r = await runWrite(window.api.skillFileSave(name, rel, next), {
+                success: t('editor.saved')
+              })
+              if (r !== null) onSaved()
+              return r !== null
+            }}
+          />
         </Tabs.Panel>
       )}
     </Tabs>
-  )
-}
-
-/** Extra file picker + raw editor */
-function SkillFileEditor({
-  name,
-  files,
-  onSaved
-}: {
-  name: string
-  files: string[]
-  onSaved: () => void
-}): React.JSX.Element {
-  const { t } = useTranslation()
-  const [rel, setRel] = useState<string>(files[0])
-  const [text, setText] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the previous file before loading another
-    setText(null)
-    setErr(null)
-    window.api.skillFileRead(name, rel).then((r) => {
-      if (!alive) return
-      if (r.ok) setText(r.value)
-      else setErr(r.message)
-    })
-    return () => {
-      alive = false
-    }
-  }, [name, rel])
-
-  return (
-    <Stack gap="sm">
-      <Select
-        data={files}
-        value={rel}
-        onChange={(v) => v && setRel(v)}
-        allowDeselect={false}
-        w={320}
-        leftSection={<FolderOpen size={14} />}
-      />
-      {err ? (
-        <ErrorAlert message={err} />
-      ) : text === null ? (
-        <Loading />
-      ) : (
-        <MarkdownEditor
-          key={`${name}/${rel}`}
-          value={text}
-          onSave={async (next) => {
-            const r = await runWrite(window.api.skillFileSave(name, rel, next), {
-              success: t('editor.saved')
-            })
-            if (r !== null) {
-              setText(next)
-              onSaved()
-            }
-            return r !== null
-          }}
-        />
-      )}
-    </Stack>
   )
 }
 

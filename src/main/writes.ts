@@ -78,6 +78,17 @@ import {
   type NewHookInput,
   savePermissionRules,
   createScript,
+  createFolderScript,
+  readScriptFile,
+  readScript,
+  writeScriptFile,
+  deleteScriptFile,
+  saveScriptInfo,
+  scriptToFolder,
+  importScriptFolder,
+  scriptDirPath,
+  scriptPath,
+  isFolderScript,
   saveScript,
   deleteScript,
   convertHookToLibraryScript,
@@ -711,6 +722,36 @@ export const lib = {
     return { name }
   },
   scriptDelete: (home: string, name: string) => deleteScript(home, name),
+  scriptCreateFolder: (home: string, name: string, description: string) => {
+    createFolderScript(home, name, { description: String(description ?? '') })
+    return { name }
+  },
+  scriptFileRead: (home: string, name: string, rel: string) => readScriptFile(home, name, rel),
+  scriptFileSave: (home: string, name: string, rel: string, content: string) => {
+    writeScriptFile(home, name, rel, String(content))
+  },
+  scriptFileDelete: (home: string, name: string, rel: string) => deleteScriptFile(home, name, rel),
+  scriptInfoSave: (
+    home: string,
+    name: string,
+    info: { description?: unknown; entry?: unknown }
+  ) => {
+    saveScriptInfo(home, name, {
+      ...(typeof info?.description === 'string' ? { description: info.description } : {}),
+      ...(typeof info?.entry === 'string' ? { entry: info.entry } : {})
+    })
+  },
+  scriptToFolder: (home: string, name: string) => {
+    scriptToFolder(home, name)
+    return { name }
+  },
+  scriptImportFolder: (home: string, name: string, from: string, entry?: string) => {
+    importScriptFolder(home, name, from, entry || undefined)
+    return { name }
+  },
+  /** Where a script lives (its folder, or its .sh file) */
+  scriptLocation: (home: string, name: string) =>
+    isFolderScript(home, name) ? scriptDirPath(home, name) : scriptPath(home, name),
   hookDelete: (home: string, name: string) => deleteHook(home, name),
   hookScriptSave: (home: string, name: string, file: string, content: string) => {
     saveHookScript(home, name, file, String(content))
@@ -745,7 +786,14 @@ export function hookRead(home: string, name: string): HookEditView {
         ? { trigger: t, file: script.file, content: script.content }
         : { trigger: t, prompt: renderAskPrompt(h.doc) }
     }
-    return { name: h.name, doc: h.doc, scripts: h.scripts, runs }
+    const lib = h.folder ? readScript(home, h.folder.name) : null
+    return {
+      name: h.name,
+      doc: h.doc,
+      scripts: h.scripts,
+      runs,
+      ...(h.folder ? { folder: { ...h.folder, files: lib?.files ?? [] } } : {})
+    }
   } catch (e) {
     if (e instanceof LibraryError) throw e
     throw new LibraryError('notFound', (e as Error).message)

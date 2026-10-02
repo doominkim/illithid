@@ -301,7 +301,8 @@
     "unsupported": "Not supported",
     "disabled": "Marketplace is off",
     "invalid": "Invalid",
-    "changed": "Source changed"
+    "changed": "Source changed",
+    "inUse": "In use"
   },
   "import": {
     "none": "Nothing to import.",
@@ -1030,7 +1031,8 @@
         "shell": "After",
         "all": "After"
       }
-    }
+    },
+    "folderFiles": "Other files"
   },
   "permissions": {
     "new": "New rule",
@@ -1118,6 +1120,40 @@
     "copied": "Copied to {{name}}",
     "allTools": "All tools",
     "allToolsHint": "One script for every tool: it picks its part by the tool name in $1. This is what a copy saves.",
-    "toolHint": "What {{tool}} runs for this recipe."
+    "toolHint": "What {{tool}} runs for this recipe.",
+    "kindLabel": "Kind",
+    "kindFile": "Single file",
+    "kindFolder": "Folder",
+    "kindFileHint": "One .sh file. Good for short scripts.",
+    "kindFolderHint": "A folder with run.sh and any other files it calls by relative path. The tools get the whole folder.",
+    "nameHintFolder": "Saved as scripts/<name>/",
+    "entry": "Runs",
+    "entryHint": "The file hooks run",
+    "fileNew": "New file (path in the folder)",
+    "fileAdd": "Add",
+    "fileAdded": "Added {{file}}",
+    "fileDelete": "Delete {{file}}",
+    "fileDeleteBody": "{{file}} moves to .trash.",
+    "fileDeleted": "Deleted {{file}} (kept in .trash)",
+    "reveal": "Show in Finder",
+    "depsHint": "Illithid does not install packages (pip, npm and so on). Set up what the script needs so it runs from the tools.",
+    "toFolder": "Turn into a folder",
+    "toFolderHint": "To keep other files next to it",
+    "toFolderBody": "{{name}}.sh becomes {{name}}/run.sh so other files can sit next to it. Hooks using this script keep it.",
+    "toFolderDone": "Turned into a folder script",
+    "importFolder": "Import a folder",
+    "importEntryHint": "Path in the folder. Left empty: its SCRIPT.md's, else run.sh",
+    "importHint": "The folder is copied into the library; the original stays where it is.",
+    "imported": "Imported {{name}}",
+    "deleteFolderUsed": "{{count}} hooks use {{name}}, so it can't be deleted. Point them at another script first.",
+    "problemShort": "Not copied",
+    "problemTitle": "The tools don't get this script",
+    "problem": {
+      "ignoredFolder": "It holds .git, node_modules, .venv or __pycache__. Keep those out of the folder.",
+      "symlink": "It holds a symbolic link.",
+      "tooLarge": "More than 200 files or 5 MB.",
+      "noEntry": "The file it runs is missing.",
+      "badDoc": "SCRIPT.md can't be read."
+    }
   }
 }

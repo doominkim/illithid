@@ -1077,8 +1077,15 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
   if (doc.action === 'script')
     rows.push([
       t('hooks.scripts'),
-      o.use ? `${t('hooks.libScript')}: ${String(o.use)}` : Object.keys(edit.scripts).join(', ')
+      edit.folder
+        ? `${t('hooks.libScript')}: ${edit.folder.name}/${edit.folder.entry}`
+        : o.use
+          ? `${t('hooks.libScript')}: ${String(o.use)}`
+          : Object.keys(edit.scripts).join(', ')
     ])
+  const otherFiles = (edit.folder?.files ?? []).filter(
+    (f) => f !== edit.folder!.entry && f !== 'SCRIPT.md'
+  )
   return (
     <Stack gap="md">
       <Box className="ac-card" p="md">
@@ -1087,12 +1094,28 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
       {doc.action === 'script' &&
         Object.entries(edit.scripts).map(([file, content]) => (
           <Stack key={file} gap={6} data-testid="hook-overview-script">
-            <SectionLabel>{o.use ? String(o.use) : file}</SectionLabel>
+            <SectionLabel>
+              {edit.folder
+                ? `${edit.folder.name}/${edit.folder.entry}`
+                : o.use
+                  ? String(o.use)
+                  : file}
+            </SectionLabel>
             <Code block style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {content}
             </Code>
           </Stack>
         ))}
+      {otherFiles.length > 0 && (
+        <Stack gap={6} data-testid="hook-overview-files">
+          <SectionLabel>{t('hooks.folderFiles')}</SectionLabel>
+          <Group gap={6}>
+            {otherFiles.map((f) => (
+              <Code key={f}>{f}</Code>
+            ))}
+          </Group>
+        </Stack>
+      )}
       {doc.body.trim() && (
         <Stack gap={6}>
           <SectionLabel>
@@ -1258,7 +1281,7 @@ function ScriptEditors({
   const files: { value: string; file: string; label: string; tool?: HookTool }[] = [
     {
       value: 'shared',
-      file: use ? `${use}.sh` : 'run.sh',
+      file: edit.folder ? `${edit.folder.name}/${edit.folder.entry}` : use ? `${use}.sh` : 'run.sh',
       label: use ? t('hooks.libScript') : t('hooks.shared')
     },
     ...HOOK_TOOLS.filter((tool) => doc.toolScripts?.[tool]).map((tool) => ({
@@ -1292,7 +1315,10 @@ function ScriptEditors({
         aria-label={t('hooks.useLabel')}
         data={[
           { value: '', label: t('hooks.useOwn') },
-          ...libScripts.map((x) => ({ value: x.name, label: x.name }))
+          ...libScripts.map((x) => ({
+            value: x.name,
+            label: x.kind === 'folder' ? `${x.name}/` : x.name
+          }))
         ]}
         value={use}
         onChange={(v) => void onSave({ ...doc, options: { ...doc.options, use: v ?? '' } })}
@@ -1487,7 +1513,7 @@ function HookAdvanced({
                       tool={tool}
                       doc={doc}
                       trigger={trigger}
-                      own={doc.action === 'script' ? !!own : undefined}
+                      own={doc.action === 'script' && (!edit.folder || own) ? !!own : undefined}
                       onSave={(s) => setSettings(tool, s)}
                       onOwn={(v) => setOwn(tool, v)}
                       onCancel={() => setOpen(null)}
@@ -1816,7 +1842,10 @@ function NewHookForm({
             label={t('hooks.useLabel')}
             data={[
               { value: '', label: t('hooks.useOwn') },
-              ...libScripts.map((x) => ({ value: x.name, label: x.name }))
+              ...libScripts.map((x) => ({
+                value: x.name,
+                label: x.kind === 'folder' ? `${x.name}/` : x.name
+              }))
             ]}
             value={use}
             onChange={(v) => setUse(v ?? '')}

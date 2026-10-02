@@ -51,7 +51,14 @@ import type {
   ToolModels
 } from '../engine'
 
-import type { ImportSource, RetireKind, SwitchLossItem, ToolDetection } from '../engine'
+import type {
+  ImportSource,
+  RetireKind,
+  ScriptProblem,
+  SwitchLossItem,
+  ToolDetection
+} from '../engine'
+export type { ScriptProblem } from '../engine'
 import type {
   ModelDetail,
   ModelKey,
@@ -293,8 +300,17 @@ export interface HooksData {
 /** One library script and the hooks that run it */
 export interface ScriptView {
   name: string
+  /** file: scripts/<name>.sh; folder: scripts/<name>/ with SCRIPT.md and other files */
+  kind: 'file' | 'folder'
   description: string
+  /** What the hooks run (a folder script's entry) */
   content: string
+  /** folder: the file the hooks run */
+  entry?: string
+  /** folder: every file, relative */
+  files?: string[]
+  /** folder: why the tools don't get it */
+  problem?: ScriptProblem
   users: string[]
 }
 
@@ -340,6 +356,8 @@ export interface HookEditView {
   doc: HookDoc
   /** Script action: script file → content */
   scripts: Record<string, string>
+  /** Script action running a folder library script: its name, the file the hooks run and every file */
+  folder?: { name: string; entry: string; files: string[] }
   /** Each tool that can run the hook: its trigger and the generated script (or the Claude Code prompt) */
   runs: Partial<
     Record<HookTool, { trigger: HookTrigger; file?: string; content?: string; prompt?: string }>
@@ -908,8 +926,28 @@ export interface Api {
     name: string
   ): Promise<WriteResult<{ name: string }> | Refused>
   scriptSave(name: string, content: string): Promise<WriteResult<{ name: string }> | Refused>
-  /** Hooks using it get their own copy first */
+  /** A file script: hooks using it get their own copy first. A folder script in use is refused (inUse) */
   scriptDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
+  scriptCreateFolder(
+    name: string,
+    description: string
+  ): Promise<WriteResult<{ name: string }> | Refused>
+  scriptFileRead(name: string, rel: string): Promise<WriteResult<string>>
+  scriptFileSave(name: string, rel: string, content: string): Promise<WriteResult | Refused>
+  scriptFileDelete(name: string, rel: string): Promise<WriteResult<TrashResult> | Refused>
+  scriptInfoSave(
+    name: string,
+    info: { description?: string; entry?: string }
+  ): Promise<WriteResult | Refused>
+  scriptToFolder(name: string): Promise<WriteResult<{ name: string }> | Refused>
+  /** A folder (from pickDirectory) comes in as a folder script; entry defaults to its SCRIPT.md's, else run.sh */
+  scriptImportFolder(
+    name: string,
+    from: string,
+    entry?: string
+  ): Promise<WriteResult<{ name: string }> | Refused>
+  /** Show the script in Finder */
+  scriptReveal(name: string): Promise<WriteResult>
   /** With script: save what the tool runs as a new library script and use it; without: as the hook's own run.sh */
   hookConvert(
     name: string,
@@ -1142,6 +1180,14 @@ export const CHANNELS = [
   'scriptFromRecipe',
   'scriptSave',
   'scriptDelete',
+  'scriptCreateFolder',
+  'scriptFileRead',
+  'scriptFileSave',
+  'scriptFileDelete',
+  'scriptInfoSave',
+  'scriptToFolder',
+  'scriptImportFolder',
+  'scriptReveal',
   'hookConvert',
   'hookDelete',
   'hookScriptSave',

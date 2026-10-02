@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
-import { createHook } from '../src/engine'
+import { createHook, createScript, readScript } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
 const LIB = '.illithid/workspaces/default'
@@ -130,6 +130,100 @@ test(
       const copy = readFileSync(join(home, LIB, 'scripts/my-verify.sh'), 'utf8')
       assert.match(copy, /case "\$1" in/)
       await page.getByTestId('detail-sheet').locator('textarea').first().waitFor()
+    } finally {
+      await app.close()
+    }
+  }
+)
+
+test(
+  'REQ-SCRIPTS-UI-3 a folder script: made and filled in the scripts menu, used by a hook, and the tool gets the whole folder',
+  { timeout: 180000 },
+  async () => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-scripts-ui-'))
+    buildDemoHome(home, { tools: 'all' })
+    const config = join(home, '.config/illithid/config.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(config, 'utf8')),
+        toolsInUse: ['claude'],
+        updateCheck: false,
+        marketEnabled: false,
+        ui: { language: 'en' }
+      })
+    )
+    createScript(home, 'lint', '#!/bin/sh\n# description: Lint\nexit 0\n')
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-scripts-ud-')),
+      ILLITHID_TEST: '1'
+    } as Record<string, string>
+    delete env.ELECTRON_RUN_AS_NODE
+    delete env.ELECTRON_RENDERER_URL
+    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    try {
+      const page = await app.firstWindow()
+      const synced = (): Promise<void> =>
+        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
+      const sheet = page.getByTestId('detail-sheet')
+      const editFile = async (rel: string, text: string): Promise<void> => {
+        await page.getByTestId('script-file-select').click()
+        await page.getByRole('option', { name: rel, exact: true }).click()
+        await sheet.locator('textarea').first().fill(text)
+        await page.getByTestId('editor-save').click()
+        await page.waitForTimeout(300)
+      }
+
+      // A new folder script
+      await page.locator('[data-menu="scripts"]').click()
+      await page.getByTestId('script-new').click()
+      await page.getByTestId('script-new-kind').getByText('Folder', { exact: true }).click()
+      await page.getByTestId('script-new-name').fill('fmt')
+      await page.getByTestId('script-new-description').fill('Format')
+      await page.getByTestId('script-create').click()
+      await page.getByTestId('script-files').waitFor()
+      await page.getByTestId('script-reveal').waitFor()
+      // A helper file, then the entry that calls it
+      await page.getByTestId('script-file-new').fill('lib/util.sh')
+      await page.getByTestId('script-file-add').click()
+      await editFile('lib/util.sh', 'say_done() { echo "done $1"; }\n')
+      const run = '#!/bin/sh\n. "$(dirname "$0")/lib/util.sh"\nsay_done "$1"\n'
+      await editFile('run.sh', run)
+      const s = readScript(home, 'fmt')!
+      assert.equal(s.kind, 'folder')
+      assert.deepEqual(s.files, ['SCRIPT.md', 'lib/util.sh', 'run.sh'])
+      assert.equal(s.content, run)
+      await page.keyboard.press('Escape')
+
+      // A hook runs it: the tool gets the folder, and the hook shows the entry and the other files
+      await page.locator('[data-menu="hooks"]').click()
+      await page.getByTestId('hook-new').click()
+      await page.getByTestId('hook-new-use').click()
+      await page.getByRole('option', { name: 'fmt/', exact: true }).click()
+      await page.getByTestId('hook-create').click()
+      await page.getByTestId('hook-summary').waitFor()
+      await page.getByTestId('hook-overview-files').getByText('lib/util.sh').waitFor()
+      await synced()
+      const copy = join(home, '.claude/hooks/illithid/_scripts/fmt')
+      assert.equal(
+        readFileSync(join(copy, 'lib/util.sh'), 'utf8'),
+        'say_done() { echo "done $1"; }\n'
+      )
+      const settings = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: { Stop: { hooks: { command: string }[] }[] }
+      }
+      assert.equal(settings.hooks.Stop[0].hooks[0].command, `'${copy}/run.sh' claude script-stop`)
+      await page.keyboard.press('Escape')
+
+      // A file script turns into a folder script
+      await page.locator('[data-menu="scripts"]').click()
+      await page.getByText('lint', { exact: true }).first().click()
+      await page.getByTestId('script-to-folder').click()
+      await page.getByTestId('confirm-ok').click()
+      await page.getByTestId('script-files').waitFor()
+      assert.equal(readScript(home, 'lint')!.kind, 'folder')
     } finally {
       await app.close()
     }

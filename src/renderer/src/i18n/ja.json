@@ -301,7 +301,8 @@
     "unsupported": "未対応",
     "disabled": "マーケットはオフ",
     "invalid": "無効",
-    "changed": "ソースが変更されました"
+    "changed": "ソースが変更されました",
+    "inUse": "使用中"
   },
   "import": {
     "none": "取り込む項目がありません。",
@@ -1030,7 +1031,8 @@
         "shell": "実行後",
         "all": "実行後"
       }
-    }
+    },
+    "folderFiles": "他のファイル"
   },
   "permissions": {
     "new": "新しいルール",
@@ -1118,6 +1120,40 @@
     "copied": "{{name}} にコピーしました",
     "allTools": "全ツール共通",
     "allToolsHint": "全ツールで使う 1 つのスクリプト。最初の引数 ($1) のツール名で自分の部分を選びます。コピーではこの内容が保存されます。",
-    "toolHint": "{{tool}} がこのレシピで実行するスクリプトです。"
+    "toolHint": "{{tool}} がこのレシピで実行するスクリプトです。",
+    "kindLabel": "種類",
+    "kindFile": "ファイル1つ",
+    "kindFolder": "フォルダ",
+    "kindFileHint": ".sh ファイル1つ。短いスクリプト向けです。",
+    "kindFolderHint": "run.sh と、それが相対パスで呼ぶ他のファイルを入れるフォルダ。ツールにはフォルダごと入ります。",
+    "nameHintFolder": "scripts/<名前>/ フォルダに保存されます",
+    "entry": "実行ファイル",
+    "entryHint": "フックが実行するファイル",
+    "fileNew": "新しいファイル (フォルダ内のパス)",
+    "fileAdd": "追加",
+    "fileAdded": "{{file}} を追加しました",
+    "fileDelete": "{{file}} を削除",
+    "fileDeleteBody": "{{file}} を .trash に移動します。",
+    "fileDeleted": "{{file}} を削除しました (.trash に保管)",
+    "reveal": "Finder で表示",
+    "depsHint": "必要なパッケージ (pip、npm など) は Illithid がインストールしません。ツールから実行できるようご自身で用意してください。",
+    "toFolder": "フォルダにする",
+    "toFolderHint": "他のファイルを一緒に置くには",
+    "toFolderBody": "{{name}}.sh を {{name}}/run.sh に移し、他のファイルを一緒に置けるようにします。このスクリプトを使うフックはそのまま続きます。",
+    "toFolderDone": "フォルダスクリプトにしました",
+    "importFolder": "フォルダを取り込む",
+    "importEntryHint": "フォルダ内のパス。空なら SCRIPT.md の値、なければ run.sh",
+    "importHint": "フォルダをライブラリにコピーします。元のフォルダはそのまま残ります。",
+    "imported": "{{name}} を取り込みました",
+    "deleteFolderUsed": "{{name}} を使うフックが {{count}} 個あるため削除できません。先にフックで別のスクリプトに切り替えてください。",
+    "problemShort": "コピーされない",
+    "problemTitle": "このスクリプトはツールにコピーされません",
+    "problem": {
+      "ignoredFolder": ".git、node_modules、.venv、__pycache__ が含まれています。フォルダから外してください。",
+      "symlink": "シンボリックリンクが含まれています。",
+      "tooLarge": "ファイルが 200 個または 5MB を超えています。",
+      "noEntry": "実行ファイルがありません。",
+      "badDoc": "SCRIPT.md を読めません。"
+    }
   }
 }

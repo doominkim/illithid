@@ -603,6 +603,9 @@ export {
   scriptDescription,
   scriptNames,
   scriptsDir,
+  scriptDirPath,
+  scriptPath,
+  isFolderScript,
   SCRIPT_FOLDER_LIMITS
 } from './scripts'
 export type { LibraryScript, ScriptProblem } from './scripts'
