@@ -170,10 +170,14 @@ test(
       await page.getByTestId('script-new-description').fill('Format')
       await page.getByTestId('script-create').click()
       await page.getByTestId('script-files').waitFor()
-      await page.getByTestId('script-reveal').waitFor()
-      // A helper file, then the entry that calls it
-      await page.getByTestId('script-file-new').fill('lib/util.sh')
+      // Show in Finder sits with the header icons; no hook list or argument note while nothing uses it
+      await page.getByTestId('detail-sheet').getByTestId('script-reveal').waitFor()
+      assert.equal(await page.getByTestId('script-users').count(), 0)
+      assert.equal(await page.getByText('The tool name comes as the first argument').count(), 0)
+      // A helper file from the + next to the file picker, then the entry that calls it
       await page.getByTestId('script-file-add').click()
+      await page.getByTestId('script-file-new').fill('lib/util.sh')
+      await page.getByTestId('script-file-new').press('Enter')
       await editFile('lib/util.sh', 'say_done() { echo "done $1"; }\n')
       const run = '#!/bin/sh\n. "$(dirname "$0")/lib/util.sh"\nsay_done "$1"\n'
       await editFile('run.sh', run)

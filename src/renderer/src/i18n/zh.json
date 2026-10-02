@@ -267,7 +267,8 @@
     "turnOff": "{{tool}}：开 — 点击关闭",
     "turnOn": "{{tool}}：关 — 点击开启",
     "copyPath": "复制路径",
-    "deleteItem": "删除…"
+    "deleteItem": "删除…",
+    "reveal": "在 Finder 中显示"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -1103,9 +1104,7 @@
     "empty": "还没有脚本",
     "emptyHint": "还没有自己的脚本。新建一个，或导入文件夹。",
     "users": "使用它的钩子",
-    "noUsers": "还没有钩子使用此脚本。",
     "usedBy": "{{count}} 个钩子",
-    "argHint": "第一个参数是工具名称，stdin 是事件 JSON。",
     "nameHint": "保存为 scripts/<名称>.sh",
     "nameTaken": "已有同名脚本",
     "description": "描述",
@@ -1119,12 +1118,11 @@
     "entry": "执行文件",
     "entryHint": "钩子运行的文件",
     "fileNew": "新文件（文件夹内路径）",
-    "fileAdd": "添加",
+    "fileAdd": "添加文件",
     "fileAdded": "已添加 {{file}}",
     "fileDelete": "删除 {{file}}",
     "fileDeleteBody": "将 {{file}} 移到 .trash。",
     "fileDeleted": "已删除 {{file}}（保存在 .trash）",
-    "reveal": "在 Finder 中显示",
     "depsHint": "Illithid 不会安装依赖包（pip、npm 等）。请自行准备，确保能从工具中运行。",
     "toFolder": "改为文件夹",
     "toFolderHint": "以便放入其他文件",
@@ -1143,6 +1141,7 @@
       "tooLarge": "超过 200 个文件或 5 MB。",
       "noEntry": "缺少执行文件。",
       "badDoc": "无法读取 SCRIPT.md。"
-    }
+    },
+    "fileExists": "已存在相同路径的文件"
   }
 }

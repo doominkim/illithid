@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Select, Stack } from '@mantine/core'
+import { Group, Select, Stack } from '@mantine/core'
 import { FolderOpen } from 'lucide-react'
 import { ErrorAlert, Loading } from './Layout'
 import { MarkdownEditor } from './MarkdownEditor'
@@ -13,7 +13,8 @@ export function FileEditor({
   onChange,
   read,
   save,
-  testId
+  testId,
+  actions
 }: {
   /** Folder identity: a change reloads the file */
   id: string
@@ -24,6 +25,8 @@ export function FileEditor({
   /** true when saved */
   save: (rel: string, text: string) => Promise<boolean>
   testId?: string
+  /** Buttons next to the file picker (e.g. add or delete a file) */
+  actions?: React.ReactNode
 }): React.JSX.Element {
   const [own, setOwn] = useState<string>(files[0])
   const rel = value ?? own
@@ -50,15 +53,18 @@ export function FileEditor({
 
   return (
     <Stack gap="sm">
-      <Select
-        data={files}
-        value={rel}
-        onChange={(v) => v && pick(v)}
-        allowDeselect={false}
-        w={320}
-        leftSection={<FolderOpen size={14} />}
-        data-testid={testId}
-      />
+      <Group gap={6} wrap="nowrap">
+        <Select
+          data={files}
+          value={rel}
+          onChange={(v) => v && pick(v)}
+          allowDeselect={false}
+          w={320}
+          leftSection={<FolderOpen size={14} />}
+          data-testid={testId}
+        />
+        {actions}
+      </Group>
       {err ? (
         <ErrorAlert message={err} />
       ) : text === null ? (

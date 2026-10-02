@@ -267,7 +267,8 @@
     "turnOff": "{{tool}}: 켜짐 — 누르면 꺼짐",
     "turnOn": "{{tool}}: 꺼짐 — 누르면 켜짐",
     "copyPath": "경로 복사",
-    "deleteItem": "삭제…"
+    "deleteItem": "삭제…",
+    "reveal": "Finder 에서 열기"
   },
   "editor": {
     "lines": "{{n}}줄",
@@ -1103,9 +1104,7 @@
     "empty": "스크립트가 없습니다",
     "emptyHint": "아직 내 스크립트가 없습니다. 새로 쓰거나 폴더를 가져오세요.",
     "users": "쓰는 훅",
-    "noUsers": "아직 이 스크립트를 쓰는 훅이 없습니다.",
     "usedBy": "훅 {{count}}개",
-    "argHint": "첫 인자로 툴 이름이, stdin 으로 이벤트 JSON 이 들어옵니다.",
     "nameHint": "scripts/<이름>.sh 로 저장됩니다",
     "nameTaken": "같은 이름의 스크립트가 있습니다",
     "description": "설명",
@@ -1119,12 +1118,11 @@
     "entry": "실행 파일",
     "entryHint": "훅이 실행하는 파일",
     "fileNew": "새 파일 (폴더 안 경로)",
-    "fileAdd": "추가",
+    "fileAdd": "파일 추가",
     "fileAdded": "{{file}} 을 추가했습니다",
     "fileDelete": "{{file}} 삭제",
     "fileDeleteBody": "{{file}} 을 .trash 로 옮깁니다.",
     "fileDeleted": "{{file}} 을 삭제했습니다 (.trash 에 보관)",
-    "reveal": "Finder 에서 열기",
     "depsHint": "필요한 패키지(pip, npm 등)는 Illithid 가 설치하지 않습니다. 툴에서 실행될 수 있게 직접 준비하세요.",
     "toFolder": "폴더로 바꾸기",
     "toFolderHint": "다른 파일을 함께 두려면",
@@ -1143,6 +1141,7 @@
       "tooLarge": "파일이 200개 또는 5MB 를 넘습니다.",
       "noEntry": "실행 파일이 없습니다.",
       "badDoc": "SCRIPT.md 를 읽을 수 없습니다."
-    }
+    },
+    "fileExists": "같은 경로의 파일이 있습니다"
   }
 }

@@ -267,7 +267,8 @@
     "turnOff": "{{tool}}: on — click to turn off",
     "turnOn": "{{tool}}: off — click to turn on",
     "copyPath": "Copy path",
-    "deleteItem": "Delete…"
+    "deleteItem": "Delete…",
+    "reveal": "Show in Finder"
   },
   "editor": {
     "lines": "{{n}} lines",
@@ -1103,9 +1104,7 @@
     "empty": "No scripts yet",
     "emptyHint": "No scripts of your own yet. Write one, or import a folder.",
     "users": "Hooks using it",
-    "noUsers": "No hook uses this script yet.",
     "usedBy": "{{count}} hooks",
-    "argHint": "The tool name comes as the first argument, the event as JSON on stdin.",
     "nameHint": "Saved as scripts/<name>.sh",
     "nameTaken": "A script with this name exists",
     "description": "Description",
@@ -1119,12 +1118,11 @@
     "entry": "Runs",
     "entryHint": "The file hooks run",
     "fileNew": "New file (path in the folder)",
-    "fileAdd": "Add",
+    "fileAdd": "Add a file",
     "fileAdded": "Added {{file}}",
     "fileDelete": "Delete {{file}}",
     "fileDeleteBody": "{{file}} moves to .trash.",
     "fileDeleted": "Deleted {{file}} (kept in .trash)",
-    "reveal": "Show in Finder",
     "depsHint": "Illithid does not install packages (pip, npm and so on). Set up what the script needs so it runs from the tools.",
     "toFolder": "Turn into a folder",
     "toFolderHint": "To keep other files next to it",
@@ -1143,6 +1141,7 @@
       "tooLarge": "More than 200 files or 5 MB.",
       "noEntry": "The file it runs is missing.",
       "badDoc": "SCRIPT.md can't be read."
-    }
+    },
+    "fileExists": "A file with this path exists"
   }
 }

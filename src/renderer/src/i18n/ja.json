@@ -267,7 +267,8 @@
     "turnOff": "{{tool}}: オン — クリックでオフ",
     "turnOn": "{{tool}}: オフ — クリックでオン",
     "copyPath": "パスをコピー",
-    "deleteItem": "削除…"
+    "deleteItem": "削除…",
+    "reveal": "Finder で表示"
   },
   "editor": {
     "lines": "{{n}} 行",
@@ -1103,9 +1104,7 @@
     "empty": "スクリプトはまだありません",
     "emptyHint": "まだ自分のスクリプトがありません。新しく書くか、フォルダを取り込んでください。",
     "users": "使っているフック",
-    "noUsers": "このスクリプトを使うフックはまだありません。",
     "usedBy": "フック {{count}} 件",
-    "argHint": "最初の引数にツール名、stdin にイベントの JSON が入ります。",
     "nameHint": "scripts/<名前>.sh として保存されます",
     "nameTaken": "同じ名前のスクリプトがあります",
     "description": "説明",
@@ -1119,12 +1118,11 @@
     "entry": "実行ファイル",
     "entryHint": "フックが実行するファイル",
     "fileNew": "新しいファイル (フォルダ内のパス)",
-    "fileAdd": "追加",
+    "fileAdd": "ファイルを追加",
     "fileAdded": "{{file}} を追加しました",
     "fileDelete": "{{file}} を削除",
     "fileDeleteBody": "{{file}} を .trash に移動します。",
     "fileDeleted": "{{file}} を削除しました (.trash に保管)",
-    "reveal": "Finder で表示",
     "depsHint": "必要なパッケージ (pip、npm など) は Illithid がインストールしません。ツールから実行できるようご自身で用意してください。",
     "toFolder": "フォルダにする",
     "toFolderHint": "他のファイルを一緒に置くには",
@@ -1143,6 +1141,7 @@
       "tooLarge": "ファイルが 200 個または 5MB を超えています。",
       "noEntry": "実行ファイルがありません。",
       "badDoc": "SCRIPT.md を読めません。"
-    }
+    },
+    "fileExists": "同じパスのファイルがあります"
   }
 }

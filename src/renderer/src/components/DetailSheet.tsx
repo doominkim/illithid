@@ -1,6 +1,6 @@
 import { ActionIcon, Box, Drawer, Group, Stack, Text, Title, Tooltip } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { ArrowLeft, Copy, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, FolderOpen, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
@@ -12,6 +12,10 @@ interface Props {
   tags?: React.ReactNode
   /** Meta line such as path or file (icon + text) */
   meta?: React.ReactNode
+  /** Header folder icon: show the item in Finder */
+  onReveal?: () => void
+  /** data-testid of the folder icon */
+  revealTestId?: string
   /** Path copied by the header's copy-path icon */
   copyPath?: string
   /** Header delete icon (the caller confirms) */
@@ -34,6 +38,8 @@ export function DetailSheet({
   description,
   tags,
   meta,
+  onReveal,
+  revealTestId,
   copyPath,
   onDelete,
   deleteTestId,
@@ -78,6 +84,21 @@ export function DetailSheet({
           <Title order={1} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             {title}
           </Title>
+          {onReveal && (
+            <Tooltip label={t('detail.reveal')} withArrow openDelay={300}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                onClick={onReveal}
+                aria-label={t('detail.reveal')}
+                style={{ flexShrink: 0 }}
+                data-testid={revealTestId}
+              >
+                <FolderOpen size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           {copyPath && (
             <Tooltip label={t('detail.copyPath')} withArrow openDelay={300}>
               <ActionIcon

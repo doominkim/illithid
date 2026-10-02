@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Box,
@@ -7,11 +8,13 @@ import {
   Code,
   Group,
   Modal,
+  Popover,
   SegmentedControl,
   Select,
   Stack,
   Text,
-  TextInput
+  TextInput,
+  Tooltip
 } from '@mantine/core'
 import {
   FileCode,
@@ -189,32 +192,19 @@ function Scripts(): React.JSX.Element {
             <MetaItem icon={<FolderOpen size={14} />}>{scriptPathOf(data.dir, current)}</MetaItem>
           )
         }
+        onReveal={current ? () => void runWrite(window.api.scriptReveal(current.name)) : undefined}
+        revealTestId="script-reveal"
         copyPath={current ? scriptPathOf(data.dir, current) : undefined}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="script-delete"
       >
         {current && (
           <Stack gap="lg">
-            <Group gap="xs">
-              <Button
-                size="xs"
-                variant="default"
-                leftSection={<FolderOpen size={13} />}
-                onClick={() => void runWrite(window.api.scriptReveal(current.name))}
-                data-testid="script-reveal"
-              >
-                {t('scripts.reveal')}
-              </Button>
-            </Group>
-            <Stack gap={8} data-testid="script-users">
-              <Text size="sm" fw={600} c="dimmed">
-                {t('scripts.users')}
-              </Text>
-              {current.users.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  {t('scripts.noUsers')}
+            {current.users.length > 0 && (
+              <Stack gap={8} data-testid="script-users">
+                <Text size="sm" fw={600} c="dimmed">
+                  {t('scripts.users')}
                 </Text>
-              ) : (
                 <ListCard>
                   {current.users.map((h) => (
                     <ListRow
@@ -225,11 +215,8 @@ function Scripts(): React.JSX.Element {
                     />
                   ))}
                 </ListCard>
-              )}
-            </Stack>
-            <Text size="xs" c="dimmed">
-              {t('scripts.argHint')}
-            </Text>
+              </Stack>
+            )}
             {current.kind === 'folder' ? (
               <FolderScript key={current.name} script={current} onChanged={reload} />
             ) : (
@@ -336,6 +323,7 @@ function FolderScript({
   const [description, setDescription] = useState(script.description)
   const [entry, setEntry] = useState(script.entry ?? '')
   const [newFile, setNewFile] = useState('')
+  const [adding, setAdding] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const name = script.name
   const shown = files.includes(rel) ? rel : (script.entry ?? files[0])
@@ -353,6 +341,7 @@ function FolderScript({
     })
     if (r === null) return
     setNewFile('')
+    setAdding(false)
     setRel(path)
     onChanged()
   }
@@ -366,6 +355,7 @@ function FolderScript({
     onChanged()
   }
   const removable = shown !== 'SCRIPT.md' && shown !== script.entry
+  const canAdd = !!newFile.trim() && !files.includes(newFile.trim())
   return (
     <Stack gap="md" data-testid="script-files">
       {script.problem && (
@@ -408,39 +398,63 @@ function FolderScript({
           return r !== null
         }}
         testId="script-file-select"
+        actions={
+          <>
+            <Popover
+              opened={adding}
+              onChange={setAdding}
+              position="bottom-start"
+              withArrow
+              shadow="md"
+              trapFocus
+            >
+              <Popover.Target>
+                <Tooltip label={t('scripts.fileAdd')} withArrow openDelay={300}>
+                  <ActionIcon
+                    variant="default"
+                    size={36}
+                    onClick={() => setAdding((o) => !o)}
+                    aria-label={t('scripts.fileAdd')}
+                    data-testid="script-file-add"
+                  >
+                    <Plus size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <TextInput
+                  label={t('scripts.fileNew')}
+                  placeholder="lib/util.sh"
+                  value={newFile}
+                  onChange={(e) => setNewFile(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && canAdd) void add()
+                    if (e.key === 'Escape') setAdding(false)
+                  }}
+                  error={files.includes(newFile.trim()) ? t('scripts.fileExists') : undefined}
+                  w={260}
+                  data-autofocus
+                  data-testid="script-file-new"
+                />
+              </Popover.Dropdown>
+            </Popover>
+            {removable && (
+              <Tooltip label={t('scripts.fileDelete', { file: shown })} withArrow openDelay={300}>
+                <ActionIcon
+                  variant="subtle"
+                  color="red"
+                  size={36}
+                  onClick={() => setConfirmDelete(true)}
+                  aria-label={t('scripts.fileDelete', { file: shown })}
+                  data-testid="script-file-delete"
+                >
+                  <Trash2 size={16} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </>
+        }
       />
-      <Group gap="xs" align="flex-end">
-        <TextInput
-          label={t('scripts.fileNew')}
-          placeholder="lib/util.sh"
-          value={newFile}
-          onChange={(e) => setNewFile(e.currentTarget.value)}
-          w={260}
-          data-testid="script-file-new"
-        />
-        <Button
-          size="sm"
-          variant="default"
-          leftSection={<Plus size={13} />}
-          disabled={!newFile.trim() || files.includes(newFile.trim())}
-          onClick={() => void add()}
-          data-testid="script-file-add"
-        >
-          {t('scripts.fileAdd')}
-        </Button>
-        {removable && (
-          <Button
-            size="sm"
-            variant="subtle"
-            color="red"
-            leftSection={<Trash2 size={13} />}
-            onClick={() => setConfirmDelete(true)}
-            data-testid="script-file-delete"
-          >
-            {t('scripts.fileDelete', { file: shown })}
-          </Button>
-        )}
-      </Group>
       <Text size="xs" c="dimmed">
         {t('scripts.depsHint')}
       </Text>
