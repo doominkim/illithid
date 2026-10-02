@@ -1122,7 +1122,6 @@
     "fileDelete": "Delete {{file}}",
     "fileDeleteBody": "{{file}} moves to .trash.",
     "fileDeleted": "Deleted {{file}} (kept in .trash)",
-    "depsHint": "Illithid does not install packages (pip, npm and so on). Set up what the script needs so it runs from the tools.",
     "toFolder": "Turn into a folder",
     "toFolderHint": "To keep other files next to it",
     "toFolderBody": "{{name}}.sh becomes {{name}}/run.sh so other files can sit next to it. Hooks using this script keep it.",

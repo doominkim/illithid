@@ -1122,7 +1122,6 @@
     "fileDelete": "删除 {{file}}",
     "fileDeleteBody": "将 {{file}} 移到 .trash。",
     "fileDeleted": "已删除 {{file}}（保存在 .trash）",
-    "depsHint": "Illithid 不会安装依赖包（pip、npm 等）。请自行准备，确保能从工具中运行。",
     "toFolder": "改为文件夹",
     "toFolderHint": "以便放入其他文件",
     "toFolderBody": "将 {{name}}.sh 移为 {{name}}/run.sh，以便放入其他文件。使用此脚本的钩子保持不变。",

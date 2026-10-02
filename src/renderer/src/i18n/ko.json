@@ -1122,7 +1122,6 @@
     "fileDelete": "{{file}} 삭제",
     "fileDeleteBody": "{{file}} 을 .trash 로 옮깁니다.",
     "fileDeleted": "{{file}} 을 삭제했습니다 (.trash 에 보관)",
-    "depsHint": "필요한 패키지(pip, npm 등)는 Illithid 가 설치하지 않습니다. 툴에서 실행될 수 있게 직접 준비하세요.",
     "toFolder": "폴더로 바꾸기",
     "toFolderHint": "다른 파일을 함께 두려면",
     "toFolderBody": "{{name}}.sh 를 {{name}}/run.sh 로 옮겨 다른 파일을 함께 둘 수 있게 합니다. 이 스크립트를 쓰는 훅은 그대로 이어집니다.",

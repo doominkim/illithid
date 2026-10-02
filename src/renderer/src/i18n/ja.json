@@ -1122,7 +1122,6 @@
     "fileDelete": "{{file}} を削除",
     "fileDeleteBody": "{{file}} を .trash に移動します。",
     "fileDeleted": "{{file}} を削除しました (.trash に保管)",
-    "depsHint": "必要なパッケージ (pip、npm など) は Illithid がインストールしません。ツールから実行できるようご自身で用意してください。",
     "toFolder": "フォルダにする",
     "toFolderHint": "他のファイルを一緒に置くには",
     "toFolderBody": "{{name}}.sh を {{name}}/run.sh に移し、他のファイルを一緒に置けるようにします。このスクリプトを使うフックはそのまま続きます。",

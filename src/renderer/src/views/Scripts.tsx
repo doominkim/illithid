@@ -454,9 +454,6 @@ function FolderScript({
           </>
         }
       />
-      <Text size="xs" c="dimmed">
-        {t('scripts.depsHint')}
-      </Text>
       <ConfirmModal
         opened={confirmDelete}
         onClose={() => setConfirmDelete(false)}
