@@ -1116,7 +1116,6 @@
     "kindFolderHint": "A folder with run.sh and any other files it calls by relative path. The tools get the whole folder.",
     "nameHintFolder": "Saved as scripts/<name>/",
     "entry": "Runs",
-    "entryHint": "The file hooks run",
     "fileNew": "New file (path in the folder)",
     "fileAdd": "Add a file",
     "fileAdded": "Added {{file}}",

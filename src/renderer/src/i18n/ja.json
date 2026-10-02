@@ -1116,7 +1116,6 @@
     "kindFolderHint": "run.sh と、それが相対パスで呼ぶ他のファイルを入れるフォルダ。ツールにはフォルダごと入ります。",
     "nameHintFolder": "scripts/<名前>/ フォルダに保存されます",
     "entry": "実行ファイル",
-    "entryHint": "フックが実行するファイル",
     "fileNew": "新しいファイル (フォルダ内のパス)",
     "fileAdd": "ファイルを追加",
     "fileAdded": "{{file}} を追加しました",

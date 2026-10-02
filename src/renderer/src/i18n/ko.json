@@ -1116,7 +1116,6 @@
     "kindFolderHint": "run.sh 와, 그 파일이 상대 경로로 부르는 다른 파일들을 담는 폴더. 툴에는 폴더째 들어갑니다.",
     "nameHintFolder": "scripts/<이름>/ 폴더로 저장됩니다",
     "entry": "실행 파일",
-    "entryHint": "훅이 실행하는 파일",
     "fileNew": "새 파일 (폴더 안 경로)",
     "fileAdd": "파일 추가",
     "fileAdded": "{{file}} 을 추가했습니다",

@@ -372,7 +372,6 @@ function FolderScript({
         />
         <Select
           label={t('scripts.entry')}
-          description={t('scripts.entryHint')}
           data={editable}
           value={entry}
           onChange={(v) => v && setEntry(v)}

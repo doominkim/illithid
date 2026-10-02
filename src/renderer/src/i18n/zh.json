@@ -1116,7 +1116,6 @@
     "kindFolderHint": "包含 run.sh 及其按相对路径调用的其他文件的文件夹。工具会获得整个文件夹。",
     "nameHintFolder": "保存为 scripts/<名称>/ 文件夹",
     "entry": "执行文件",
-    "entryHint": "钩子运行的文件",
     "fileNew": "新文件（文件夹内路径）",
     "fileAdd": "添加文件",
     "fileAdded": "已添加 {{file}}",
