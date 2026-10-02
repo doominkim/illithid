@@ -66,6 +66,14 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
   const [timeoutMs, setTimeoutMs] = useState<number | string>(def?.timeoutMs ?? '')
   const [headers, setHeaders] = useState<KV[]>(toKV(def?.headers))
   const [env, setEnv] = useState<KV[]>(toKV(def?.env))
+  const meta = def?._
+  const [description, setDescription] = useState(
+    meta &&
+      typeof meta === 'object' &&
+      typeof (meta as { description?: unknown }).description === 'string'
+      ? ((meta as { description: string }).description ?? '')
+      : ''
+  )
   const [warnings, setWarnings] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -106,6 +114,17 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
       else if (b) out.bearerToken = b
     }
     if (typeof timeoutMs === 'number' && timeoutMs > 0) out.timeoutMs = timeoutMs
+    // The description goes in the meta key `_`, which never reaches a tool. A text `_` (an old note) is kept as `note`
+    const nextMeta: Record<string, unknown> =
+      meta && typeof meta === 'object'
+        ? { ...(meta as Record<string, unknown>) }
+        : typeof meta === 'string'
+          ? { note: meta }
+          : {}
+    if (description.trim()) nextMeta.description = description.trim()
+    else delete nextMeta.description
+    if (Object.keys(nextMeta).length || meta !== undefined) out._ = nextMeta
+    else delete out._
     return out
   }
 
@@ -185,30 +204,34 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
       maw={isNew ? 640 : undefined}
     >
       <Stack gap="md">
-        <Group grow align="flex-start">
-          <TextInput
-            label={t('common.name')}
-            value={name}
-            disabled={!isNew}
-            onChange={(e) => setName(e.currentTarget.value)}
-            error={name && !nameOk ? t('mcp.nameInvalid') : undefined}
-            data-testid="mcp-name"
+        <TextInput
+          label={t('common.name')}
+          value={name}
+          disabled={!isNew}
+          onChange={(e) => setName(e.currentTarget.value)}
+          error={name && !nameOk ? t('mcp.nameInvalid') : undefined}
+          data-testid="mcp-name"
+        />
+        <TextInput
+          label={t('mcp.description')}
+          value={description}
+          onChange={(e) => setDescription(e.currentTarget.value)}
+          data-testid="mcp-description"
+        />
+        <Box>
+          <Text size="sm" fw={500} mb={4}>
+            {t('mcp.transport')}
+          </Text>
+          <SegmentedControl
+            fullWidth
+            value={transport}
+            onChange={setTransport}
+            data={[
+              { value: 'http', label: 'http' },
+              { value: 'stdio', label: 'stdio' }
+            ]}
           />
-          <Box>
-            <Text size="sm" fw={500} mb={4}>
-              {t('mcp.transport')}
-            </Text>
-            <SegmentedControl
-              fullWidth
-              value={transport}
-              onChange={setTransport}
-              data={[
-                { value: 'http', label: 'http' },
-                { value: 'stdio', label: 'stdio' }
-              ]}
-            />
-          </Box>
-        </Group>
+        </Box>
         {transport === 'stdio' ? (
           <>
             <TextInput

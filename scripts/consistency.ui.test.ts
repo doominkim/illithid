@@ -81,3 +81,79 @@ test(
     }
   }
 )
+
+test(
+  'REQ-UI-DESC-1 rules and MCP servers take a description that the list shows; the tools never get it',
+  { timeout: 180000 },
+  async () => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-desc-ui-'))
+    buildDemoHome(home, { tools: 'all' })
+    const config = join(home, '.config/illithid/config.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(config, 'utf8')),
+        toolsInUse: ['claude'],
+        updateCheck: false,
+        marketEnabled: false,
+        ui: { language: 'en', views: { rules: 'list', mcp: 'list' } }
+      })
+    )
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-desc-ud-')),
+      ILLITHID_TEST: '1'
+    } as Record<string, string>
+    delete env.ELECTRON_RUN_AS_NODE
+    delete env.ELECTRON_RENDERER_URL
+    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    try {
+      const page = await app.firstWindow()
+      const synced = (): Promise<void> =>
+        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
+
+      // A rule with a description: the list shows it
+      await page.locator('[data-menu="rules"]').click()
+      await page.getByTestId('rule-new').click()
+      await page.getByTestId('rule-new-name').fill('zz-tone')
+      await page.getByTestId('rule-new-description').fill('How replies should sound')
+      await page.getByTestId('rule-new-ok').click()
+      // The new rule opens: its description is there to edit
+      await page.getByTestId('tab-edit').click()
+      assert.equal(
+        await page.getByTestId('rule-description').inputValue(),
+        'How replies should sound'
+      )
+      await page.getByTestId('rule-description').fill('Keep it short')
+      await page.getByTestId('rule-description').press('Tab')
+      await page.getByText('Description saved').first().waitFor()
+      // The list shows it
+      await page
+        .locator('main .ac-row', { hasText: 'Keep it short' })
+        .waitFor({ state: 'attached' })
+      await page.keyboard.press('Escape')
+
+      // An MCP server with a description
+      await page.locator('[data-menu="mcp"]').click()
+      await page.getByTestId('mcp-new').click()
+      await page.getByTestId('mcp-name').fill('docs')
+      await page.getByTestId('mcp-description').fill('Library docs lookup')
+      await page.getByTestId('mcp-url').fill('https://example.com/mcp')
+      await page.getByTestId('mcp-save').click()
+      await page.locator('main').getByText('Library docs lookup').waitFor()
+      await synced()
+      const meta = JSON.parse(readFileSync(join(home, LIB, 'mcps/docs.json'), 'utf8')) as {
+        _?: { description?: string }
+      }
+      assert.equal(meta._?.description, 'Library docs lookup')
+      assert.doesNotMatch(readFileSync(join(home, '.claude.json'), 'utf8'), /Library docs lookup/)
+      assert.doesNotMatch(
+        readFileSync(join(home, '.claude/rules/illithid/zz-tone.md'), 'utf8'),
+        /Keep it short/
+      )
+    } finally {
+      await app.close()
+    }
+  }
+)

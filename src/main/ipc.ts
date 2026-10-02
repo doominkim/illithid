@@ -564,8 +564,17 @@ export function registerIpc(): void {
     ruleRead: async (name) => W.wrap(() => W.lib.ruleRead(home, str(name))),
     ruleSave: async (name, content) =>
       libWrite(() => W.lib.ruleSave(home, str(name), str(content))),
-    ruleCreate: async (name, content) =>
-      libWrite(() => W.lib.ruleCreate(home, str(name), str(content))),
+    ruleCreate: async (name, content, description) =>
+      libWrite(() =>
+        W.lib.ruleCreate(
+          home,
+          str(name),
+          str(content),
+          typeof description === 'string' ? description : undefined
+        )
+      ),
+    ruleDescriptionSave: async (name, text) =>
+      libWrite(() => W.lib.ruleDescriptionSave(home, str(name), str(text))),
     ruleDelete: async (name) => libWrite(() => W.lib.ruleDelete(home, str(name))),
     ruleRename: async (from, to) => libWrite(() => W.lib.ruleRename(home, str(from), str(to))),
     skillFiles: async (name) => W.wrap(() => W.lib.skillFiles(home, str(name))),

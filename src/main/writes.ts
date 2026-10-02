@@ -79,8 +79,10 @@ import {
   savePermissionRules,
   createScript,
   createFolderScript,
+  setRuleDescription,
   readScriptFile,
   readScript,
+  readMcpServer,
   writeScriptFile,
   deleteScriptFile,
   saveScriptInfo,
@@ -624,9 +626,15 @@ export const lib = {
   ruleSave: (home: string, name: string, content: string) => {
     writeRule(home, name, String(content))
   },
-  ruleCreate: (home: string, name: string, content: string) => {
+  ruleCreate: (home: string, name: string, content: string, description?: string) => {
     createRule(home, name, String(content ?? ''))
+    if (typeof description === 'string' && description.trim())
+      setRuleDescription(home, name, description)
   },
+  ruleDescriptionSave: (home: string, name: string, text: string) => {
+    setRuleDescription(home, name, String(text ?? ''))
+  },
+
   ruleDelete: (home: string, name: string) => deleteRule(home, name),
   ruleRename: (home: string, from: string, to: string) => renameRule(home, from, to),
   skillFiles: (home: string, name: string) => listSkillFiles(home, name),
@@ -797,6 +805,13 @@ export function mcpRead(home: string, name: string): McpEditView {
   if (!Object.prototype.hasOwnProperty.call(servers, name))
     throw new LibraryError('notFound', 'Server not found')
   const def = structuredClone(servers[name]) as unknown as Json
+  // The sources drop the meta key `_` (never for the tools); the form edits its description
+  try {
+    const meta = readMcpServer(home, name)._
+    if (meta !== undefined) def._ = structuredClone(meta) as Json[string]
+  } catch {
+    // Unreadable raw file: the form just has no meta
+  }
   const masked = maskServer(def)
   if (typeof def.bearerToken === 'string') {
     def.bearerToken = MASK

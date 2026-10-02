@@ -66,6 +66,7 @@ function Rules(): React.JSX.Element {
   const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -137,12 +138,14 @@ function Rules(): React.JSX.Element {
   }
   const create = async (): Promise<void> => {
     const name = newName.trim().endsWith('.md') ? newName.trim() : `${newName.trim()}.md`
-    const r = await runWrite(window.api.ruleCreate(name, `# ${name.replace(/\.md$/, '')}\n\n`), {
-      success: t('rules.created')
-    })
+    const r = await runWrite(
+      window.api.ruleCreate(name, `# ${name.replace(/\.md$/, '')}\n\n`, newDesc.trim()),
+      { success: t('rules.created') }
+    )
     if (r !== null) {
       setCreating(false)
       setNewName('')
+      setNewDesc('')
       setSelected(name)
       reload()
     }
@@ -234,7 +237,7 @@ function Rules(): React.JSX.Element {
             <ItemCard
               key={f.name}
               name={f.name}
-              description={cardTitle(f.name, f.text)}
+              description={data.descriptions?.[f.name] || cardTitle(f.name, f.text)}
               switchChecked={
                 cardTools.length > 0 && cardTools.every((tool) => enabled(f.name, tool))
               }
@@ -265,7 +268,7 @@ function Rules(): React.JSX.Element {
               key={f.name}
               avatar={<Initial text={f.name.replace(/^\d+-/, '')} />}
               title={f.name}
-              subtitle={cardTitle(f.name, f.text)}
+              subtitle={data.descriptions?.[f.name] || cardTitle(f.name, f.text)}
               right={
                 <ToolPills
                   pills={pillsOf(f.name)}
@@ -285,7 +288,9 @@ function Rules(): React.JSX.Element {
         opened={!!current}
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
-        description={current ? firstHeading(current.text) : undefined}
+        description={
+          current ? data.descriptions?.[current.name] || firstHeading(current.text) : undefined
+        }
         meta={
           current && (
             <>
@@ -343,6 +348,11 @@ function Rules(): React.JSX.Element {
                       {t('rules.rename')}
                     </Button>
                   </Group>
+                  <RuleDescription
+                    name={current.name}
+                    value={data.descriptions?.[current.name] ?? ''}
+                    onSaved={reload}
+                  />
                   <MarkdownEditor
                     value={current.text}
                     onSave={(text) => save(current.name, text)}
@@ -371,6 +381,12 @@ function Rules(): React.JSX.Element {
             data-autofocus
             data-testid="rule-new-name"
           />
+          <TextInput
+            label={t('rules.description')}
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.currentTarget.value)}
+            data-testid="rule-new-description"
+          />
           <FormFooter>
             <Button size="xs" variant="default" onClick={() => setCreating(false)}>
               {t('common.cancel')}
@@ -396,6 +412,37 @@ function Rules(): React.JSX.Element {
         message={t('rules.deleteBody', { name: current?.name ?? '' })}
       />
     </Stack>
+  )
+}
+
+/** A rule's description (for this app only); saved when the field is left */
+function RuleDescription({
+  name,
+  value,
+  onSaved
+}: {
+  name: string
+  value: string
+  onSaved: () => void
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  const [text, setText] = useState(value)
+  const save = async (): Promise<void> => {
+    if (text.trim() === value) return
+    const r = await runWrite(window.api.ruleDescriptionSave(name, text), {
+      success: t('rules.descriptionSaved')
+    })
+    if (r !== null) onSaved()
+  }
+  return (
+    <TextInput
+      key={name}
+      label={t('rules.description')}
+      value={text}
+      onChange={(e) => setText(e.currentTarget.value)}
+      onBlur={() => void save()}
+      data-testid="rule-description"
+    />
   )
 }
 

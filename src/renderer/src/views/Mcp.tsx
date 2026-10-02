@@ -198,7 +198,7 @@ function Mcp(): React.JSX.Element {
                 key={s.name}
                 name={s.name}
                 badges={transportTag(s)}
-                description={endpoint(s) || none}
+                description={s.description || endpoint(s) || none}
                 switchChecked={
                   cardTools.length > 0 && cardTools.every((tool) => enabled(s.name, tool))
                 }
@@ -227,7 +227,7 @@ function Mcp(): React.JSX.Element {
               avatar={<Initial text={s.name} />}
               title={s.name}
               tags={transportTag(s)}
-              subtitle={endpoint(s) || none}
+              subtitle={s.description || endpoint(s) || none}
               right={
                 <Group gap="md" wrap="nowrap">
                   <UsageSpark summary={usage?.[s.name]} />
@@ -261,6 +261,7 @@ function Mcp(): React.JSX.Element {
         opened={!!current}
         onClose={() => setSelected(null)}
         title={current?.name ?? ''}
+        description={current?.description || undefined}
         tags={current && transportTag(current)}
         meta={
           current &&

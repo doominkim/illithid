@@ -101,7 +101,9 @@
     "deleteTitle": "ルールを削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "rename": "名前を変更",
-    "renamed": "名前を変更しました"
+    "renamed": "名前を変更しました",
+    "description": "説明",
+    "descriptionSaved": "説明を保存しました"
   },
   "skills": {
     "search": "スキルを検索",
@@ -138,7 +140,8 @@
     "deleteTitle": "MCP を削除",
     "deleteBody": "{{name}} を .trash に移します。",
     "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はキーチェーンに保管します。",
-    "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。"
+    "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。",
+    "description": "説明"
   },
   "agents": {
     "model": "モデル",

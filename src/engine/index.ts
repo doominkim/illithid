@@ -580,6 +580,8 @@ export type { CommandRule, PermissionDecision, PermissionRules, RuleGroup } from
 export {
   createScript,
   createFolderScript,
+  setRuleDescription,
+  readRuleDescriptions,
   saveScript,
   deleteScript,
   scriptUsers,

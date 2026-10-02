@@ -101,7 +101,9 @@
     "deleteTitle": "Delete rule",
     "deleteBody": "Move {{name}} to .trash.",
     "rename": "Rename",
-    "renamed": "Renamed"
+    "renamed": "Renamed",
+    "description": "Description",
+    "descriptionSaved": "Description saved"
   },
   "skills": {
     "search": "Search skills",
@@ -138,7 +140,8 @@
     "deleteTitle": "Delete MCP",
     "deleteBody": "Move {{name}} to .trash.",
     "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the Keychain.",
-    "timeoutHint": "How long to wait for the server. Left empty: the tool's default."
+    "timeoutHint": "How long to wait for the server. Left empty: the tool's default.",
+    "description": "Description"
   },
   "agents": {
     "model": "Model",

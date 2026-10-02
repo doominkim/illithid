@@ -185,6 +185,8 @@ export interface RulesData {
   /** Display path (~/...) */
   dir: string
   files: { name: string; text: string }[]
+  /** Rule name → description (rules/_meta.json; for this app only) */
+  descriptions?: Record<string, string>
   /** Per-rule tool on/off (manifest). Missing key = on */
   toggles: Record<string, ToolToggles>
   error?: string
@@ -238,6 +240,8 @@ export type McpToolState = SyncState | 'notApplicable'
 /** One library MCP server */
 export interface McpServerView {
   name: string
+  /** For this app only: the definition's meta key `_.description` */
+  description?: string
   transport?: string
   /** URL without query and userinfo */
   url?: string
@@ -883,7 +887,9 @@ export interface Api {
   ): Promise<WriteResult<Manifest> | Refused>
   ruleRead(name: string): Promise<WriteResult<string>>
   ruleSave(name: string, content: string): Promise<WriteResult | Refused>
-  ruleCreate(name: string, content: string): Promise<WriteResult | Refused>
+  ruleCreate(name: string, content: string, description?: string): Promise<WriteResult | Refused>
+  /** Blank clears it */
+  ruleDescriptionSave(name: string, text: string): Promise<WriteResult | Refused>
   ruleDelete(name: string): Promise<WriteResult<TrashResult> | Refused>
   ruleRename(from: string, to: string): Promise<WriteResult<{ name: string }> | Refused>
   skillFiles(name: string): Promise<WriteResult<string[]>>
@@ -1139,6 +1145,7 @@ export const CHANNELS = [
   'ruleRead',
   'ruleSave',
   'ruleCreate',
+  'ruleDescriptionSave',
   'ruleDelete',
   'ruleRename',
   'skillFiles',

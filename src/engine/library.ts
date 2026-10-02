@@ -200,7 +200,64 @@ export function createRule(home: string, name: string, content = ''): string {
 }
 
 export function deleteRule(home: string, name: string): TrashResult {
-  return moveToTrash(home, rulePath(home, name))
+  const r = moveToTrash(home, rulePath(home, name))
+  moveRuleDescription(home, name, null)
+  return r
+}
+
+/**
+ * Rule descriptions live beside the rules in rules/_meta.json, not in the rule files: the tools get rule files as they are
+ * (OpenCode even reads the library file itself), and a description is for this app only. Rule readers take *.md only
+ */
+export const RULE_META_FILE = '_meta.json'
+
+function ruleMetaPath(home: string): string {
+  return join(libraryPaths(home).rulesDir, RULE_META_FILE)
+}
+
+/** Rule name → description ({} when there are none or the file can't be read) */
+export function readRuleDescriptions(home: string): Record<string, string> {
+  try {
+    const raw = JSON.parse(readFileSync(assertInsideLibrary(home, ruleMetaPath(home)), 'utf8')) as {
+      descriptions?: unknown
+    }
+    if (!isObj(raw.descriptions)) return {}
+    return Object.fromEntries(
+      Object.entries(raw.descriptions).filter(
+        (e): e is [string, string] => typeof e[1] === 'string' && !!e[1].trim()
+      )
+    )
+  } catch {
+    return {}
+  }
+}
+
+function writeRuleDescriptions(home: string, map: Record<string, string>): void {
+  const sorted = Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)))
+  writeLibFile(home, ruleMetaPath(home), JSON.stringify({ descriptions: sorted }, null, 2) + '\n')
+}
+
+/** A rule's description (blank clears it). notFound unless the rule exists */
+export function setRuleDescription(home: string, name: string, text: string): string {
+  const p = rulePath(home, name)
+  if (!existsSync(assertInsideLibrary(home, p)))
+    throw new LibraryError('notFound', 'rule not found')
+  if (typeof text !== 'string') throw new LibraryError('invalidSchema', 'description must be text')
+  const map = readRuleDescriptions(home)
+  if (text.trim()) map[name] = text.trim()
+  else delete map[name]
+  writeRuleDescriptions(home, map)
+  return ruleMetaPath(home)
+}
+
+/** A renamed rule keeps its description; a deleted one (to = null) drops it */
+function moveRuleDescription(home: string, from: string, to: string | null): void {
+  const map = readRuleDescriptions(home)
+  if (!(from in map)) return
+  const text = map[from]
+  delete map[from]
+  if (to) map[to] = text
+  writeRuleDescriptions(home, map)
 }
 
 /**
@@ -227,6 +284,7 @@ export function renameRule(home: string, from: string, to: string): { name: stri
   try {
     renameManifestEntry(home, 'rules', from, next)
     renamePendingRetire(home, 'rule', from, next)
+    moveRuleDescription(home, from, next)
   } catch (e) {
     try {
       renameSync(realDst, realSrc)

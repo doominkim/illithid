@@ -101,7 +101,9 @@
     "deleteTitle": "删除规则",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "rename": "重命名",
-    "renamed": "已重命名"
+    "renamed": "已重命名",
+    "description": "说明",
+    "descriptionSaved": "已保存说明"
   },
   "skills": {
     "search": "搜索技能",
@@ -138,7 +140,8 @@
     "deleteTitle": "删除 MCP",
     "deleteBody": "将 {{name}} 移到 .trash。",
     "headersHint": "发送给服务器的 HTTP 头。${VAR} 读取环境变量，其他值保存在钥匙串中。",
-    "timeoutHint": "等待服务器响应的最长时间。留空则用工具默认值。"
+    "timeoutHint": "等待服务器响应的最长时间。留空则用工具默认值。",
+    "description": "说明"
   },
   "agents": {
     "model": "模型",

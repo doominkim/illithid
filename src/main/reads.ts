@@ -6,6 +6,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   importedBackupRoot,
+  readMcpServer,
+  readRuleDescriptions,
   type HookTool,
   buildContext,
   canonicalPaths,
@@ -105,7 +107,13 @@ export function rules(home: string): RulesData {
       .filter((f) => f.endsWith('.md'))
       .sort()
       .map((name) => ({ name, text: readFileSync(join(dir, name), 'utf8') }))
-    return { dir: tilde(home, dir), files, toggles: toggles(home, 'rules') }
+    const descriptions = readRuleDescriptions(home)
+    return {
+      dir: tilde(home, dir),
+      files,
+      ...(Object.keys(descriptions).length ? { descriptions } : {}),
+      toggles: toggles(home, 'rules')
+    }
   } catch (e) {
     return {
       dir: tilde(home, dir),
@@ -342,6 +350,18 @@ function keysOf(v: unknown): string[] {
   return v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v) : []
 }
 
+/** An MCP server's description: its meta key `_.description` (the sources drop `_` before the tools see it) */
+function mcpDescription(home: string, name: string): string | undefined {
+  try {
+    const meta = readMcpServer(home, name)._
+    const d =
+      meta && typeof meta === 'object' ? (meta as { description?: unknown }).description : undefined
+    return typeof d === 'string' && d.trim() ? d.trim() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function mcp(home: string, env: Env): McpData {
   let changes: FileChange[]
   let source: ReturnType<typeof mcpEntries>
@@ -400,8 +420,10 @@ export function mcp(home: string, env: Env): McpData {
 
   const servers: McpServerView[] = source.map(([name, s]) => {
     const url = typeof s.url === 'string' ? (safeUrl(s.url) ?? '(not a URL)') : undefined
+    const description = mcpDescription(home, name)
     return {
       name,
+      ...(description ? { description } : {}),
       transport: typeof s.transport === 'string' ? s.transport : undefined,
       ...(url ? { url } : {}),
       ...(typeof s.command === 'string' ? { command: s.command } : {}),
