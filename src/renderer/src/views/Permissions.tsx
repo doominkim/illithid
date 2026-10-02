@@ -12,7 +12,6 @@ import {
   Text,
   Textarea,
   TextInput,
-  Tooltip,
   UnstyledButton
 } from '@mantine/core'
 import {
@@ -69,44 +68,34 @@ const commandText = (r: CommandRule): string => r.argv.join(' ')
 const ruleTitle = (r: CommandRule): string => (r.exact ? commandText(r) : `${commandText(r)} *`)
 
 /**
- * The trailing * of a command: lit when the rule also covers commands that start with it, dimmed when it is an exact match.
- * Clicking switches between the two
+ * Prefix or exact match, as a two-choice control like the decision. A prefix rule also covers commands that start with it, and
+ * reads with a trailing * in the list
  */
-function StarToggle({
+function MatchPicker({
   exact,
   onChange,
+  short,
   testId
 }: {
   exact: boolean
   onChange: (exact: boolean) => void
+  /** Short labels, for a group's command lines */
+  short?: boolean
   testId: string
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const sfx = short ? 'Short' : ''
   return (
-    <Tooltip
-      label={t(exact ? 'permissions.starExact' : 'permissions.starPrefix')}
-      withArrow
-      openDelay={300}
-      style={{ whiteSpace: 'pre-line' }}
-    >
-      <UnstyledButton
-        onClick={() => onChange(!exact)}
-        aria-pressed={!exact}
-        aria-label={t(exact ? 'permissions.starExact' : 'permissions.starPrefix')}
-        data-testid={testId}
-        style={{ userSelect: 'none', lineHeight: 1 }}
-      >
-        <Code
-          style={{
-            opacity: exact ? 0.35 : 1,
-            textDecoration: exact ? 'line-through' : undefined,
-            cursor: 'pointer'
-          }}
-        >
-          *
-        </Code>
-      </UnstyledButton>
-    </Tooltip>
+    <SegmentedControl
+      size={short ? 'xs' : undefined}
+      value={exact ? 'exact' : 'prefix'}
+      onChange={(v) => onChange(v === 'exact')}
+      data={[
+        { value: 'prefix', label: t(`permissions.matchPrefix${sfx}`) },
+        { value: 'exact', label: t(`permissions.matchExact${sfx}`) }
+      ]}
+      data-testid={testId}
+    />
   )
 }
 /** A command has one rule: its words and whether it is exact identify it */
@@ -663,7 +652,6 @@ function RuleForm({
             {argv.map((a, i) => (
               <Code key={i}>{a}</Code>
             ))}
-            <StarToggle exact={exact} onChange={setExact} testId="perm-star" />
           </Group>
         )}
       </Stack>
@@ -672,6 +660,15 @@ function RuleForm({
           {t('permissions.decisionLabel')}
         </Text>
         <DecisionPicker value={decision} onChange={setDecision} testId="perm-decision" />
+      </Stack>
+      <Stack gap={4}>
+        <Text size="sm" fw={500}>
+          {t('permissions.matchLabel')}
+        </Text>
+        <MatchPicker exact={exact} onChange={setExact} testId="perm-match" />
+        <Text size="xs" c="dimmed">
+          {t(exact ? 'permissions.matchExactHint' : 'permissions.matchPrefixHint')}
+        </Text>
       </Stack>
       {(groups.length > 0 || group) && (
         <Select
@@ -706,7 +703,7 @@ function RuleForm({
 
 /**
  * New rules, or a group's rules: group name, description, default decision and the commands, one per line. Each line gets its
- * own decision and trailing * (off: exact match); a line starts with the default, and a line that was already a rule keeps its decision, exact,
+ * own decision and match (prefix or exact); a line starts with the default, and a line that was already a rule keeps its decision, exact,
  * description and the tools it is off for.
  * New rules may leave the group name empty: they go in no group, and the description goes on each rule
  */
@@ -829,20 +826,19 @@ function GroupForm({
           {lines.map(({ key, rule, dup }, i) => (
             <Group key={`${i}:${key}`} gap="xs" wrap="nowrap" data-testid="perm-line">
               <Box style={{ flex: 1, minWidth: 0 }}>
-                <Group gap={4} wrap="nowrap">
-                  <Code>{commandLine(rule.argv)}</Code>
-                  <StarToggle
-                    exact={rule.exact}
-                    onChange={(on) => setExacts((x) => ({ ...x, [key]: on }))}
-                    testId="perm-line-star"
-                  />
-                </Group>
+                <Code>{commandLine(rule.argv)}</Code>
                 {dup && (
                   <Text size="xs" c="red" data-testid="perm-line-duplicate">
                     {t('permissions.duplicate')}
                   </Text>
                 )}
               </Box>
+              <MatchPicker
+                short
+                exact={rule.exact}
+                onChange={(on) => setExacts((x) => ({ ...x, [key]: on }))}
+                testId="perm-line-match"
+              />
               <SegmentedControl
                 size="xs"
                 value={rule.decision}
