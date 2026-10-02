@@ -106,13 +106,13 @@ function whenKey(when: HookTiming, scope: Scope): string {
 /** Timing and target as one choice, in the order people meet them */
 const WHEN_CHOICES: readonly (readonly [HookTiming, Scope])[] = [
   ['prompt', 'all'],
-  ['before-tool', 'shell'],
-  ['before-tool', 'edit'],
-  ['before-tool', 'all'],
-  ['after-tool', 'shell'],
-  ['after-tool', 'edit'],
-  ['after-tool', 'all'],
   ['stop', 'all'],
+  ['before-tool', 'edit'],
+  ['after-tool', 'edit'],
+  ['before-tool', 'shell'],
+  ['after-tool', 'shell'],
+  ['before-tool', 'all'],
+  ['after-tool', 'all'],
   ['notification', 'all'],
   ['session-start', 'all'],
   ['session-end', 'all']

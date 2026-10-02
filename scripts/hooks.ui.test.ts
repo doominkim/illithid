@@ -245,6 +245,15 @@ test(
       assert.equal(await page.locator('[data-card^="hook-action-"]').count(), 0)
       await page.getByTestId('hook-new-script').waitFor()
       await page.getByTestId('hook-new-timing').click()
+      // Request and reply first, then each target's before and after side by side
+      assert.deepEqual((await page.getByRole('option').allInnerTexts()).slice(0, 6), [
+        'When you send a prompt',
+        'When a reply finishes',
+        'Before a file edit',
+        'After a file edit',
+        'Before a shell command',
+        'After a shell command'
+      ])
       // Timing and target are one choice
       await page.getByRole('option', { name: 'Before a shell command' }).click()
       const script = '#!/bin/sh\necho checked >&2\nexit 0\n'

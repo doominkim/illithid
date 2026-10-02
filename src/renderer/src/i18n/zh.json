@@ -806,7 +806,7 @@
     "timing": {
       "before-tool": "操作执行前",
       "after-tool": "操作执行后",
-      "prompt": "发送消息时",
+      "prompt": "发送请求时",
       "stop": "回复结束时",
       "session-start": "会话开始",
       "session-end": "会话结束",
@@ -815,7 +815,7 @@
     "timingHint": {
       "before-tool": "命令或编辑执行之前。部分工具可在此阻止。",
       "after-tool": "工具结束之后。用于格式化、检查和记录。",
-      "prompt": "发送消息时。补充上下文或进行检查。",
+      "prompt": "发送请求时。补充上下文或进行检查。",
       "stop": "代理完成回复时。用于通知。",
       "session-start": "会话打开时。检查环境或记录。",
       "session-end": "会话关闭时。",

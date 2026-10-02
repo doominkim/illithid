@@ -806,7 +806,7 @@
     "timing": {
       "before-tool": "Before an action",
       "after-tool": "After an action",
-      "prompt": "When you send a message",
+      "prompt": "When you send a prompt",
       "stop": "When a reply finishes",
       "session-start": "Session starts",
       "session-end": "Session ends",
@@ -815,7 +815,7 @@
     "timingHint": {
       "before-tool": "Right before a command or edit runs. Some tools can stop it here.",
       "after-tool": "Right after a tool finishes. For formatting, linting and logging.",
-      "prompt": "When you send a message. Add context or check it.",
+      "prompt": "When you send a prompt. Add context or check it.",
       "stop": "When the agent finishes a reply. For notifications.",
       "session-start": "When a session opens. Check the environment or log it.",
       "session-end": "When a session closes.",
