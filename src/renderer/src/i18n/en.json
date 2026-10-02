@@ -953,7 +953,7 @@
       "allow": "The agent runs these without asking."
     },
     "decisionLabel": "What to do",
-    "exact": "Exact",
+    "exact": "Exact match",
     "exactLabel": "Only this exact command",
     "exactHint": "Off: also every command that starts with it (git push --force origin main).",
     "command": "Command",
