@@ -19,6 +19,7 @@ import { activeWorkspaceId } from './config'
 import { hookEventInfo, isHookTool, type HookTiming, type HookTool } from './hookEvents'
 import { HOOK_TOOLS } from './hookEvents'
 import {
+  hooksDir,
   hookTriggers,
   readHooks,
   type HookDoc,
@@ -260,7 +261,13 @@ export function hookImportCandidates(
   if (!isHookTool(tool)) return []
   const library = readHooks(home)
   const out: HookImportCandidate[] = []
-  const taken = new Set<string>()
+  // Folders under hooks/ that are not library hooks (no HOOK.md) still hold their names
+  const dir = hooksDir(home)
+  const taken = new Set(
+    (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : [])
+      .filter((d) => d.isDirectory() && !library.some((h) => h.name === d.name))
+      .map((d) => d.name)
+  )
   for (const e of scanTool(home, tool, notes)) {
     const info = hookEventInfo(tool, e.event)
     if (!info) {

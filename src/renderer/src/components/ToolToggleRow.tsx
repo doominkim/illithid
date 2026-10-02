@@ -72,9 +72,6 @@ export function ToolToggleRow({ pills, tools, onToggle, busy, testId }: Props): 
             {TOOL_NAME[tool]}: {pills[tool]!.hint}
           </Text>
         ))}
-      <Text size="xs" c="dimmed">
-        {t('detail.applyOnSync')}
-      </Text>
     </Stack>
   )
 }

@@ -266,7 +266,6 @@
     "off": "オフ",
     "turnOff": "{{tool}}: オン — クリックでオフ",
     "turnOn": "{{tool}}: オフ — クリックでオン",
-    "applyOnSync": "変更は次回の同期で反映されます。",
     "copyPath": "パスをコピー",
     "deleteItem": "削除…"
   },

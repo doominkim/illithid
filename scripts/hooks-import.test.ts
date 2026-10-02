@@ -215,3 +215,25 @@ test('REQ-HOOKS-IMPORT-4 a Claude Code prompt hook comes in as a natural-languag
   assert.equal(stop[0].hooks[0].timeout, 20)
   assert.equal(stop[0].hooks[0].statusMessage, `Illithid · ${c.name}`)
 })
+
+test('REQ-HOOKS-IMPORT-5 a hooks folder that is not a hook (no HOOK.md) keeps its name; the import takes the next one', () => {
+  const home = demoHome(['copilot'])
+  const leftover = join(home, '.illithid/workspaces/default/hooks/copilot-sessionstart')
+  mkdirSync(leftover, { recursive: true })
+  writeFileSync(join(leftover, 'hook.json'), '{}')
+  mkdirSync(join(home, '.copilot/hooks'), { recursive: true })
+  writeFileSync(
+    join(home, '.copilot/hooks/mine.json'),
+    JSON.stringify({
+      version: 1,
+      hooks: { sessionStart: [{ type: 'command', bash: 'echo hi' }] }
+    })
+  )
+  const [c] = planImport(home, 'tool:copilot').hooks
+  assert.equal(c.name, 'copilot-sessionstart-2')
+  assert.equal(c.status, 'new')
+  const [r] = applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:copilot')
+  assert.equal(r.status, 'imported')
+  assert.equal(readHook(home, 'copilot-sessionstart-2').doc.when, 'session-start')
+  assert.equal(readFileSync(join(leftover, 'hook.json'), 'utf8'), '{}')
+})
