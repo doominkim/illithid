@@ -810,7 +810,7 @@
       "stop": "When a reply finishes",
       "session-start": "Session starts",
       "session-end": "Session ends",
-      "notification": "Waiting for you"
+      "notification": "Waiting for approval or input"
     },
     "timingHint": {
       "before-tool": "Right before a command or edit runs. Some tools can stop it here.",

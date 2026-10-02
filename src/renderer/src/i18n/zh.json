@@ -810,7 +810,7 @@
       "stop": "回复结束时",
       "session-start": "会话开始",
       "session-end": "会话结束",
-      "notification": "等待你时"
+      "notification": "等待批准或输入"
     },
     "timingHint": {
       "before-tool": "命令或编辑执行之前。部分工具可在此阻止。",

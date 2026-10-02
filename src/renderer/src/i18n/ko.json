@@ -810,7 +810,7 @@
       "stop": "응답이 끝났을 때",
       "session-start": "세션 시작",
       "session-end": "세션 종료",
-      "notification": "입력 기다릴 때"
+      "notification": "승인·입력 대기"
     },
     "timingHint": {
       "before-tool": "명령·편집을 실행하기 직전. 일부 툴은 여기서 막을 수 있습니다.",

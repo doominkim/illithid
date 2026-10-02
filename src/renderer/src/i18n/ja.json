@@ -810,7 +810,7 @@
       "stop": "応答が終わったとき",
       "session-start": "セッション開始",
       "session-end": "セッション終了",
-      "notification": "入力待ち"
+      "notification": "承認・入力待ち"
     },
     "timingHint": {
       "before-tool": "コマンドや編集の実行直前。ここで止められるツールもあります。",
