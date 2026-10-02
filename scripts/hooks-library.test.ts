@@ -9,6 +9,7 @@ import {
   defaultHookEvent,
   deleteHook,
   dropHookToolScript,
+  hookOptions,
   hookSupport,
   hookTriggers,
   LibraryError,
@@ -18,7 +19,9 @@ import {
   readManifest,
   saveHookDoc,
   saveHookScript,
-  setToggle
+  setToggle,
+  validateHookDoc,
+  type HookDoc
 } from '../src/engine'
 import { buildDemoHome } from './readme-shots'
 
@@ -199,4 +202,35 @@ test('REQ-HOOKS-LIB-7 hooks have per-tool on/off in illithid.json, and deleting 
   deleteHook(home, 'notify')
   assert.equal(existsSync(join(libraryRoot(home), 'hooks/notify')), false)
   assert.deepEqual(readHooks(home), [])
+})
+
+test('REQ-HOOKS-LIB-8 a script hook before or after a tool call can target shell commands, file edits or every call', () => {
+  const doc = (target?: string): HookDoc => ({
+    description: '',
+    when: 'before-tool',
+    action: 'script',
+    options: hookOptions('script', target ? { target } : {}),
+    body: ''
+  })
+  // Every call: no matcher
+  assert.deepEqual(hookTriggers(doc()).claude, { event: 'PreToolUse' })
+  assert.deepEqual(hookTriggers(doc('shell')), {
+    claude: { event: 'PreToolUse', matcher: 'Bash' },
+    codex: { event: 'PreToolUse', matcher: 'Bash' },
+    gemini: { event: 'BeforeTool', matcher: 'run_shell_command' },
+    copilot: { event: 'preToolUse', matcher: 'bash' },
+    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' }
+  })
+  assert.deepEqual(hookTriggers(doc('edit')), {
+    claude: { event: 'PreToolUse', matcher: 'Write|Edit' },
+    codex: { event: 'PreToolUse', matcher: 'apply_patch' },
+    gemini: { event: 'BeforeTool', matcher: 'write_file|replace' },
+    copilot: { event: 'preToolUse', matcher: 'edit|create' },
+    grok: { event: 'PreToolUse', matcher: 'search_replace' }
+  })
+  // Format still can't run in Codex (no file path), the script hook can
+  assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')
+  // Outside tool calls the target means nothing
+  assert.deepEqual(hookTriggers({ ...doc('shell'), when: 'stop' }).claude, { event: 'Stop' })
+  assert.ok(validateHookDoc({ ...doc(), options: { target: 'files' } }).length > 0)
 })

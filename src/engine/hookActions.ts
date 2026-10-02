@@ -75,6 +75,16 @@ const EDIT: Partial<Record<HookTool, string>> = {
   grok: 'search_replace'
 }
 
+/** File edits including Codex's apply_patch: for script hooks, which read the tool's raw input (no file path needed) */
+const EDIT_ALL: Record<HookTool, string> = { ...EDIT, codex: 'apply_patch' } as Record<
+  HookTool,
+  string
+>
+
+/** What a script hook at a tool call reacts to */
+export const SCRIPT_TARGETS = ['all', 'shell', 'edit'] as const
+export type ScriptTarget = (typeof SCRIPT_TARGETS)[number]
+
 export const DEFAULT_GUARD_PATTERNS = ['rm -rf /', 'git push --force', 'git reset --hard']
 
 /** File globs protect matches (a pattern with / is matched against the path, others against the file name) */
@@ -178,7 +188,12 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
     defaults: { verbatim: false, judge: 'same', model: '' }
   },
   // use: a library script (scripts/<name>.sh) instead of the hook's own run.sh
-  script: { timings: ALL_TIMINGS, defaults: { use: '' } }
+  // target (before/after a tool call): every call, shell commands or file edits
+  script: {
+    timings: ALL_TIMINGS,
+    choices: { target: SCRIPT_TARGETS },
+    defaults: { use: '', target: 'all' }
+  }
 }
 
 export function isHookAction(v: unknown): v is HookAction {
@@ -198,8 +213,14 @@ export function hookSupport(action: HookAction, when: HookTiming, tool: HookTool
 export function actionMatcher(
   action: HookAction,
   tool: HookTool,
-  when?: HookTiming
+  when?: HookTiming,
+  options?: Record<string, unknown>
 ): string | undefined {
+  if (action === 'script') {
+    if (when !== 'before-tool' && when !== 'after-tool') return undefined
+    const target = options?.target
+    return target === 'shell' ? SHELL[tool] : target === 'edit' ? EDIT_ALL[tool] : undefined
+  }
   const info = HOOK_ACTION_INFO[action]
   return (when && info.matcherAt?.[when]?.[tool]) ?? info.matcher?.[tool]
 }

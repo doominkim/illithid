@@ -1444,7 +1444,7 @@ function TriggerForm({
   const info = hookEventInfo(tool, event)
   const events = hookEventsFor(tool, doc.when).map((e) => e.event)
   // Keep only what differs from the timing and action defaults, so later default changes still apply
-  const defaultMatcher = actionMatcher(doc.action, tool, doc.when) ?? ''
+  const defaultMatcher = actionMatcher(doc.action, tool, doc.when, doc.options) ?? ''
   const next: HookToolSettings = {
     ...(event !== defaultHookEvent(tool, doc.when) ? { event } : {}),
     ...(info?.matcher && matcher.trim() !== defaultMatcher ? { matcher: matcher.trim() } : {}),
