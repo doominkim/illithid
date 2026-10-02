@@ -144,3 +144,30 @@ test('REQ-PERM-SYNC-4 Copilot keeps no deny rules, so deny rules become an Illit
     {}
   )
 })
+
+test('REQ-PERM-SYNC-5 groups and descriptions change nothing the tools get', () => {
+  const tools = ['claude', 'codex', 'gemini', 'copilot']
+  const files = [
+    '.claude/settings.json',
+    '.codex/rules/default.rules',
+    '.gemini/policies/illithid.toml',
+    '.copilot/hooks/illithid/_permissions/run.sh'
+  ]
+  const plain = demoHome(tools)
+  savePermissionRules(plain, RULES)
+  sync(plain)
+  const grouped = demoHome(tools)
+  savePermissionRules(grouped, {
+    groups: [{ name: 'git', description: 'Hard to undo', decision: 'deny' }],
+    commands: RULES.commands.map((r) =>
+      r.argv[0] === 'git' ? { ...r, group: 'git', description: 'why' } : r
+    )
+  })
+  sync(grouped)
+  for (const f of files)
+    assert.equal(
+      readFileSync(join(grouped, f), 'utf8').replaceAll(grouped, '~'),
+      readFileSync(join(plain, f), 'utf8').replaceAll(plain, '~'),
+      f
+    )
+})

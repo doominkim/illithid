@@ -346,7 +346,7 @@ export interface HookEditView {
   >
 }
 
-export type { CommandRule, PermissionDecision, PermissionRules } from '../engine'
+export type { CommandRule, PermissionDecision, PermissionRules, RuleGroup } from '../engine'
 export type {
   HookAction,
   HookDoc,

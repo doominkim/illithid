@@ -8,16 +8,28 @@ import type { SecretBackend } from './secrets'
 export type Env = Record<string, string | undefined>
 
 /**
- * A command rule entry is either an argv array or an {argv, claudeExact, note} object. claudeExact: match the whole command,
+ * A command rule entry is either an argv array or an {argv, claudeExact, description} object. claudeExact: match the whole command,
  * not just its start (the name predates the other tools)
  */
-export type AllowlistEntry = string[] | { argv: string[]; claudeExact?: boolean; note?: string }
+export type AllowlistEntry =
+  | string[]
+  | {
+      argv: string[]
+      claudeExact?: boolean
+      description?: string
+      /** Older name of description, still read */
+      note?: string
+      /** Name of the rule's group (permissions.ts) */
+      group?: string
+    }
 
 /** permissions.json. bash is the allow list (as before); ask and deny rules were added beside it so older versions still read it */
 export interface Allowlist {
   bash: AllowlistEntry[]
   bashAsk?: AllowlistEntry[]
   bashDeny?: AllowlistEntry[]
+  /** Rule groups in menu order (permissions.ts RuleGroup); decision missing in a hand-written file */
+  groups?: { name: string; description?: string; decision?: 'deny' | 'ask' | 'allow' }[]
   claudeOnly: {
     allow: string[]
     deny: string[]

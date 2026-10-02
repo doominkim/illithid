@@ -1209,13 +1209,24 @@ export function validatePermissions(v: unknown): string[] {
         errs.push(`${key}[${i}] must be a non-empty string argv array or {argv, claudeExact}`)
       if (isObj(e) && e.claudeExact !== undefined && typeof e.claudeExact !== 'boolean')
         errs.push(`${key}[${i}].claudeExact must be a boolean`)
-      if (isObj(e) && e.note !== undefined && typeof e.note !== 'string')
-        errs.push(`${key}[${i}].note must be a string`)
+      for (const k of ['description', 'note', 'group'] as const)
+        if (isObj(e) && e[k] !== undefined && typeof e[k] !== 'string')
+          errs.push(`${key}[${i}].${k} must be a string`)
     })
   }
   checkList('bash', v.bash)
   if (v.bashAsk !== undefined) checkList('bashAsk', v.bashAsk)
   if (v.bashDeny !== undefined) checkList('bashDeny', v.bashDeny)
+  if (v.groups !== undefined) {
+    if (!Array.isArray(v.groups)) errs.push('groups must be an array')
+    else
+      v.groups.forEach((g, i) => {
+        if (!isObj(g) || typeof g.name !== 'string')
+          errs.push(`groups[${i}] must be an object with a string name`)
+        else if (g.description !== undefined && typeof g.description !== 'string')
+          errs.push(`groups[${i}].description must be a string`)
+      })
+  }
   if (!errs.length) errs.push(...ruleProblems(permissionRules(v as unknown as Allowlist)))
   if (!isObj(v.claudeOnly)) errs.push('claudeOnly must be an object')
   else {

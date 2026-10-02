@@ -574,12 +574,13 @@ export {
 } from './hookRender'
 export {
   PERMISSION_DECISIONS,
+  commandLine,
   parseCommand,
   permissionRules,
   ruleProblems,
   withPermissionRules
 } from './permissions'
-export type { CommandRule, PermissionDecision, PermissionRules } from './permissions'
+export type { CommandRule, PermissionDecision, PermissionRules, RuleGroup } from './permissions'
 export {
   createScript,
   saveScript,

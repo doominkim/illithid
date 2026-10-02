@@ -4,10 +4,12 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  commandLine,
   parseCommand,
   permissionRules,
   readPermissions,
   savePermissionRules,
+  type CommandRule,
   type PermissionRules
 } from '../src/engine'
 import { buildDemoHome } from './readme-shots'
@@ -42,7 +44,7 @@ test('REQ-PERM-MODEL-1 an existing permissions.json reads as allow rules, and sa
   const next: PermissionRules = {
     commands: [
       ...rules.commands,
-      { decision: 'deny', argv: ['git', 'push', '--force'], exact: false, note: 'never' },
+      { decision: 'deny', argv: ['git', 'push', '--force'], exact: false, description: 'never' },
       { decision: 'ask', argv: ['rm'], exact: false }
     ]
   }
@@ -50,13 +52,14 @@ test('REQ-PERM-MODEL-1 an existing permissions.json reads as allow rules, and sa
   assert.deepEqual(json(home), {
     bash: [['git', 'status'], { argv: ['npm', 'test'], claudeExact: true }],
     bashAsk: [['rm']],
-    bashDeny: [{ argv: ['git', 'push', '--force'], note: 'never' }],
+    bashDeny: [{ argv: ['git', 'push', '--force'], description: 'never' }],
     claudeOnly: { allow: ['WebFetch'], deny: [], ask: ['Edit'] },
     _comment: 'mine'
   })
   // Read back grouped: allow, ask, deny
   assert.deepEqual(permissionRules(readPermissions(home)!), {
-    commands: [next.commands[0], next.commands[1], next.commands[3], next.commands[2]]
+    commands: [next.commands[0], next.commands[1], next.commands[3], next.commands[2]],
+    groups: []
   })
 })
 
@@ -104,4 +107,114 @@ test('REQ-PERM-MODEL-4 a typed command becomes argv the way a shell splits it', 
   assert.deepEqual(parseCommand('  rm  -rf "/tmp/a b" '), ['rm', '-rf', '/tmp/a b'])
   assert.deepEqual(parseCommand(`psql -c 'DROP TABLE x'`), ['psql', '-c', 'DROP TABLE x'])
   assert.deepEqual(parseCommand(''), [])
+})
+
+test('REQ-PERM-MODEL-5 a rule note from an older file reads as its description and is saved as description', () => {
+  const home = demoHome()
+  writeFileSync(
+    file(home),
+    JSON.stringify({
+      bash: [],
+      bashDeny: [{ argv: ['git', 'reset', '--hard'], note: 'loses work' }],
+      claudeOnly: { allow: [], deny: [] }
+    })
+  )
+  const rules = permissionRules(readPermissions(home)!)
+  assert.deepEqual(rules.commands, [
+    { decision: 'deny', argv: ['git', 'reset', '--hard'], exact: false, description: 'loses work' }
+  ])
+  savePermissionRules(home, rules)
+  assert.deepEqual(json(home).bashDeny, [
+    { argv: ['git', 'reset', '--hard'], description: 'loses work' }
+  ])
+})
+
+test('REQ-PERM-MODEL-6 rules keep their group; groups keep their order, description and default, and a group with no rules goes', () => {
+  const home = demoHome()
+  const rules: PermissionRules = {
+    groups: [
+      { name: 'git', description: 'Hard to undo', decision: 'deny' },
+      { name: 'empty', decision: 'ask' },
+      { name: 'files', decision: 'ask' }
+    ],
+    commands: [
+      { decision: 'allow', argv: ['git', 'status'], exact: false, group: 'git' },
+      { decision: 'deny', argv: ['git', 'push', '--force'], exact: false, group: 'git' },
+      { decision: 'ask', argv: ['rm'], exact: false, group: 'files' },
+      { decision: 'deny', argv: ['shutdown'], exact: true }
+    ]
+  }
+  savePermissionRules(home, rules)
+  assert.deepEqual(json(home), {
+    bash: [{ argv: ['git', 'status'], group: 'git' }],
+    bashAsk: [{ argv: ['rm'], group: 'files' }],
+    bashDeny: [
+      { argv: ['git', 'push', '--force'], group: 'git' },
+      { argv: ['shutdown'], claudeExact: true }
+    ],
+    claudeOnly: { allow: [], deny: [] },
+    groups: [
+      { name: 'git', description: 'Hard to undo', decision: 'deny' },
+      { name: 'files', decision: 'ask' }
+    ]
+  })
+  const back = permissionRules(readPermissions(home)!)
+  assert.deepEqual(back.groups, [
+    { name: 'git', description: 'Hard to undo', decision: 'deny' },
+    { name: 'files', decision: 'ask' }
+  ])
+  assert.deepEqual(
+    back.commands.map((r) => [r.argv.join(' '), r.group]),
+    [
+      ['git status', 'git'],
+      ['rm', 'files'],
+      ['git push --force', 'git'],
+      ['shutdown', undefined]
+    ]
+  )
+})
+
+test('REQ-PERM-MODEL-7 a hand-written group name with no group entry still reads as a group; bad groups are refused', () => {
+  const home = demoHome()
+  writeFileSync(
+    file(home),
+    JSON.stringify({
+      bash: [],
+      bashDeny: [{ argv: ['dd'], group: 'disk' }],
+      claudeOnly: { allow: [], deny: [] }
+    })
+  )
+  assert.deepEqual(permissionRules(readPermissions(home)!).groups, [
+    { name: 'disk', decision: 'deny' }
+  ])
+
+  const cmd: CommandRule = { decision: 'deny', argv: ['x'], exact: false }
+  const bad: PermissionRules[] = [
+    { groups: [{ name: ' ', decision: 'deny' }], commands: [{ ...cmd, group: ' ' }] },
+    {
+      groups: [
+        { name: 'a', decision: 'deny' },
+        { name: 'a', decision: 'ask' }
+      ],
+      commands: [{ ...cmd, group: 'a' }]
+    },
+    { groups: [], commands: [{ ...cmd, group: 'nope' }] },
+    { groups: [{ name: 'a', decision: 'nope' as 'deny' }], commands: [{ ...cmd, group: 'a' }] }
+  ]
+  for (const rules of bad)
+    assert.throws(() => savePermissionRules(home, rules), { code: 'invalidSchema' })
+})
+
+test('REQ-PERM-MODEL-8 a rule written back as a line types the same words again', () => {
+  for (const argv of [
+    ['git', 'push', '--force'],
+    ['rm', '-rf', '/tmp/a b'],
+    ['psql', '-c', 'DROP TABLE x'],
+    ['echo', "it's"],
+    ['echo', 'say "hi"', 'a\\b'],
+    ['printf', '']
+  ])
+    assert.deepEqual(parseCommand(commandLine(argv)), argv)
+  assert.equal(commandLine(['git', 'push', '--force']), 'git push --force')
+  assert.equal(commandLine(['rm', '/tmp/a b']), "rm '/tmp/a b'")
 })
