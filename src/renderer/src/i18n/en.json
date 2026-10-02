@@ -953,9 +953,8 @@
       "allow": "The agent runs these without asking."
     },
     "decisionLabel": "What to do",
-    "exact": "Exact match",
-    "exactLabel": "Only this exact command",
-    "exactHint": "Off: also every command that starts with it (git push --force origin main).",
+    "starPrefix": "Starts with: also covers longer commands (git push --force origin main).\nClick for an exact match.",
+    "starExact": "Exact match: only this command.\nClick to also cover longer commands.",
     "command": "Command",
     "commandHint": "The words a command starts with. Quotes group words, like in a shell.",
     "description": "Description",

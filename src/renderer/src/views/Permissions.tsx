@@ -4,7 +4,6 @@ import {
   Badge,
   Box,
   Button,
-  Checkbox,
   Code,
   Group,
   SegmentedControl,
@@ -66,6 +65,50 @@ const DECISION_COLOR: Record<PermissionDecision, string> = {
 const ROW_PAD = 15
 
 const commandText = (r: CommandRule): string => r.argv.join(' ')
+/** How a rule reads in a list: a rule that also covers longer commands ends with * */
+const ruleTitle = (r: CommandRule): string => (r.exact ? commandText(r) : `${commandText(r)} *`)
+
+/**
+ * The trailing * of a command: lit when the rule also covers commands that start with it, dimmed when it is an exact match.
+ * Clicking switches between the two
+ */
+function StarToggle({
+  exact,
+  onChange,
+  testId
+}: {
+  exact: boolean
+  onChange: (exact: boolean) => void
+  testId: string
+}): React.JSX.Element {
+  const { t } = useTranslation()
+  return (
+    <Tooltip
+      label={t(exact ? 'permissions.starExact' : 'permissions.starPrefix')}
+      withArrow
+      openDelay={300}
+      style={{ whiteSpace: 'pre-line' }}
+    >
+      <UnstyledButton
+        onClick={() => onChange(!exact)}
+        aria-pressed={!exact}
+        aria-label={t(exact ? 'permissions.starExact' : 'permissions.starPrefix')}
+        data-testid={testId}
+        style={{ userSelect: 'none', lineHeight: 1 }}
+      >
+        <Code
+          style={{
+            opacity: exact ? 0.35 : 1,
+            textDecoration: exact ? 'line-through' : undefined,
+            cursor: 'pointer'
+          }}
+        >
+          *
+        </Code>
+      </UnstyledButton>
+    </Tooltip>
+  )
+}
 /** A command has one rule: its words and whether it is exact identify it */
 const ruleKey = (r: Pick<CommandRule, 'argv' | 'exact'>): string =>
   JSON.stringify([r.argv, r.exact])
@@ -262,7 +305,7 @@ function Permissions(): React.JSX.Element {
     <ListRow
       key={ruleKey(r)}
       avatar={DECISION_ICON[r.decision]}
-      title={commandText(r)}
+      title={ruleTitle(r)}
       tags={
         <>
           <Badge
@@ -274,11 +317,6 @@ function Permissions(): React.JSX.Element {
           >
             {t(`permissions.decision.${r.decision}`)}
           </Badge>
-          {r.exact && (
-            <Badge variant="default" size="xs" fw={500} c="dimmed">
-              {t('permissions.exact')}
-            </Badge>
-          )}
         </>
       }
       subtitle={r.description || undefined}
@@ -425,7 +463,7 @@ function Permissions(): React.JSX.Element {
       <DetailSheet
         opened={!!current}
         onClose={() => setSelected(null)}
-        title={current ? commandText(current) : ''}
+        title={current ? ruleTitle(current) : ''}
         meta={<MetaItem icon={<FileText size={14} />}>{data.file}</MetaItem>}
         onDelete={() => setConfirmDelete(true)}
         deleteTestId="perm-delete"
@@ -625,6 +663,7 @@ function RuleForm({
             {argv.map((a, i) => (
               <Code key={i}>{a}</Code>
             ))}
+            <StarToggle exact={exact} onChange={setExact} testId="perm-star" />
           </Group>
         )}
       </Stack>
@@ -634,13 +673,6 @@ function RuleForm({
         </Text>
         <DecisionPicker value={decision} onChange={setDecision} testId="perm-decision" />
       </Stack>
-      <Checkbox
-        label={t('permissions.exactLabel')}
-        description={t('permissions.exactHint')}
-        checked={exact}
-        onChange={(e) => setExact(e.currentTarget.checked)}
-        data-testid="perm-exact"
-      />
       {(groups.length > 0 || group) && (
         <Select
           label={t('permissions.group')}
@@ -674,7 +706,7 @@ function RuleForm({
 
 /**
  * New rules, or a group's rules: group name, description, default decision and the commands, one per line. Each line gets its
- * own decision and exact switch; a line starts with the default, and a line that was already a rule keeps its decision, exact,
+ * own decision and trailing * (off: exact match); a line starts with the default, and a line that was already a rule keeps its decision, exact,
  * description and the tools it is off for.
  * New rules may leave the group name empty: they go in no group, and the description goes on each rule
  */
@@ -797,25 +829,20 @@ function GroupForm({
           {lines.map(({ key, rule, dup }, i) => (
             <Group key={`${i}:${key}`} gap="xs" wrap="nowrap" data-testid="perm-line">
               <Box style={{ flex: 1, minWidth: 0 }}>
-                <Code>{commandLine(rule.argv)}</Code>
+                <Group gap={4} wrap="nowrap">
+                  <Code>{commandLine(rule.argv)}</Code>
+                  <StarToggle
+                    exact={rule.exact}
+                    onChange={(on) => setExacts((x) => ({ ...x, [key]: on }))}
+                    testId="perm-line-star"
+                  />
+                </Group>
                 {dup && (
                   <Text size="xs" c="red" data-testid="perm-line-duplicate">
                     {t('permissions.duplicate')}
                   </Text>
                 )}
               </Box>
-              <Tooltip label={t('permissions.exactLabel')} withArrow openDelay={300}>
-                <Checkbox
-                  size="xs"
-                  label={t('permissions.exact')}
-                  checked={rule.exact}
-                  onChange={(e) => {
-                    const on = e.currentTarget.checked
-                    setExacts((x) => ({ ...x, [key]: on }))
-                  }}
-                  data-testid="perm-line-exact"
-                />
-              </Tooltip>
               <SegmentedControl
                 size="xs"
                 value={rule.decision}
