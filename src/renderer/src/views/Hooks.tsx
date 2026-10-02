@@ -33,6 +33,7 @@ import {
   type HookSupport
 } from '../../../engine/hookActions'
 import {
+  HOOK_TIMINGS,
   defaultHookEvent,
   HOOK_CATALOG,
   HOOK_TOOLS,
@@ -1574,11 +1575,9 @@ function NewHookForm({
   const libScripts = useApi('scripts', () => window.api.scripts()).data?.scripts ?? []
 
   const action: HookAction = mode
-  const timings = HOOK_ACTION_INFO[action].timings
-  const pickMode = (m: 'script' | 'ask'): void => {
-    setMode(m)
-    if (!HOOK_ACTION_INFO[m].timings.includes(when)) setWhen(HOOK_ACTION_INFO[m].timings[0])
-  }
+  // The timing never changes by itself: one AI judgment can't use is kept and flagged instead
+  const timingOk = HOOK_ACTION_INFO[action].timings.includes(when)
+  const pickMode = (m: 'script' | 'ask'): void => setMode(m)
   const autoName = (() => {
     const base = `${mode}-${when}`
     let n = base
@@ -1591,6 +1590,7 @@ function NewHookForm({
   const atToolCall = when === 'before-tool' || when === 'after-tool'
   const valid =
     nameOk &&
+    timingOk &&
     (mode === 'ask' ? !!instruction.trim() : !!use || !!script.trim()) &&
     (timeout === '' || typeof timeout === 'number')
   const create = async (): Promise<void> => {
@@ -1640,11 +1640,18 @@ function NewHookForm({
       />
       <Select
         label={t('hooks.timingLabel')}
-        data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
+        data={HOOK_TIMINGS.map((x) => ({
+          value: x,
+          label: HOOK_ACTION_INFO[action].timings.includes(x)
+            ? t(`hooks.timing.${x}`)
+            : `${t(`hooks.timing.${x}`)} (${t('hooks.askNoTiming')})`,
+          disabled: !HOOK_ACTION_INFO[action].timings.includes(x)
+        }))}
         value={when}
         onChange={(v) => v && setWhen(v as HookTiming)}
         allowDeselect={false}
         description={t(`hooks.timingHint.${when}`)}
+        error={timingOk ? undefined : t('hooks.askTimingError')}
         data-testid="hook-new-timing"
       />
       {mode === 'script' && (

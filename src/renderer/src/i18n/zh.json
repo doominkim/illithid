@@ -1008,7 +1008,9 @@
     "doScript": "运行命令或脚本",
     "doAsk": "让 AI 判断",
     "doScriptHint": "脚本通过 stdin 接收工具的事件 JSON。要阻止，在 stderr 写原因并以 exit 2 结束。",
-    "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。"
+    "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。",
+    "askNoTiming": "不支持 AI 判断",
+    "askTimingError": "AI 判断只能在回复完成、工具运行前或提交提示时使用。请从中选择。"
   },
   "permissions": {
     "new": "新建规则",

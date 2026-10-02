@@ -126,7 +126,24 @@ test(
       const page = await app.firstWindow()
       await page.locator('[data-menu="hooks"]').click()
       await page.getByTestId('hook-new').click()
+      // The timing stays when switching to AI judgment
+      await page.getByTestId('hook-new-timing').click()
+      await page.getByRole('option', { name: 'Before a tool runs' }).click()
       await page.getByTestId('hook-new-mode').getByText('Let AI judge', { exact: true }).click()
+      assert.equal(await page.getByTestId('hook-new-timing').inputValue(), 'Before a tool runs')
+      // A timing AI judgment can't use is kept and flagged, and nothing can be created
+      await page
+        .getByTestId('hook-new-mode')
+        .getByText('Run a command or script', { exact: true })
+        .click()
+      await page.getByTestId('hook-new-timing').click()
+      await page.getByRole('option', { name: 'After a tool runs' }).click()
+      await page.getByTestId('hook-new-mode').getByText('Let AI judge', { exact: true }).click()
+      assert.match(await page.getByTestId('hook-new-timing').inputValue(), /^After a tool runs/)
+      await page.getByText(/AI judgment runs when a reply finishes/).waitFor()
+      await page.getByTestId('hook-instruction').fill('x')
+      assert.equal(await page.getByTestId('hook-create').isDisabled(), true)
+      await page.getByTestId('hook-instruction').fill('')
       assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
       await page.getByTestId('hook-option-judge').waitFor()
       // Judging before every tool call is slow: the form says so
