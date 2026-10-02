@@ -1033,9 +1033,8 @@
       "allow": "確認せずに実行します。"
     },
     "decisionLabel": "扱い",
-    "exact": "完全一致",
-    "exactLabel": "このコマンドと完全に同じときだけ",
-    "exactHint": "オフ: このコマンドで始まるコマンドも含みます (git push --force origin main)。",
+    "starPrefix": "前方一致: このコマンドで始まるコマンドも含みます (git push --force origin main)。\nクリックで完全一致にします。",
+    "starExact": "完全一致: このコマンドだけが対象です。\nクリックで前方一致にします。",
     "command": "コマンド",
     "commandHint": "コマンドの先頭の単語。引用符で単語をまとめられます (シェルと同じ)。",
     "description": "説明",
