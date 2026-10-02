@@ -146,13 +146,14 @@ test(
         { name: 'git', description: 'Hard to undo', decision: 'deny' }
       ])
 
-      // Edit: rename, drop a line, add one that starts with the group default
+      // Edit: rename, drop a line, add one that starts with the group default, make one exact
       await section.getByTestId('perm-group-open').click()
       await page.getByTestId('perm-group-name').fill('git danger')
       await page
         .getByTestId('perm-group-commands')
         .fill('git push --force\ngit status\ngit clean -fd')
       await line('git status').getByText('Allow', { exact: true }).waitFor()
+      await line('git status').getByTestId('perm-line-exact').check()
       await page.getByTestId('perm-group-save').click()
       const renamed = page.locator('[data-testid="perm-group"][data-group="git danger"]')
       await renamed.getByText('git clean -fd').waitFor()
@@ -161,7 +162,7 @@ test(
         'Bash(git push --force:*)',
         'Bash(git clean -fd:*)'
       ])
-      assert.deepEqual(claude().permissions?.allow, ['Bash(git status:*)'])
+      assert.deepEqual(claude().permissions?.allow, ['Bash(git status)'])
       await page.keyboard.press('Escape')
 
       // A line that another rule already has is refused
@@ -243,6 +244,15 @@ test(
         'Bash(git reset --hard:*)',
         'Bash(rm:*)'
       ])
+
+      // Editing the group keeps each rule's tools: --force stays off for Codex
+      await group.getByTestId('perm-group-open').click()
+      await page.getByTestId('perm-group-description').fill('Hard to undo')
+      await page.getByTestId('perm-group-save').click()
+      await group.getByText('Hard to undo').waitFor()
+      await synced()
+      assert.doesNotMatch(codex(), /"--force"/)
+      assert.match(codex(), /"--hard"/)
     } finally {
       await app.close()
     }

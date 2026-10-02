@@ -13,6 +13,7 @@ import {
   Text,
   Textarea,
   TextInput,
+  Tooltip,
   UnstyledButton
 } from '@mantine/core'
 import {
@@ -673,7 +674,8 @@ function RuleForm({
 
 /**
  * New rules, or a group's rules: group name, description, default decision and the commands, one per line. Each line gets its
- * own decision; a line starts with the default, and a line that was already a rule keeps its decision, exact and description.
+ * own decision and exact switch; a line starts with the default, and a line that was already a rule keeps its decision, exact,
+ * description and the tools it is off for.
  * New rules may leave the group name empty: they go in no group, and the description goes on each rule
  */
 function GroupForm({
@@ -708,6 +710,10 @@ function GroupForm({
   const [picks, setPicks] = useState<Record<string, PermissionDecision>>(() =>
     Object.fromEntries(members.map((r) => [JSON.stringify(r.argv), r.decision]))
   )
+  // "Only this exact command" per line; a saved rule starts with its own
+  const [exacts, setExacts] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(members.map((r) => [JSON.stringify(r.argv), r.exact]))
+  )
   const [busy, setBusy] = useState(false)
 
   const trimmed = name.trim()
@@ -720,7 +726,7 @@ function GroupForm({
     .map((argv) => {
       const key = JSON.stringify(argv)
       const member = members.find((r) => JSON.stringify(r.argv) === key)
-      const exact = member?.exact ?? false
+      const exact = exacts[key] ?? false
       const dup =
         seen.has(key) || taken.some((r) => r.exact === exact && JSON.stringify(r.argv) === key)
       seen.add(key)
@@ -730,7 +736,8 @@ function GroupForm({
         argv,
         exact,
         ...(own ? { description: own } : {}),
-        ...(trimmed ? { group: trimmed } : {})
+        ...(trimmed ? { group: trimmed } : {}),
+        ...(member?.off ? { off: member.off } : {})
       }
       return { key, rule, dup }
     })
@@ -797,6 +804,18 @@ function GroupForm({
                   </Text>
                 )}
               </Box>
+              <Tooltip label={t('permissions.exactLabel')} withArrow openDelay={300}>
+                <Checkbox
+                  size="xs"
+                  label={t('permissions.exact')}
+                  checked={rule.exact}
+                  onChange={(e) => {
+                    const on = e.currentTarget.checked
+                    setExacts((x) => ({ ...x, [key]: on }))
+                  }}
+                  data-testid="perm-line-exact"
+                />
+              </Tooltip>
               <SegmentedControl
                 size="xs"
                 value={rule.decision}
