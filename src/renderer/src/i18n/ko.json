@@ -956,7 +956,13 @@
       "judgeHint": "Claude Code 는 내장 prompt 훅으로 바로 판단합니다. 다른 툴은 이 CLI 를 한 번 더 실행해서 판단합니다 (느리고 구독 사용량을 씀).",
       "model": "모델",
       "modelHint": "비우면 CLI 기본 모델을 씁니다.",
-      "judgeSlow": "툴 실행 전에 걸면 모든 명령이 판단을 기다립니다. 꼭 필요하지 않으면 \"응답 완료\" 를 쓰세요."
+      "judgeSlow": "툴 실행 전에 걸면 모든 명령이 판단을 기다립니다. 꼭 필요하지 않으면 \"응답 완료\" 를 쓰세요.",
+      "target": "어떤 호출에",
+      "targets": {
+        "all": "모든 툴 호출",
+        "shell": "셸 명령",
+        "edit": "파일 편집"
+      }
     },
     "instruction": "지시문",
     "instructionHint": "AI 가 이 지시문과 이벤트를 읽고 계속해도 되는지 판단합니다.",
@@ -997,7 +1003,12 @@
     "scriptName": "스크립트 이름",
     "contextNote": "알려줄 내용",
     "contextNoteHint": "세션 시작 때 함께 전달합니다. 프로젝트 규칙이나 먼저 볼 곳 같은 것.",
-    "contextNoteExample": "끝내기 전에 npm test 를 돌려. 생성된 파일은 고치지 마."
+    "contextNoteExample": "끝내기 전에 npm test 를 돌려. 생성된 파일은 고치지 마.",
+    "doLabel": "할 일",
+    "doScript": "명령·스크립트 실행",
+    "doAsk": "AI 에게 판단 맡기기",
+    "doScriptHint": "스크립트는 stdin 으로 툴의 이벤트 JSON 을 받습니다. 막으려면 stderr 에 이유를 쓰고 exit 2 로 끝내세요.",
+    "timeoutAllHint": "초 단위, 모든 툴에 같은 값. 비우면 툴 기본값."
   },
   "permissions": {
     "new": "새 규칙",

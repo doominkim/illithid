@@ -670,7 +670,8 @@ export const lib = {
       action: i.action as NewHookInput['action'],
       options: (i.options ?? {}) as NewHookInput['options'],
       ...(typeof i.body === 'string' ? { body: i.body } : {}),
-      ...(typeof i.script === 'string' ? { script: i.script } : {})
+      ...(typeof i.script === 'string' ? { script: i.script } : {}),
+      ...(i.tools && typeof i.tools === 'object' ? { tools: i.tools } : {})
     })
     return { name }
   },

@@ -16,18 +16,18 @@ import {
   Textarea,
   TextInput
 } from '@mantine/core'
-import { ArrowLeft, Download, FolderOpen, Layers, Plus, RefreshCw, Undo2 } from 'lucide-react'
+import { Download, FolderOpen, Layers, Plus, RefreshCw, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   actionMatcher,
   ENV_NAME_RE,
   HOOK_ACTION_INFO,
-  HOOK_ACTIONS,
   hookSupport,
   JUDGE_CLIS,
   NOTIFY_CHANNELS,
   NOTIFY_URL_ENV,
   PROTECT_PATTERN_RE,
+  SCRIPT_TARGETS,
   type NotifyChannel,
   type HookAction,
   type HookSupport
@@ -82,12 +82,10 @@ import {
   TOOLS
 } from '../lib/tools'
 import { useApi } from '../lib/useApi'
-import { LIBRARY_SCRIPT_RE } from '../../../engine/scriptNames'
+import { LIBRARY_SCRIPT_RE, SCRIPT_TEMPLATE } from '../../../engine/scriptNames'
 import { useViewMode } from '../lib/viewMode'
 
 const NEW = '__new__'
-/** Actions a new hook can start from (log stays readable for existing hooks but is not offered) */
-const NEW_HOOK_ACTIONS = HOOK_ACTIONS.filter((a) => a !== 'log')
 const ALL = 'all'
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
@@ -146,13 +144,7 @@ function Hooks(): React.JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
-  // NEW, or NEW:<action> to open the new hook form on that action (from the scripts menu)
-  const isNew = selected === NEW || !!selected?.startsWith(`${NEW}:`)
-  const startAction =
-    selected?.startsWith(`${NEW}:`) &&
-    (HOOK_ACTIONS as readonly string[]).includes(selected.slice(NEW.length + 1))
-      ? (selected.slice(NEW.length + 1) as HookAction)
-      : null
+  const isNew = selected === NEW
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -376,8 +368,6 @@ function Hooks(): React.JSX.Element {
       <DetailSheet opened={isNew} onClose={() => setSelected(null)} title={t('hooks.new')}>
         {isNew && (
           <NewHookForm
-            key={selected}
-            initialAction={startAction}
             tools={hookTools}
             taken={data.hooks.map((h) => h.name)}
             onCreated={(name) => {
@@ -677,6 +667,20 @@ function OptionFields({
           data-testid="hook-option-command"
         />
       )
+    case 'script':
+      return when === 'before-tool' || when === 'after-tool' ? (
+        <Stack gap={4}>
+          <Text size="sm" fw={500}>
+            {t('hooks.opt.target')}
+          </Text>
+          <SegmentedControl
+            value={String(value.target || 'all')}
+            onChange={(v) => set('target', v)}
+            data={SCRIPT_TARGETS.map((x) => ({ value: x, label: t(`hooks.opt.targets.${x}`) }))}
+            data-testid="hook-option-target"
+          />
+        </Stack>
+      ) : null
     case 'log':
       return (
         <TextInput
@@ -1536,93 +1540,76 @@ function TriggerForm({
   )
 }
 
-/** New hook: pick what it does, then a short form */
+/**
+ * New hook: one form for every hook — when, which tool calls, and what to do (a command or script, or an AI judgment).
+ * Built-in recipes (notify, verify, …) stay readable and editable for hooks that have them, but are not offered here
+ */
 function NewHookForm({
-  initialAction,
   tools,
   taken,
   onCreated,
   onCancel
 }: {
-  /** Open on this action's form instead of the action cards */
-  initialAction?: HookAction | null
   tools: HookTool[]
   taken: string[]
   onCreated: (name: string) => void
   onCancel: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [action, setAction] = useState<HookAction | null>(initialAction ?? null)
-  const [when, setWhen] = useState<HookTiming>(
-    initialAction ? HOOK_ACTION_INFO[initialAction].timings[0] : 'stop'
-  )
-  const [options, setOptions] = useState<Options>(
-    initialAction ? { ...HOOK_ACTION_INFO[initialAction].defaults } : {}
-  )
-  const [body, setBody] = useState('')
+  const [mode, setMode] = useState<'script' | 'ask'>('script')
+  const [when, setWhen] = useState<HookTiming>('stop')
+  const [scriptOptions, setScriptOptions] = useState<Options>({
+    ...HOOK_ACTION_INFO.script.defaults
+  })
+  const [askOptions, setAskOptions] = useState<Options>({ ...HOOK_ACTION_INFO.ask.defaults })
+  // script: '' = written here, else a library script
+  const [use, setUse] = useState('')
+  const [script, setScript] = useState(SCRIPT_TEMPLATE)
+  const [instruction, setInstruction] = useState('')
+  const [timeout, setTimeoutValue] = useState<number | string>('')
   const [description, setDescription] = useState('')
-  // null = the name follows the action and timing until the user types one
+  // null = the name follows the kind and timing until the user types one
   const [typedName, setTypedName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // script: a library script to run instead of the hook's own run.sh ('' = its own)
-  const [use, setUse] = useState('')
   const libScripts = useApi('scripts', () => window.api.scripts()).data?.scripts ?? []
 
-  const pick = (a: HookAction): void => {
-    setAction(a)
-    setWhen(HOOK_ACTION_INFO[a].timings[0])
-    setOptions({ ...HOOK_ACTION_INFO[a].defaults })
-    setBody('')
+  const action: HookAction = mode
+  const timings = HOOK_ACTION_INFO[action].timings
+  const pickMode = (m: 'script' | 'ask'): void => {
+    setMode(m)
+    if (!HOOK_ACTION_INFO[m].timings.includes(when)) setWhen(HOOK_ACTION_INFO[m].timings[0])
   }
-
-  if (!action)
-    return (
-      <Stack gap="md">
-        <Text size="sm" c="dimmed">
-          {t('hooks.pickAction')}
-        </Text>
-        <CardGrid>
-          {NEW_HOOK_ACTIONS.map((a) => (
-            <ItemCard
-              key={a}
-              testId={`hook-action-${a}`}
-              name={t(`hooks.actions.${a}.title`)}
-              description={t(`hooks.actions.${a}.desc`)}
-              badges={
-                a === 'script' ? (
-                  <Badge variant="default" size="xs" fw={500} c="dimmed">
-                    {t('hooks.advanced')}
-                  </Badge>
-                ) : undefined
-              }
-              onClick={() => pick(a)}
-            />
-          ))}
-        </CardGrid>
-      </Stack>
-    )
-
   const autoName = (() => {
-    const base = `${action}-${when}`
+    const base = `${mode}-${when}`
     let n = base
     for (let i = 2; taken.includes(n); i++) n = `${base}-${i}`
     return n
   })()
   const name = typedName ?? autoName
   const nameOk = NAME_RE.test(name) && !taken.includes(name)
-  const clean = cleanOptions(action, options)
   const runs = tools.filter((tool) => hookSupport(action, when, tool) === 'ok')
-  const timings = HOOK_ACTION_INFO[action].timings
+  const atToolCall = when === 'before-tool' || when === 'after-tool'
+  const valid =
+    nameOk &&
+    (mode === 'ask' ? !!instruction.trim() : !!use || !!script.trim()) &&
+    (timeout === '' || typeof timeout === 'number')
   const create = async (): Promise<void> => {
-    if (!clean) return
     setBusy(true)
+    const seconds = typeof timeout === 'number' ? timeout : undefined
     const r = await runWrite(
       window.api.hookCreate(name, {
         description: description.trim(),
         when,
         action,
-        options: action === 'script' ? { ...clean, use } : clean,
-        body
+        options:
+          mode === 'ask'
+            ? askOptions
+            : { ...scriptOptions, target: atToolCall ? scriptOptions.target : 'all', use },
+        body: mode === 'ask' ? instruction : '',
+        ...(mode === 'script' && !use ? { script } : {}),
+        ...(seconds
+          ? { tools: Object.fromEntries(HOOK_TOOLS.map((tool) => [tool, { timeout: seconds }])) }
+          : {})
       }),
       { success: t('hooks.created') }
     )
@@ -1631,73 +1618,88 @@ function NewHookForm({
   }
 
   return (
-    <Stack gap="md" maw={560}>
-      <Group gap="xs">
-        <Button
-          size="compact-xs"
-          variant="subtle"
-          color="gray"
-          leftSection={<ArrowLeft size={12} />}
-          onClick={() => setAction(null)}
-          data-testid="hook-new-back"
-        >
-          {t('hooks.back')}
-        </Button>
-        <Text size="sm" fw={600}>
-          {t(`hooks.actions.${action}.title`)}
-        </Text>
-      </Group>
+    <Stack gap="md" maw={640}>
       <Select
         label={t('hooks.timingLabel')}
         data={timings.map((x) => ({ value: x, label: t(`hooks.timing.${x}`) }))}
         value={when}
         onChange={(v) => v && setWhen(v as HookTiming)}
         allowDeselect={false}
-        disabled={timings.length < 2}
         description={t(`hooks.timingHint.${when}`)}
         data-testid="hook-new-timing"
       />
-      <OptionFields
-        action={action}
-        when={when}
-        value={options}
-        onChange={setOptions}
-        placeholderMessage={description || name}
-      />
-      {action === 'ask' && <InstructionField value={body} onChange={setBody} />}
-      {action === 'context' && <ContextNoteField value={body} onChange={setBody} />}
-      {action === 'script' && (
-        <Select
-          label={t('hooks.useLabel')}
-          description={use ? t('hooks.libScriptHint') : t('hooks.scriptStarter')}
-          data={[
-            { value: '', label: t('hooks.useOwn') },
-            ...libScripts.map((x) => ({ value: x.name, label: x.name }))
-          ]}
-          value={use}
-          onChange={(v) => setUse(v ?? '')}
-          allowDeselect={false}
-          data-testid="hook-new-use"
+      {mode === 'script' && (
+        <OptionFields
+          action="script"
+          when={when}
+          value={scriptOptions}
+          onChange={setScriptOptions}
         />
       )}
-      <TextInput
-        label={t('hooks.description')}
-        value={description}
-        onChange={(e) => setDescription(e.currentTarget.value)}
-      />
-      <TextInput
-        label={t('common.name')}
-        value={name}
-        onChange={(e) => setTypedName(e.currentTarget.value)}
-        error={
-          name && !NAME_RE.test(name)
-            ? t('mcp.nameInvalid')
-            : taken.includes(name)
-              ? t('hooks.nameTaken')
-              : undefined
-        }
-        data-testid="hook-new-name"
-      />
+      <Stack gap={4}>
+        <Text size="sm" fw={500}>
+          {t('hooks.doLabel')}
+        </Text>
+        <SegmentedControl
+          value={mode}
+          onChange={(v) => pickMode(v as 'script' | 'ask')}
+          data={[
+            { value: 'script', label: t('hooks.doScript') },
+            { value: 'ask', label: t('hooks.doAsk') }
+          ]}
+          data-testid="hook-new-mode"
+        />
+        {mode === 'script' && (
+          <Text size="xs" c="dimmed">
+            {t('hooks.doScriptHint')}
+          </Text>
+        )}
+      </Stack>
+      {mode === 'script' ? (
+        <Stack gap="sm">
+          <Select
+            label={t('hooks.useLabel')}
+            data={[
+              { value: '', label: t('hooks.useOwn') },
+              ...libScripts.map((x) => ({ value: x.name, label: x.name }))
+            ]}
+            value={use}
+            onChange={(v) => setUse(v ?? '')}
+            allowDeselect={false}
+            description={use ? t('hooks.libScriptHint') : undefined}
+            data-testid="hook-new-use"
+          />
+          {!use && (
+            <>
+              <Textarea
+                aria-label={t('hooks.script')}
+                value={script}
+                onChange={(e) => setScript(e.currentTarget.value)}
+                autosize
+                minRows={8}
+                maxRows={24}
+                styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+                data-testid="hook-new-script"
+              />
+              <Box className="ac-card" p="sm">
+                <Stack gap={6}>
+                  <Text size="xs" c="dimmed">
+                    {t('hooks.argHint')}
+                  </Text>
+                  <Fields
+                    rows={runs.map((tool) => [TOOL_NAME[tool], t(`hooks.toolInput.${tool}`)])}
+                  />
+                </Stack>
+              </Box>
+            </>
+          )}
+        </Stack>
+      ) : (
+        <Stack gap="sm">
+          <InstructionField value={instruction} onChange={setInstruction} />
+          <OptionFields action="ask" when={when} value={askOptions} onChange={setAskOptions} />
+        </Stack>
+      )}
       <Stack gap={6}>
         <Text size="sm" fw={500}>
           {t('hooks.runsIn')}
@@ -1717,6 +1719,36 @@ function NewHookForm({
         </Group>
         <Unsupported action={action} when={when} tools={tools} testPrefix="hook-new-unsupported" />
       </Stack>
+      <NumberInput
+        label={t('hooks.timeout')}
+        placeholder={t('hooks.timeoutDefault')}
+        description={t('hooks.timeoutAllHint')}
+        value={timeout}
+        onChange={setTimeoutValue}
+        min={1}
+        max={3600}
+        allowDecimal={false}
+        w={240}
+        data-testid="hook-new-timeout"
+      />
+      <TextInput
+        label={t('hooks.description')}
+        value={description}
+        onChange={(e) => setDescription(e.currentTarget.value)}
+      />
+      <TextInput
+        label={t('common.name')}
+        value={name}
+        onChange={(e) => setTypedName(e.currentTarget.value)}
+        error={
+          name && !NAME_RE.test(name)
+            ? t('mcp.nameInvalid')
+            : taken.includes(name)
+              ? t('hooks.nameTaken')
+              : undefined
+        }
+        data-testid="hook-new-name"
+      />
       <Group justify="flex-end" gap="xs">
         <Button size="xs" variant="default" onClick={onCancel}>
           {t('common.cancel')}
@@ -1725,7 +1757,7 @@ function NewHookForm({
           size="xs"
           onClick={() => void create()}
           loading={busy}
-          disabled={!nameOk || !clean || (action === 'ask' && !body.trim())}
+          disabled={!valid}
           data-testid="hook-create"
         >
           {t('common.create')}

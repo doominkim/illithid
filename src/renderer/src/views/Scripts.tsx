@@ -377,14 +377,6 @@ function BuiltinDetail({
       <Group gap="sm">
         <Button
           size="xs"
-          leftSection={<Plus size={13} />}
-          onClick={() => navigate('hooks', { select: `${NEW}:${builtin.action}` })}
-          data-testid="script-builtin-new-hook"
-        >
-          {t('scripts.newHook')}
-        </Button>
-        <Button
-          size="xs"
           variant="default"
           leftSection={<Copy size={13} />}
           onClick={() => setCopyName(copyName === null ? suggested : null)}

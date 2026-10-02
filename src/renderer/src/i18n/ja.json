@@ -956,7 +956,13 @@
       "judgeHint": "Claude Code は内蔵の prompt フックですぐ判断します。他のツールはこの CLI をもう一度実行して判断します (遅く、プランの使用量を使います)。",
       "model": "モデル",
       "modelHint": "空なら CLI の既定モデルを使います。",
-      "judgeSlow": "ツール実行前にすると、すべてのコマンドが判断を待ちます。必要でなければ「応答完了」を使ってください。"
+      "judgeSlow": "ツール実行前にすると、すべてのコマンドが判断を待ちます。必要でなければ「応答完了」を使ってください。",
+      "target": "対象の呼び出し",
+      "targets": {
+        "all": "すべての呼び出し",
+        "shell": "シェルコマンド",
+        "edit": "ファイル編集"
+      }
     },
     "instruction": "指示",
     "instructionHint": "AI がこの指示とイベントを読み、続けてよいか判断します。",
@@ -997,7 +1003,12 @@
     "scriptName": "スクリプト名",
     "contextNote": "伝える内容",
     "contextNoteHint": "セッション開始時に一緒に伝えます。プロジェクトのルールや最初に見る場所など。",
-    "contextNoteExample": "終える前に npm test を実行して。生成ファイルは編集しないで。"
+    "contextNoteExample": "終える前に npm test を実行して。生成ファイルは編集しないで。",
+    "doLabel": "すること",
+    "doScript": "コマンド・スクリプトを実行",
+    "doAsk": "AI に判断させる",
+    "doScriptHint": "スクリプトは stdin でツールのイベント JSON を受け取ります。止めるには stderr に理由を書いて exit 2 で終了します。",
+    "timeoutAllHint": "秒単位、全ツール共通。空ならツールの既定値。"
   },
   "permissions": {
     "new": "新しいルール",

@@ -1353,6 +1353,8 @@ export interface NewHookInput {
   body?: string
   /** script: run.sh content (a starter script if left out) */
   script?: string
+  /** Per-tool settings (event, matcher, timeout) */
+  tools?: HookDoc['tools']
 }
 
 /** New hook: hooks/<name>/HOOK.md (+ run.sh for the script action). exists if the folder is there */
@@ -1366,6 +1368,7 @@ export function createHook(home: string, name: string, input: NewHookInput): str
     when: i.when,
     action: i.action,
     options: i.options ?? {},
+    ...(isObj(i.tools) && Object.keys(i.tools).length ? { tools: i.tools } : {}),
     body: typeof i.body === 'string' ? i.body : ''
   })
   checkUsedScript(home, doc)

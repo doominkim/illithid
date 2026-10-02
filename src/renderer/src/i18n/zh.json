@@ -956,7 +956,13 @@
       "judgeHint": "Claude Code 用内置的 prompt 钩子直接判断。其他工具会再运行一次这个 CLI 来判断 (较慢，会消耗订阅用量)。",
       "model": "模型",
       "modelHint": "留空则使用 CLI 的默认模型。",
-      "judgeSlow": "放在工具运行前时，每条命令都要等待判断。非必要请使用“回复完成”。"
+      "judgeSlow": "放在工具运行前时，每条命令都要等待判断。非必要请使用“回复完成”。",
+      "target": "针对哪些调用",
+      "targets": {
+        "all": "所有调用",
+        "shell": "Shell 命令",
+        "edit": "文件编辑"
+      }
     },
     "instruction": "指令",
     "instructionHint": "AI 会读取此指令和事件，判断是否可以继续。",
@@ -997,7 +1003,12 @@
     "scriptName": "脚本名称",
     "contextNote": "要告知的内容",
     "contextNoteHint": "在会话开始时一并告知，例如项目规则或先看哪里。",
-    "contextNoteExample": "结束前运行 npm test。不要编辑生成的文件。"
+    "contextNoteExample": "结束前运行 npm test。不要编辑生成的文件。",
+    "doLabel": "要做什么",
+    "doScript": "运行命令或脚本",
+    "doAsk": "让 AI 判断",
+    "doScriptHint": "脚本通过 stdin 接收工具的事件 JSON。要阻止，在 stderr 写原因并以 exit 2 结束。",
+    "timeoutAllHint": "秒，所有工具相同。留空则用工具默认值。"
   },
   "permissions": {
     "new": "新建规则",

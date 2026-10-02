@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
+import { createHook, syncAll } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
 const LIB = '.illithid/workspaces/default'
@@ -49,25 +50,27 @@ async function launch(
 }
 
 test(
-  'REQ-HOOKS-UI-1 pick "notify", fill the message, and every tool gets a generated script; edit and advanced settings follow',
+  'REQ-HOOKS-UI-1 an existing recipe hook (notify) keeps its generated scripts; edit and advanced settings follow',
   { timeout: 180000 },
   async () => {
-    const { home, app } = await launch(['claude', 'codex', 'gemini'], 'illithid-hooks-ui-')
+    const { home, app } = await launch(['claude', 'codex', 'gemini'], 'illithid-hooks-ui-', (h) => {
+      createHook(h, 'notify-stop', {
+        description: '',
+        when: 'stop',
+        action: 'notify',
+        options: { message: 'All done' }
+      })
+      // Made before this launch: written to the tools up front
+      syncAll(h, baseEnv(h), { allowReal: true })
+    })
     try {
       const page = await app.firstWindow()
       const synced = (): Promise<void> =>
         page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
       await page.locator('[data-menu="hooks"]').click()
-      await page.getByTestId('empty-import').waitFor()
+      await page.getByText('notify-stop', { exact: true }).first().click()
 
-      // New hook: an action card, then a short form with the timing and the name already filled in
-      await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-notify"]').click()
-      await page.getByTestId('hook-option-message').fill('All done')
-      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'notify-stop')
-      await page.getByTestId('hook-create').click()
-
-      // Detail: a one-line summary; outside the real HOME a library write syncs at once
+      // Detail: a one-line summary; outside the real HOME the library syncs at once
       await page.getByTestId('hook-summary').getByText('Reply finished').waitFor()
       await synced()
       const copy = join(home, '.claude/hooks/illithid/notify-stop/run.sh')
@@ -123,11 +126,7 @@ test(
       const page = await app.firstWindow()
       await page.locator('[data-menu="hooks"]').click()
       await page.getByTestId('hook-new').click()
-      assert.equal(
-        await page.locator('[data-card="hook-action-ask"]').getByText('Claude Code only').count(),
-        0
-      )
-      await page.locator('[data-card="hook-action-ask"]').click()
+      await page.getByTestId('hook-new-mode').getByText('Let AI judge', { exact: true }).click()
       assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
       await page.getByTestId('hook-option-judge').waitFor()
       // Judging before every tool call is slow: the form says so
@@ -210,94 +209,48 @@ test(
 )
 
 test(
-  "REQ-HOOKS-UI-4 recipes: check before finishing gets a long timeout everywhere, protect files says where it can't run, phone notifications ask for a variable",
+  'REQ-HOOKS-UI-4 one form for every hook: a script before shell commands, with a timeout, reaches each tool with its own shell tool name',
   { timeout: 180000 },
   async () => {
-    const { home, app } = await launch(['claude', 'codex', 'copilot'], 'illithid-hooks-ui-recipes-')
+    const { home, app } = await launch(['claude', 'gemini', 'copilot'], 'illithid-hooks-ui-form-')
     try {
       const page = await app.firstWindow()
-      const synced = (): Promise<void> =>
-        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
       await page.locator('[data-menu="hooks"]').click()
-
       await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-verify"]').click()
-      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'verify-stop')
-      await page.getByTestId('hook-create').click()
-      await page.getByTestId('hook-summary').getByText('Check before finishing').waitFor()
-      await synced()
-      const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
-        hooks: Record<string, { matcher?: string; hooks: { timeout?: number }[] }[]>
-      }
-      assert.equal(claude.hooks.Stop[0].hooks[0].timeout, 300)
-      const copilot = JSON.parse(
-        readFileSync(join(home, '.copilot/hooks/illithid.json'), 'utf8')
-      ) as { hooks: { agentStop: { timeoutSec: number }[] } }
-      assert.equal(copilot.hooks.agentStop[0].timeoutSec, 300)
-      await page.keyboard.press('Escape')
-
-      await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-protect"]').click()
+      // No recipe cards: the form is there at once
+      assert.equal(await page.locator('[data-card^="hook-action-"]').count(), 0)
+      await page.getByTestId('hook-new-script').waitFor()
+      await page.getByTestId('hook-new-timing').click()
+      await page.getByRole('option', { name: 'Before a tool runs' }).click()
       await page
-        .getByTestId('hook-new-unsupported-noFilePath')
-        .getByText(/Codex, GitHub Copilot/)
-        .waitFor()
+        .getByTestId('hook-option-target')
+        .getByText('Shell commands', { exact: true })
+        .click()
+      const script = '#!/bin/sh\necho checked >&2\nexit 0\n'
+      await page.getByTestId('hook-new-script').fill(script)
+      await page.getByTestId('hook-new-timeout').fill('15')
+      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'script-before-tool')
       await page.getByTestId('hook-create').click()
       await page.getByTestId('hook-summary').waitFor()
-      await synced()
-      const after = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
-        hooks: Record<string, { matcher?: string }[]>
-      }
-      assert.equal(after.hooks.PreToolUse[0].matcher, 'Write|Edit')
-      await page.keyboard.press('Escape')
-
-      await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-notify"]').click()
-      await page.getByTestId('hook-option-channel').getByText('ntfy', { exact: true }).click()
-      await page.getByTestId('hook-option-urlenv').waitFor()
-      assert.equal(
-        await page.getByTestId('hook-option-urlenv').getAttribute('placeholder'),
-        'ILLITHID_NTFY_URL'
-      )
-    } finally {
-      await app.close()
-    }
-  }
-)
-
-test(
-  'REQ-HOOKS-UI-5 format and checkpoint are everyday cards that run when a reply ends',
-  { timeout: 180000 },
-  async () => {
-    const { home, app } = await launch(['claude'], 'illithid-hooks-ui-ckpt-')
-    try {
-      const page = await app.firstWindow()
-      await page.locator('[data-menu="hooks"]').click()
-      await page.getByTestId('hook-new').click()
-      // Format is no longer marked advanced
-      assert.equal(
-        await page.locator('[data-card="hook-action-format"]').getByText('Advanced').count(),
-        0
-      )
-      await page.locator('[data-card="hook-action-checkpoint"]').click()
-      await page.getByTestId('hook-option-mode').getByText('Snapshot', { exact: true }).waitFor()
-      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'checkpoint-stop')
-      await page.getByTestId('hook-create').click()
-      await page
-        .getByTestId('hook-summary')
-        .getByText(/Checkpoint each reply/)
-        .waitFor()
       await page
         .locator('[data-testid="sync-button"][data-state="synced"]')
         .waitFor({ timeout: 30000 })
-      const s = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
-        hooks: { Stop: { hooks: { command: string }[] }[] }
+      assert.equal(readFileSync(join(home, LIB, 'hooks/script-before-tool/run.sh'), 'utf8'), script)
+      const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')) as {
+        hooks: { PreToolUse: { matcher: string; hooks: { timeout: number }[] }[] }
       }
-      assert.match(s.hooks.Stop[0].hooks[0].command, /checkpoint-stop\/run\.sh' claude$/)
-      await page.keyboard.press('Escape')
-      await page.getByTestId('hook-new').click()
-      await page.locator('[data-card="hook-action-format"]').click()
-      assert.equal(await page.getByTestId('hook-new-name').inputValue(), 'format-stop')
+      assert.equal(claude.hooks.PreToolUse[0].matcher, 'Bash')
+      assert.equal(claude.hooks.PreToolUse[0].hooks[0].timeout, 15)
+      const gemini = JSON.parse(readFileSync(join(home, '.gemini/settings.json'), 'utf8')) as {
+        hooks: { BeforeTool: { matcher: string; hooks: { timeout: number }[] }[] }
+      }
+      assert.equal(gemini.hooks.BeforeTool[0].matcher, 'run_shell_command')
+      assert.equal(gemini.hooks.BeforeTool[0].hooks[0].timeout, 15000)
+      const copilot = JSON.parse(
+        readFileSync(join(home, '.copilot/hooks/illithid.json'), 'utf8')
+      ) as { hooks: { preToolUse: { matcher: string; timeoutSec: number }[] } }
+      assert.equal(copilot.hooks.preToolUse[0].matcher, 'bash')
+      assert.equal(copilot.hooks.preToolUse[0].timeoutSec, 15)
     } finally {
       await app.close()
     }
