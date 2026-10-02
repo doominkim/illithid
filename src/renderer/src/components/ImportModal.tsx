@@ -263,7 +263,7 @@ export function ImportModal({
                     <Badge
                       key={w}
                       variant="light"
-                      color={w === 'originalKept' ? 'yellow' : 'gray'}
+                      color={w === 'originalKept' || w === 'usesSiblings' ? 'yellow' : 'gray'}
                       size="xs"
                       fw={500}
                       data-testid={`import-hook-${c.name}-${w}`}

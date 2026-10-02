@@ -360,7 +360,9 @@
       "inlineCommand": "内联命令 → 脚本文件",
       "originalKept": "保留原有 · 删除原有之前此工具中关闭",
       "toolVariable": "使用工具专用变量",
-      "joins": "加入 {{name}}"
+      "joins": "加入 {{name}}",
+      "folderScript": "连同文件夹导入，作为文件夹脚本使用",
+      "usesSiblings": "使用共享文件夹中的相邻文件，保留原始项"
     }
   },
   "rel": {

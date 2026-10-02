@@ -40,6 +40,7 @@ import {
   deleteHook,
   saveHookDoc,
   writeNewHook,
+  importScriptFolder,
   listAgents,
   readAgentDoc,
   writeNewAgentText,
@@ -2905,6 +2906,7 @@ export function applyImport(
         const v = variant as unknown as HookImportVariant
         const r = applyHookCandidate(home, cand, v, !!sel.overwrite, {
           createHookFiles: (name, doc, script) => void writeNewHook(home, name, doc, script),
+          importFolder: (name, from, entry) => void importScriptFolder(home, name, from, entry),
           saveDoc: (name, doc) => void saveHookDoc(home, name, doc),
           trashHook: (name) => deleteHook(home, name).trashPath
         })

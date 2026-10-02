@@ -19,6 +19,7 @@ import {
   planImport,
   readHook,
   readManifest,
+  readScript,
   syncAll
 } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
@@ -284,4 +285,62 @@ test('REQ-HOOKS-IMPORT-7 a Codex hook written in config.toml (outside the app bl
   assert.equal(readManifest(home).manifest.hooks[c.name].codex, false)
   approved(home)
   assert.ok(readFileSync(toml, 'utf8').startsWith(original))
+})
+
+const SIBLING_RUN = '#!/bin/sh\n. "$(dirname "$0")/lib.sh"\ntidy "$1"\n'
+const SIBLING_LIB = 'tidy() { echo "tidied $1"; }\n'
+
+test('REQ-HOOKS-IMPORT-8 a hook script that calls files next to it comes in with its folder, as a folder script', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const home = demoHome(['claude'])
+  const dir = join(home, '.claude/hooks/tidy')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'run.sh'), SIBLING_RUN, { mode: 0o755 })
+  writeFileSync(join(dir, 'lib.sh'), SIBLING_LIB)
+  const settings = join(home, '.claude/settings.json')
+  writeFileSync(
+    settings,
+    JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/tidy/run.sh' }] }] }
+    })
+  )
+  const [c] = planImport(home, 'tool:claude').hooks
+  assert.equal(c.name, 'tidy')
+  assert.deepEqual(c.variants[0].warnings, ['folderScript'])
+  const [r] = applyImport(home, [{ kind: 'hook', name: 'tidy' }], 'tool:claude')
+  assert.equal(r.status, 'imported')
+  const s = readScript(home, 'tidy')!
+  assert.equal(s.kind, 'folder')
+  assert.equal(s.entry, 'run.sh')
+  assert.deepEqual(s.files, ['SCRIPT.md', 'lib.sh', 'run.sh'])
+  assert.equal(readHook(home, 'tidy').doc.options.use, 'tidy')
+  approved(home)
+  const stop = (json(settings) as { hooks: { Stop: { hooks: { command: string }[] }[] } }).hooks
+    .Stop
+  assert.equal(stop.length, 1)
+  const cmd = stop[0].hooks[0].command
+  assert.match(cmd, /\/\.claude\/hooks\/illithid\/_scripts\/tidy\/run\.sh' claude tidy$/)
+  assert.equal(spawnSync('/bin/sh', ['-c', cmd], { encoding: 'utf8' }).stdout, 'tidied claude\n')
+  // The original folder is left as it was
+  assert.equal(readFileSync(join(dir, 'run.sh'), 'utf8'), SIBLING_RUN)
+  assert.equal(existsSync(join(dir, 'SCRIPT.md')), false)
+})
+
+test('REQ-HOOKS-IMPORT-9 a script that calls files next to it in a shared folder comes in turned off, its original kept', () => {
+  const home = demoHome(['claude'])
+  const hooksDir = join(home, '.claude/hooks')
+  mkdirSync(hooksDir, { recursive: true })
+  writeFileSync(join(hooksDir, 'tidy.sh'), SIBLING_RUN, { mode: 0o755 })
+  writeFileSync(join(hooksDir, 'lib.sh'), SIBLING_LIB)
+  const settings = join(home, '.claude/settings.json')
+  const original = {
+    hooks: { Stop: [{ hooks: [{ type: 'command', command: '~/.claude/hooks/tidy.sh' }] }] }
+  }
+  writeFileSync(settings, JSON.stringify(original))
+  const [c] = planImport(home, 'tool:claude').hooks
+  assert.deepEqual(c.variants[0].warnings, ['usesSiblings', 'originalKept'])
+  applyImport(home, [{ kind: 'hook', name: c.name }], 'tool:claude')
+  assert.equal(readManifest(home).manifest.hooks[c.name].claude, false)
+  approved(home)
+  assert.deepEqual(json(settings).hooks, original.hooks)
 })

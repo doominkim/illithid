@@ -13,7 +13,7 @@
  * A copy of each original entry is saved to backups/imported at import time.
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { activeWorkspaceId } from './config'
 import { hookEventInfo, isHookTool, type HookTiming, type HookTool } from './hookEvents'
@@ -29,6 +29,7 @@ import {
 import { LibraryError } from './libpath'
 import { setToggle } from './manifest'
 import { addPending, importedBackupRoot, importStamp, type PendingRetire } from './pendingRetire'
+import { readScript, scanScriptFolder, scriptDirPath } from './scripts'
 import { readState, writeState } from './state'
 import {
   appHookName,
@@ -55,7 +56,14 @@ function replacesOriginal(home: string, tool: HookTool, configPath: string): boo
   )
 }
 
-export type HookImportWarning = 'inlineCommand' | 'originalKept' | 'toolVariable'
+export type HookImportWarning =
+  | 'inlineCommand'
+  | 'originalKept'
+  | 'toolVariable'
+  /** The script calls files next to it: it comes in with its folder, as a folder library script */
+  | 'folderScript'
+  /** The script calls files next to it, in a folder it shares with others: it can't come in whole, so the original stays */
+  | 'usesSiblings'
 
 export interface HookImportVariant {
   /** First 12 chars of sha256 of the original entry */
@@ -76,6 +84,8 @@ export interface HookImportVariant {
   prompt?: string
   /** Library hook this one connects to instead of making a new hook */
   joins?: string
+  /** The folder the script comes in with (a folder library script the hook uses), and the file it runs */
+  folder?: { path: string; entry: string }
   warnings: HookImportWarning[]
   /** Config file the entry is in (absolute) */
   configPath: string
@@ -257,6 +267,26 @@ function slug(s: string): string {
   )
 }
 
+/** A script that finds other files by its own location */
+const SIBLING_RE =
+  /\$\(\s*dirname\s+["']?\$\{?0|\$\{BASH_SOURCE(?:\[0\])?%\/\*\}|dirname\s+["']?\$\{?BASH_SOURCE|(?:^|[\s;&|])(?:source|\.)\s+["']?\.{1,2}\/|__dirname|__file__|import\.meta\.url/m
+
+/**
+ * The folder a script can come in with: its own folder when that holds only this script's files — not HOME, not a dot folder
+ * in HOME (~/.claude), not a hooks folder shared by several scripts — and a copy of it would be accepted
+ */
+function ownFolder(home: string, script: string): string | null {
+  const dir = dirname(script)
+  const parent = dirname(dir)
+  if (dir === home || parent === dirname(home) || basename(dir) === 'hooks') return null
+  if (parent === home && basename(dir).startsWith('.')) return null
+  try {
+    return scanScriptFolder(dir).problem ? null : dir
+  } catch {
+    return null
+  }
+}
+
 /** Library timeout (whole seconds) from the tool's own value */
 function seconds(tool: HookTool, handler: Json): number | undefined {
   const v = tool === 'copilot' ? (handler.timeoutSec ?? handler.timeout) : handler.timeout
@@ -304,7 +334,13 @@ export function hookImportCandidates(
     const warnings: HookImportWarning[] = []
     if (!ask && !scriptPath) warnings.push('inlineCommand')
     if (/\b(CLAUDE|GEMINI|CODEX)_[A-Z_]*DIR\b/.test(e.command)) warnings.push('toolVariable')
-    if (!replacesOriginal(home, tool, e.configPath)) warnings.push('originalKept')
+    // A script calling files next to it: with its own folder, or not at all (the original then stays)
+    const siblings = !!scriptPath && SIBLING_RE.test(script)
+    const folderPath = siblings ? ownFolder(home, scriptPath!) : null
+    if (folderPath) warnings.push('folderScript')
+    else if (siblings) warnings.push('usesSiblings')
+    if (!replacesOriginal(home, tool, e.configPath) || (siblings && !folderPath))
+      warnings.push('originalKept')
     const timeout = seconds(tool, e.handler)
     const trigger: HookTrigger = {
       event: e.event,
@@ -312,17 +348,23 @@ export function hookImportCandidates(
       ...(timeout !== undefined ? { timeout } : {})
     }
     // A library script hook at the same timing running the same script: this original is that hook in another tool
+    // A folder script only joins a hook running a folder script too (a run.sh of the same content lacks the other files)
     const joins = ask
       ? undefined
       : library.find(
           (h) =>
             h.doc.action === 'script' &&
             h.doc.when === info.timing &&
+            !!folderPath === !!h.folder &&
             Object.values(h.scripts).includes(script)
         )?.name
     let name =
       joins ??
-      (scriptPath ? slug(basename(scriptPath).replace(/\.[^.]+$/, '')) : slug(`${tool}-${e.event}`))
+      (folderPath
+        ? slug(basename(folderPath))
+        : scriptPath
+          ? slug(basename(scriptPath).replace(/\.[^.]+$/, ''))
+          : slug(`${tool}-${e.event}`))
     if (!joins) {
       const base = name
       for (let i = 2; taken.has(name); i++) name = `${base}-${i}`
@@ -350,6 +392,9 @@ export function hookImportCandidates(
           script,
           ...(ask ? { prompt: e.prompt } : {}),
           ...(joins ? { joins } : {}),
+          ...(folderPath && !joins
+            ? { folder: { path: folderPath, entry: basename(scriptPath!) } }
+            : {}),
           warnings,
           configPath: e.configPath,
           portability: 'ok',
@@ -364,6 +409,8 @@ export function hookImportCandidates(
 
 export interface HookImportDeps {
   createHookFiles: (name: string, doc: HookDoc, script?: string) => void
+  /** A folder comes in as a folder library script */
+  importFolder: (name: string, from: string, entry: string) => void
   saveDoc: (name: string, doc: HookDoc) => void
   trashHook: (name: string) => string
 }
@@ -406,16 +453,25 @@ export function applyHookCandidate(
       if (!overwrite) throw new LibraryError('exists', 'a hook with the same name exists')
       trashPath = deps.trashHook(c.name)
     }
+    // A script with its folder: a folder library script under a free name, which the hook uses
+    let use: string | undefined
+    if (v.folder) {
+      const base = slug(basename(v.folder.path))
+      use = base
+      for (let i = 2; readScript(home, use) || existsSync(scriptDirPath(home, use)); i++)
+        use = `${base}-${i}`
+      deps.importFolder(use, v.folder.path, v.folder.entry)
+    }
     const base: HookDoc = {
       description: '',
       when: v.timing,
       action: v.action,
-      options: v.action === 'ask' ? { verbatim: true } : {},
+      options: v.action === 'ask' ? { verbatim: true } : use ? { use } : {},
       body: v.prompt ?? ''
     }
     const s = toolSettings(base, tool, v.trigger)
     const doc: HookDoc = { ...base, ...(Object.keys(s).length ? { tools: { [tool]: s } } : {}) }
-    deps.createHookFiles(c.name, doc, v.action === 'script' ? v.script : undefined)
+    deps.createHookFiles(c.name, doc, v.action === 'script' && !use ? v.script : undefined)
     // Like other imports: on only for the tool it came from
     for (const other of HOOK_TOOLS)
       if (other !== tool && hookTriggers(doc)[other]) setToggle(home, 'hooks', c.name, other, false)
@@ -431,7 +487,7 @@ export function applyHookCandidate(
     { mode: 0o600 }
   )
   const name = v.joins ?? c.name
-  if (replacesOriginal(home, tool, v.configPath)) {
+  if (replacesOriginal(home, tool, v.configPath) && !v.warnings.includes('usesSiblings')) {
     // The next approved sync removes the original as it writes the app entry
     const st = readState(home)
     if (st.error) throw new LibraryError('configError', `state.json: ${st.error}`)

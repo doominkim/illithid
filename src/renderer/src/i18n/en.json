@@ -360,7 +360,9 @@
       "inlineCommand": "Inline command → script file",
       "originalKept": "Original stays · off for this tool until you remove it",
       "toolVariable": "Uses a tool-specific variable",
-      "joins": "Joins {{name}}"
+      "joins": "Joins {{name}}",
+      "folderScript": "Comes in with its folder, as a folder script",
+      "usesSiblings": "Uses files next to it in a shared folder · original stays"
     }
   },
   "rel": {

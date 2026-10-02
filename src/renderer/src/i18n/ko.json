@@ -360,7 +360,9 @@
       "inlineCommand": "인라인 명령 → 스크립트 파일",
       "originalKept": "원본 유지 · 원본을 지우기 전까지 이 툴에서는 꺼짐",
       "toolVariable": "툴 전용 변수 사용",
-      "joins": "{{name}} 에 연결"
+      "joins": "{{name}} 에 연결",
+      "folderScript": "폴더째 가져와 폴더 스크립트로 사용",
+      "usesSiblings": "공유 폴더의 옆 파일을 써서 원본 유지"
     }
   },
   "rel": {

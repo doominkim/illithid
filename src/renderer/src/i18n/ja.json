@@ -360,7 +360,9 @@
       "inlineCommand": "インラインのコマンド → スクリプトファイル",
       "originalKept": "元のまま · 元を消すまでこのツールではオフ",
       "toolVariable": "ツール固有の変数を使用",
-      "joins": "{{name}} に接続"
+      "joins": "{{name}} に接続",
+      "folderScript": "フォルダごと取り込み、フォルダスクリプトとして使用",
+      "usesSiblings": "共有フォルダ内の隣のファイルを使うため元を維持"
     }
   },
   "rel": {
