@@ -968,8 +968,6 @@
     "copilotNo": "Copilot は確認・許可ルールを保存できない",
     "grokViaClaude": "Grok CLI は Claude Code の設定からこのルールを読む",
     "codexPrefix": "Codex はコマンドの先頭で照合するため、長いコマンドも含まれる",
-    "newGroup": "新しいグループ",
-    "groupCreated": "グループを追加しました",
     "groupSaved": "グループを保存しました",
     "groupDeleted": "グループを削除しました",
     "groupDeleteTitle": "グループを削除",
@@ -977,13 +975,15 @@
     "ungrouped": "グループなし",
     "group": "グループ",
     "groupName": "グループ名",
+    "groupNameHint": "省略可。空のままだとグループなしで追加され、説明は各ルールに付きます。",
     "groupNamePlaceholder": "git",
     "groupNameTaken": "同じ名前のグループがあります",
     "groupDecision": "新しいコマンドの既定値",
     "groupCommands": "コマンド",
     "groupCommandsHint": "1 行に 1 コマンド。行ごとに下で動作を変えられます。",
     "expand": "展開",
-    "collapse": "折りたたむ"
+    "collapse": "折りたたむ",
+    "groupPartial": "{{count}} 件中 {{on}} 件オン"
   },
   "scripts": {
     "search": "スクリプトを検索",

@@ -1212,6 +1212,12 @@ export function validatePermissions(v: unknown): string[] {
       for (const k of ['description', 'note', 'group'] as const)
         if (isObj(e) && e[k] !== undefined && typeof e[k] !== 'string')
           errs.push(`${key}[${i}].${k} must be a string`)
+      if (
+        isObj(e) &&
+        e.off !== undefined &&
+        (!Array.isArray(e.off) || !e.off.every((x) => typeof x === 'string'))
+      )
+        errs.push(`${key}[${i}].off must be a string array`)
     })
   }
   checkList('bash', v.bash)

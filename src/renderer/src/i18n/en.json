@@ -968,8 +968,6 @@
     "copilotNo": "Copilot can't keep ask or allow rules",
     "grokViaClaude": "Grok CLI reads these from Claude Code's settings",
     "codexPrefix": "Codex matches the start of the command, so this also covers longer commands",
-    "newGroup": "New group",
-    "groupCreated": "Group added",
     "groupSaved": "Group saved",
     "groupDeleted": "Group deleted",
     "groupDeleteTitle": "Delete group",
@@ -977,13 +975,15 @@
     "ungrouped": "No group",
     "group": "Group",
     "groupName": "Group name",
+    "groupNameHint": "Optional. Left empty, the commands go in no group and the description goes on each rule.",
     "groupNamePlaceholder": "git",
     "groupNameTaken": "A group with this name exists",
     "groupDecision": "What to do by default",
     "groupCommands": "Commands",
     "groupCommandsHint": "One command per line. Change what to do for each line below.",
     "expand": "Expand",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "groupPartial": "{{on}} of {{count}} rules on"
   },
   "scripts": {
     "search": "Search scripts",

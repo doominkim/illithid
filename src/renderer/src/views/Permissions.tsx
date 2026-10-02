@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  FolderPlus,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -28,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { commandLine, parseCommand, type PermissionDecision } from '../../../engine/permissions'
-import type { CommandRule, PermissionRules, RuleGroup } from '../../../shared/api'
+import type { CommandRule, PermissionRules, RuleGroup, ToolId } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyState } from '../components/EmptyState'
@@ -43,6 +42,7 @@ import { runWrite } from '../lib/mutate'
 import { useNav } from '../lib/nav'
 import { problemText } from '../lib/problemReason'
 import { useReload } from '../lib/reload'
+import { useToggleBusy } from '../lib/toggleBusy'
 import { pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
 import { useApi } from '../lib/useApi'
 
@@ -61,6 +61,9 @@ const DECISION_COLOR: Record<PermissionDecision, string> = {
   allow: 'teal'
 }
 
+/** Right padding of a list row (.ac-row) plus the card border, so a group's pills line up with its rules' */
+const ROW_PAD = 15
+
 const commandText = (r: CommandRule): string => r.argv.join(' ')
 /** A command has one rule: its words and whether it is exact identify it */
 const ruleKey = (r: Pick<CommandRule, 'argv' | 'exact'>): string =>
@@ -75,13 +78,14 @@ function Permissions(): React.JSX.Element {
   const { navigate } = useNav()
   const { data, error } = useApi('permissions', () => window.api.permissions())
   const [query, setQuery] = useState('')
-  // ruleKey of the open rule, NEW for a new rule, null when closed
+  // ruleKey of the open rule, null when closed
   const [selected, setSelected] = useState<string | null>(null)
-  // name of the open group, NEW for a new group, null when closed
+  // name of the open group, NEW for new rules, null when closed
   const [groupSel, setGroupSel] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
+  const busy = useToggleBusy()
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -122,13 +126,28 @@ function Permissions(): React.JSX.Element {
     setConfirmGroupDelete(false)
     if (ok) setGroupSel(null)
   }
-  const toggle = (name: string): void =>
+  const fold = (name: string): void =>
     setCollapsed((prev) => {
       const next = new Set(prev)
       if (next.has(name)) next.delete(name)
       else next.add(name)
       return next
     })
+
+  /** Copilot keeps only block rules, and Grok reads Claude Code's: those pills can't be turned */
+  const turnable = (r: CommandRule, tool: ToolId): boolean => {
+    const st = data.tools[tool]
+    if (!st || st === 'notApplicable' || st === 'viaClaude') return false
+    return tool !== 'copilot' || r.decision === 'deny'
+  }
+  const isOn = (r: CommandRule, tool: ToolId): boolean => !r.off?.includes(tool)
+  const withTool = (r: CommandRule, tool: ToolId, on: boolean): CommandRule => {
+    const off = (r.off ?? []).filter((x) => x !== tool)
+    if (!on) off.push(tool)
+    const next: CommandRule = { ...r, off }
+    if (!off.length) delete next.off
+    return next
+  }
 
   const pillsOf = (r: CommandRule): PillMap =>
     Object.fromEntries(
@@ -141,9 +160,10 @@ function Permissions(): React.JSX.Element {
           return [tool, { on: false, na: true }]
         }
         if (st === 'viaClaude')
-          return [tool, { on: true, via: true, hint: t('permissions.grokViaClaude') }]
+          return [tool, { on: isOn(r, 'claude'), via: true, hint: t('permissions.grokViaClaude') }]
         if (tool === 'copilot' && r.decision !== 'deny')
           return [tool, { on: false, hint: t('permissions.copilotNo') }]
+        if (!isOn(r, tool)) return [tool, { on: false, pending: st === 'needsSync' }]
         const hint =
           st === 'error'
             ? problemText(t, data.reasons?.[tool])
@@ -155,6 +175,69 @@ function Permissions(): React.JSX.Element {
         return [tool, { ...pillFromCellState(st), on: true, ...(hint ? { hint } : {}) }]
       })
     ) as PillMap
+
+  /** A group's pill per tool: on when all its rules that tool can take are on */
+  const groupPills = (rules: CommandRule[]): PillMap =>
+    Object.fromEntries(
+      TOOLS.map((tool) => {
+        const st = data.tools[tool]
+        if (st === 'viaClaude') {
+          const on = rules.filter((r) => isOn(r, 'claude')).length
+          return [
+            tool,
+            { on: on === rules.length, via: true, hint: t('permissions.grokViaClaude') }
+          ]
+        }
+        const can = rules.filter((r) => turnable(r, tool))
+        if (!can.length)
+          // Shown like its rules' pills: Copilot with only ask or allow rules is off, not hidden
+          return [
+            tool,
+            tool === 'copilot' && st
+              ? { on: false, hint: t('permissions.copilotNo') }
+              : { on: false, na: true }
+          ]
+        const on = can.filter((r) => isOn(r, tool)).length
+        return [
+          tool,
+          {
+            on: on === can.length,
+            pending: st === 'needsSync',
+            ...(on > 0 && on < can.length
+              ? { hint: t('permissions.groupPartial', { on, count: can.length }) }
+              : {})
+          }
+        ]
+      })
+    ) as PillMap
+
+  const turn = async (key: string, tool: ToolId, next: CommandRule[]): Promise<void> => {
+    await busy.run(key, tool, () =>
+      runWrite(window.api.permissionsSave({ groups, commands: next }), {
+        success: t('toggles.saved')
+      })
+    )
+    reload()
+  }
+  const toggleRule = (r: CommandRule, tool: ToolId): void => {
+    if (!turnable(r, tool)) return
+    void turn(
+      ruleKey(r),
+      tool,
+      commands.map((x) => (x === r ? withTool(x, tool, !isOn(x, tool)) : x))
+    )
+  }
+  const toggleGroup = (g: RuleGroup, tool: ToolId): void => {
+    const can = commands.filter((r) => r.group === g.name && turnable(r, tool))
+    if (!can.length) return
+    // All on → all off; otherwise all on
+    const on = !can.every((r) => isOn(r, tool))
+    void turn(
+      `group:${g.name}`,
+      tool,
+      commands.map((x) => (can.includes(x) ? withTool(x, tool, on) : x))
+    )
+  }
 
   const q = query.trim().toLowerCase()
   const ruleMatches = (r: CommandRule): boolean =>
@@ -198,7 +281,14 @@ function Permissions(): React.JSX.Element {
         </>
       }
       subtitle={r.description || undefined}
-      right={<ToolPills pills={pillsOf(r)} size={18} />}
+      right={
+        <ToolPills
+          pills={pillsOf(r)}
+          size={18}
+          onToggle={(tool) => toggleRule(r, tool)}
+          busy={busy.of(ruleKey(r))}
+        />
+      }
       active={ruleKey(r) === selected}
       onClick={() => openRule(ruleKey(r))}
     />
@@ -213,17 +303,8 @@ function Permissions(): React.JSX.Element {
           <>
             <Button
               size="xs"
-              variant="default"
-              leftSection={<FolderPlus size={13} />}
-              onClick={() => openGroup(NEW)}
-              data-testid="perm-group-new"
-            >
-              {t('permissions.newGroup')}
-            </Button>
-            <Button
-              size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => openRule(NEW)}
+              onClick={() => openGroup(NEW)}
               data-testid="perm-new"
             >
               {t('permissions.new')}
@@ -268,7 +349,7 @@ function Permissions(): React.JSX.Element {
                     variant="subtle"
                     color="gray"
                     size="sm"
-                    onClick={() => toggle(g.name)}
+                    onClick={() => fold(g.name)}
                     aria-label={t(closed ? 'permissions.expand' : 'permissions.collapse')}
                   >
                     {closed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -290,6 +371,15 @@ function Permissions(): React.JSX.Element {
                       </Text>
                     )}
                   </UnstyledButton>
+                  <Box style={{ flex: 1 }} />
+                  <Box data-testid="perm-group-tools" pr={ROW_PAD}>
+                    <ToolPills
+                      pills={groupPills(commands.filter((r) => r.group === g.name))}
+                      size={18}
+                      onToggle={(tool) => toggleGroup(g, tool)}
+                      busy={busy.of(`group:${g.name}`)}
+                    />
+                  </Box>
                 </Group>
                 {!closed && <ListCard>{byDecision(rows).map(ruleRow)}</ListCard>}
               </Stack>
@@ -332,29 +422,6 @@ function Permissions(): React.JSX.Element {
       </Stack>
 
       <DetailSheet
-        opened={selected === NEW}
-        onClose={() => setSelected(null)}
-        title={t('permissions.new')}
-      >
-        {selected === NEW && (
-          <RuleForm
-            taken={commands}
-            groups={groups}
-            onSubmit={async (rule) => {
-              const ok = await save(
-                { groups, commands: [...commands, rule] },
-                t('permissions.created')
-              )
-              if (ok) setSelected(null)
-            }}
-            onCancel={() => setSelected(null)}
-            submitLabel={t('common.create')}
-            submitTestId="perm-create"
-          />
-        )}
-      </DetailSheet>
-
-      <DetailSheet
         opened={!!current}
         onClose={() => setSelected(null)}
         title={current ? commandText(current) : ''}
@@ -364,7 +431,12 @@ function Permissions(): React.JSX.Element {
       >
         {current && (
           <Stack gap="lg">
-            <ToolPills pills={pillsOf(current)} size={20} />
+            <ToolPills
+              pills={pillsOf(current)}
+              size={20}
+              onToggle={(tool) => toggleRule(current, tool)}
+              busy={busy.of(ruleKey(current))}
+            />
             <RuleForm
               key={selected}
               initial={current}
@@ -387,7 +459,7 @@ function Permissions(): React.JSX.Element {
       <DetailSheet
         opened={groupSel === NEW}
         onClose={() => setGroupSel(null)}
-        title={t('permissions.newGroup')}
+        title={t('permissions.new')}
       >
         {groupSel === NEW && (
           <GroupForm
@@ -396,14 +468,17 @@ function Permissions(): React.JSX.Element {
             takenNames={groups.map((g) => g.name)}
             onSubmit={async (group, rules) => {
               const ok = await save(
-                { groups: [...groups, group], commands: [...commands, ...rules] },
-                t('permissions.groupCreated')
+                {
+                  groups: group ? [...groups, group] : groups,
+                  commands: [...commands, ...rules]
+                },
+                t('permissions.created')
               )
               if (ok) setGroupSel(null)
             }}
             onCancel={() => setGroupSel(null)}
             submitLabel={t('common.create')}
-            submitTestId="perm-group-create"
+            submitTestId="perm-create"
           />
         )}
       </DetailSheet>
@@ -424,6 +499,7 @@ function Permissions(): React.JSX.Element {
             taken={commands.filter((r) => r.group !== currentGroup.name)}
             takenNames={groups.filter((g) => g !== currentGroup).map((g) => g.name)}
             onSubmit={async (group, rules) => {
+              if (!group) return
               const ok = await save(
                 {
                   groups: groups.map((g) => (g === currentGroup ? group : g)),
@@ -489,31 +565,29 @@ function DecisionPicker({
   )
 }
 
-/** Command, decision, exact, group, description */
+/** Edits one rule: command, decision, exact, group, description */
 function RuleForm({
   initial,
   taken,
   groups,
   onSubmit,
-  onCancel,
   submitLabel,
   submitTestId
 }: {
-  initial?: CommandRule
+  initial: CommandRule
   /** The other rules (a command may have one rule) */
   taken: CommandRule[]
   groups: RuleGroup[]
   onSubmit: (rule: CommandRule) => Promise<void>
-  onCancel?: () => void
   submitLabel: string
   submitTestId: string
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [text, setText] = useState(initial ? commandText(initial) : '')
-  const [decision, setDecision] = useState<PermissionDecision>(initial?.decision ?? 'deny')
-  const [exact, setExact] = useState(initial?.exact ?? false)
-  const [group, setGroup] = useState<string | null>(initial?.group ?? null)
-  const [description, setDescription] = useState(initial?.description ?? '')
+  const [text, setText] = useState(commandText(initial))
+  const [decision, setDecision] = useState<PermissionDecision>(initial.decision)
+  const [exact, setExact] = useState(initial.exact)
+  const [group, setGroup] = useState<string | null>(initial.group ?? null)
+  const [description, setDescription] = useState(initial.description ?? '')
   const [busy, setBusy] = useState(false)
   const argv = parseCommand(text)
   const dup = taken.some(
@@ -526,7 +600,7 @@ function RuleForm({
     ...(description.trim() ? { description: description.trim() } : {}),
     ...(group ? { group } : {})
   }
-  const dirty = !initial || JSON.stringify(rule) !== JSON.stringify(initial)
+  const dirty = JSON.stringify(rule) !== JSON.stringify(initial)
   const submit = async (): Promise<void> => {
     setBusy(true)
     await onSubmit(rule)
@@ -583,11 +657,6 @@ function RuleForm({
         onChange={(e) => setDescription(e.currentTarget.value)}
       />
       <Group justify="flex-end" gap="xs">
-        {onCancel && (
-          <Button size="xs" variant="default" onClick={onCancel}>
-            {t('common.cancel')}
-          </Button>
-        )}
         <Button
           size="xs"
           loading={busy}
@@ -603,8 +672,9 @@ function RuleForm({
 }
 
 /**
- * Name, description, default decision and the group's commands, one per line. Each line gets its own decision; a line
- * starts with the default, and a line that was already a rule keeps its decision, exact and description
+ * New rules, or a group's rules: group name, description, default decision and the commands, one per line. Each line gets its
+ * own decision; a line starts with the default, and a line that was already a rule keeps its decision, exact and description.
+ * New rules may leave the group name empty: they go in no group, and the description goes on each rule
  */
 function GroupForm({
   initial,
@@ -623,7 +693,8 @@ function GroupForm({
   taken: CommandRule[]
   /** Names of the other groups */
   takenNames: string[]
-  onSubmit: (group: RuleGroup, rules: CommandRule[]) => Promise<void>
+  /** group is null for new rules with no group name */
+  onSubmit: (group: RuleGroup | null, rules: CommandRule[]) => Promise<void>
   onCancel?: () => void
   submitLabel: string
   submitTestId: string
@@ -653,23 +724,28 @@ function GroupForm({
       const dup =
         seen.has(key) || taken.some((r) => r.exact === exact && JSON.stringify(r.argv) === key)
       seen.add(key)
+      const own = trimmed ? member?.description : description.trim()
       const rule: CommandRule = {
         decision: picks[key] ?? decision,
         argv,
         exact,
-        ...(member?.description ? { description: member.description } : {}),
-        group: trimmed
+        ...(own ? { description: own } : {}),
+        ...(trimmed ? { group: trimmed } : {})
       }
       return { key, rule, dup }
     })
-  const group: RuleGroup = {
-    name: trimmed,
-    ...(description.trim() ? { description: description.trim() } : {}),
-    decision
-  }
+  const group: RuleGroup | null = trimmed
+    ? {
+        name: trimmed,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        decision
+      }
+    : null
   const rules = lines.map((l) => l.rule)
   const dirty = !initial || JSON.stringify([group, rules]) !== JSON.stringify([initial, members])
-  const valid = !!trimmed && !nameTaken && lines.length > 0 && !lines.some((l) => l.dup)
+  // A group keeps its name; new rules may have none
+  const valid =
+    (!!trimmed || !initial) && !nameTaken && lines.length > 0 && !lines.some((l) => l.dup)
   const submit = async (): Promise<void> => {
     setBusy(true)
     await onSubmit(group, rules)
@@ -679,6 +755,7 @@ function GroupForm({
     <Stack gap="md" maw={560}>
       <TextInput
         label={t('permissions.groupName')}
+        description={initial ? undefined : t('permissions.groupNameHint')}
         placeholder={t('permissions.groupNamePlaceholder')}
         value={name}
         onChange={(e) => setName(e.currentTarget.value)}

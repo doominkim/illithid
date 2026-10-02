@@ -218,3 +218,35 @@ test('REQ-PERM-MODEL-8 a rule written back as a line types the same words again'
   assert.equal(commandLine(['git', 'push', '--force']), 'git push --force')
   assert.equal(commandLine(['rm', '/tmp/a b']), "rm '/tmp/a b'")
 })
+
+test('REQ-PERM-MODEL-9 a rule keeps the tools it is off for; an unknown tool is refused', () => {
+  const home = demoHome()
+  savePermissionRules(home, {
+    commands: [
+      {
+        decision: 'deny',
+        argv: ['git', 'push', '--force'],
+        exact: false,
+        off: ['codex', 'gemini']
+      },
+      { decision: 'allow', argv: ['ls'], exact: false, off: [] }
+    ]
+  })
+  assert.deepEqual(json(home).bashDeny, [
+    { argv: ['git', 'push', '--force'], off: ['codex', 'gemini'] }
+  ])
+  assert.deepEqual(json(home).bash, [['ls']])
+  assert.deepEqual(permissionRules(readPermissions(home)!).commands[1], {
+    decision: 'deny',
+    argv: ['git', 'push', '--force'],
+    exact: false,
+    off: ['codex', 'gemini']
+  })
+  assert.throws(
+    () =>
+      savePermissionRules(home, {
+        commands: [{ decision: 'deny', argv: ['x'], exact: false, off: ['nope' as 'codex'] }]
+      }),
+    { code: 'invalidSchema' }
+  )
+})

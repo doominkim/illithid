@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator } from 'playwright-core'
-import { createHook } from '../src/engine'
+import { createHook, savePermissionRules } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
 async function launch(
@@ -60,11 +60,13 @@ test(
       const row = (command: string): Locator =>
         page.getByTestId('perm-ungrouped').locator('.ac-row', { hasText: command })
 
-      // New rule: the typed command is shown as the words each tool matches; Block is the default
+      // New rule with no group name: it goes in no group, with Block (the default) and the description
       await page.getByTestId('perm-new').click()
-      await page.getByTestId('perm-command').fill('git push --force')
-      await page.getByTestId('perm-argv').getByText('--force', { exact: true }).waitFor()
+      await page.getByTestId('perm-group-commands').fill('git push --force')
+      await page.getByTestId('perm-line').getByText('git push --force').waitFor()
+      await page.getByTestId('perm-group-description').fill('never')
       await page.getByTestId('perm-create').click()
+      await row('git push --force').getByText('never').waitFor()
       await page.getByTestId('perm-ungrouped').getByText('git push --force').waitFor()
       await row('git push --force').getByTestId('perm-badge-deny').waitFor()
       await synced()
@@ -122,15 +124,15 @@ test(
         page.getByTestId('perm-line').filter({ hasText: command })
       await page.locator('[data-menu="permissions"]').click()
 
-      // New group: Block by default; one line is changed to Allow
-      await page.getByTestId('perm-group-new').click()
+      // New rules in a group: Block by default; one line is changed to Allow
+      await page.getByTestId('perm-new').click()
       await page.getByTestId('perm-group-name').fill('git')
       await page.getByTestId('perm-group-description').fill('Hard to undo')
       await page
         .getByTestId('perm-group-commands')
         .fill('git push --force\ngit reset --hard\n\ngit status')
       await line('git status').getByText('Allow', { exact: true }).click()
-      await page.getByTestId('perm-group-create').click()
+      await page.getByTestId('perm-create').click()
       const section = page.locator('[data-testid="perm-group"][data-group="git"]')
       await section.getByText('Hard to undo').waitFor()
       await section.getByText('git reset --hard').waitFor()
@@ -164,7 +166,7 @@ test(
 
       // A line that another rule already has is refused
       await page.getByTestId('perm-new').click()
-      await page.getByTestId('perm-command').fill('ls')
+      await page.getByTestId('perm-group-commands').fill('ls')
       await page.getByTestId('perm-create').click()
       await page.getByTestId('perm-ungrouped').getByText('ls', { exact: true }).waitFor()
       await renamed.getByTestId('perm-group-open').click()
@@ -181,6 +183,66 @@ test(
       assert.deepEqual(claude().permissions?.deny, ['Bash(ls:*)'])
       assert.deepEqual(claude().permissions?.allow, [])
       assert.equal(lib().groups, undefined)
+    } finally {
+      await app.close()
+    }
+  }
+)
+
+test(
+  'REQ-PERM-UI-3 a tool icon turns one rule off for that tool; a group icon turns all its rules',
+  { timeout: 180000 },
+  async () => {
+    const { home, app } = await launch(['claude', 'codex'], (home) =>
+      savePermissionRules(home, {
+        groups: [{ name: 'git', decision: 'deny' }],
+        commands: [
+          { decision: 'deny', argv: ['git', 'push', '--force'], exact: false, group: 'git' },
+          { decision: 'deny', argv: ['git', 'reset', '--hard'], exact: false, group: 'git' },
+          { decision: 'deny', argv: ['rm'], exact: false }
+        ]
+      })
+    )
+    try {
+      const page = await app.firstWindow()
+      const synced = (): Promise<void> =>
+        page.locator('[data-testid="sync-button"][data-state="synced"]').waitFor({ timeout: 30000 })
+      const claudeDeny = (): string[] | undefined =>
+        JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')).permissions?.deny
+      const codex = (): string => readFileSync(join(home, '.codex/rules/default.rules'), 'utf8')
+      const group = page.locator('[data-testid="perm-group"][data-group="git"]')
+      const pill = (scope: Locator, tool: string): Locator =>
+        scope.locator(`button:has([data-tool="${tool}"])`)
+      await page.locator('[data-menu="permissions"]').click()
+      await synced()
+
+      // One rule off for Codex: Codex drops it, Claude Code keeps it
+      const force = group.locator('.ac-row', { hasText: 'git push --force' })
+      await pill(force, 'codex').click()
+      await force.locator('[data-tool="codex"][data-off]').waitFor()
+      await synced()
+      assert.doesNotMatch(codex(), /"--force"/)
+      assert.match(codex(), /"--hard"/)
+      assert.deepEqual(claudeDeny(), [
+        'Bash(git push --force:*)',
+        'Bash(git reset --hard:*)',
+        'Bash(rm:*)'
+      ])
+
+      // The group icon turns every rule in the group off for Claude Code, then on again
+      const head = group.getByTestId('perm-group-tools')
+      await pill(head, 'claude').click()
+      await head.locator('[data-tool="claude"][data-off]').waitFor()
+      await synced()
+      assert.deepEqual(claudeDeny(), ['Bash(rm:*)'])
+      await pill(head, 'claude').click()
+      await head.locator('[data-tool="claude"]:not([data-off])').waitFor()
+      await synced()
+      assert.deepEqual(claudeDeny(), [
+        'Bash(git push --force:*)',
+        'Bash(git reset --hard:*)',
+        'Bash(rm:*)'
+      ])
     } finally {
       await app.close()
     }

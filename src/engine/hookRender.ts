@@ -16,6 +16,7 @@ import { renderAskPrompt, renderPermissionGuard, toolScript } from './hookScript
 import { isEnabled, type Manifest } from './manifest'
 import { grokClaudeReading } from './targets/grokCompat'
 import { normalizeEntry } from './text'
+import { allowlistFor } from './permissions'
 import type { Allowlist } from './types'
 
 /** Tool home relative to HOME */
@@ -89,7 +90,7 @@ const PERMISSION_HOOK_TRIGGER: Partial<Record<HookTool, HookTrigger>> = {
 
 function permissionHook(tool: HookTool, allowlist: Allowlist | null): ToolHook[] {
   const trigger = PERMISSION_HOOK_TRIGGER[tool]
-  const deny = (allowlist?.bashDeny ?? []).map(normalizeEntry)
+  const deny = (allowlist ? (allowlistFor(allowlist, tool).bashDeny ?? []) : []).map(normalizeEntry)
   if (!trigger || !deny.length) return []
   const hook: LibraryHook = {
     name: PERMISSION_HOOK,

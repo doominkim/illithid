@@ -741,7 +741,7 @@ export function permissions(home: string, env: Env): PermissionsData {
   } catch {
     // copies unknown
   }
-  const hasDeny = rules.commands.some((r) => r.decision === 'deny')
+  const hasDeny = rules.commands.some((r) => r.decision === 'deny' && !r.off?.includes('copilot'))
   const tools: PermissionsData['tools'] = {}
   const reasons: Partial<Record<ToolId, string>> = {}
   for (const tool of inUse) {

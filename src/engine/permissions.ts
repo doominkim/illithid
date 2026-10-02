@@ -2,9 +2,11 @@
  * Permission rules as the app edits them: one list of shell command rules, each allow / ask / deny, optionally in a named group.
  * Stored in permissions.json beside the older allow-only shape (types.ts Allowlist): bash = allow, bashAsk, bashDeny. A rule's
  * group is its `group` field; the groups' order, description and default decision are the top-level `groups` list. Groups only
- * organize the menu — the tools get the same rules either way.
+ * organize the menu — the tools get the same rules either way. A rule's `off` lists the tools it is turned off for; each tool
+gets only the rules that are on for it (allowlistFor).
  * Dependency-free so the renderer can use it too.
  */
+import { TOOL_IDS, type ToolId } from './toolIds'
 import type { Allowlist, AllowlistEntry } from './types'
 
 export const PERMISSION_DECISIONS = ['deny', 'ask', 'allow'] as const
@@ -19,6 +21,8 @@ export interface CommandRule {
   description?: string
   /** Name of the group the rule is in */
   group?: string
+  /** Tools the rule is turned off for */
+  off?: ToolId[]
 }
 
 /** A named set of rules */
@@ -52,18 +56,28 @@ function entryRule(decision: PermissionDecision, e: AllowlistEntry): CommandRule
     argv: e.argv,
     exact: !!e.claudeExact,
     ...(description ? { description } : {}),
-    ...(e.group ? { group: e.group } : {})
+    ...(e.group ? { group: e.group } : {}),
+    ...(e.off?.length ? { off: e.off as ToolId[] } : {})
   }
 }
 
 function ruleEntry(r: CommandRule): AllowlistEntry {
-  if (!r.exact && !r.description && !r.group) return r.argv
+  const off = r.off?.length ? r.off : undefined
+  if (!r.exact && !r.description && !r.group && !off) return r.argv
   return {
     argv: r.argv,
     ...(r.exact ? { claudeExact: true } : {}),
     ...(r.description ? { description: r.description } : {}),
-    ...(r.group ? { group: r.group } : {})
+    ...(r.group ? { group: r.group } : {}),
+    ...(off ? { off } : {})
   }
+}
+
+/** The rules a tool gets: permissions.json without the rules turned off for it */
+export function allowlistFor(a: Allowlist, tool: ToolId): Allowlist {
+  const on = (list: AllowlistEntry[] | undefined): AllowlistEntry[] | undefined =>
+    list?.filter((e) => Array.isArray(e) || !e.off?.includes(tool))
+  return { ...a, bash: on(a.bash) ?? [], bashAsk: on(a.bashAsk), bashDeny: on(a.bashDeny) }
 }
 
 function storedGroup(g: RuleGroup): RuleGroup {
@@ -132,6 +146,8 @@ export function ruleProblems(rules: PermissionRules): string[] {
     else seen.set(key, i)
     if (r.group !== undefined && !(rules.groups ?? []).some((g) => g.name === r.group))
       errs.push(`commands[${i}]: no such group`)
+    if (r.off !== undefined && (!Array.isArray(r.off) || !r.off.every((x) => TOOL_IDS.includes(x))))
+      errs.push(`commands[${i}]: unknown tool in off`)
   })
   const names = new Set<string>()
   ;(rules.groups ?? []).forEach((g, i) => {
