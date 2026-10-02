@@ -304,6 +304,7 @@ export {
   deleteMemoryFile,
   listMcpServers,
   readMcpServer,
+  setMcpKnownTools,
   readMcpOrderList,
   writeMcpOrder,
   upsertMcpServer,

@@ -1191,6 +1191,20 @@ function secretFail(e: unknown): never {
   throw e
 }
 
+/** Tool names a server reported (its meta key `_.tools`, never sent to a tool); other meta is kept */
+export function setMcpKnownTools(home: string, name: string, tools: string[]): string {
+  const raw = readMcpServer(home, name) as Record<string, unknown>
+  const prev = raw._
+  const meta: Record<string, unknown> = isObj(prev)
+    ? { ...prev }
+    : typeof prev === 'string'
+      ? { note: prev }
+      : {}
+  meta.tools = [...new Set(tools.filter((t) => typeof t === 'string' && t))].sort()
+  upsertMcpServer(home, name, { ...(raw as McpServer), _: meta })
+  return mcpPath(home, name)
+}
+
 /**
  * Add or replace a server (atomic write of mcps/<name>.json). If the new definition lacks `_` meta, the existing file's `_` is kept.
  * Validation errors throw LibraryError('invalidSchema'); suspected secret literals are returned as warnings.
