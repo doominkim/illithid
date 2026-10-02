@@ -234,3 +234,21 @@ test('REQ-HOOKS-LIB-8 a script hook before or after a tool call can target shell
   assert.deepEqual(hookTriggers({ ...doc('shell'), when: 'stop' }).claude, { event: 'Stop' })
   assert.ok(validateHookDoc({ ...doc(), options: { target: 'files' } }).length > 0)
 })
+
+test("REQ-HOOKS-LIB-9 a plain-language check before shell commands only reaches each tool's shell tool", () => {
+  const doc: HookDoc = {
+    description: '',
+    when: 'before-tool',
+    action: 'ask',
+    options: hookOptions('ask', { target: 'shell' }),
+    body: 'Never push to main.'
+  }
+  const t = hookTriggers(doc)
+  assert.deepEqual(t.claude, { event: 'PreToolUse', matcher: 'Bash', timeout: 120 })
+  assert.deepEqual(t.gemini, { event: 'BeforeTool', matcher: 'run_shell_command', timeout: 120 })
+  // Default: every action
+  assert.deepEqual(hookTriggers({ ...doc, options: hookOptions('ask', {}) }).claude, {
+    event: 'PreToolUse',
+    timeout: 120
+  })
+})

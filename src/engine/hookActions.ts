@@ -184,8 +184,8 @@ export const HOOK_ACTION_INFO: Readonly<Record<HookAction, HookActionInfo>> = {
   ask: {
     timings: ['stop', 'before-tool', 'prompt'],
     timeout: 120,
-    choices: { judge: JUDGE_CLIS },
-    defaults: { verbatim: false, judge: 'same', model: '' }
+    choices: { judge: JUDGE_CLIS, target: SCRIPT_TARGETS },
+    defaults: { verbatim: false, judge: 'same', model: '', target: 'all' }
   },
   // use: a library script (scripts/<name>.sh) instead of the hook's own run.sh
   // target (before/after a tool call): every call, shell commands or file edits
@@ -216,7 +216,8 @@ export function actionMatcher(
   when?: HookTiming,
   options?: Record<string, unknown>
 ): string | undefined {
-  if (action === 'script') {
+  // Script hooks and plain-language checks pick their own target (every action, shell commands, file edits)
+  if (action === 'script' || action === 'ask') {
     if (when !== 'before-tool' && when !== 'after-tool') return undefined
     const target = options?.target
     return target === 'shell' ? SHELL[tool] : target === 'edit' ? EDIT_ALL[tool] : undefined
