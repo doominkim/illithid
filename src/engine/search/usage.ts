@@ -8,7 +8,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { ToolCall } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 
-export const USAGE_SCHEMA = '2'
+export const USAGE_SCHEMA = '3'
 
 export type UsageKind = 'skill' | 'mcp'
 /** `mcpRaw`: OpenCode names MCP tools `<server>_<tool>`; the server is matched by prefix at query time */
@@ -54,6 +54,7 @@ export function ensureUsage(db: DatabaseSync): boolean {
       tool text not null,
       kind text not null,
       name text not null,
+      item text not null default '',
       model text not null,
       day text not null,
       n integer not null
@@ -79,7 +80,19 @@ function str(v: unknown): string | undefined {
 }
 
 /** Classify one call. Codex skills yield every SKILL.md path in the call */
-export function classify(tool: string, call: ToolCall): { kind: StoredKind; name: string }[] {
+/** An MCP tool name worth keeping ({} otherwise) */
+function toolItem(tool: string): { item?: string } {
+  return str(tool) ? { item: tool } : {}
+}
+
+/** One usage: a skill, or an MCP server with the tool called on it (`item`; OpenCode's mcpRaw name carries the tool itself) */
+export interface UsageHit {
+  kind: StoredKind
+  name: string
+  item?: string
+}
+
+export function classify(tool: string, call: ToolCall): UsageHit[] {
   const input = call.input as Json | undefined
   switch (tool) {
     case 'claude': {
@@ -93,15 +106,16 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
         return n ? [{ kind: 'skill', name: n }] : []
       }
       if (call.name.startsWith('mcp__')) {
-        const n = str(call.name.split('__')[1])
-        return n ? [{ kind: 'mcp', name: n }] : []
+        const [, server, ...rest] = call.name.split('__')
+        const n = str(server)
+        return n ? [{ kind: 'mcp', name: n, ...toolItem(rest.join('__')) }] : []
       }
       return []
     }
     case 'codex': {
       if (call.namespace?.startsWith('mcp__')) {
         const n = str(call.namespace.slice(5))
-        return n ? [{ kind: 'mcp', name: n }] : []
+        return n ? [{ kind: 'mcp', name: n, ...toolItem(call.name) }] : []
       }
       if (call.name === 'apply_patch') return []
       const text = typeof call.input === 'string' ? call.input : JSON.stringify(call.input ?? '')
@@ -128,8 +142,9 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
       }
       // MCP tools are registered as <server>__<tool>
       if (call.name.includes('__')) {
-        const n = str(call.name.split('__')[0])
-        return n ? [{ kind: 'mcp', name: n }] : []
+        const [server, ...rest] = call.name.split('__')
+        const n = str(server)
+        return n ? [{ kind: 'mcp', name: n, ...toolItem(rest.join('__')) }] : []
       }
       return []
     }
@@ -137,8 +152,9 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
       // MCP tools are reached through use_tool with the qualified catalog key <server>__<tool>
       if (call.name === 'use_tool') {
         const key = typeof input?.tool_name === 'string' ? input.tool_name : ''
-        const n = key.includes('__') ? str(key.split('__')[0]) : undefined
-        return n ? [{ kind: 'mcp', name: n }] : []
+        const [server, ...rest] = key.split('__')
+        const n = key.includes('__') ? str(server) : undefined
+        return n ? [{ kind: 'mcp', name: n, ...toolItem(rest.join('__')) }] : []
       }
       return []
     }
@@ -151,7 +167,7 @@ export function classify(tool: string, call: ToolCall): { kind: StoredKind; name
 export class UsageCounter {
   readonly rows = new Map<
     string,
-    { kind: StoredKind; name: string; model: string; day: string; n: number }
+    { kind: StoredKind; name: string; item: string; model: string; day: string; n: number }
   >()
   private readonly seenTurn = new Set<string>()
 
@@ -161,7 +177,7 @@ export class UsageCounter {
   ) {}
 
   add(call: ToolCall): void {
-    for (const { kind, name } of classify(this.tool, call)) {
+    for (const { kind, name, item = '' } of classify(this.tool, call)) {
       if (this.tool === 'codex' && kind === 'skill') {
         const k = `${call.turn ?? 0}\u0000${name}`
         if (this.seenTurn.has(k)) continue
@@ -169,10 +185,10 @@ export class UsageCounter {
       }
       const model = call.model ?? ''
       const day = dayOf(call.at, this.fallbackAt)
-      const key = `${kind}\u0000${name}\u0000${model}\u0000${day}`
+      const key = `${kind}\u0000${name}\u0000${item}\u0000${model}\u0000${day}`
       const cur = this.rows.get(key)
       if (cur) cur.n++
-      else this.rows.set(key, { kind, name, model, day, n: 1 })
+      else this.rows.set(key, { kind, name, item, model, day, n: 1 })
     }
   }
 }
@@ -260,6 +276,31 @@ function usageFilter(
     test: (r) =>
       (r.kind === 'mcp' && (r.name === name || r.name === key)) ||
       (r.kind === 'mcpRaw' && prefixes.some((p) => r.name.toLowerCase().startsWith(p)))
+  }
+}
+
+/** Tools an MCP server was called with in the local session logs, sorted ([] when there is nothing to read yet) */
+export function mcpToolNames(home: string, name: string, opts: { dbPath?: string } = {}): string[] {
+  const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
+  if (!db) return []
+  try {
+    if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return []
+    const f = usageFilter('mcp', name)
+    const rows = db
+      .prepare(`select distinct kind, name, item from usage where ${f.sql}`)
+      .all(...f.args) as { kind: string; name: string; item: string }[]
+    const prefixes = [`${name}_`, `${mcpKey(name)}_`].map((p) => p.toLowerCase())
+    const tools = new Set<string>()
+    for (const r of rows.filter(f.test)) {
+      if (r.kind === 'mcp' && r.item) tools.add(r.item)
+      if (r.kind === 'mcpRaw') {
+        const p = prefixes.find((x) => r.name.toLowerCase().startsWith(x))
+        if (p && r.name.length > p.length) tools.add(r.name.slice(p.length))
+      }
+    }
+    return [...tools].sort()
+  } finally {
+    db.close()
   }
 }
 

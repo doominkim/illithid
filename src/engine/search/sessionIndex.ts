@@ -303,7 +303,7 @@ export async function indexSessions(
     const delUsage = db.prepare('delete from usage where sid = ?')
     const delModel = MODEL_TABLES.map((t) => db.prepare(`delete from ${t} where sid = ?`))
     const insUsage = db.prepare(
-      'insert into usage(sid, tool, kind, name, model, day, n) values (?, ?, ?, ?, ?, ?, ?)'
+      'insert into usage(sid, tool, kind, name, item, model, day, n) values (?, ?, ?, ?, ?, ?, ?, ?)'
     )
 
     // Sessions that disappeared
@@ -456,7 +456,7 @@ export async function indexSessions(
         }
         delUsage.run(sid)
         for (const u of usage.rows.values())
-          insUsage.run(sid, s.tool, u.kind, u.name, u.model, u.day, u.n)
+          insUsage.run(sid, s.tool, u.kind, u.name, u.item, u.model, u.day, u.n)
         models.write(db, sid)
         finish.run(
           s.path,
