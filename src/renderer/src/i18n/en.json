@@ -1032,7 +1032,9 @@
         "all": "After"
       }
     },
-    "folderFiles": "Other files"
+    "folderFiles": "Other files",
+    "imported": "Imported",
+    "importedFrom": "Imported from {{tool}}"
   },
   "permissions": {
     "new": "New rule",

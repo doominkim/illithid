@@ -1032,7 +1032,9 @@
         "all": "실행 후"
       }
     },
-    "folderFiles": "다른 파일"
+    "folderFiles": "다른 파일",
+    "imported": "가져옴",
+    "importedFrom": "{{tool}} 에서 가져옴"
   },
   "permissions": {
     "new": "새 규칙",

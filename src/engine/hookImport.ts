@@ -467,7 +467,8 @@ export function applyHookCandidate(
       when: v.timing,
       action: v.action,
       options: v.action === 'ask' ? { verbatim: true } : use ? { use } : {},
-      body: v.prompt ?? ''
+      body: v.prompt ?? '',
+      importedFrom: tool
     }
     const s = toolSettings(base, tool, v.trigger)
     const doc: HookDoc = { ...base, ...(Object.keys(s).length ? { tools: { [tool]: s } } : {}) }

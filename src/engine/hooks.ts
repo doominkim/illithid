@@ -69,6 +69,8 @@ export interface HookDoc {
   toolScripts?: Partial<Record<HookTool, string>>
   /** ask: the instruction. Otherwise free notes */
   body: string
+  /** The tool it was imported from (left out for hooks made here) */
+  importedFrom?: HookTool
 }
 
 /** A tool's trigger for a hook: its own event, the matcher and timeout to write */
@@ -155,6 +157,8 @@ export function validateHookDoc(v: unknown): string[] {
     errors.push('options.use must be a script name')
   if (v.action === 'ask' && typeof v.body === 'string' && !v.body.trim())
     errors.push('ask needs an instruction')
+  if (v.importedFrom !== undefined && !(HOOK_TOOLS as readonly unknown[]).includes(v.importedFrom))
+    errors.push(`importedFrom: unknown tool ${String(v.importedFrom)}`)
   if (v.tools !== undefined) {
     if (!isObj(v.tools)) errors.push('tools must be an object')
     else
@@ -253,6 +257,7 @@ export function renderHookDoc(name: string, doc: HookDoc): string {
     ...(doc.toolScripts && Object.keys(doc.toolScripts).length
       ? [`toolScripts: ${y(doc.toolScripts)}`]
       : []),
+    ...(doc.importedFrom ? [`importedFrom: ${doc.importedFrom}`] : []),
     '---',
     ''
   ]
@@ -284,6 +289,7 @@ export function parseHookDoc(text: string, label = HOOK_FILE): HookDoc {
     options: d.options ?? {},
     ...(d.tools !== undefined ? { tools: d.tools } : {}),
     ...(d.toolScripts !== undefined ? { toolScripts: d.toolScripts } : {}),
+    ...(d.importedFrom !== undefined ? { importedFrom: d.importedFrom } : {}),
     body
   }
   const errors = validateHookDoc(raw)

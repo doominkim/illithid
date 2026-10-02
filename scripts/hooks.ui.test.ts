@@ -246,6 +246,9 @@ test(
       }
       assert.equal(s.hooks.PreToolUse.length, 1)
       assert.match(s.hooks.PreToolUse[0].hooks[0].command, /illithid\/guard\/run\.sh' claude$/)
+      // It is tagged as imported
+      await page.getByText('guard', { exact: true }).first().click()
+      await page.getByTestId('detail-sheet').getByTestId('hook-tag-imported').waitFor()
     } finally {
       await app.close()
     }

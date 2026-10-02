@@ -284,6 +284,8 @@ export interface HookView {
   reasons?: Partial<Record<ToolId, string>>
   /** Script copies edited in a tool since the last sync: tool → file */
   edited?: Partial<Record<ToolId, string>>
+  /** The tool it was imported from */
+  importedFrom?: HookTool
 }
 
 export interface HooksData {

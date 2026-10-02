@@ -1032,7 +1032,9 @@
         "all": "実行後"
       }
     },
-    "folderFiles": "他のファイル"
+    "folderFiles": "他のファイル",
+    "imported": "取り込み",
+    "importedFrom": "{{tool}} から取り込み"
   },
   "permissions": {
     "new": "新しいルール",

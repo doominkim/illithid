@@ -1032,7 +1032,9 @@
         "all": "执行后"
       }
     },
-    "folderFiles": "其他文件"
+    "folderFiles": "其他文件",
+    "imported": "已导入",
+    "importedFrom": "从 {{tool}} 导入"
   },
   "permissions": {
     "new": "新建规则",

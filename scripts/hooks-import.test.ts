@@ -20,9 +20,13 @@ import {
   readHook,
   readManifest,
   readScript,
+  saveHookDoc,
   syncAll
 } from '../src/engine'
+import { hooks as hooksView } from '../src/main/reads'
 import { baseEnv, buildDemoHome } from './readme-shots'
+
+const LIB_DIR = '.illithid/workspaces/default'
 
 function demoHome(tools: string[]): string {
   const home = mkdtempSync(join(tmpdir(), 'illithid-hooks-import-'))
@@ -83,6 +87,12 @@ test('REQ-HOOKS-IMPORT-1 Claude hooks come in as library hooks and their origina
     timeout: 10
   })
   assert.equal(lib.scripts['run.sh'], '#!/bin/sh\necho guard\n')
+  // Where it came from is kept with the hook
+  assert.equal(lib.doc.importedFrom, 'claude')
+  assert.match(
+    readFileSync(join(home, LIB_DIR, 'hooks/guard/HOOK.md'), 'utf8'),
+    /^importedFrom: claude$/m
+  )
   assert.match(
     readHook(home, 'claude-stop').scripts['run.sh'],
     /^#!\/usr\/bin\/env bash\nsay done\n/
@@ -343,4 +353,28 @@ test('REQ-HOOKS-IMPORT-9 a script that calls files next to it in a shared folder
   assert.equal(readManifest(home).manifest.hooks[c.name].claude, false)
   approved(home)
   assert.deepEqual(json(settings).hooks, original.hooks)
+})
+
+test('REQ-HOOKS-IMPORT-10 an imported hook says so: from its HOOK.md, or for an earlier import from its import backup', () => {
+  const home = demoHome(['claude'])
+  createHook(home, 'mine', { description: '', when: 'stop', action: 'notify', options: {} })
+  createHook(home, 'earlier', { description: '', when: 'stop', action: 'notify', options: {} })
+  const backup = join(
+    home,
+    '.config/illithid/backups/imported/2026-10-01T00-00-00-000Z/codex/hooks'
+  )
+  mkdirSync(backup, { recursive: true })
+  writeFileSync(join(backup, 'earlier.json'), '{}')
+  createHook(home, 'tagged', { description: '', when: 'stop', action: 'notify', options: {} })
+  const doc = readHook(home, 'tagged').doc
+  saveHookDoc(home, 'tagged', { ...doc, importedFrom: 'gemini' })
+  // Editing keeps it
+  saveHookDoc(home, 'tagged', { ...readHook(home, 'tagged').doc, description: 'edited' })
+  const from = Object.fromEntries(
+    hooksView(home, baseEnv(home)).hooks.map((h) => [h.name, h.importedFrom ?? null])
+  )
+  assert.deepEqual(from, { earlier: 'codex', mine: null, tagged: 'gemini' })
+  assert.throws(() => saveHookDoc(home, 'tagged', { ...doc, importedFrom: 'nope' as 'claude' }), {
+    code: 'invalidSchema'
+  })
 })

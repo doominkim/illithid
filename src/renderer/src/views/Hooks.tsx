@@ -15,7 +15,8 @@ import {
   Tabs,
   Text,
   Textarea,
-  TextInput
+  TextInput,
+  Tooltip
 } from '@mantine/core'
 import { Download, FolderOpen, Layers, Plus, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -386,6 +387,17 @@ function Hooks(): React.JSX.Element {
       <Badge variant="light" size="xs" fw={500}>
         {t(`hooks.actions.${h.action}.title`)}
       </Badge>
+      {h.importedFrom && (
+        <Tooltip
+          label={t('hooks.importedFrom', { tool: TOOL_NAME[h.importedFrom] })}
+          withArrow
+          openDelay={300}
+        >
+          <Badge variant="outline" color="gray" size="xs" fw={500} data-testid="hook-tag-imported">
+            {t('hooks.imported')}
+          </Badge>
+        </Tooltip>
+      )}
     </>
   )
   const cardTools = (h: HookView): ToolId[] => hookTools.filter((tool) => runsIn(h, tool))

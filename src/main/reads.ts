@@ -5,6 +5,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  importedBackupRoot,
+  type HookTool,
   buildContext,
   canonicalPaths,
   canonicalSkills,
@@ -607,6 +609,25 @@ export function runOp(
   }
 }
 
+/** Hook name → the tool an import backup (backups/imported/<time>/<tool>/hooks/<name>.json) says it came from */
+function importedHookTools(home: string): Map<string, HookTool> {
+  const out = new Map<string, HookTool>()
+  const root = importedBackupRoot(home)
+  const dirs = (p: string): string[] => {
+    try {
+      return readdirSync(p).sort()
+    } catch {
+      return []
+    }
+  }
+  for (const stamp of dirs(root))
+    for (const tool of dirs(join(root, stamp)))
+      if ((HOOK_TOOLS as readonly string[]).includes(tool))
+        for (const f of dirs(join(root, stamp, tool, 'hooks')))
+          if (f.endsWith('.json')) out.set(f.slice(0, -5), tool as HookTool)
+  return out
+}
+
 /** Hooks with per-tool state: the tool's config entry (before vs after the planned sync) and its script copies */
 export function hooks(home: string, env: Env): HooksData {
   const dir = tilde(home, hooksDir(home))
@@ -649,6 +670,8 @@ export function hooks(home: string, env: Env): HooksData {
         (x.hook === name || !!x.folder?.users.includes(name)) &&
         (x.action === 'copy' || x.action === 'update' || x.action === 'deleteCandidate')
     )
+  // Hooks imported before HOOK.md kept the source: their import backup names the tool
+  const importedBefore = importedHookTools(home)
   const view: HookView[] = list.map((h) => {
     const tools: Partial<Record<ToolId, HookToolState>> = {}
     const reasons: Partial<Record<ToolId, string>> = {}
@@ -686,6 +709,9 @@ export function hooks(home: string, env: Env): HooksData {
       }
     return {
       ...(Object.keys(edited).length ? { edited } : {}),
+      ...((h.doc.importedFrom ?? importedBefore.get(h.name))
+        ? { importedFrom: h.doc.importedFrom ?? importedBefore.get(h.name) }
+        : {}),
       name: h.name,
       description: h.doc.description,
       when: h.doc.when,
