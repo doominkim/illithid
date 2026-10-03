@@ -50,7 +50,7 @@
 
 ## エージェントが実行できるコマンドを決める
 
-シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。
+シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。 MCP サーバーも同じように決められます。サーバーの権限タブで全ツールの既定値を決め、ツールごとに個別に変えると、Claude Code、Codex、Gemini CLI、OpenCode に反映されます。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="force push と hard reset をブロックし git status を許可する git グループを 4 つのツールに反映"></p>
 

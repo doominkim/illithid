@@ -50,7 +50,7 @@
 
 ## 决定智能体可以运行哪些命令
 
-只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI 和 GitHub Copilot 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。
+只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI 和 GitHub Copilot 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。 MCP 服务器也一样：在服务器的权限标签页中为所有工具设置默认值，并单独调整某个工具，规则会应用到 Claude Code、Codex、Gemini CLI 和 OpenCode。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="一个阻止强制推送和硬重置、允许 git status 的 git 分组，应用到 4 个工具"></p>
 

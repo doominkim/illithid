@@ -50,7 +50,7 @@ Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot,
 
 ## Decide which commands agents can run.
 
-Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, and GitHub Copilot, each in its own format. Group related commands, and turn a rule off for a single tool.
+Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, and GitHub Copilot, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, and OpenCode.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="A git group that blocks force pushes and hard resets and allows git status, applied to four tools"></p>
 

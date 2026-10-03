@@ -50,7 +50,7 @@
 
 ## 에이전트가 실행할 수 있는 명령 정하기
 
-셸 명령을 허용, 물어보기, 막기 중 하나로 한 번 정하면 Illithid가 Claude Code, Codex, Gemini CLI, GitHub Copilot 에 각 툴의 형식으로 규칙을 씁니다. 관련 명령을 그룹으로 묶고, 특정 툴에서만 규칙을 끌 수 있습니다.
+셸 명령을 허용, 물어보기, 막기 중 하나로 한 번 정하면 Illithid가 Claude Code, Codex, Gemini CLI, GitHub Copilot 에 각 툴의 형식으로 규칙을 씁니다. 관련 명령을 그룹으로 묶고, 특정 툴에서만 규칙을 끌 수 있습니다. MCP 서버도 같은 방식으로 정할 수 있습니다. 서버의 권한 탭에서 모든 도구의 기본값을 정하고 도구마다 따로 바꾸면, Claude Code, Codex, Gemini CLI, OpenCode 에 반영됩니다.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="강제 push 와 hard reset 은 막고 git status 는 허용하는 git 그룹을 4개 툴에 반영"></p>
 
