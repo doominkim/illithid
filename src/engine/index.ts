@@ -305,6 +305,7 @@ export {
   listMcpServers,
   readMcpServer,
   setMcpKnownTools,
+  setMcpPermissions,
   readMcpOrderList,
   writeMcpOrder,
   upsertMcpServer,
@@ -608,3 +609,10 @@ export {
   SCRIPT_FOLDER_LIMITS
 } from './scripts'
 export type { LibraryScript, ScriptProblem } from './scripts'
+export {
+  mcpPermissionsOf,
+  MCP_DECISIONS,
+  type McpDecision,
+  type McpPermissions
+} from './mcpPermissions'
+export { mcpToolNames } from './search/usage'

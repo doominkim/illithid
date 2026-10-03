@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Plug,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -444,6 +445,39 @@ function Permissions(): React.JSX.Element {
                   title={g.name}
                   subtitle={g.patterns.join(', ')}
                   onClick={() => navigate('hooks', { select: g.name })}
+                />
+              ))}
+            </ListCard>
+          </Stack>
+        )}
+
+        {(data.mcp ?? []).length > 0 && (
+          <Stack gap={8} data-testid="perm-mcp-tools">
+            <Text size="sm" fw={600} c="dimmed">
+              {t('permissions.mcpTools')}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('permissions.mcpToolsHint')}
+            </Text>
+            <ListCard>
+              {(data.mcp ?? []).map((m) => (
+                <ListRow
+                  key={m.name}
+                  avatar={<Plug size={18} />}
+                  title={m.name}
+                  subtitle={[
+                    m.default
+                      ? t('permissions.mcpDefault', {
+                          decision: t(`permissions.decision.${m.default}`)
+                        })
+                      : null,
+                    ...(['deny', 'ask', 'allow'] as const)
+                      .filter((d) => m[d] > 0)
+                      .map((d) => `${t(`permissions.decision.${d}`)} ${m[d]}`)
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  onClick={() => navigate('mcp', { select: m.name, tab: 'permissions' })}
                 />
               ))}
             </ListCard>

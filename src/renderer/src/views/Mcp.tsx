@@ -38,6 +38,8 @@ import { SortToggle, UsageSpark } from '../components/UsageSpark'
 import { sortByUsage, useListSort } from '../lib/listSort'
 import { useUsageSummary } from '../lib/useUsageSummary'
 
+import { McpPermissionsTab } from '../components/McpPermissions'
+
 const NEW = '__new__'
 
 function Mcp(): React.JSX.Element {
@@ -55,6 +57,18 @@ function Mcp(): React.JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
+  // Detail tab: preview for a server picked from the list, or the one a link asks for (the permissions menu's)
+  const [tab, setTab] = useState<string | null>(request.tab ?? 'fields')
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a navigation request picks the tab once
+    if (request.select) setTab(request.tab ?? 'fields')
+    // Only when a new request comes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request.seq])
+  const open = (name: string): void => {
+    setSelected(name)
+    setTab('fields')
+  }
   const [sort, setSort] = useListSort('mcp')
   const usage = useUsageSummary('mcp', data?.servers.map((s) => s.name) ?? [])
 
@@ -214,7 +228,7 @@ function Mcp(): React.JSX.Element {
                   />
                 }
                 selected={s.name === selected}
-                onClick={() => setSelected(s.name)}
+                onClick={() => open(s.name)}
               />
             )
           })}
@@ -240,7 +254,7 @@ function Mcp(): React.JSX.Element {
                 </Group>
               }
               active={s.name === selected}
-              onClick={() => setSelected(s.name)}
+              onClick={() => open(s.name)}
             />
           ))}
         </ListCard>
@@ -282,11 +296,16 @@ function Mcp(): React.JSX.Element {
               testId="mcp-detail-tools"
             />
             <UsagePanel kind="mcp" name={current.name} />
-            <Tabs defaultValue="fields" keepMounted={false}>
+            <Tabs value={tab} onChange={setTab} keepMounted={false}>
               <Tabs.List>
-                <Tabs.Tab value="fields">{t('detail.source')}</Tabs.Tab>
+                <Tabs.Tab value="fields" data-testid="mcp-tab-preview">
+                  {t('detail.source')}
+                </Tabs.Tab>
                 <Tabs.Tab value="edit" data-testid="tab-edit">
                   {t('detail.edit')}
+                </Tabs.Tab>
+                <Tabs.Tab value="permissions" data-testid="mcp-tab-permissions">
+                  {t('mcp.tabPermissions')}
                 </Tabs.Tab>
               </Tabs.List>
               <Tabs.Panel value="fields" pt="md">
@@ -316,6 +335,9 @@ function Mcp(): React.JSX.Element {
               </Tabs.Panel>
               <Tabs.Panel value="edit" pt="md">
                 <McpEdit name={current.name} onSave={save} />
+              </Tabs.Panel>
+              <Tabs.Panel value="permissions" pt="md">
+                <McpPermissionsTab key={current.name} server={current} />
               </Tabs.Panel>
             </Tabs>
           </Stack>

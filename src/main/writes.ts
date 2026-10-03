@@ -79,6 +79,7 @@ import {
   savePermissionRules,
   createScript,
   createFolderScript,
+  setMcpPermissions,
   setRuleDescription,
   readScriptFile,
   readScript,
@@ -752,6 +753,9 @@ export const lib = {
   scriptImportFolder: (home: string, name: string, from: string, entry?: string) => {
     importScriptFolder(home, name, from, entry || undefined)
     return { name }
+  },
+  mcpPermissionsSave: (home: string, name: string, permissions: unknown) => {
+    setMcpPermissions(home, name, permissions)
   },
   /** Where a script lives (its folder, or its .sh file) */
   scriptLocation: (home: string, name: string) =>

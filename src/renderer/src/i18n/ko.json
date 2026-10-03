@@ -142,7 +142,28 @@
     "deleteBody": "{{name}} 을(를) .trash 로 옮깁니다.",
     "headersHint": "서버에 보낼 HTTP 헤더. ${VAR} 는 환경 변수를 읽고, 그 밖의 값은 키체인에 보관합니다.",
     "timeoutHint": "서버 응답을 기다리는 최대 시간. 비우면 툴 기본값.",
-    "description": "설명"
+    "description": "설명",
+    "tabPermissions": "권한",
+    "perm": {
+      "default": "서버 기본값",
+      "toolDefault": "툴 기본",
+      "defaultHint": "이 서버의 모든 도구에 적용됩니다. 아래에서 따로 정한 도구는 그 값을 따릅니다. \"툴 기본\"은 각 에이전트 툴의 기본 동작(보통 물어보기)을 따릅니다.",
+      "tools": "도구",
+      "useDefault": "기본값",
+      "noTools": "아직 알려진 도구가 없습니다. 서버에서 불러오거나 이름을 추가하세요.",
+      "toolsHint": "목록: 서버 설정에 있는 도구, 서버에서 불러온 도구, 세션에서 호출된 도구.",
+      "addPlaceholder": "도구 이름으로 추가",
+      "badName": "영문·숫자와 . _ - 만 쓸 수 있습니다",
+      "fetch": "전체 도구 불러오기",
+      "fetchRun": "실행해서 불러오기",
+      "fetchConfirm": "도구 목록을 묻기 위해 서버를 실행합니다: {{command}}",
+      "fetched": "도구 {{count}}개를 불러왔습니다",
+      "saved": "도구 권한을 저장했습니다",
+      "noteClaude": "Claude Code·Grok CLI: 막기·물어보기가 허용보다 우선이라, 이 기본값에서는 허용한 도구도 물어보거나 막힙니다.",
+      "noteCodex": "Codex: 서버를 막으면 여기서 허용·물어보기로 정한 도구만 보입니다.",
+      "noteGemini": "Gemini CLI: 서버 이름에 \"_\" 가 있으면 규칙이 맞지 않을 수 있습니다.",
+      "noteCopilot": "GitHub Copilot: 설정 파일로는 도구 권한을 정할 수 없습니다."
+    }
   },
   "agents": {
     "model": "모델",
@@ -1099,7 +1120,10 @@
     "groupCommandsHint": "한 줄에 명령 하나씩 적습니다. 처리는 아래에서 줄마다 바꿀 수 있습니다.",
     "expand": "펼치기",
     "collapse": "접기",
-    "groupPartial": "규칙 {{count}}개 중 {{on}}개 켜짐"
+    "groupPartial": "규칙 {{count}}개 중 {{on}}개 켜짐",
+    "mcpTools": "MCP 도구",
+    "mcpToolsHint": "각 MCP 서버의 권한 탭에서 정합니다. 눌러서 바꿀 수 있습니다.",
+    "mcpDefault": "기본값: {{decision}}"
   },
   "scripts": {
     "search": "스크립트 검색",

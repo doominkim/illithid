@@ -6,6 +6,8 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   importedBackupRoot,
+  mcpPermissionsOf,
+  mcpToolNames,
   readMcpServer,
   readRuleDescriptions,
   type HookTool,
@@ -81,6 +83,7 @@ import {
   type Allowlist
 } from '../engine'
 import type {
+  McpToolInfo,
   ScriptsData,
   PermissionsData,
   AgentsData,
@@ -775,6 +778,7 @@ export function permissions(home: string, env: Env): PermissionsData {
       claudeOnly: 0,
       tools: {},
       guards: [],
+      mcp: [],
       error: `${dir}: ${(e as Error).message}`
     }
   }
@@ -855,8 +859,54 @@ export function permissions(home: string, env: Env): PermissionsData {
       : 0,
     tools,
     ...(Object.keys(reasons).length ? { reasons } : {}),
-    guards
+    guards,
+    mcp: mcpRuleSummary(home)
   }
+}
+
+/** MCP servers with tool rules, for the permissions menu */
+function mcpRuleSummary(home: string): PermissionsData['mcp'] {
+  try {
+    return Object.entries(readSources(home).mcp.servers)
+      .map(([name, s]) => {
+        const p = mcpPermissionsOf(s)
+        const count = (d: string): number =>
+          Object.values(p.tools ?? {}).filter((x) => x === d).length
+        return {
+          name,
+          ...(p.default ? { default: p.default } : {}),
+          allow: count('allow'),
+          ask: count('ask'),
+          deny: count('deny')
+        }
+      })
+      .filter((x) => x.default || x.allow + x.ask + x.deny)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  } catch {
+    return []
+  }
+}
+
+/** An MCP server's known tools and rules */
+export function mcpToolInfo(home: string, name: string): McpToolInfo {
+  const raw = readMcpServer(home, name)
+  const permissions = mcpPermissionsOf(raw)
+  const meta = raw._ && typeof raw._ === 'object' ? (raw._ as { tools?: unknown }) : {}
+  const fetched = Array.isArray(meta.tools)
+    ? meta.tools.filter((t): t is string => typeof t === 'string')
+    : []
+  const cx = raw.codex ?? {}
+  const tools = new Set<string>([
+    ...Object.keys(permissions.tools ?? {}),
+    ...Object.keys(cx.toolApprovals ?? {}),
+    ...(cx.enabledTools ?? []),
+    ...fetched,
+    ...mcpToolNames(home, name)
+  ])
+  const codexOnly = Object.fromEntries(
+    Object.entries(cx.toolApprovals ?? {}).filter(([, m]) => m !== 'auto')
+  )
+  return { tools: [...tools].sort(), permissions, codexOnly }
 }
 
 // ---------------------------------------------------------------- scripts

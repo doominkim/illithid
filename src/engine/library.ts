@@ -1191,6 +1191,20 @@ function secretFail(e: unknown): never {
   throw e
 }
 
+/** A server's tool rules (none left: the key goes). Everything else in the definition is kept as written */
+export function setMcpPermissions(home: string, name: string, permissions: unknown): string {
+  const raw = { ...(readMcpServer(home, name) as Record<string, unknown>) }
+  const problems = mcpPermissionProblems(permissions)
+  if (problems.length) throw new LibraryError('invalidSchema', problems.join('; '))
+  const p = (permissions ?? {}) as { default?: string; tools?: Record<string, string> }
+  const tools = p.tools && Object.keys(p.tools).length ? p.tools : undefined
+  if (p.default || tools)
+    raw.permissions = { ...(p.default ? { default: p.default } : {}), ...(tools ? { tools } : {}) }
+  else delete raw.permissions
+  upsertMcpServer(home, name, raw as McpServer)
+  return mcpPath(home, name)
+}
+
 /** Tool names a server reported (its meta key `_.tools`, never sent to a tool); other meta is kept */
 export function setMcpKnownTools(home: string, name: string, tools: string[]): string {
   const raw = readMcpServer(home, name) as Record<string, unknown>

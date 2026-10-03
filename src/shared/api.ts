@@ -50,6 +50,8 @@ import type {
   ToolModels
 } from '../engine'
 
+import type { McpDecision, McpPermissions } from '../engine'
+export type { McpDecision, McpPermissions } from '../engine'
 import type {
   ImportSource,
   RetireKind,
@@ -341,7 +343,18 @@ export interface PermissionsData {
   reasons?: Partial<Record<ToolId, string>>
   /** Hooks that block commands too (the guard action) */
   guards: { name: string; patterns: string[] }[]
+  /** MCP servers with tool rules (set in the MCP detail): their default and how many tools each decision has */
+  mcp: { name: string; default?: McpDecision; allow: number; ask: number; deny: number }[]
   error?: string
+}
+
+/** An MCP server's tools and their rules, for the MCP detail's permissions tab */
+export interface McpToolInfo {
+  /** Known tool names: the rules, the server's settings, tools fetched from it, and the session logs */
+  tools: string[]
+  permissions: McpPermissions
+  /** Codex-only approvals other than auto (kept for tools the rules leave alone) */
+  codexOnly: Record<string, string>
 }
 
 /** HOOK.md, its scripts and what each tool runs, for the detail sheet */
@@ -940,6 +953,10 @@ export interface Api {
   ): Promise<WriteResult<{ name: string }> | Refused>
   /** Show the script in Finder */
   scriptReveal(name: string): Promise<WriteResult>
+  mcpToolInfo(name: string): Promise<WriteResult<McpToolInfo>>
+  mcpPermissionsSave(name: string, permissions: McpPermissions): Promise<WriteResult | Refused>
+  /** Ask the server itself for its tools (runs a stdio server's command); the names are kept with the server */
+  mcpFetchTools(name: string): Promise<WriteResult<string[]> | Refused>
   /** With script: save what the tool runs as a new library script and use it; without: as the hook's own run.sh */
   hookConvert(
     name: string,
@@ -1180,6 +1197,9 @@ export const CHANNELS = [
   'scriptToFolder',
   'scriptImportFolder',
   'scriptReveal',
+  'mcpToolInfo',
+  'mcpPermissionsSave',
+  'mcpFetchTools',
   'hookConvert',
   'hookDelete',
   'hookScriptSave',

@@ -59,6 +59,9 @@ import type {
   WriteResult
 } from '../shared/api'
 import type { Op } from './reads'
+import { mcpToolInfo } from './reads'
+import { fetchMcpTools } from './mcpTools'
+import { defaultSecretBackend } from '../engine/secrets'
 import type { UiPrefsPatch } from '../engine/uiPrefs'
 import * as W from './writes'
 import { adoptEditedRule } from '../engine/editedRules'
@@ -658,6 +661,26 @@ export function registerIpc(): void {
           typeof entry === 'string' ? entry : undefined
         )
       ),
+    mcpToolInfo: async (name) => W.wrap(() => mcpToolInfo(home, str(name))),
+    mcpPermissionsSave: async (name, permissions) =>
+      libWrite(() => W.lib.mcpPermissionsSave(home, str(name), permissions)),
+    mcpFetchTools: async (name) => {
+      const g = W.libGate(home)
+      if (g) return g
+      try {
+        const env = await envNow()
+        W.markSelfWrite()
+        const tools = await fetchMcpTools(home, str(name), {
+          env,
+          secrets: defaultSecretBackend()
+        })
+        W.markSelfWrite()
+        return { ok: true, value: tools }
+      } catch (e) {
+        const err = e as { code?: string; message?: string }
+        return { ok: false, code: err.code ?? 'error', message: err.message ?? String(e) }
+      }
+    },
     scriptReveal: async (name) =>
       W.wrap(() => {
         shell.showItemInFolder(W.lib.scriptLocation(home, str(name)))

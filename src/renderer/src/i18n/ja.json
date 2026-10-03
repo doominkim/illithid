@@ -142,7 +142,28 @@
     "deleteBody": "{{name}} を .trash に移します。",
     "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はキーチェーンに保管します。",
     "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。",
-    "description": "説明"
+    "description": "説明",
+    "tabPermissions": "権限",
+    "perm": {
+      "default": "サーバーの既定",
+      "toolDefault": "ツールの既定",
+      "defaultHint": "このサーバーのすべてのツールに適用されます。下で個別に決めたツールはその値に従います。「ツールの既定」は各エージェントツールの既定(通常は確認)に従います。",
+      "tools": "ツール",
+      "useDefault": "既定",
+      "noTools": "まだ既知のツールがありません。サーバーから読み込むか、名前を追加してください。",
+      "toolsHint": "一覧: サーバー設定のツール、サーバーから読み込んだツール、セッションで呼び出されたツール。",
+      "addPlaceholder": "名前でツールを追加",
+      "badName": "英数字と . _ - のみ",
+      "fetch": "すべてのツールを読み込む",
+      "fetchRun": "実行して読み込む",
+      "fetchConfirm": "ツール一覧を取得するためにサーバーを実行します: {{command}}",
+      "fetched": "{{count}} 個のツールを読み込みました",
+      "saved": "ツールの権限を保存しました",
+      "noteClaude": "Claude Code・Grok CLI: ブロック・確認が許可より優先されるため、この既定では許可したツールも確認またはブロックされます。",
+      "noteCodex": "Codex: サーバーをブロックすると、ここで許可・確認にしたツールだけが提供されます。",
+      "noteGemini": "Gemini CLI: サーバー名に \"_\" があるとルールが一致しない場合があります。",
+      "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。"
+    }
   },
   "agents": {
     "model": "モデル",
@@ -1099,7 +1120,10 @@
     "groupCommandsHint": "1 行に 1 コマンド。行ごとに下で動作を変えられます。",
     "expand": "展開",
     "collapse": "折りたたむ",
-    "groupPartial": "{{count}} 件中 {{on}} 件オン"
+    "groupPartial": "{{count}} 件中 {{on}} 件オン",
+    "mcpTools": "MCP ツール",
+    "mcpToolsHint": "各 MCP サーバーの権限タブで設定します。クリックして変更できます。",
+    "mcpDefault": "既定: {{decision}}"
   },
   "scripts": {
     "search": "スクリプトを検索",

@@ -142,7 +142,28 @@
     "deleteBody": "Move {{name}} to .trash.",
     "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the Keychain.",
     "timeoutHint": "How long to wait for the server. Left empty: the tool's default.",
-    "description": "Description"
+    "description": "Description",
+    "tabPermissions": "Permissions",
+    "perm": {
+      "default": "Server default",
+      "toolDefault": "Tool's own",
+      "defaultHint": "For every tool of this server, unless a tool below says otherwise. \"Tool's own\" leaves each agent tool's default (usually ask).",
+      "tools": "Tools",
+      "useDefault": "Default",
+      "noTools": "No tools known yet. Load them from the server, or add a name.",
+      "toolsHint": "Listed: tools from the server settings, tools loaded from the server, and tools called in your sessions.",
+      "addPlaceholder": "Add a tool by name",
+      "badName": "Letters, digits and . _ - only",
+      "fetch": "Load all tools",
+      "fetchRun": "Run and load",
+      "fetchConfirm": "Illithid runs the server to ask for its tools: {{command}}",
+      "fetched": "Loaded {{count}} tools",
+      "saved": "Tool rules saved",
+      "noteClaude": "Claude Code and Grok CLI: block and ask win over allow, so with this default an allowed tool still asks or is blocked.",
+      "noteCodex": "Codex: with a blocked server, only the tools allowed or asked here are offered.",
+      "noteGemini": "Gemini CLI: a server name with \"_\" can make its rules miss.",
+      "noteCopilot": "GitHub Copilot: tool rules can't be set in its config files."
+    }
   },
   "agents": {
     "model": "Model",
@@ -1099,7 +1120,10 @@
     "groupCommandsHint": "One command per line. Change what to do for each line below.",
     "expand": "Expand",
     "collapse": "Collapse",
-    "groupPartial": "{{on}} of {{count}} rules on"
+    "groupPartial": "{{on}} of {{count}} rules on",
+    "mcpTools": "MCP tools",
+    "mcpToolsHint": "Set in each server's permissions tab. Open one to change it.",
+    "mcpDefault": "Default: {{decision}}"
   },
   "scripts": {
     "search": "Search scripts",
