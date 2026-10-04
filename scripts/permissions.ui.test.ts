@@ -238,7 +238,8 @@ test(
       const pill = (scope: Locator, tool: string): Locator =>
         scope.locator(`button:has([data-tool="${tool}"])`)
       await page.locator('[data-menu="permissions"]').click()
-      await synced()
+      // The demo HOME starts with changes not yet applied, so don't wait for a synced state here: each write below syncs
+      await group.waitFor()
 
       // One rule off for Codex: Codex drops it, Claude Code keeps it
       const force = group.locator('.ac-row', { hasText: 'git push --force' })
