@@ -33,9 +33,14 @@ export function ModelCost({
               {cost?.total == null ? t('efficiency.unpriced') : usd(cost.total)}
             </Text>
           </Box>
-          <Text size="sm">
-            {usd(cost?.perRequest)} / {t('models.col.requests')}
-          </Text>
+          <Stack gap={4} align="flex-end">
+            <Text size="sm" fw={600} data-testid="stats-cost-turn-median">
+              {t('efficiency.turnMedian')}: {usd(cost?.medianPerTurn)}
+            </Text>
+            <Text size="xs" c="dimmed" data-testid="stats-cost-request-median">
+              {t('efficiency.requestMedian')}: {usd(cost?.medianPerRequest)}
+            </Text>
+          </Stack>
         </Group>
         {(cost?.source === 'recorded' || cost?.source === 'mixed') && (
           <Text size="xs" c="dimmed">

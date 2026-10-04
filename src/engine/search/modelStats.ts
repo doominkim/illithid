@@ -21,6 +21,7 @@ export const MODEL_SCHEMA = '2'
 /** Samples under these counts show counts only, not rates or distributions */
 export const MIN_REQUESTS = 30
 export const MIN_TOOL_CALLS = 100
+const MIN_COST_TURNS = 30
 
 /** Tools that start a subagent (Claude, Codex, OpenCode) */
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task', 'spawn_agent', 'task'])
@@ -776,6 +777,7 @@ function pricingFor(
     )
     pricing.needsReindex = true
     pricing.medianPerRequest = null
+    pricing.medianPerTurn = null
     const maxContext = Number(
       (
         db.prepare(`select max(ctx) as max from model_ctx where ${where}`).get(...args) as {
@@ -850,12 +852,20 @@ function pricingFor(
     .map((g) => sum(g, 'total'))
     .filter((c): c is number => c !== null)
   const distribution = samples.length >= MIN_REQUESTS ? dist(samples) : null
+  const turnSamples = costs
+    .map((c) => c.cost.total)
+    .filter((c): c is number => c !== null && Number.isFinite(c))
+  const turnDistribution =
+    turnSamples.length === costs.length && turnSamples.length >= MIN_COST_TURNS
+      ? dist(turnSamples)
+      : null
   return {
     pricing: {
       total,
       converted,
       perRequest: total === null || summary.requests <= 0 ? null : total / summary.requests,
       medianPerRequest: distribution?.median ?? null,
+      medianPerTurn: turnDistribution?.median ?? null,
       source:
         total === null
           ? 'unpriced'

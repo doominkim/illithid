@@ -25,8 +25,8 @@ export const providerText = (model: string): string =>
 
 export function chartRows(models: ModelSummary[]): (ModelSummary & { x: number; y: number })[] {
   return models.flatMap((m) => {
-    // Median, not the period total over requests: a few very long sessions would otherwise decide the position
-    const x = m.pricing?.medianPerRequest
+    // Use the measured model-turn median; request length must not decide the cost position.
+    const x = m.pricing?.medianPerTurn
     const y = m.median.responseSec
     return m.requests >= 30 &&
       x !== null &&

@@ -155,7 +155,7 @@ export function UsageLeaderboard({
       : metric === 'cost'
         ? (costs.get(modelKeyStr(m))?.total ?? null)
         : metric === 'perCost'
-          ? (costs.get(modelKeyStr(m))?.medianPerRequest ?? null)
+          ? (costs.get(modelKeyStr(m))?.medianPerTurn ?? null)
           : metric === 'response'
             ? m.median.responseSec
             : metric === 'tools'
@@ -389,7 +389,7 @@ export function UsageLeaderboard({
                 data-model={m.model}
                 data-series={seriesKey(m)}
                 data-active={active?.series === seriesKey(m)}
-                aria-label={`${modelLabel(m)}, ${toolName(m.tool)}, ${usd(m.x)}, ${Math.round(m.y)}s${m.median.contextPerTurn === null ? '' : `, ${t('leaderboard.contextChip', { n: formatTokens(m.median.contextPerTurn, i18n.language) })}`}`}
+                aria-label={`${modelLabel(m)}, ${toolName(m.tool)}, ${t('leaderboard.perCost')}: ${usd(m.x)}, ${Math.round(m.y)}s${m.median.contextPerTurn === null ? '' : `, ${t('leaderboard.contextChip', { n: formatTokens(m.median.contextPerTurn, i18n.language) })}`}`}
                 onMouseEnter={() => setPointHover(m)}
                 onFocus={() => moveFocus(m)}
                 onBlur={() => setFocus(null)}
@@ -865,7 +865,7 @@ export function UsageLeaderboard({
                             </Table.Td>
                             <Table.Td ta="right">
                               <Text size="sm" fw={600}>
-                                {usd(cost?.medianPerRequest)}
+                                {usd(cost?.medianPerTurn)}
                               </Text>
                               {bar(m, 'perCost')}
                             </Table.Td>

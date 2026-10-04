@@ -95,6 +95,7 @@ test('REQ-MODEL-EFFICIENCY-3 REQ-MODEL-EFFICIENCY-4 injected catalog, per-turn t
   const detail = modelDetail(home, { tool: 'codex', model: 'gpt-test', effort: 'high' })!
   assert.equal(detail.costDist?.n, 30)
   assert.ok(Math.abs(detail.costDist!.median - 0.904) < 1e-9)
+  assert.ok(Math.abs(list[0].pricing!.medianPerTurn! - 0.904) < 1e-9)
   assert.ok(Math.abs(detail.costDaily![0].cost! - 27.12) < 1e-9)
 })
 
@@ -132,6 +133,114 @@ test('REQ-STATS-MEDIAN-COST-1 REQ-STATS-MEDIAN-COST-2 per-request median ignores
   assert.ok(Math.abs(pricing.medianPerRequest! - 0.904) < 1e-9, String(pricing.medianPerRequest))
   assert.ok(pricing.perRequest! > pricing.medianPerRequest! * 4, String(pricing.perRequest))
   assert.equal(run(29)![0].pricing?.medianPerRequest, null)
+})
+
+test('per-turn median prices individual model calls while retaining the request distribution', () => {
+  const home = mkdtempSync(join(tmpdir(), 'illithid-turn-cost-'))
+  mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+  writeFileSync(join(home, '.cache/opencode/models.json'), JSON.stringify(book.providers))
+  const db = openDb(searchIndexPath(home))
+  ensureModelStats(db)
+  const counter = new ModelStatsCounter('codex')
+  for (let i = 0; i < 30; i++) {
+    const at = new Date(Date.UTC(2026, 8, 20, 0, i)).toISOString()
+    counter.prompt(at)
+    // Twenty $0.002 single-call requests and ten $0.10 five-call requests.
+    for (let turn = 0; turn < (i < 20 ? 1 : 5); turn++) {
+      counter.turn({
+        model: 'gpt-test',
+        effort: 'high',
+        at,
+        usage: {
+          input: i < 20 ? 1000 : 10000,
+          output: i < 20 ? 500 : 5000,
+          cacheRead: 0,
+          cacheWrite: 0,
+          reasoning: 0
+        }
+      })
+    }
+    counter.requestEnd(at)
+  }
+  counter.write(db, 1)
+  db.close()
+
+  const model = modelList(home)![0]
+  assert.equal(model.turns, 70)
+  assert.equal(model.pricing?.medianPerTurn, 0.02)
+  assert.equal(model.pricing?.medianPerRequest, 0.002)
+  const detail = modelDetail(home, { tool: 'codex', model: 'gpt-test', effort: 'high' })!
+  assert.equal(detail.summary.pricing?.medianPerTurn, 0.02)
+  assert.equal(detail.costDist?.median, 0.002)
+})
+
+test('per-turn median requires 30 measured calls, independently of completed request count', () => {
+  for (const measuredTurns of [29, 30]) {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-turn-samples-'))
+    mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+    writeFileSync(join(home, '.cache/opencode/models.json'), JSON.stringify(book.providers))
+    const db = openDb(searchIndexPath(home))
+    ensureModelStats(db)
+    const counter = new ModelStatsCounter('codex')
+    const at = '2026-09-20T10:00:00Z'
+    counter.prompt(at)
+    for (let i = 0; i < measuredTurns; i++) {
+      counter.turn({
+        model: 'gpt-test',
+        effort: 'high',
+        at,
+        usage: { input: 1000, output: 500, cacheRead: 5000, cacheWrite: 0, reasoning: 100 }
+      })
+    }
+    // Empty usage events must neither appear free nor satisfy the cost sample threshold.
+    for (let i = 0; i < 10; i++) {
+      counter.turn({
+        model: 'gpt-test',
+        effort: 'high',
+        at,
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 }
+      })
+    }
+    counter.requestEnd(at)
+    counter.write(db, 1)
+    db.close()
+    const model = modelList(home)![0]
+    assert.equal(model.requests, 1)
+    assert.equal(model.pricing?.medianPerRequest, null)
+    assert.equal(model.pricing?.medianPerTurn, measuredTurns === 30 ? 0.0025 : null)
+  }
+})
+
+test('per-turn median does not hide calls with unavailable token prices', () => {
+  const home = mkdtempSync(join(tmpdir(), 'illithid-turn-unpriced-'))
+  mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+  writeFileSync(
+    join(home, '.cache/opencode/models.json'),
+    JSON.stringify({ openai: { models: { 'gpt-test': { cost: { input: 1, output: 2 } } } } })
+  )
+  const db = openDb(searchIndexPath(home))
+  ensureModelStats(db)
+  const counter = new ModelStatsCounter('codex')
+  const at = '2026-09-20T10:00:00Z'
+  for (let i = 0; i < 31; i++) {
+    counter.turn({
+      model: 'gpt-test',
+      effort: 'high',
+      at,
+      usage: {
+        input: 1000,
+        output: 500,
+        cacheRead: i === 30 ? 1000 : 0,
+        cacheWrite: 0,
+        reasoning: 0
+      }
+    })
+  }
+  counter.write(db, 1)
+  db.close()
+  const model = modelList(home)![0]
+  assert.equal(model.pricing?.total, null)
+  assert.equal(model.pricing?.medianPerTurn, null)
 })
 
 test('REQ-MODEL-EFFICIENCY-3 partial OpenCode recorded cost is labeled mixed', () => {

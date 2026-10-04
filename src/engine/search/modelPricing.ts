@@ -30,6 +30,8 @@ export interface ConvertedCost {
   perRequest: number | null
   /** Median cost of completed main-session requests (the request distribution); null below MIN_REQUESTS or before reindexing */
   medianPerRequest?: number | null
+  /** Median cost of measured model turns; null below 30 priced turns or before per-turn indexing */
+  medianPerTurn?: number | null
   source: 'recorded' | 'converted' | 'mixed' | 'unpriced'
   priceSource: 'cache' | 'snapshot'
   date: string

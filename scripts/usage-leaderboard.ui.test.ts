@@ -15,17 +15,22 @@ async function pick(page: Page, testId: string, label: string): Promise<void> {
   assert.equal(await page.getByTestId(testId).inputValue(), label)
 }
 
-/** The chart and the per-request column use the median of completed requests; fixtures set it to 60% of the mean */
-const withMedian = (p: ReturnType<typeof convertedCost>): ReturnType<typeof convertedCost> => ({
+/** Model-turn medians are independent fixtures, with request costs ordered differently. */
+const withMedian = (
+  p: ReturnType<typeof convertedCost>,
+  medianPerTurn: number | null
+): ReturnType<typeof convertedCost> => ({
   ...p,
-  medianPerRequest: p.perRequest === null ? null : p.perRequest * 0.6
+  medianPerRequest: p.perRequest === null ? null : p.perRequest * 0.6,
+  medianPerTurn
 })
 const base = (
   model: string,
   tool: string,
   effort: string,
   requests: number,
-  response: number
+  response: number,
+  medianPerTurn: number | null
 ): ModelSummary => ({
   model,
   tool,
@@ -72,7 +77,8 @@ const base = (
           }
         }
       }
-    )
+    ),
+    medianPerTurn
   ),
   median: {
     responseSec: requests >= 30 ? response : null,
@@ -83,12 +89,12 @@ const base = (
   }
 })
 const fixtures = [
-  base('gpt-6.1-sol', 'codex', 'medium', 40, 50),
-  base('gpt-6.1-sol', 'codex', 'high', 60, 90),
-  base('claude-fable-5-1', 'claude', 'high', 80, 115),
-  base('gemini-2.5-pro', 'opencode', 'medium', 35, 160),
-  base('claude-haiku-4-5', 'claude', '', 12, 10),
-  base('unpriced-model', 'opencode', '', 70, 60)
+  base('gpt-6.1-sol', 'codex', 'medium', 40, 50, 0.08),
+  base('gpt-6.1-sol', 'codex', 'high', 60, 90, 0.12),
+  base('claude-fable-5-1', 'claude', 'high', 80, 115, 0.02),
+  base('gemini-2.5-pro', 'opencode', 'medium', 35, 160, 0.06),
+  base('claude-haiku-4-5', 'claude', '', 12, 10, null),
+  base('unpriced-model', 'opencode', '', 70, 60, null)
 ]
 
 test(
@@ -238,6 +244,19 @@ test(
       for (const line of await svg.locator('polyline').all())
         assert.ok((await line.getAttribute('clip-path'))?.startsWith('url('))
       assert.equal(await rows.count(), 5)
+      // Representative costs sort by measured model-turn medians, not request medians.
+      assert.deepEqual(await rows.evaluateAll((entries) => entries.map((e) => e.dataset.model)), [
+        'claude-fable-5-1',
+        'gemini-2.5-pro',
+        'gpt-6.1-sol',
+        'gpt-6.1-sol',
+        'unpriced-model'
+      ])
+      const gptCosts = page.locator(
+        '[data-testid="stats-row"][data-model="gpt-6.1-sol"] td:last-child'
+      )
+      assert.deepEqual(await gptCosts.allTextContents(), ['$0.08', '$0.12'])
+      assert.ok((await svg.textContent())?.includes('USD / 턴'))
       // REQ-MODEL-EFFICIENCY-16: flat by default, tool headers optional, model hierarchy opt-in.
       assert.equal(await page.getByTestId('stats-model-parent').count(), 0)
       assert.equal(await rows.first().locator('td').count(), 12)
@@ -279,10 +298,13 @@ test(
       await grouping.getByText('모델별', { exact: true }).click()
       await page
         .getByTestId('stats-table')
-        .getByText('API 환산 비용 / 요청 (중앙값)', { exact: true })
+        .getByText('API 환산 비용 / 턴 (중앙값)', { exact: true })
         .click()
       await page.getByTestId('stats-show-small').check()
       assert.equal(await rows.count(), 6)
+      const smallCost = page.locator('[data-testid="stats-row"][data-model="claude-haiku-4-5"]')
+      assert.equal(await smallCost.locator('td').last().innerText(), '—')
+      assert.equal(await smallCost.locator('[data-metric-bar="perCost"]').count(), 0)
       await page.getByTestId('stats-table').getByText('요청', { exact: true }).click()
       await page.getByTestId('stats-table').getByText('요청 ↑', { exact: true }).click()
       assert.equal(
@@ -338,6 +360,15 @@ test(
         '[data-testid="stats-row"][data-model="gemini-2.5-pro"] [data-metric-bar="response"] > span'
       )
       assert.equal(await geminiBar.evaluate((e) => (e as HTMLElement).style.width), '100%')
+      const claudeCostBar = page.locator(
+        '[data-testid="stats-row"][data-model="claude-fable-5-1"] [data-metric-bar="perCost"] > span'
+      )
+      assert.ok(
+        Math.abs(
+          (await claudeCostBar.evaluate((e) => parseFloat((e as HTMLElement).style.width))) -
+            16.6667
+        ) < 0.01
+      )
       assert.equal(
         await page
           .locator(
@@ -405,24 +436,27 @@ test(
       assert.equal(await page.getByTestId('stats-guides').locator('line').count(), 2)
       // REQ-STATS-MEDIAN-COST-4: the hovered point shows its median context per turn
       assert.equal(await page.getByTestId('stats-guide-context').textContent(), '컨텍스트 9K / 턴')
-      // REQ-STATS-MEDIAN-COST-1: the point sits at the median cost per request, not the period mean
+      // REQ-STATS-MEDIAN-COST-1: the point uses the median cost per model turn.
       const claudeFixture = fixtures.find((m) => m.model === 'claude-fable-5-1')!
       assert.ok(
         (await claude.getAttribute('aria-label'))!.includes(
-          usd(claudeFixture.pricing!.medianPerRequest)
+          usd(claudeFixture.pricing!.medianPerTurn)
         )
       )
       assert.ok(
-        !(await claude.getAttribute('aria-label'))!.includes(usd(claudeFixture.pricing!.perRequest))
+        !(await claude.getAttribute('aria-label'))!.includes(
+          usd(claudeFixture.pricing!.medianPerRequest)
+        )
       )
-      // REQ-STATS-MEDIAN-COST-3: the per-request column shows the same median
+      assert.ok((await claude.getAttribute('aria-label'))!.includes('API 환산 비용 / 턴 (중앙값)'))
+      // REQ-STATS-MEDIAN-COST-3: the per-turn column shows the same median.
       assert.ok(
         (
           await page
             .locator('[data-testid="stats-row"][data-model="claude-fable-5-1"] td')
             .last()
             .innerText()
-        ).includes(usd(claudeFixture.pricing!.medianPerRequest))
+        ).includes(usd(claudeFixture.pricing!.medianPerTurn))
       )
       assert.equal(await page.getByTestId('stats-point-tooltip').count(), 0) // REQ-MODEL-EFFICIENCY-6
       assert.equal(await gpt.locator('.lb-dot').getAttribute('fill'), 'var(--ac-text-muted)')
@@ -448,8 +482,22 @@ test(
       await claude.locator('.lb-dot').click()
       await page.getByTestId('stats-cost-detail').waitFor()
       assert.ok((await page.getByTestId('stats-cost-detail').innerText()).includes('API 환산 비용'))
+      assert.equal(
+        await page.getByTestId('stats-cost-turn-median').innerText(),
+        '모델 턴당 비용 중앙값: $0.02'
+      )
+      assert.equal(
+        await page.getByTestId('stats-cost-request-median').innerText(),
+        `요청당 비용 중앙값: ${usd(claudeFixture.pricing!.medianPerRequest)}`
+      )
       assert.equal(await page.getByTestId('stats-cost-daily').locator('.recharts-line').count(), 1)
       assert.equal(await page.getByTestId('stats-cost-distribution').locator('svg').count(), 1)
+      assert.ok(
+        (await page.getByTestId('stats-cost-distribution').innerText()).includes(
+          '요청당 API 환산 비용 분포'
+        )
+      )
+      assert.ok((await page.getByTestId('stats-cost-distribution').innerText()).includes('$0.04'))
       await page.getByTestId('detail-sheet').getByRole('button', { name: '뒤로' }).click()
       await pick(page, 'stats-days', '7일')
       await page.waitForFunction(
