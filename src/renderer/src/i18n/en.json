@@ -143,11 +143,10 @@
     "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the Keychain.",
     "timeoutHint": "How long to wait for the server. Left empty: the tool's default.",
     "description": "Description",
-    "tabPermissions": "Permissions",
     "perm": {
       "default": "Server default",
       "toolDefault": "Tool's own",
-      "defaultHint": "For every tool of this server, unless a tool below says otherwise. \"Tool's own\" leaves each agent tool's default (usually ask).",
+      "defaultHint": "Applies to all of this server's tools. A tool set below follows its own value.",
       "tools": "Tools",
       "useDefault": "Default",
       "noTools": "No tools known yet. Load them from the server, or add a name.",
@@ -162,8 +161,11 @@
       "noteClaude": "Claude Code and Grok CLI: block and ask win over allow, so with this default an allowed tool still asks or is blocked.",
       "noteCodex": "Codex: with a blocked server, only the tools allowed or asked here are offered.",
       "noteGemini": "Gemini CLI: a server name with \"_\" can make its rules miss.",
-      "noteCopilot": "GitHub Copilot: tool rules can't be set in its config files."
-    }
+      "noteCopilot": "GitHub Copilot: tool rules can't be set in its config files.",
+      "useAll": "All servers ({{decision}})"
+    },
+    "permTitle": "Permissions",
+    "permEdit": "Edit in Permissions"
   },
   "agents": {
     "model": "Model",
@@ -1122,8 +1124,13 @@
     "collapse": "Collapse",
     "groupPartial": "{{on}} of {{count}} rules on",
     "mcpTools": "MCP tools",
-    "mcpToolsHint": "Set in each server's permissions tab. Open one to change it.",
-    "mcpDefault": "Default: {{decision}}"
+    "mcpToolsHint": "Allow, ask for or block each MCP server's tools. Open a server to set its tools one by one.",
+    "mcpDefault": "Default: {{decision}}",
+    "mcpAll": "Default for all servers",
+    "mcpAllHint": "A server without a default of its own follows this, servers you add later included. \"Tool's own\" leaves it to each agent tool (usually ask).",
+    "mcpAllowWarning": "Every MCP server's tools run without asking, including tools that write or delete. Block those per server or per tool.",
+    "mcpDefaultAll": "Default: {{decision}} (all servers)",
+    "mcpToolDefault": "Tool's own default"
   },
   "scripts": {
     "search": "Search scripts",

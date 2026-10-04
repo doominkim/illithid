@@ -44,14 +44,12 @@ export interface NavRequest {
   select?: string
   /** Dashboard tool filter */
   tool?: ToolId | null
-  /** With select: the detail tab to open (e.g. an MCP server's permissions) */
-  tab?: string
   seq: number
 }
 
 export interface Nav {
   request: NavRequest
-  navigate: (menu: Menu, opts?: { select?: string; tool?: ToolId | null; tab?: string }) => void
+  navigate: (menu: Menu, opts?: { select?: string; tool?: ToolId | null }) => void
 }
 
 export const NavContext = createContext<Nav>({

@@ -240,6 +240,16 @@ export interface AgentsData {
 export type McpToolState = SyncState | 'notApplicable'
 
 /** One library MCP server */
+/** An MCP server's tool rules in short: the default its tools get and how many tools each decision has */
+export interface McpRuleSummary {
+  /** The server's own default, else the default for all servers (viaAll) */
+  default?: McpDecision
+  viaAll?: boolean
+  allow: number
+  ask: number
+  deny: number
+}
+
 export interface McpServerView {
   name: string
   /** For this app only: the definition's meta key `_.description` */
@@ -260,6 +270,8 @@ export interface McpServerView {
   tools: Partial<Record<ToolId, McpToolState>>
   /** Why a tool is in error: a reason code (configUnreadable) or the generator's message */
   reasons?: Partial<Record<ToolId, string>>
+  /** Tool rules, edited in the permissions menu */
+  rules: McpRuleSummary
 }
 
 export interface McpData {
@@ -343,13 +355,18 @@ export interface PermissionsData {
   reasons?: Partial<Record<ToolId, string>>
   /** Hooks that block commands too (the guard action) */
   guards: { name: string; patterns: string[] }[]
-  /** MCP servers with tool rules (set in the MCP detail): their default and how many tools each decision has */
-  mcp: { name: string; default?: McpDecision; allow: number; ask: number; deny: number }[]
+  /** The default for every MCP server without one of its own (permissions.json mcpDefault) */
+  mcpDefault?: McpDecision
+  /** Library MCP servers and their tool rules */
+  mcp: (McpRuleSummary & { name: string })[]
   error?: string
 }
 
-/** An MCP server's tools and their rules, for the MCP detail's permissions tab */
+/** An MCP server's tools and their rules, for its rules in the permissions menu */
 export interface McpToolInfo {
+  transport: string
+  /** stdio: the command with its arguments, shown before the server is run to list its tools */
+  command?: string
   /** Known tool names: the rules, the server's settings, tools fetched from it, and the session logs */
   tools: string[]
   permissions: McpPermissions
@@ -955,6 +972,8 @@ export interface Api {
   scriptReveal(name: string): Promise<WriteResult>
   mcpToolInfo(name: string): Promise<WriteResult<McpToolInfo>>
   mcpPermissionsSave(name: string, permissions: McpPermissions): Promise<WriteResult | Refused>
+  /** The default for all MCP servers; null = each tool's own */
+  mcpDefaultSave(decision: McpDecision | null): Promise<WriteResult | Refused>
   /** Ask the server itself for its tools (runs a stdio server's command); the names are kept with the server */
   mcpFetchTools(name: string): Promise<WriteResult<string[]> | Refused>
   /** With script: save what the tool runs as a new library script and use it; without: as the hook's own run.sh */
@@ -1199,6 +1218,7 @@ export const CHANNELS = [
   'scriptReveal',
   'mcpToolInfo',
   'mcpPermissionsSave',
+  'mcpDefaultSave',
   'mcpFetchTools',
   'hookConvert',
   'hookDelete',

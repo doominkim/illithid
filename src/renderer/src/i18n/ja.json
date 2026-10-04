@@ -143,11 +143,10 @@
     "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はキーチェーンに保管します。",
     "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。",
     "description": "説明",
-    "tabPermissions": "権限",
     "perm": {
       "default": "サーバーの既定",
       "toolDefault": "ツールの既定",
-      "defaultHint": "このサーバーのすべてのツールに適用されます。下で個別に決めたツールはその値に従います。「ツールの既定」は各エージェントツールの既定(通常は確認)に従います。",
+      "defaultHint": "このサーバーのすべてのツールに適用されます。下で個別に決めたツールはその値に従います。",
       "tools": "ツール",
       "useDefault": "既定",
       "noTools": "まだ既知のツールがありません。サーバーから読み込むか、名前を追加してください。",
@@ -162,8 +161,11 @@
       "noteClaude": "Claude Code・Grok CLI: ブロック・確認が許可より優先されるため、この既定では許可したツールも確認またはブロックされます。",
       "noteCodex": "Codex: サーバーをブロックすると、ここで許可・確認にしたツールだけが提供されます。",
       "noteGemini": "Gemini CLI: サーバー名に \"_\" があるとルールが一致しない場合があります。",
-      "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。"
-    }
+      "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。",
+      "useAll": "全サーバー({{decision}})"
+    },
+    "permTitle": "権限",
+    "permEdit": "権限で編集"
   },
   "agents": {
     "model": "モデル",
@@ -1122,8 +1124,13 @@
     "collapse": "折りたたむ",
     "groupPartial": "{{count}} 件中 {{on}} 件オン",
     "mcpTools": "MCP ツール",
-    "mcpToolsHint": "各 MCP サーバーの権限タブで設定します。クリックして変更できます。",
-    "mcpDefault": "既定: {{decision}}"
+    "mcpToolsHint": "MCP サーバーごとにツールを許可・確認・ブロックで決めます。サーバーを開くとツールごとに変えられます。",
+    "mcpDefault": "既定: {{decision}}",
+    "mcpAll": "全サーバーの既定値",
+    "mcpAllHint": "既定値を個別に決めていないサーバーはこの値に従います。後から追加するサーバーも含みます。「ツールの既定」は各エージェントツールの既定の動作(通常は確認)に従います。",
+    "mcpAllowWarning": "すべての MCP サーバーのツールが確認なしで実行されます。書き込み・削除のツールも含まれるので、止めたいツールはサーバーやツールごとに決めてください。",
+    "mcpDefaultAll": "既定値: {{decision}}(全サーバー)",
+    "mcpToolDefault": "ツールの既定"
   },
   "scripts": {
     "search": "スクリプトを検索",

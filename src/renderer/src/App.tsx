@@ -275,18 +275,14 @@ function App(): React.JSX.Element {
     )
   }, [])
 
-  const navigate = useCallback(
-    (menu: Menu, opts?: { select?: string; tool?: ToolId | null; tab?: string }) => {
-      setRequest((r) => ({
-        menu,
-        select: opts?.select,
-        tool: opts && 'tool' in opts ? opts.tool : null,
-        ...(opts?.tab ? { tab: opts.tab } : {}),
-        seq: r.seq + 1
-      }))
-    },
-    []
-  )
+  const navigate = useCallback((menu: Menu, opts?: { select?: string; tool?: ToolId | null }) => {
+    setRequest((r) => ({
+      menu,
+      select: opts?.select,
+      tool: opts && 'tool' in opts ? opts.tool : null,
+      seq: r.seq + 1
+    }))
+  }, [])
   // New version notice: opens once per version per launch; the menu bar item reopens it
   const [update, setUpdate] = useState<UpdateView | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
