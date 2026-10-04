@@ -5,7 +5,8 @@
  * - Codex: default_tools_approval_mode, [tools.<tool>] approval_mode, disabled_tools; a blocked server exposes only the tools let
  *   through (enabled_tools)
  * - Gemini CLI: policy rules with mcpName (+ toolName); a tool's rule sits above its server's
- * A Codex-only approval in `codex.toolApprovals` still applies to the tools these rules leave alone.
+ * A Codex-only approval in `codex.toolApprovals` still applies to the tools these rules leave alone, except an `auto` one
+ * under a server default (Codex would read it before the default).
  * Checked 2026-10-02: code.claude.com/docs/en/permissions, Codex config reference, geminicli.com/docs/reference/policy-engine/
  */
 import type { McpServer } from './types'
@@ -86,7 +87,11 @@ export function codexMcpSettings(s: McpServer): {
   const p = mcpPermissionsOf(s)
   const cx = s.codex ?? {}
   const mode = (d: McpDecision): string => (d === 'allow' ? 'approve' : 'prompt')
-  const approvals: Record<string, string> = { ...(cx.toolApprovals ?? {}) }
+  // A Codex-only `auto` leaves the tool to Codex's own judgement (it asks for tools not marked read-only). Codex reads a
+  // tool's value before the server's, so with a server default an `auto` would hide it: only explicit values are kept
+  const approvals: Record<string, string> = Object.fromEntries(
+    Object.entries(cx.toolApprovals ?? {}).filter(([, m]) => !p.default || m !== 'auto')
+  )
   for (const [tool, d] of Object.entries(p.tools ?? {})) {
     if (d === 'deny') delete approvals[tool]
     else approvals[tool] = mode(d)

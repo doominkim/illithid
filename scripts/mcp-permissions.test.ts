@@ -162,3 +162,40 @@ test('REQ-MCP-PERM-5 OpenCode gets permission keys, each server catch-all before
   )
   assert.equal(after.edit, 'ask')
 })
+
+test("REQ-MCP-PERM-6 with a server default, a Codex-only auto approval doesn't override it; explicit Codex approvals stay", () => {
+  const home = demoHome(['codex'])
+  // Imported from Codex: auto on two tools, writes on one
+  const toolApprovals = { create_task: 'auto', get_task: 'auto', list_tasks: 'writes' }
+  mcpSave(home, 'kaneo', {
+    transport: 'http',
+    url: 'https://kaneo.example/mcp',
+    codex: { toolApprovals },
+    permissions: { default: 'allow' }
+  })
+  // No server default: Codex keeps its own per-tool values as before
+  mcpSave(home, 'notion', {
+    transport: 'http',
+    url: 'https://notion.example/mcp',
+    codex: { toolApprovals }
+  })
+  sync(home)
+  const toml = parseToml(readFileSync(join(home, '.codex/config.toml'), 'utf8')) as {
+    mcp_servers: Record<
+      string,
+      {
+        default_tools_approval_mode?: string
+        tools?: Record<string, { approval_mode: string }>
+      }
+    >
+  }
+  const kaneo = toml.mcp_servers.kaneo
+  assert.equal(kaneo.default_tools_approval_mode, 'approve')
+  assert.equal(kaneo.tools?.create_task, undefined)
+  assert.equal(kaneo.tools?.get_task, undefined)
+  assert.equal(kaneo.tools?.list_tasks.approval_mode, 'writes')
+  const notion = toml.mcp_servers.notion
+  assert.equal(notion.default_tools_approval_mode, undefined)
+  assert.equal(notion.tools?.create_task.approval_mode, 'auto')
+  assert.equal(notion.tools?.list_tasks.approval_mode, 'writes')
+})
