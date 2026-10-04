@@ -26,7 +26,7 @@ function wanted(ctx: BuildContext): [string, string][] {
   const out: [string, string][] = []
   for (const [name, s] of mcpEntries(ctx.sources.mcp)) {
     if (!isEnabled(ctx.sources.manifest, 'mcp', name, 'opencode')) continue
-    const p = mcpPermissionsOf(s, ctx.sources.allowlist.mcpDefault)
+    const p = mcpPermissionsOf(s)
     const server = ocName(name)
     if (p.default) out.push([`${server}_*`, p.default])
     for (const [tool, d] of Object.entries(p.tools ?? {}).sort(([a], [b]) => a.localeCompare(b)))

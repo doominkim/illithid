@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   ActionIcon,
   Badge,
@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Plug,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -34,7 +35,6 @@ import { DetailSheet, MetaItem } from '../components/DetailSheet'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
-import { McpRulesSection } from '../components/McpPermissions'
 import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { SearchInput } from '../components/SearchInput'
@@ -112,7 +112,7 @@ const byDecision = (rules: CommandRule[]): CommandRule[] =>
 function Permissions(): React.JSX.Element {
   const { t } = useTranslation()
   const reload = useReload()
-  const { navigate, request } = useNav()
+  const { navigate } = useNav()
   const { data, error } = useApi('permissions', () => window.api.permissions())
   const [query, setQuery] = useState('')
   // ruleKey of the open rule, null when closed
@@ -124,31 +124,6 @@ function Permissions(): React.JSX.Element {
   const [ruleTab, setRuleTab] = useState<string | null>('preview')
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
   const busy = useToggleBusy()
-  // Open MCP servers; a link from an MCP server's detail opens that one and scrolls to it
-  const [mcpOpen, setMcpOpen] = useState<ReadonlySet<string>>(new Set())
-  const foldMcp = (name: string): void =>
-    setMcpOpen((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  const linked = request.menu === 'permissions' ? request.select : undefined
-  useEffect(() => {
-    if (!linked) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- a navigation request opens its server once
-    setMcpOpen((prev) => new Set(prev).add(linked))
-    // Only when a new request comes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request.seq])
-  useEffect(() => {
-    if (!linked || !data) return
-    document
-      .querySelector(`[data-testid="perm-mcp-server"][data-server="${CSS.escape(linked)}"]`)
-      ?.scrollIntoView({ block: 'start' })
-    // Once the section is there for the request
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request.seq, !!data])
 
   if (error) return <ErrorAlert message={error} />
   if (!data) return <Loading />
@@ -476,7 +451,38 @@ function Permissions(): React.JSX.Element {
           </Stack>
         )}
 
-        <McpRulesSection data={data} query={q} open={mcpOpen} onFold={foldMcp} onChanged={reload} />
+        {(data.mcp ?? []).length > 0 && (
+          <Stack gap={8} data-testid="perm-mcp-tools">
+            <Text size="sm" fw={600} c="dimmed">
+              {t('permissions.mcpTools')}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {t('permissions.mcpToolsHint')}
+            </Text>
+            <ListCard>
+              {(data.mcp ?? []).map((m) => (
+                <ListRow
+                  key={m.name}
+                  avatar={<Plug size={18} />}
+                  title={m.name}
+                  subtitle={[
+                    m.default
+                      ? t('permissions.mcpDefault', {
+                          decision: t(`permissions.decision.${m.default}`)
+                        })
+                      : null,
+                    ...(['deny', 'ask', 'allow'] as const)
+                      .filter((d) => m[d] > 0)
+                      .map((d) => `${t(`permissions.decision.${d}`)} ${m[d]}`)
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  onClick={() => navigate('mcp', { select: m.name, tab: 'permissions' })}
+                />
+              ))}
+            </ListCard>
+          </Stack>
+        )}
 
         <Stack gap={4}>
           {data.claudeOnly > 0 && (

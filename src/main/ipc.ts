@@ -664,7 +664,6 @@ export function registerIpc(): void {
     mcpToolInfo: async (name) => W.wrap(() => mcpToolInfo(home, str(name))),
     mcpPermissionsSave: async (name, permissions) =>
       libWrite(() => W.lib.mcpPermissionsSave(home, str(name), permissions)),
-    mcpDefaultSave: async (decision) => libWrite(() => W.lib.mcpDefaultSave(home, decision)),
     mcpFetchTools: async (name) => {
       const g = W.libGate(home)
       if (g) return g

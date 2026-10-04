@@ -80,12 +80,9 @@ import {
   type HookDoc,
   usedScript,
   PERMISSION_HOOK,
-  type Allowlist,
-  type McpDecision,
-  type McpServer
+  type Allowlist
 } from '../engine'
 import type {
-  McpRuleSummary,
   McpToolInfo,
   ScriptsData,
   PermissionsData,
@@ -371,16 +368,13 @@ function mcpDescription(home: string, name: string): string | undefined {
 export function mcp(home: string, env: Env): McpData {
   let changes: FileChange[]
   let source: ReturnType<typeof mcpEntries>
-  let mcpDefault: McpDecision | undefined
   try {
     changes = plan(
       home,
       env,
       MCP_TARGETS.map((x) => x.id)
     )
-    const src = readSources(home)
-    source = mcpEntries(src.mcp)
-    mcpDefault = src.allowlist.mcpDefault
+    source = mcpEntries(readSources(home).mcp)
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     return {
@@ -442,8 +436,7 @@ export function mcp(home: string, env: Env): McpData {
       ...(typeof s.bearerEnv === 'string' ? { bearerEnv: s.bearerEnv } : {}),
       ...(typeof s.bearerToken === 'string' ? { bearerToken: true } : {}),
       tools: Object.fromEntries(perTool.map((t) => [t.tool, stateOf(t, name)])),
-      ...mcpReasons(perTool, name),
-      rules: mcpRules(s, mcpDefault)
+      ...mcpReasons(perTool, name)
     }
   })
   return {
@@ -867,32 +860,27 @@ export function permissions(home: string, env: Env): PermissionsData {
     tools,
     ...(Object.keys(reasons).length ? { reasons } : {}),
     guards,
-    ...(allowlist?.mcpDefault ? { mcpDefault: allowlist.mcpDefault } : {}),
     mcp: mcpRuleSummary(home)
   }
 }
 
-/** A server's tool rules in short; mcpDefault is the default for all servers (permissions.json) */
-function mcpRules(s: McpServer, mcpDefault?: McpDecision): McpRuleSummary {
-  const own = mcpPermissionsOf(s)
-  const def = own.default ?? mcpDefault
-  const count = (d: McpDecision): number =>
-    Object.values(own.tools ?? {}).filter((x) => x === d).length
-  return {
-    ...(def ? { default: def } : {}),
-    ...(!own.default && def ? { viaAll: true } : {}),
-    allow: count('allow'),
-    ask: count('ask'),
-    deny: count('deny')
-  }
-}
-
-/** Every library MCP server with its tool rules, for the permissions menu */
+/** MCP servers with tool rules, for the permissions menu */
 function mcpRuleSummary(home: string): PermissionsData['mcp'] {
   try {
-    const src = readSources(home)
-    return Object.entries(src.mcp.servers)
-      .map(([name, s]) => ({ name, ...mcpRules(s, src.allowlist.mcpDefault) }))
+    return Object.entries(readSources(home).mcp.servers)
+      .map(([name, s]) => {
+        const p = mcpPermissionsOf(s)
+        const count = (d: string): number =>
+          Object.values(p.tools ?? {}).filter((x) => x === d).length
+        return {
+          name,
+          ...(p.default ? { default: p.default } : {}),
+          allow: count('allow'),
+          ask: count('ask'),
+          deny: count('deny')
+        }
+      })
+      .filter((x) => x.default || x.allow + x.ask + x.deny)
       .sort((a, b) => a.name.localeCompare(b.name))
   } catch {
     return []
@@ -918,17 +906,7 @@ export function mcpToolInfo(home: string, name: string): McpToolInfo {
   const codexOnly = Object.fromEntries(
     Object.entries(cx.toolApprovals ?? {}).filter(([, m]) => m !== 'auto')
   )
-  const command =
-    raw.transport === 'stdio'
-      ? [raw.command, ...(raw.args ?? [])].filter(Boolean).join(' ')
-      : undefined
-  return {
-    transport: raw.transport,
-    ...(command ? { command } : {}),
-    tools: [...tools].sort(),
-    permissions,
-    codexOnly
-  }
+  return { tools: [...tools].sort(), permissions, codexOnly }
 }
 
 // ---------------------------------------------------------------- scripts

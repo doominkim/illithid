@@ -79,7 +79,6 @@ import {
   savePermissionRules,
   createScript,
   createFolderScript,
-  setMcpDefault,
   setMcpPermissions,
   setRuleDescription,
   readScriptFile,
@@ -97,7 +96,6 @@ import {
   deleteScript,
   convertHookToLibraryScript,
   renderUniversalScript,
-  type McpDecision,
   type PermissionRules
 } from '../engine'
 import { previewSwitch } from '../engine'
@@ -758,10 +756,6 @@ export const lib = {
   },
   mcpPermissionsSave: (home: string, name: string, permissions: unknown) => {
     setMcpPermissions(home, name, permissions)
-  },
-  /** The default for all MCP servers (null clears it) */
-  mcpDefaultSave: (home: string, decision: unknown) => {
-    setMcpDefault(home, (decision || null) as McpDecision | null)
   },
   /** Where a script lives (its folder, or its .sh file) */
   scriptLocation: (home: string, name: string) =>

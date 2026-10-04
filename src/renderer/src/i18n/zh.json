@@ -143,10 +143,11 @@
     "headersHint": "发送给服务器的 HTTP 头。${VAR} 读取环境变量，其他值保存在钥匙串中。",
     "timeoutHint": "等待服务器响应的最长时间。留空则用工具默认值。",
     "description": "说明",
+    "tabPermissions": "权限",
     "perm": {
       "default": "服务器默认",
       "toolDefault": "工具默认",
-      "defaultHint": "应用于此服务器的所有工具。下方单独设置的工具使用各自的值。",
+      "defaultHint": "适用于此服务器的所有工具，下方单独设置的工具以其设置为准。“工具默认”沿用各代理工具的默认行为（通常为询问）。",
       "tools": "工具",
       "useDefault": "默认",
       "noTools": "尚无已知工具。可从服务器加载，或添加名称。",
@@ -161,11 +162,8 @@
       "noteClaude": "Claude Code、Grok CLI：阻止和询问优先于允许，因此在此默认值下，允许的工具仍会询问或被阻止。",
       "noteCodex": "Codex：阻止服务器后，只提供此处设为允许或询问的工具。",
       "noteGemini": "Gemini CLI：服务器名含 \"_\" 时规则可能无法匹配。",
-      "noteCopilot": "GitHub Copilot：无法在配置文件中设置工具权限。",
-      "useAll": "所有服务器（{{decision}}）"
-    },
-    "permTitle": "权限",
-    "permEdit": "在权限中编辑"
+      "noteCopilot": "GitHub Copilot：无法在配置文件中设置工具权限。"
+    }
   },
   "agents": {
     "model": "模型",
@@ -1124,13 +1122,8 @@
     "collapse": "折叠",
     "groupPartial": "{{count}} 条规则中 {{on}} 条开启",
     "mcpTools": "MCP 工具",
-    "mcpToolsHint": "为每个 MCP 服务器的工具设置允许、询问或阻止。展开服务器可逐个设置工具。",
-    "mcpDefault": "默认：{{decision}}",
-    "mcpAll": "所有服务器的默认值",
-    "mcpAllHint": "没有单独设置默认值的服务器会使用此值，之后添加的服务器也包括在内。“工具默认”表示沿用各智能体工具的默认行为（通常为询问）。",
-    "mcpAllowWarning": "所有 MCP 服务器的工具都会不经询问直接运行，包括写入和删除类工具。需要阻止的工具请按服务器或工具单独设置。",
-    "mcpDefaultAll": "默认值：{{decision}}（所有服务器）",
-    "mcpToolDefault": "工具默认"
+    "mcpToolsHint": "在各 MCP 服务器的权限标签中设置，点击可修改。",
+    "mcpDefault": "默认：{{decision}}"
   },
   "scripts": {
     "search": "搜索脚本",

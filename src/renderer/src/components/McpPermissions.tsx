@@ -1,31 +1,26 @@
 import { useEffect, useState } from 'react'
 import {
-  ActionIcon,
   Badge,
-  Box,
   Button,
   Group,
   SegmentedControl,
   Stack,
   Table,
   Text,
-  TextInput,
-  UnstyledButton
+  TextInput
 } from '@mantine/core'
-import { ChevronDown, ChevronRight, ListRestart, Plug } from 'lucide-react'
+import { ListRestart } from 'lucide-react'
 import { notifications } from '@mantine/notifications'
 import { useTranslation } from 'react-i18next'
 import type {
   McpDecision,
   McpPermissions,
+  McpServerView,
   McpToolInfo,
-  PermissionsData,
   ToolId
 } from '../../../shared/api'
 import { useToolsInUse } from '../lib/config'
-import { mcpRuleText } from '../lib/mcpRules'
 import { runWrite } from '../lib/mutate'
-import { includesCI } from '../lib/format'
 import { ConfirmModal } from './ConfirmModal'
 import { ErrorAlert, Loading } from './Layout'
 import { ToolIcon } from './ToolIcon'
@@ -34,126 +29,13 @@ const DECISIONS: McpDecision[] = ['allow', 'ask', 'deny']
 const TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,128}$/
 
 /**
- * The permissions menu's MCP section: a default for every server, then each library server folded, opening to its own
- * default and a decision per tool. Each change is saved at once and reaches the tools on the next sync
+ * An MCP server's tool rules: a default for the server and a decision per tool. Each change is saved at once and reaches the
+ * tools on the next sync. Notes say where a tool can't follow a rule
  */
-export function McpRulesSection({
-  data,
-  query,
-  open,
-  onFold,
-  onChanged
-}: {
-  data: PermissionsData
-  query: string
-  open: ReadonlySet<string>
-  onFold: (name: string) => void
-  onChanged: () => void
-}): React.JSX.Element | null {
-  const { t } = useTranslation()
-  const servers = data.mcp.filter((m) => !query || includesCI(m.name, query))
-  if (!data.mcp.length) return null
-
-  const setAll = async (v: string): Promise<void> => {
-    const r = await runWrite(window.api.mcpDefaultSave((v || null) as McpDecision | null), {
-      success: t('mcp.perm.saved')
-    })
-    if (r !== null) onChanged()
-  }
-
-  return (
-    <Stack gap={8} data-testid="perm-mcp-tools">
-      <Text size="sm" fw={600} c="dimmed">
-        {t('permissions.mcpTools')}
-      </Text>
-      <Text size="xs" c="dimmed">
-        {t('permissions.mcpToolsHint')}
-      </Text>
-      <Box className="ac-card" p="md">
-        <Stack gap={6}>
-          <Text size="sm" fw={500}>
-            {t('permissions.mcpAll')}
-          </Text>
-          <SegmentedControl
-            value={data.mcpDefault ?? ''}
-            onChange={(v) => void setAll(v)}
-            data={decisionChoices(t, t('mcp.perm.toolDefault'))}
-            data-testid="perm-mcp-default"
-          />
-          <Text size="xs" c="dimmed">
-            {t('permissions.mcpAllHint')}
-          </Text>
-          {data.mcpDefault === 'allow' && (
-            <Text size="xs" c="var(--ac-warning)" data-testid="perm-mcp-allow-warning">
-              {t('permissions.mcpAllowWarning')}
-            </Text>
-          )}
-        </Stack>
-      </Box>
-      {servers.map((m) => {
-        const opened = open.has(m.name)
-        return (
-          <Stack key={m.name} gap={8} data-testid="perm-mcp-server" data-server={m.name}>
-            <Group gap={6} wrap="nowrap" align="flex-start">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                onClick={() => onFold(m.name)}
-                aria-label={t(opened ? 'permissions.collapse' : 'permissions.expand')}
-              >
-                {opened ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </ActionIcon>
-              <UnstyledButton
-                onClick={() => onFold(m.name)}
-                style={{ minWidth: 0 }}
-                data-testid="perm-mcp-server-open"
-              >
-                <Group gap={6} wrap="nowrap">
-                  <Plug size={14} />
-                  <Text size="sm" fw={600}>
-                    {m.name}
-                  </Text>
-                </Group>
-                <Text size="xs" c="dimmed" data-testid="perm-mcp-summary">
-                  {mcpRuleText(t, m)}
-                </Text>
-              </UnstyledButton>
-            </Group>
-            {opened && (
-              <Box className="ac-card" p="md">
-                <McpServerRules name={m.name} allDefault={data.mcpDefault} onChanged={onChanged} />
-              </Box>
-            )}
-          </Stack>
-        )
-      })}
-    </Stack>
-  )
-}
-
-function decisionChoices(
-  t: (k: string) => string,
-  first: string
-): { value: string; label: string }[] {
-  return [
-    { value: '', label: first },
-    ...DECISIONS.map((d) => ({ value: d, label: t(`permissions.decision.${d}`) }))
-  ]
-}
-
-/** One server's default and its tools' decisions. Notes say where a tool can't follow a rule */
-function McpServerRules({
-  name,
-  allDefault,
-  onChanged
-}: {
-  name: string
-  allDefault?: McpDecision
-  onChanged: () => void
-}): React.JSX.Element {
+export function McpPermissionsTab({ server }: { server: McpServerView }): React.JSX.Element {
   const { t } = useTranslation()
   const inUse = useToolsInUse()
+  const name = server.name
   const [info, setInfo] = useState<McpToolInfo | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [added, setAdded] = useState<string[]>([])
@@ -178,9 +60,7 @@ function McpServerRules({
     const r = await runWrite(window.api.mcpPermissionsSave(name, next), {
       success: t('mcp.perm.saved')
     })
-    if (r === null) return
-    load()
-    onChanged()
+    if (r !== null) load()
   }
   const setDefault = (v: string): void => {
     const { default: _, ...rest } = rules
@@ -210,19 +90,23 @@ function McpServerRules({
   }
 
   // Where a tool can't follow the rules (only for tools in use)
-  const effective = rules.default ?? allDefault
-  const hasRules = !!effective || Object.keys(rules.tools ?? {}).length > 0
+  const hasRules = !!rules.default || Object.keys(rules.tools ?? {}).length > 0
   const allowUnderStricter =
-    (effective === 'ask' || effective === 'deny') &&
+    (rules.default === 'ask' || rules.default === 'deny') &&
     Object.values(rules.tools ?? {}).includes('allow')
   const notes: [string, string][] = []
   if (allowUnderStricter && inUse.includes('claude'))
     notes.push(['claude', t('mcp.perm.noteClaude')])
-  if (effective === 'deny' && inUse.includes('codex'))
+  if (rules.default === 'deny' && inUse.includes('codex'))
     notes.push(['codex', t('mcp.perm.noteCodex')])
   if (hasRules && name.includes('_') && inUse.includes('gemini'))
     notes.push(['gemini', t('mcp.perm.noteGemini')])
   if (hasRules && inUse.includes('copilot')) notes.push(['copilot', t('mcp.perm.noteCopilot')])
+
+  const choices = (first: string): { value: string; label: string }[] => [
+    { value: '', label: first },
+    ...DECISIONS.map((d) => ({ value: d, label: t(`permissions.decision.${d}`) }))
+  ]
 
   return (
     <Stack gap="md" data-testid="mcp-permissions">
@@ -233,12 +117,7 @@ function McpServerRules({
         <SegmentedControl
           value={rules.default ?? ''}
           onChange={setDefault}
-          data={decisionChoices(
-            t,
-            allDefault
-              ? t('mcp.perm.useAll', { decision: t(`permissions.decision.${allDefault}`) })
-              : t('mcp.perm.toolDefault')
-          )}
+          data={choices(t('mcp.perm.toolDefault'))}
           data-testid="mcp-perm-default"
         />
         <Text size="xs" c="dimmed">
@@ -268,7 +147,7 @@ function McpServerRules({
           variant="default"
           leftSection={<ListRestart size={13} />}
           loading={fetching}
-          onClick={() => (info.transport === 'stdio' ? setConfirmFetch(true) : void fetchTools())}
+          onClick={() => (server.transport === 'stdio' ? setConfirmFetch(true) : void fetchTools())}
           data-testid="mcp-perm-fetch"
         >
           {t('mcp.perm.fetch')}
@@ -300,7 +179,7 @@ function McpServerRules({
                     size="xs"
                     value={rules.tools?.[tool] ?? ''}
                     onChange={(v) => setTool(tool, v)}
-                    data={decisionChoices(t, t('mcp.perm.useDefault'))}
+                    data={choices(t('mcp.perm.useDefault'))}
                     data-testid={`mcp-perm-tool-${tool}`}
                   />
                 </Table.Td>
@@ -330,7 +209,9 @@ function McpServerRules({
         onConfirm={fetchTools}
         title={t('mcp.perm.fetch')}
         confirmLabel={t('mcp.perm.fetchRun')}
-        message={t('mcp.perm.fetchConfirm', { command: info.command ?? '' })}
+        message={t('mcp.perm.fetchConfirm', {
+          command: [server.command, ...(server.args ?? [])].filter(Boolean).join(' ')
+        })}
       />
     </Stack>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Badge, Box, Button, Code, Group, Stack, Tabs, Text } from '@mantine/core'
+import { Badge, Box, Button, Code, Group, Stack, Tabs } from '@mantine/core'
 import { Download, Globe, Plus, Terminal, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToolsInUse } from '../lib/config'
@@ -18,7 +18,7 @@ import { CardGrid, ItemCard } from '../components/ItemCard'
 import { ErrorAlert, Fields, Loading } from '../components/Layout'
 import { Initial, ListCard, ListRow } from '../components/ListRow'
 import { McpForm } from '../components/McpForm'
-import { PageHeader, SectionTitle, ShownCount, Toolbar } from '../components/PageHeader'
+import { PageHeader, ShownCount, Toolbar } from '../components/PageHeader'
 import { ReloadButton } from '../components/ReloadButton'
 import { useReload } from '../lib/reload'
 import { SearchInput } from '../components/SearchInput'
@@ -27,7 +27,6 @@ import { ToolToggleRow } from '../components/ToolToggleRow'
 import { UsagePanel } from '../components/UsagePanel'
 import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
-import { mcpRuleText } from '../lib/mcpRules'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
 import { grokReadsFromClaude, pillFromCellState, type PillMap, TOOLS } from '../lib/tools'
@@ -39,6 +38,8 @@ import { SortToggle, UsageSpark } from '../components/UsageSpark'
 import { sortByUsage, useListSort } from '../lib/listSort'
 import { useUsageSummary } from '../lib/useUsageSummary'
 
+import { McpPermissionsTab } from '../components/McpPermissions'
+
 const NEW = '__new__'
 
 function Mcp(): React.JSX.Element {
@@ -46,7 +47,7 @@ function Mcp(): React.JSX.Element {
   // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
   const inUse = useToolsInUse()
   const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
-  const { request, navigate } = useNav()
+  const { request } = useNav()
   const reload = useReload()
   const { data, error } = useApi('mcp', () => window.api.mcp())
   const [query, setQuery] = useState('')
@@ -56,6 +57,18 @@ function Mcp(): React.JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   useNavSelect(setSelected)
+  // Detail tab: preview for a server picked from the list, or the one a link asks for (the permissions menu's)
+  const [tab, setTab] = useState<string | null>(request.tab ?? 'fields')
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a navigation request picks the tab once
+    if (request.select) setTab(request.tab ?? 'fields')
+    // Only when a new request comes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request.seq])
+  const open = (name: string): void => {
+    setSelected(name)
+    setTab('fields')
+  }
   const [sort, setSort] = useListSort('mcp')
   const usage = useUsageSummary('mcp', data?.servers.map((s) => s.name) ?? [])
 
@@ -215,7 +228,7 @@ function Mcp(): React.JSX.Element {
                   />
                 }
                 selected={s.name === selected}
-                onClick={() => setSelected(s.name)}
+                onClick={() => open(s.name)}
               />
             )
           })}
@@ -241,7 +254,7 @@ function Mcp(): React.JSX.Element {
                 </Group>
               }
               active={s.name === selected}
-              onClick={() => setSelected(s.name)}
+              onClick={() => open(s.name)}
             />
           ))}
         </ListCard>
@@ -282,31 +295,17 @@ function Mcp(): React.JSX.Element {
               busy={pending.of(current.name)}
               testId="mcp-detail-tools"
             />
-            <Box data-testid="mcp-perm-summary">
-              <SectionTitle
-                right={
-                  <Button
-                    size="compact-xs"
-                    variant="subtle"
-                    onClick={() => navigate('permissions', { select: current.name })}
-                    data-testid="mcp-perm-link"
-                  >
-                    {t('mcp.permEdit')}
-                  </Button>
-                }
-              >
-                {t('mcp.permTitle')}
-              </SectionTitle>
-              <Text size="sm" c="dimmed">
-                {mcpRuleText(t, current.rules)}
-              </Text>
-            </Box>
             <UsagePanel kind="mcp" name={current.name} />
-            <Tabs defaultValue="fields" keepMounted={false}>
+            <Tabs value={tab} onChange={setTab} keepMounted={false}>
               <Tabs.List>
-                <Tabs.Tab value="fields">{t('detail.source')}</Tabs.Tab>
+                <Tabs.Tab value="fields" data-testid="mcp-tab-preview">
+                  {t('detail.source')}
+                </Tabs.Tab>
                 <Tabs.Tab value="edit" data-testid="tab-edit">
                   {t('detail.edit')}
+                </Tabs.Tab>
+                <Tabs.Tab value="permissions" data-testid="mcp-tab-permissions">
+                  {t('mcp.tabPermissions')}
                 </Tabs.Tab>
               </Tabs.List>
               <Tabs.Panel value="fields" pt="md">
@@ -336,6 +335,9 @@ function Mcp(): React.JSX.Element {
               </Tabs.Panel>
               <Tabs.Panel value="edit" pt="md">
                 <McpEdit name={current.name} onSave={save} />
+              </Tabs.Panel>
+              <Tabs.Panel value="permissions" pt="md">
+                <McpPermissionsTab key={current.name} server={current} />
               </Tabs.Panel>
             </Tabs>
           </Stack>
