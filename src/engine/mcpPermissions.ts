@@ -6,6 +6,8 @@
  *   through (enabled_tools)
  * - Gemini CLI: policy rules with mcpName (+ toolName); a tool's rule sits above its server's
  * A Codex-only approval in `codex.toolApprovals` still applies to the tools these rules leave alone.
+ * permissions.json `mcpDefault` is the default of every server without one of its own: the targets pass it as `fallback`, and
+ * each server gets it written out under its own name, so no tool needs a wildcard over servers.
  * Checked 2026-10-02: code.claude.com/docs/en/permissions, Codex config reference, geminicli.com/docs/reference/policy-engine/
  */
 import type { McpServer } from './types'
@@ -45,12 +47,18 @@ export function mcpPermissionProblems(v: unknown): string[] {
   return errors
 }
 
-/** The server's rules (an unreadable value reads as none: validation refuses it on save) */
-export function mcpPermissionsOf(s: McpServer): McpPermissions {
+/**
+ * The server's rules (an unreadable value reads as none: validation refuses it on save). `fallback` is the default for all
+ * servers, used when the server has none of its own
+ */
+export function mcpPermissionsOf(s: McpServer, fallback?: McpDecision): McpPermissions {
   const p = s.permissions
-  if (!isObj(p) || mcpPermissionProblems(p).length) return {}
+  const ok = isObj(p) && !mcpPermissionProblems(p).length
+  const own = ok && isDecision(p.default) ? p.default : undefined
+  const def = own ?? (isDecision(fallback) ? fallback : undefined)
+  if (!ok) return def ? { default: def } : {}
   return {
-    ...(isDecision(p.default) ? { default: p.default } : {}),
+    ...(def ? { default: def } : {}),
     ...(isObj(p.tools) && Object.keys(p.tools).length
       ? { tools: { ...(p.tools as Record<string, McpDecision>) } }
       : {})
@@ -64,8 +72,12 @@ const sortedTools = (p: McpPermissions, d?: McpDecision): string[] =>
     .sort()
 
 /** Claude Code permission rules for one server */
-export function claudeMcpRules(name: string, s: McpServer): Record<McpDecision, string[]> {
-  const p = mcpPermissionsOf(s)
+export function claudeMcpRules(
+  name: string,
+  s: McpServer,
+  fallback?: McpDecision
+): Record<McpDecision, string[]> {
+  const p = mcpPermissionsOf(s, fallback)
   const out: Record<McpDecision, string[]> = { allow: [], ask: [], deny: [] }
   if (p.default) out[p.default].push(`mcp__${name}`)
   for (const d of MCP_DECISIONS)
@@ -77,13 +89,16 @@ export function claudeMcpRules(name: string, s: McpServer): Record<McpDecision, 
 }
 
 /** Codex settings for one server: the rules over its Codex-only options */
-export function codexMcpSettings(s: McpServer): {
+export function codexMcpSettings(
+  s: McpServer,
+  fallback?: McpDecision
+): {
   defaultMode?: string
   enabledTools?: string[]
   disabledTools?: string[]
   approvals: Record<string, string>
 } {
-  const p = mcpPermissionsOf(s)
+  const p = mcpPermissionsOf(s, fallback)
   const cx = s.codex ?? {}
   const mode = (d: McpDecision): string => (d === 'allow' ? 'approve' : 'prompt')
   const approvals: Record<string, string> = { ...(cx.toolApprovals ?? {}) }
@@ -122,8 +137,12 @@ export interface GeminiMcpRule {
   priority: number
 }
 
-export function geminiMcpRules(name: string, s: McpServer): GeminiMcpRule[] {
-  const p = mcpPermissionsOf(s)
+export function geminiMcpRules(
+  name: string,
+  s: McpServer,
+  fallback?: McpDecision
+): GeminiMcpRule[] {
+  const p = mcpPermissionsOf(s, fallback)
   const out: GeminiMcpRule[] = []
   if (p.default)
     out.push({

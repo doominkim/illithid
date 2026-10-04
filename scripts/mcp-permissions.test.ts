@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import { savePermissionRules, syncAll, upsertMcpServer } from '../src/engine'
+import { savePermissionRules, setMcpDefault, syncAll, upsertMcpServer } from '../src/engine'
 import { mcpSave } from '../src/main/writes'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
@@ -161,4 +161,60 @@ test('REQ-MCP-PERM-5 OpenCode gets permission keys, each server catch-all before
     []
   )
   assert.equal(after.edit, 'ask')
+})
+
+test('REQ-MCP-PERM-6 the default for all MCP servers applies to servers without their own default, in every tool, new servers included', () => {
+  const home = demoHome(['claude', 'codex', 'gemini', 'opencode'])
+  withServers(home)
+  // notion has no rules; kaneo keeps a tool rule but follows the default for the rest
+  mcpSave(home, 'notion', { transport: 'http', url: 'https://notion.example/mcp' })
+  mcpSave(home, 'kaneo', {
+    transport: 'http',
+    url: 'https://kaneo.example/mcp',
+    permissions: { tools: { delete_task: 'deny' } }
+  })
+  setMcpDefault(home, 'allow')
+  sync(home)
+
+  const claude = (): { allow: string[]; ask: string[]; deny: string[] } =>
+    JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8')).permissions
+  for (const r of ['mcp__notion', 'mcp__kaneo']) assert.ok(claude().allow.includes(r), r)
+  // gh keeps its own default (block)
+  assert.ok(!claude().allow.includes('mcp__gh'))
+  for (const r of ['mcp__gh', 'mcp__kaneo__delete_task']) assert.ok(claude().deny.includes(r), r)
+
+  const codex = parseToml(readFileSync(join(home, '.codex/config.toml'), 'utf8')) as {
+    mcp_servers: Record<string, { default_tools_approval_mode?: string; enabled_tools?: string[] }>
+  }
+  assert.equal(codex.mcp_servers.notion.default_tools_approval_mode, 'approve')
+  assert.equal(codex.mcp_servers.kaneo.default_tools_approval_mode, 'approve')
+  assert.deepEqual(codex.mcp_servers.gh.enabled_tools, ['get_issue', 'search'])
+
+  const policy = parseToml(readFileSync(join(home, '.gemini/policies/illithid.toml'), 'utf8')) as {
+    rule: { mcpName?: string; toolName?: string; decision: string }[]
+  }
+  const server = (name: string): string | undefined =>
+    policy.rule.find((r) => r.mcpName === name && !r.toolName)?.decision
+  assert.equal(server('notion'), 'allow')
+  assert.equal(server('gh'), 'deny')
+
+  const perm = (): Record<string, unknown> =>
+    JSON.parse(readFileSync(join(home, '.config/opencode/opencode.json'), 'utf8')).permission
+  assert.equal(perm()['notion_*'], 'allow')
+  assert.equal(perm()['gh_*'], 'deny')
+
+  // A server added later follows the default
+  mcpSave(home, 'later', { transport: 'http', url: 'https://later.example/mcp' })
+  sync(home)
+  assert.ok(claude().allow.includes('mcp__later'))
+
+  // Cleared: the servers without their own default go back to each tool's default
+  setMcpDefault(home, null)
+  sync(home)
+  for (const r of ['mcp__notion', 'mcp__later', 'mcp__kaneo'])
+    assert.ok(!claude().allow.includes(r), r)
+  assert.ok(claude().deny.includes('mcp__gh'))
+  assert.equal(perm()['notion_*'], undefined)
+
+  assert.throws(() => setMcpDefault(home, 'maybe' as never), { code: 'invalidSchema' })
 })

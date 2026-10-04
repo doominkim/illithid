@@ -65,7 +65,9 @@ export const geminiPolicy: TargetDef = {
   build(before, { sources, retiring }) {
     const mcpRules = retiring
       ? []
-      : mcpEntries(sources.mcp).flatMap(([name, s]) => geminiMcpRules(name, s))
+      : mcpEntries(sources.mcp).flatMap(([name, s]) =>
+          geminiMcpRules(name, s, sources.allowlist.mcpDefault)
+        )
     if (!sources.hasPermissions && !mcpRules.length && !before.trim())
       return { after: before, notes: ['no command or MCP tool rules — nothing to write'] }
     if (before.trim() && !ours(before))

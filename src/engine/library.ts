@@ -51,7 +51,7 @@ import {
   type PermissionRules
 } from './permissions'
 import type { Allowlist, McpServer } from './types'
-import { mcpPermissionProblems } from './mcpPermissions'
+import { MCP_DECISIONS, mcpPermissionProblems, type McpDecision } from './mcpPermissions'
 import type { HookAction } from './hookActions'
 import { isHookTool, type HookTiming, type HookTool } from './hookEvents'
 import {
@@ -1365,6 +1365,8 @@ export function validatePermissions(v: unknown): string[] {
     if (ask !== undefined && (!Array.isArray(ask) || !ask.every((x) => typeof x === 'string')))
       errs.push('claudeOnly.ask must be a string array')
   }
+  if (v.mcpDefault !== undefined && !(MCP_DECISIONS as readonly unknown[]).includes(v.mcpDefault))
+    errs.push('mcpDefault must be allow, ask or deny')
   return errs
 }
 
@@ -1402,6 +1404,13 @@ export function savePermissionRules(home: string, rules: PermissionRules): strin
     home,
     withPermissionRules(readPermissions(home) ?? emptyAllowlist(), rules)
   )
+}
+
+/** Set (or clear, with null) the default for every MCP server without one of its own. Other keys stay */
+export function setMcpDefault(home: string, decision: McpDecision | null): string {
+  const { mcpDefault: _, ...rest } = readPermissions(home) ?? emptyAllowlist()
+  void _
+  return writePermissions(home, (decision ? { ...rest, mcpDefault: decision } : rest) as Allowlist)
 }
 
 // ---------------------------------------------------------------- Internal (for importer)

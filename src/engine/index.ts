@@ -315,6 +315,7 @@ export {
   writePermissions,
   validatePermissions,
   savePermissionRules,
+  setMcpDefault,
   looksLikeSecret,
   isSecretPair,
   LibraryError,

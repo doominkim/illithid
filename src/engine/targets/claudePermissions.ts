@@ -25,7 +25,7 @@ export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, set
       return `Bash(${argv.join(' ')}${claudeExact ? '' : ':*'})`
     })
   // MCP servers' tool rules (and Codex-only approvals, mirrored as ask so both tools gate the same tools)
-  const mcpRules = mcpEntries(mcp).map(([name, s]) => claudeMcpRules(name, s))
+  const mcpRules = mcpEntries(mcp).map(([name, s]) => claudeMcpRules(name, s, allowlist.mcpDefault))
   const fromMcp = (d: 'allow' | 'ask' | 'deny'): string[] => mcpRules.flatMap((r) => r[d])
   next.permissions.allow = [
     ...bash(allowlist.bash),

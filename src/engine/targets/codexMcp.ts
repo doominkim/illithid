@@ -7,7 +7,7 @@ import {
   toggleNotes,
   type MarkerPair
 } from '../text'
-import { codexMcpSettings } from '../mcpPermissions'
+import { codexMcpSettings, type McpDecision } from '../mcpPermissions'
 import { isSecretRef, type SecretBackend } from '../secrets'
 import type { Env, McpSource, TargetDef } from '../types'
 import { bareEnvName, httpHeaders, isServerError, renderValue, secretValue } from './mcpRender'
@@ -82,12 +82,14 @@ export interface CodexMcpBody {
  * - `secret:` headers and bearerToken become http_headers literals (Codex rejects a bearer_token literal)
  * - Headers whose whole value is ${VAR} go to env_http_headers; bearerEnv goes to bearer_token_env_var
  * prevBody is the previous marker block body — used to keep existing tables for servers with missing secrets.
+ * mcpDefault is the default for all servers (permissions.json), for servers without one of their own.
  */
 export function buildCodexMcpBody(
   mcp: McpSource,
   env: Env,
   secrets?: SecretBackend,
-  prevBody = ''
+  prevBody = '',
+  mcpDefault?: McpDecision
 ): CodexMcpBody {
   const lines: string[] = []
   const warnings: string[] = []
@@ -108,7 +110,7 @@ export function buildCodexMcpBody(
         if (s.bearerEnv) out.push(`bearer_token_env_var = ${tomlString(s.bearerEnv)}`)
       }
       // Tool rules over the Codex-only options (mcpPermissions.ts)
-      const cx = codexMcpSettings(s)
+      const cx = codexMcpSettings(s, mcpDefault)
       if (cx.defaultMode) out.push(`default_tools_approval_mode = ${tomlString(cx.defaultMode)}`)
       if (cx.enabledTools)
         out.push(`enabled_tools = [${cx.enabledTools.map(tomlString).join(', ')}]`)
@@ -192,7 +194,8 @@ export const codexMcp: TargetDef = {
       mcpForTool(sources, 'codex'),
       env,
       ctx.secrets,
-      blockBodyMulti(before, ALL_TOML_MCP_MARKERS) ?? ''
+      blockBodyMulti(before, ALL_TOML_MCP_MARKERS) ?? '',
+      sources.allowlist.mcpDefault
     )
     // With no enabled servers, don't create an empty block and remove any previously written one
     const none = !enabledServerNames(sources, 'codex').length

@@ -38,6 +38,8 @@ export interface Allowlist {
     deny: string[]
     ask?: string[]
   }
+  /** Decision for the tools of every MCP server without a default of its own (mcpPermissions.ts) */
+  mcpDefault?: 'allow' | 'ask' | 'deny'
   [key: string]: unknown
 }
 
