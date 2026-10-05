@@ -65,6 +65,8 @@ import {
   writePermissions
 } from './library'
 import { secretRefsOf, type SecretBackend } from './secrets'
+import { MCP_TOOL_NAME_RE, type McpDecision } from './mcpPermissions'
+import { secretAccountsInWorkspaces } from './workspace'
 import { canonicalSkills, dirContentHash } from './skills'
 import { MANIFEST_TOOLS, setToggle, type ManifestKind } from './manifest'
 import {
@@ -558,6 +560,38 @@ function readJsonSafe(path: string): Json | null {
   try {
     const v = JSON.parse(readFileSync(path, 'utf8'))
     return isObj(v) ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** Match the target's alternate-path selection; import JSONC without rewriting the user's comments. */
+function opencodeConfigPath(home: string): string {
+  const plain = join(home, '.config/opencode/opencode.json')
+  return existsSync(plain) ? plain : join(home, '.config/opencode/opencode.jsonc')
+}
+
+function readOpencodeSettings(path: string): Json | null {
+  try {
+    const text = stripJsonComments(readFileSync(path, 'utf8'))
+    let normalized = ''
+    let inString = false
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]
+      if (inString) {
+        normalized += ch
+        if (ch === '\\') normalized += text[++i] ?? ''
+        else if (ch === '"') inString = false
+      } else if (ch === '"') {
+        inString = true
+        normalized += ch
+      } else if (ch === ',' && /^\s*[}\]]/.test(text.slice(i + 1))) {
+        // JSONC allows a trailing comma in objects and arrays, but string contents stay literal.
+        normalized += ' '
+      } else normalized += ch
+    }
+    const value: unknown = JSON.parse(normalized)
+    return isObj(value) ? value : null
   } catch {
     return null
   }
@@ -1160,9 +1194,9 @@ function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: st
   for (const dir of agentSourceDirs(home, tool))
     scanAgentDir(found, home, tool, dir, base, dir === slot ? managed : {})
   if (tool === 'opencode') {
-    const cp = join(home, '.config/opencode/opencode.json')
+    const cp = opencodeConfigPath(home)
     if (!existsSync(cp)) return
-    const o = readJsonSafe(cp)
+    const o = readOpencodeSettings(cp)
     if (!o || !isObj(o.agent)) return
     for (const [name, def] of Object.entries(o.agent)) {
       if (!isObj(def)) continue
@@ -1722,14 +1756,39 @@ function convertCodex(name: string, s: Json): Conv {
   if (typeof s.default_tools_approval_mode === 'string')
     cx.defaultToolsApprovalMode = s.default_tools_approval_mode
   if (Array.isArray(s.enabled_tools)) cx.enabledTools = s.enabled_tools.map(String)
+  if (Array.isArray(s.disabled_tools)) {
+    const denied: Record<string, McpDecision> = Object.create(null)
+    for (const tool of s.disabled_tools) {
+      if (typeof tool === 'string' && MCP_TOOL_NAME_RE.test(tool)) denied[tool] = 'deny'
+      else c.warnings.push('dropped an invalid disabled_tools entry (no library equivalent)')
+    }
+    if (Object.keys(denied).length) server.permissions = { tools: denied }
+  }
   if (isObj(s.tools)) {
-    const ta: Record<string, string> = {}
+    const ta: Record<string, string> = Object.create(null)
     for (const [t, o] of Object.entries(s.tools))
       if (isObj(o) && typeof o.approval_mode === 'string') ta[t] = o.approval_mode
     if (Object.keys(ta).length) cx.toolApprovals = ta
   }
   if (Object.keys(cx).length) server.codex = cx
   if (s.enabled === false) c.warnings.push('was disabled in codex (enabled=false)')
+  const supported = new Set([
+    'command',
+    'args',
+    'env',
+    'startup_timeout_sec',
+    'url',
+    'bearer_token_env_var',
+    'env_http_headers',
+    'http_headers',
+    'default_tools_approval_mode',
+    'enabled_tools',
+    'disabled_tools',
+    'tools',
+    'enabled'
+  ])
+  for (const key of Object.keys(s))
+    if (!supported.has(key)) c.warnings.push(`dropped ${key} (no library equivalent)`)
   return { server, c }
 }
 
@@ -2237,10 +2296,10 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       break
     }
     case 'opencode': {
-      const op = join(home, '.config/opencode/opencode.json')
+      const op = opencodeConfigPath(home)
       if (existsSync(op)) {
-        const o = readJsonSafe(op)
-        if (!o) found.notes.push('~/.config/opencode/opencode.json parse failed')
+        const o = readOpencodeSettings(op)
+        if (!o) found.notes.push(`~/.config/opencode/${basename(op)} parse failed`)
         else {
           if (isObj(o.mcp))
             for (const [n, s] of Object.entries(o.mcp))
@@ -2949,7 +3008,8 @@ export function applyImport(
         )
         if (opts.secrets && prevRefs.length) {
           const keep = new Set(secretRefsOf(readMcpServer(home, cand.name)).map((x) => x.account))
-          for (const a of prevRefs) if (!keep.has(a)) opts.secrets.delete(a)
+          const shared = secretAccountsInWorkspaces(home, activeWorkspaceId(home))
+          for (const a of prevRefs) if (!keep.has(a) && !shared.has(a)) opts.secrets.delete(a)
         }
         const togglesOk = exists || sourceToggles(home, 'mcp', cand.name, v.sources)
         const warnings = [...v.warnings, ...r.warnings, ...(togglesOk ? [] : ['togglesNotSet'])]

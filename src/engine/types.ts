@@ -85,7 +85,7 @@ export interface Sources {
   rules: RuleFile[]
   /** null if memory/MEMORY.md is missing */
   memoryIndex: string | null
-  /** permissions.json. Empty allowlist if missing (hasPermissions=false — permission targets are left alone) */
+  /** Empty command allowlist when permissions.json is absent; MCP permissions are independent. */
   allowlist: Allowlist
   hasPermissions: boolean
   /** Merged mcps/*.json (excluding `_` meta) */

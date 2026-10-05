@@ -160,7 +160,7 @@ export const grokMcp: TargetDef = {
       mcpForTool(sources, 'grok'),
       env,
       ctx.secrets,
-      blockBodyMulti(before, ALL_MARKERS) ?? '',
+      before,
       kept
     )
     const enabled = enabledServerNames(sources, 'grok')

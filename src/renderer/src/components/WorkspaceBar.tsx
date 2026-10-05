@@ -18,6 +18,7 @@ import type { SwitchLossItem, WorkspaceView } from '../../../shared/api'
 import { TOOL_NAME } from '../lib/tools'
 import { WORKSPACE_SWITCH_REQUEST } from '../lib/mutate'
 import { ConfirmModal } from './ConfirmModal'
+import { hasDirtyDrafts } from '../lib/dirtyDraft'
 
 const NEW = '__new__'
 
@@ -27,6 +28,8 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
   const [list, setList] = useState<WorkspaceView[]>([])
   const [switchTo, setSwitchTo] = useState<WorkspaceView | null>(null)
   const [losses, setLosses] = useState<SwitchLossItem[] | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [unsaved, setUnsaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -47,10 +50,12 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
     let live = true
     window.api.workspaceSwitchPreview(switchTo.id).then(
       (r) => {
-        if (live) setLosses(r.ok ? r.value : [])
+        if (!live) return
+        if (r.ok) setLosses(r.value)
+        else setPreviewError(r.message)
       },
-      () => {
-        if (live) setLosses([])
+      (e) => {
+        if (live) setPreviewError(String((e as Error).message ?? e))
       }
     )
     return () => {
@@ -65,6 +70,8 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
 
   const openSwitch = (w: WorkspaceView): void => {
     setLosses(null)
+    setPreviewError(null)
+    setUnsaved(hasDirtyDrafts())
     setSwitchTo(w)
   }
 
@@ -98,7 +105,7 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
   }
 
   const doSwitch = async (): Promise<void> => {
-    if (!switchTo) return
+    if (!switchTo || losses === null || previewError) return
     setBusy(true)
     try {
       const r = await window.api.workspaceSwitch(switchTo.id)
@@ -242,8 +249,8 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
     const r = await window.api.workspaceImport()
     if (!r.ok) return fail(r.message)
     if (!r.value) return
+    // Import creates an inactive workspace; keep the current editor and its draft intact.
     load()
-    onChanged()
     const miss = r.value.missingSecrets
     notifications.show({
       color: miss.length ? 'yellow' : 'accent',
@@ -382,10 +389,25 @@ export function WorkspaceBar({ onChanged }: { onChanged: () => void }): React.JS
         onConfirm={doSwitch}
         loading={busy}
         title={t('workspace.switchTitle')}
+        disabled={losses === null || !!previewError}
         confirmLabel={t('workspace.switch')}
         message={
           <Stack gap={6}>
             <Text size="md">{switchTo?.name ?? ''}</Text>
+            {unsaved && (
+              <Text size="sm" c="yellow" data-testid="workspace-switch-unsaved">
+                {t('workspace.switchUnsaved')}
+              </Text>
+            )}
+            {previewError ? (
+              <Text size="sm" c="red" data-testid="workspace-switch-preview-error">
+                {t('workspace.switchPreviewFailed')} · {previewError}
+              </Text>
+            ) : losses === null ? (
+              <Text size="sm" c="dimmed" data-testid="workspace-switch-preview-loading">
+                {t('workspace.switchPreviewLoading')}
+              </Text>
+            ) : null}
             {losses && losses.length > 0 && (
               <>
                 <Text size="sm" fw={600} data-testid="workspace-switch-losses">

@@ -3669,14 +3669,14 @@ async function run(): Promise<void> {
     if (readRule(F, ruleA) !== original + '\n<!-- from device-b -->\n')
       bad.push('content after pull')
     if ((await history(F, 1))[0]?.device !== 'device-b') bad.push('history device after pull')
-    // divergence: B pushes again and A has local changes → A snapshot is diverged
+    // Divergence keeps A's local snapshot durable while its remote upload remains pending.
     writeRule(B, ruleB, readRule(B, ruleB) + '\n<!-- b2 -->\n')
     const snB2 = await snapshot(B, 'b2')
     if (!snB2.ok) bad.push('B snapshot2')
     writeRule(F, ruleA, original + '\n<!-- from device-a -->\n')
     const snA = await snapshot(F, 'a conflicting')
-    if (snA.ok || snA.reason !== 'diverged')
-      bad.push(`diverged check ${snA.ok ? 'ok' : snA.reason}`)
+    if (!snA.ok || snA.pushed || snA.remoteError !== 'diverged')
+      bad.push(`diverged check ${snA.ok ? (snA.remoteError ?? 'uploaded') : snA.reason}`)
     const sd = await backupStatus(F)
     if (sd.ahead !== 1 || sd.behind !== 1)
       bad.push(`diverged status ahead ${sd.ahead} behind ${sd.behind}`)

@@ -159,7 +159,7 @@
       "fetchConfirm": "为获取工具列表，Illithid 会运行该服务器：{{command}}",
       "fetched": "已加载 {{count}} 个工具",
       "saved": "已保存工具权限",
-      "noteClaude": "Claude Code、Grok CLI：阻止和询问优先于允许，因此在此默认值下，允许的工具仍会询问或被阻止。",
+      "noteClaude": "Claude Code、Grok CLI：阻止优先于询问和允许，询问优先于允许。更严格的服务器默认规则可能使工具级设置无法生效。",
       "noteCodex": "Codex：阻止服务器后，只提供此处设为允许或询问的工具。",
       "noteGemini": "Gemini CLI：服务器名含 \"_\" 时规则可能无法匹配。",
       "noteCopilot": "GitHub Copilot：无法在配置文件中设置工具权限。"
@@ -442,7 +442,10 @@
     "connected": "备份已连接",
     "snapshotFirst": "先为当前状态创建快照",
     "snapshotFirstHint": "存在尚未备份的更改。",
-    "autoHint": "每次将资料库应用到工具时创建快照。"
+    "autoHint": "每次将资料库应用到工具时创建快照。",
+    "localSaved": "已保存到本地",
+    "remotePending": "等待上传到远程",
+    "remoteFailed": "远程同步失败"
   },
   "memory": {
     "new": "新建笔记",
@@ -503,7 +506,10 @@
     "rename": "重命名",
     "delete": "删除",
     "deleteTitle": "删除工作区",
-    "switchRemoves": "将从工具中移除 {{n}}"
+    "switchRemoves": "将从工具中移除 {{n}}",
+    "switchPreviewFailed": "无法检查切换时的更改。请重试后再切换。",
+    "switchPreviewLoading": "正在检查更改…",
+    "switchUnsaved": "切换工作区将丢弃未保存的编辑。"
   },
   "preview": {
     "title": "应用到工具",
@@ -533,7 +539,12 @@
     "editedIn": "已在 {{tool}} 中修改",
     "keepEdited": "保留此版本",
     "keptEdited": "已保存到库",
-    "codexTrust": "应用后需在 Codex /hooks 中重新信任"
+    "codexTrust": "应用后需在 Codex /hooks 中重新信任",
+    "policies": "权限更改",
+    "policyKey": "设置",
+    "before": "更改前",
+    "after": "更改后",
+    "notes": "转换说明"
   },
   "onboarding": {
     "title": "开始使用 Illithid",
@@ -626,7 +637,8 @@
     "recentTitle": "最近 30 天调用 {{n}} 次",
     "sort": "排序",
     "sortName": "按名称",
-    "sortUsage": "按使用量"
+    "sortUsage": "按使用量",
+    "readFailed": "无法读取使用量"
   },
   "combo": {
     "title": "同时使用 Claude Code？",
@@ -784,7 +796,11 @@
       "s": "{{s}} 秒",
       "ms": "{{m}} 分 {{s}} 秒",
       "hm": "{{h}} 小时 {{m}} 分"
-    }
+    },
+    "readFailed": "无法读取会话统计",
+    "metricsUnavailable": "这些日志未收集的指标显示为 —，而非零。",
+    "unmeasured": "未收集",
+    "lastIndexed": "最近收集：{{at}}"
   },
   "leaderboard": {
     "zoomIn": "放大",
@@ -990,7 +1006,8 @@
       "judgeHint": "Claude Code 用内置的 prompt 钩子直接检查。其他工具会再运行一次这个 CLI 来检查 (较慢，会消耗订阅用量)。",
       "model": "模型",
       "modelHint": "留空则使用 CLI 的默认模型。",
-      "judgeSlow": "放在操作执行前时，每条命令都要等待检查。非必要请使用“回复结束时”。"
+      "judgeSlow": "放在操作执行前时，每条命令都要等待检查。非必要请使用“回复结束时”。",
+      "judgeFailOpen": "对于运行检查 CLI 的工具，如果 CLI 不存在、命令执行失败或 JSON 判断无效，将跳过检查并允许事件继续。跳过的检查会显示在标准错误输出中。Claude Code 遵循其自身的 prompt 钩子行为。"
     },
     "instruction": "规则",
     "instructionHint": "AI 会根据此规则和事件决定放行还是阻止。",

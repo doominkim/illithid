@@ -73,7 +73,8 @@ export function claudeMcpRules(name: string, s: McpServer): Record<McpDecision, 
     for (const t of sortedTools(p, d)) out[d].push(`mcp__${name}__${t}`)
   // A Codex-only approval for a tool the rules leave alone: asked in Claude Code too (as before)
   for (const [tool, mode] of Object.entries(s.codex?.toolApprovals ?? {}))
-    if (mode !== 'auto' && !p.tools?.[tool]) out.ask.push(`mcp__${name}__${tool}`)
+    if (mode !== 'auto' && !Object.hasOwn(p.tools ?? {}, tool))
+      out.ask.push(`mcp__${name}__${tool}`)
   return out
 }
 
@@ -94,7 +95,13 @@ export function codexMcpSettings(s: McpServer): {
   )
   for (const [tool, d] of Object.entries(p.tools ?? {})) {
     if (d === 'deny') delete approvals[tool]
-    else approvals[tool] = mode(d)
+    else
+      Object.defineProperty(approvals, tool, {
+        value: mode(d),
+        enumerable: true,
+        configurable: true,
+        writable: true
+      })
   }
   const denied = sortedTools(p, 'deny')
   const passed = [...sortedTools(p, 'allow'), ...sortedTools(p, 'ask')].sort()

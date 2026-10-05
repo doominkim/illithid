@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util'
+import { parse as parseToml, stringify as stringifyToml, type TomlTable } from 'smol-toml'
 import {
   blockBodyMulti,
   mcpEntries,
@@ -9,7 +11,7 @@ import {
 } from '../text'
 import { codexMcpSettings } from '../mcpPermissions'
 import { isSecretRef, type SecretBackend } from '../secrets'
-import type { Env, McpSource, TargetDef } from '../types'
+import { TargetError, type Env, type McpSource, type TargetDef } from '../types'
 import { bareEnvName, httpHeaders, isServerError, renderValue, secretValue } from './mcpRender'
 import {
   disabledUnownedServers,
@@ -52,9 +54,9 @@ function tomlString(v: unknown): string {
 }
 
 /** Server key in an mcp_servers table header (raw, including quotes) */
-const TABLE_HEADER = /^\[mcp_servers\.((?:"[^"]+")|(?:[A-Za-z0-9_-]+))(\.|\])/
+const TABLE_HEADER = /^\s*\[mcp_servers\.((?:"[^"]+")|(?:[A-Za-z0-9_-]+))(\.|\])/
 
-/** Extracts one server's tables (including subtables) from a block body. [] if none */
+/** Extracts one complete native server, including dotted/inline definitions. [] if absent. */
 export function extractCodexTables(text: string, name: string): string[] {
   const keys = new Set([name, `"${name}"`])
   const out: string[] = []
@@ -62,11 +64,33 @@ export function extractCodexTables(text: string, name: string): string[] {
   for (const line of text.split('\n')) {
     const header = TABLE_HEADER.exec(line)
     if (header) taking = keys.has(header[1])
-    else if (/^\[/.test(line)) taking = false
+    else if (/^\s*\[/.test(line)) taking = false
     if (taking) out.push(line)
   }
   while (out.length && !out[out.length - 1].trim()) out.pop()
-  return out
+  try {
+    const servers = parseToml(text).mcp_servers
+    if (!servers || typeof servers !== 'object' || Array.isArray(servers)) return out
+    const native = (servers as TomlTable)[name]
+    if (native === undefined) return out
+    try {
+      const extracted = parseToml(out.join('\n')).mcp_servers
+      if (
+        extracted &&
+        typeof extracted === 'object' &&
+        !Array.isArray(extracted) &&
+        isDeepStrictEqual((extracted as TomlTable)[name], native)
+      )
+        return out
+    } catch {
+      // Preserve the complete parsed definition when text extraction cannot represent it.
+    }
+    return stringifyToml({ mcp_servers: Object.fromEntries([[name, native]]) })
+      .trimEnd()
+      .split('\n')
+  } catch {
+    return out
+  }
 }
 
 export interface CodexMcpBody {
@@ -81,7 +105,7 @@ export interface CodexMcpBody {
  * mcp.json → Codex [mcp_servers.*] tables.
  * - `secret:` headers and bearerToken become http_headers literals (Codex rejects a bearer_token literal)
  * - Headers whose whole value is ${VAR} go to env_http_headers; bearerEnv goes to bearer_token_env_var
- * prevBody is the previous marker block body — used to keep existing tables for servers with missing secrets.
+ * prevBody is the previous config (or marker block body) — used to keep native definitions for servers with missing secrets.
  */
 export function buildCodexMcpBody(
   mcp: McpSource,
@@ -159,17 +183,41 @@ export function buildCodexMcpBody(
 }
 
 /** Removes leftover table blocks outside the markers for servers now owned by the SSOT. */
-export function stripCodexManagedTables(text: string, names: string[]): string {
+function stripManagedTables(text: string, names: string[]): { text: string; normalized: boolean } {
+  let expected: TomlTable
+  try {
+    expected = parseToml(text)
+  } catch {
+    // Parser errors can include config values, so never expose the original diagnostic.
+    throw new TargetError('TOML parse failed')
+  }
+  const servers = expected.mcp_servers
+  if (servers && typeof servers === 'object' && !Array.isArray(servers)) {
+    for (const name of names) delete (servers as Record<string, unknown>)[name]
+    if (!Object.keys(servers).length) delete expected.mcp_servers
+  }
   const managed = new Set(names.flatMap((n) => [n, `"${n}"`]))
   const out: string[] = []
   let skipping = false
   for (const line of text.split('\n')) {
     const header = TABLE_HEADER.exec(line)
     if (header) skipping = managed.has(header[1])
-    else if (/^\[/.test(line)) skipping = false
+    else if (/^\s*\[/.test(line)) skipping = false
     if (!skipping) out.push(line)
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n')
+  const stripped = out.join('\n').replace(/\n{3,}/g, '\n\n')
+  try {
+    const actual = parseToml(stripped)
+    if (actual.mcp_servers && !Object.keys(actual.mcp_servers).length) delete actual.mcp_servers
+    if (isDeepStrictEqual(actual, expected)) return { text: stripped, normalized: false }
+  } catch {
+    // Dotted keys, inline tables, and multiline strings cannot safely be stripped line by line.
+  }
+  return { text: stringifyToml(expected), normalized: true }
+}
+
+export function stripCodexManagedTables(text: string, names: string[]): string {
+  return stripManagedTables(text, names).text
 }
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -184,7 +232,7 @@ export const codexMcp: TargetDef = {
   build(before, ctx) {
     const { sources, env } = ctx
     // Tables to remove outside the markers = enabled servers ∪ previously owned servers (off servers with no ownership record are kept as the user's)
-    const stripped = stripCodexManagedTables(
+    const stripped = stripManagedTables(
       outsideBlockMulti(before, ALL_TOML_MCP_MARKERS),
       ownedServerNames(sources, 'codex', ctx, 'codexMcp')
     )
@@ -192,13 +240,18 @@ export const codexMcp: TargetDef = {
       mcpForTool(sources, 'codex'),
       env,
       ctx.secrets,
-      blockBodyMulti(before, ALL_TOML_MCP_MARKERS) ?? ''
+      before
     )
     // With no enabled servers, don't create an empty block and remove any previously written one
     const none = !enabledServerNames(sources, 'codex').length
     const after = none
-      ? removeBlockMulti(stripped, ALL_TOML_MCP_MARKERS)
-      : spliceBlockMulti(stripped, TOML_MCP_MARKERS, LEGACY_TOML_MCP_MARKERS, body)
+      ? removeBlockMulti(stripped.text, ALL_TOML_MCP_MARKERS)
+      : spliceBlockMulti(stripped.text, TOML_MCP_MARKERS, LEGACY_TOML_MCP_MARKERS, body)
+    try {
+      parseToml(after)
+    } catch {
+      throw new TargetError('generated TOML parse failed')
+    }
     // Same-name server tables outside the markers (user area) move into the block (app-owned from then on)
     const outsideBefore = outsideBlockMulti(before, ALL_TOML_MCP_MARKERS)
     const movedIn = enabledServerNames(sources, 'codex').filter((n) =>
@@ -212,6 +265,11 @@ export const codexMcp: TargetDef = {
       after,
       notes: [
         ...warnings,
+        ...(stripped.normalized
+          ? [
+              'native TOML comments and formatting are not retained during managed-server conversion; unrelated settings are preserved'
+            ]
+          : []),
         ...(legacy ? ['legacy marker block → replaced with app marker'] : []),
         ...(movedIn.length
           ? [

@@ -171,6 +171,10 @@ test(
         .click()
       assert.equal(await page.getByTestId('hook-new-unsupported-claudeOnly').count(), 0)
       await page.getByTestId('hook-option-judge').waitFor()
+      const failurePolicy = page.getByTestId('hook-ask-fail-open')
+      await failurePolicy.waitFor({ timeout: 2000 })
+      assert.ok((await failurePolicy.innerText()).includes('lets the event continue'))
+      assert.ok((await failurePolicy.innerText()).includes('stderr'))
       // Judging before every tool call is slow: the form says so
       await page
         .getByTestId('hook-new-timing')
