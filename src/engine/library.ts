@@ -1261,8 +1261,9 @@ export function upsertMcpServer(
   // Clean up secrets this server no longer uses
   if (opts.secrets && prev) {
     const keep = new Set(secretRefsOf(next).map((r) => r.account))
+    const shared = secretAccountsInWorkspaces(home, activeWorkspaceId(home))
     for (const r of secretRefsOf(prev))
-      if (r.server === name && !keep.has(r.account)) {
+      if (r.server === name && !keep.has(r.account) && !shared.has(r.account)) {
         try {
           opts.secrets.delete(r.account)
         } catch {

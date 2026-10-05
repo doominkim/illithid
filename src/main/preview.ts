@@ -1,8 +1,9 @@
 /**
  * Apply preview: the current sync plan (planSyncAll) summarized per tool for the confirm dialog.
- * Read-only. No file contents leave this module — names, actions and display paths (~) only.
+ * Read-only. Exposes names, actions, display paths and permission policies; never MCP credentials or raw config files.
  */
 import { basename } from 'node:path'
+import { parse as parseToml } from 'smol-toml'
 import {
   ALL_TARGETS,
   canonicalSkills,
@@ -15,6 +16,7 @@ import {
   planSyncAll,
   tilde,
   type Env,
+  type SecretBackend,
   type SyncPlan,
   type ToolId
 } from '../engine'
@@ -25,6 +27,7 @@ import { toolsInUse } from '../engine/config'
 import { parseJsonObject } from '../engine/text'
 import type {
   ApplyPreviewItem,
+  ApplyPreviewPolicy,
   ApplyPreviewView,
   ImportedKeepRequest,
   LibraryDirectItem
@@ -79,7 +82,7 @@ function planItems(p: SyncPlan): PlanItem[] {
   ]
 }
 
-export function applyPreview(home: string, env: Env): ApplyPreviewView {
+export function applyPreview(home: string, env: Env, secrets?: SecretBackend): ApplyPreviewView {
   const inUse = toolsInUse(home)
   if (!libraryExists(home))
     return {
@@ -92,7 +95,7 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
       libraryMissing: true,
       inUse
     }
-  const p = planSyncAll(home, env)
+  const p = planSyncAll(home, env, secrets)
   // Imported hook originals (pendingRetire kind hook) a change removes → their hook names
   const hookRecords = activePending(home, readState(home).state.pendingRetire).filter(
     (r) => r.kind === 'hook'
@@ -100,17 +103,26 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
   const replacedHooks = (c: (typeof p.targets)[number]): Set<string> =>
     new Set(hookRecords.filter((r) => c.retired?.includes(r.path)).map((r) => r.name))
   const items: ApplyPreviewItem[] = []
+  const policies: ApplyPreviewPolicy[] = []
+  const notes: NonNullable<ApplyPreviewView['notes']> = []
 
   // Config files: several targets can write one file (opencode.json) — one row per file
   const files = new Map<string, ApplyPreviewItem>()
   const errors = [...p.errors]
   for (const c of p.targets) {
+    const tool = TARGET_TOOL.get(c.id)
+    if (tool && inUse.includes(tool)) {
+      notes.push(...c.notes.map((text) => ({ tool, path: c.label, text })))
+      if (!c.error && c.changed)
+        policies.push(...policyDiff(tool, c.label, c.id, c.before, c.after))
+    }
+    for (const [name, error] of Object.entries(c.serverErrors ?? {}))
+      errors.push(`${c.label} · ${name}: ${error}`)
     if (c.error) {
       errors.push(`${c.label}: ${c.error}`)
       continue
     }
     if (!c.changed) continue
-    const tool = TARGET_TOOL.get(c.id)
     if (!tool) continue
     const prev = files.get(c.path)
     const action = c.before === '' ? 'add' : 'update'
@@ -210,6 +222,8 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     items,
     importedChanged,
     errors,
+    policies,
+    notes,
     notInitialized: notInitializedOf(p.targets),
     libraryDirect: libraryDirect(home, inUse, items),
     edited: editedRules(home, env).map((e) => ({
@@ -221,6 +235,75 @@ export function applyPreview(home: string, env: Env): ApplyPreviewView {
     inUse,
     fingerprint: planFingerprint(p)
   }
+}
+
+/** Only policy fields are read: credentials and arbitrary target values stay in main. */
+function policyFields(id: string, text: string): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  const object = (v: unknown): Record<string, unknown> =>
+    v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+  const list = (key: string, v: unknown): void => {
+    if (Array.isArray(v)) out.set(key, v.filter((x): x is string => typeof x === 'string').sort())
+    else if (typeof v === 'string' || typeof v === 'boolean') out.set(key, [String(v)])
+  }
+  try {
+    if (id === 'codexMcp' || id === 'grokMcp') {
+      const servers = object(parseToml(text || '').mcp_servers)
+      for (const [name, raw] of Object.entries(servers)) {
+        const server = object(raw)
+        for (const key of ['enabled_tools', 'disabled_tools', 'default_tools_approval_mode'])
+          list(`mcp_servers.${name}.${key}`, server[key])
+        for (const [nameOfTool, rawTool] of Object.entries(object(server.tools)))
+          list(
+            `mcp_servers.${name}.tools.${nameOfTool}.approval_mode`,
+            object(rawTool).approval_mode
+          )
+      }
+    } else if (id === 'geminiPolicy') {
+      const rules = parseToml(text || '').rule
+      if (Array.isArray(rules))
+        for (const raw of rules) {
+          const rule = object(raw)
+          if (typeof rule.mcpName === 'string')
+            list(`mcp.${rule.mcpName}.${String(rule.toolName ?? '*')}`, rule.decision)
+        }
+    } else if (id === 'claudePermissions') {
+      const permissions = object(parseJsonObject(text || '{}').permissions)
+      for (const decision of ['allow', 'ask', 'deny'])
+        list(`permissions.${decision}`, permissions[decision])
+    } else if (id === 'opencodeMcpPermissions') {
+      const rules = Object.entries(object(parseJsonObject(text || '{}').permission)).filter(
+        ([, value]) => ['allow', 'ask', 'deny'].includes(String(value))
+      )
+      for (const [key, value] of rules) list(`permission.${key}`, value)
+      // OpenCode uses the last matching rule, so order is part of the policy.
+      out.set(
+        'permission (rule order)',
+        rules.map(([key, value]) => `${key}: ${value}`)
+      )
+    }
+  } catch {
+    // The plan reports parse failures; never recover by showing raw target contents.
+  }
+  return out
+}
+
+function policyDiff(
+  tool: ToolId,
+  path: string,
+  id: string,
+  before: string,
+  after: string
+): ApplyPreviewPolicy[] {
+  const a = policyFields(id, before)
+  const b = policyFields(id, after)
+  return [...new Set([...a.keys(), ...b.keys()])].flatMap((key) => {
+    const previous = a.get(key) ?? []
+    const next = b.get(key) ?? []
+    return JSON.stringify(previous) === JSON.stringify(next)
+      ? []
+      : [{ tool, path, key, before: previous, after: next }]
+  })
 }
 
 function instructionList(text: string): string[] {

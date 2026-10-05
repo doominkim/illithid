@@ -7,6 +7,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { StatsHooks, ToolCall, ToolErrorKind, TurnUsage } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 import { classify, dayOf, mcpKey } from './usage'
+import { modelMetricSupport } from '../../shared/modelMetrics'
 import {
   convertedCost,
   readPriceBook,
@@ -531,6 +532,8 @@ export interface TokenCounts {
 }
 
 export interface ModelSummary extends ModelKey {
+  /** False distinguishes unsupported metrics from measured zeroes. */
+  metrics?: import('../../shared/modelMetrics').ModelMetricSupport
   first: string
   last: string
   activeDays: number
@@ -694,6 +697,7 @@ function summaryOf(r: SumRow, requests: RequestRow[], ctx: number[]): ModelSumma
   const enough = requests.length >= MIN_REQUESTS
   const med = (vals: number[]): number | null => (enough ? dist(vals)!.median : null)
   return {
+    metrics: modelMetricSupport(r.tool),
     tool: r.tool,
     model: r.model,
     effort: r.effort,
@@ -915,7 +919,7 @@ export function modelList(home: string, o: ModelRange = {}): ModelSummary[] | nu
     }
     const book = readPriceBook(home)
     return rows
-      .filter((x) => Number(x.turns) > 0)
+      .filter((x) => Number(x.turns) > 0 || Number(x.toolCalls) > 0)
       .map((x) => {
         const summary = summaryOf(x, reqs.get(keyStr(x)) ?? [], ctx.get(keyStr(x)) ?? [])
         summary.pricing = pricingFor(db, summary, w, book).pricing

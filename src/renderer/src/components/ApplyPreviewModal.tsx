@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Badge, Box, Button, Group, Modal, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Box, Button, Group, Modal, Stack, Table, Text } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import type {
   ApplyPreviewAction,
@@ -177,6 +177,58 @@ export function ApplyPreviewBody({
             ))}
           </Stack>
         </Alert>
+      )}
+      {(view.policies?.length ?? 0) > 0 && (
+        <Box data-testid="apply-preview-policies" style={{ maxHeight: 220, overflow: 'auto' }}>
+          <Text fw={600} size="sm">
+            {t('preview.policies')}
+          </Text>
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('preview.policyKey')}</Table.Th>
+                <Table.Th>{t('preview.before')}</Table.Th>
+                <Table.Th>{t('preview.after')}</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {view.policies!.map((p) => (
+                <Table.Tr key={`${p.tool}:${p.path}:${p.key}`}>
+                  <Table.Td>
+                    <Text size="xs">
+                      {TOOL_NAME[p.tool]} · {p.path}
+                    </Text>
+                    <Text size="sm" ff="monospace">
+                      {p.key}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                      {p.before.join('\n') || '—'}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                      {p.after.join('\n') || '—'}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Box>
+      )}
+      {(view.notes?.length ?? 0) > 0 && (
+        <Box data-testid="apply-preview-notes" style={{ maxHeight: 160, overflow: 'auto' }}>
+          <Text fw={600} size="sm">
+            {t('preview.notes')}
+          </Text>
+          {view.notes!.map((n, i) => (
+            <Text key={`${n.tool}:${n.path}:${i}`} size="xs" c="dimmed">
+              {TOOL_NAME[n.tool]} · {n.path}: {n.text}
+            </Text>
+          ))}
+        </Box>
       )}
       {!view.libraryMissing && tools.length === 0 && (
         <Text size="md" c="dimmed" data-testid="apply-preview-empty">

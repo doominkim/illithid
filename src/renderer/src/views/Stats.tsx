@@ -2,6 +2,7 @@ import { formatTokens } from '../lib/tokenFormat'
 import { useContext, useEffect, useState } from 'react'
 import {
   Box,
+  Alert,
   Group,
   SegmentedControl,
   Select,
@@ -18,7 +19,15 @@ import {
 import { LineChart } from '@mantine/charts'
 import { Info, Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Dist, ModelDetail, ModelKey, ModelSummary, ToolId } from '../../../shared/api'
+import type {
+  Dist,
+  ModelDetail,
+  ModelKey,
+  ModelSummary,
+  SearchIndexView,
+  ToolId
+} from '../../../shared/api'
+import { modelMetricSupport } from '../../../shared/modelMetrics'
 import { UsageLeaderboard } from '../components/UsageLeaderboard'
 import { ModelCost } from '../components/ModelCost'
 
@@ -32,6 +41,7 @@ import { modelKeyStr, modelLabel, parseModelKey } from '../lib/modelKey'
 import { useNav, useNavSelect } from '../lib/nav'
 import { TOOL_NAME } from '../lib/tools'
 import { RefreshContext } from '../lib/useApi'
+import { resolveMcpUsageServer } from '../lib/usageNavigation'
 
 /** Same thresholds as the engine (modelStats.ts): below them, counts only */
 const MIN_REQUESTS = 30
@@ -84,28 +94,32 @@ const NUM: React.CSSProperties = { fontVariantNumeric: 'tabular-nums', whiteSpac
 function useStatsLoad<T>(
   deps: unknown[],
   load: () => Promise<T | null>
-): { data: T | null | undefined; indexing: boolean } {
+): { data: T | null | undefined; indexing: boolean; error?: string; lastIndexedAt?: string } {
   const tick = useContext(RefreshContext)
   // Results are tagged with the deps they were loaded for: a stale result reads as "loading" without resetting state in the effect
   const depKey = JSON.stringify([tick, ...deps])
-  const [result, setResult] = useState<{ key: string; value: T | null } | undefined>(undefined)
-  const [indexing, setIndexing] = useState(false)
+  const [result, setResult] = useState<
+    { key: string; value: T | null; error?: string } | undefined
+  >(undefined)
+  const [index, setIndex] = useState<SearchIndexView | undefined>()
   useEffect(() => {
     let alive = true
     const run = (): void => {
       load().then(
         (value) => alive && setResult({ key: depKey, value }),
-        () => alive && setResult({ key: depKey, value: null })
+        (e) =>
+          alive &&
+          setResult({ key: depKey, value: null, error: String(e instanceof Error ? e.message : e) })
       )
     }
     run()
     window.api.sessionIndexStatus().then(
-      (v) => alive && setIndexing(v.running),
+      (v) => alive && setIndex(v),
       () => {}
     )
     const off = window.api.onSearchIndexEvent((v) => {
       if (!alive) return
-      setIndexing(v.running)
+      setIndex(v)
       if (!v.running) run()
     })
     return () => {
@@ -115,7 +129,13 @@ function useStatsLoad<T>(
     // load is identified by deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey])
-  return { data: result && result.key === depKey ? result.value : undefined, indexing }
+  const current = result?.key === depKey ? result : undefined
+  return {
+    data: current?.value,
+    indexing: index?.running ?? false,
+    error: current?.error ?? index?.error,
+    lastIndexedAt: index?.lastIndexedAt
+  }
 }
 
 function Tip({ label: text }: { label: string }): React.JSX.Element {
@@ -313,23 +333,32 @@ function DistTable({
 function ModelDetailView({
   k,
   range,
-  onSession
+  onSession,
+  onItem
 }: {
   k: ModelKey
   range: Range
   onSession: (tool: string, id: string) => void
+  onItem: (kind: 'skill' | 'mcp', name: string) => void
 }): React.JSX.Element {
   const f = useFmt()
   const { t } = f
   const [tab, setTab] = useState<string | null>('turns')
   const [listTab, setListTab] = useState<string | null>('tools')
   const [sessionSort, setSessionSort] = useState<'turns' | 'output' | 'toolCalls'>('turns')
-  const { data } = useStatsLoad<ModelDetail>([modelKeyStr(k), JSON.stringify(range)], () =>
+  const { data, error } = useStatsLoad<ModelDetail>([modelKeyStr(k), JSON.stringify(range)], () =>
     window.api.modelDetail(k, range)
   )
+  if (error)
+    return (
+      <Alert color="red">
+        {t('models.readFailed')}: {error}
+      </Alert>
+    )
   if (data === undefined) return <Loading />
   if (!data) return <Text c="dimmed">{t('models.indexing')}</Text>
   const s = data.summary
+  const metrics = s.metrics ?? modelMetricSupport(s.tool)
   const med = s.median
   const fmtOf = (key: string): ((n: number) => string) =>
     key === 'responseSec'
@@ -349,7 +378,8 @@ function ModelDetailView({
     s.errors.mistake + s.errors.command + s.errors.policy + s.errors.userReject + s.errors.other
   const kinds = ['mistake', 'command', 'policy', 'userReject', 'other'] as const
   const kindAvailable = (kind: (typeof kinds)[number]): boolean =>
-    s.tool === 'claude' || (s.tool === 'codex' ? kind === 'command' : kind === 'other')
+    metrics.errors &&
+    (s.tool === 'claude' || (s.tool === 'codex' ? kind === 'command' : kind === 'other'))
   const sessions = [...data.sessions].sort((a, b) => b[sessionSort] - a[sessionSort]).slice(0, 10)
   const listRows = listTab === 'skills' ? data.skills : listTab === 'mcp' ? data.mcp : data.tools
   const listMax = Math.max(1, ...listRows.map((x) => x.calls))
@@ -357,12 +387,17 @@ function ModelDetailView({
 
   return (
     <Stack gap="xl" data-testid="stats-detail">
+      {(!metrics.tokens || !metrics.turns) && (
+        <Alert color="yellow" data-testid="stats-metrics-unavailable">
+          {t('models.metricsUnavailable')}
+        </Alert>
+      )}
       <Text size="sm" c="dimmed" style={NUM}>
         {t('models.detail.sub', {
           from: s.first,
           to: s.last,
           days: s.activeDays,
-          n: f.int(s.requests)
+          n: metrics.requests ? f.int(s.requests) : '—'
         })}
       </Text>
 
@@ -374,7 +409,7 @@ function ModelDetailView({
               label={t('models.detail.sessions')}
               value={f.int(s.sessions)}
               sub={
-                s.sessions
+                metrics.requests && s.sessions
                   ? t('models.detail.sessionsSub', { n: (s.requests / s.sessions).toFixed(1) })
                   : undefined
               }
@@ -386,7 +421,7 @@ function ModelDetailView({
             />
             <Tile
               label={t('models.detail.turns')}
-              value={f.int(s.turns)}
+              value={metrics.turns ? f.int(s.turns) : '—'}
               sub={
                 med.turnsPerRequest !== null
                   ? t('models.detail.turnsSub', { n: med.turnsPerRequest })
@@ -419,17 +454,21 @@ function ModelDetailView({
             />
             <Tile
               label={t('models.detail.interrupts')}
-              value={s.tool === 'opencode' ? '—' : f.int(s.interrupts)}
+              value={metrics.interrupts ? f.int(s.interrupts) : '—'}
               sub={
-                s.tool !== 'opencode'
+                metrics.interrupts
                   ? t('models.detail.interruptsSub', {
                       n: ((s.interrupts / turnsTotal) * 100).toFixed(2)
                     })
                   : undefined
               }
-              tip={t(
-                `models.detail.interruptTip.${s.tool === 'codex' ? 'codex' : s.tool === 'opencode' ? 'opencode' : 'claude'}`
-              )}
+              tip={
+                metrics.interrupts
+                  ? t(
+                      `models.detail.interruptTip.${s.tool === 'codex' ? 'codex' : s.tool === 'opencode' ? 'opencode' : 'claude'}`
+                    )
+                  : t('models.metricsUnavailable')
+              }
             />
           </SimpleGrid>
         </Box>
@@ -447,26 +486,32 @@ function ModelDetailView({
               <Tabs.Tab value="context">{t('models.detail.tabContext')}</Tabs.Tab>
             </Tabs.List>
           </Tabs>
-          <LineChart
-            h={200}
-            data={chart}
-            dataKey="day"
-            series={[
-              {
-                name: 'v',
-                label: t(
-                  `models.detail.tab${chartKey === 'turns' ? 'Turns' : chartKey === 'output' ? 'Output' : 'Context'}`
-                ),
-                color: 'accent.6'
-              }
-            ]}
-            withLegend={false}
-            gridAxis="y"
-            tickLine="none"
-            valueFormatter={(v) => (chartKey === 'turns' ? f.int(v) : f.tok(v))}
-            curveType="linear"
-            withDots={false}
-          />
+          {!metrics.turns || !metrics.tokens ? (
+            <Text size="sm" c="dimmed">
+              {t('models.metricsUnavailable')}
+            </Text>
+          ) : (
+            <LineChart
+              h={200}
+              data={chart}
+              dataKey="day"
+              series={[
+                {
+                  name: 'v',
+                  label: t(
+                    `models.detail.tab${chartKey === 'turns' ? 'Turns' : chartKey === 'output' ? 'Output' : 'Context'}`
+                  ),
+                  color: 'accent.6'
+                }
+              ]}
+              withLegend={false}
+              gridAxis="y"
+              tickLine="none"
+              valueFormatter={(v) => (chartKey === 'turns' ? f.int(v) : f.tok(v))}
+              curveType="linear"
+              withDots={false}
+            />
+          )}
         </Box>
       </Box>
 
@@ -498,7 +543,8 @@ function ModelDetailView({
                   (key) => {
                     const v = s.tokens[key]
                     // Codex logs have no cache writes
-                    const missing = v === 0 && key === 'cacheWrite' && s.tool === 'codex'
+                    const missing =
+                      !metrics.tokens || (v === 0 && key === 'cacheWrite' && s.tool === 'codex')
                     return (
                       <Table.Tr key={key}>
                         <Table.Td>
@@ -553,13 +599,17 @@ function ModelDetailView({
         <SectionTitle
           right={
             <Text size="xs" c="dimmed">
-              {f.int(s.requests)}
+              {metrics.requests ? f.int(s.requests) : '—'}
             </Text>
           }
         >
           {t('models.detail.dist')}
         </SectionTitle>
-        {s.requests < MIN_REQUESTS ? (
+        {!metrics.requests ? (
+          <Text size="sm" c="dimmed">
+            {t('models.metricsUnavailable')}
+          </Text>
+        ) : s.requests < MIN_REQUESTS ? (
           <Text size="sm" c="dimmed">
             {t('models.detail.distTooFew', { min: MIN_REQUESTS, n: s.requests })}
           </Text>
@@ -599,7 +649,7 @@ function ModelDetailView({
         <SectionTitle
           right={
             <Text size="xs" c="dimmed">
-              {f.int(errTotal)}
+              {metrics.errors ? f.int(errTotal) : '—'}
             </Text>
           }
         >
@@ -608,7 +658,13 @@ function ModelDetailView({
         <Box className="ac-card" p="md">
           {s.tool !== 'claude' && (
             <Text size="xs" c="dimmed" mb="sm">
-              {t(s.tool === 'codex' ? 'models.detail.errorsCodex' : 'models.detail.errorsOpencode')}
+              {t(
+                !metrics.errors
+                  ? 'models.metricsUnavailable'
+                  : s.tool === 'codex'
+                    ? 'models.detail.errorsCodex'
+                    : 'models.detail.errorsOpencode'
+              )}
             </Text>
           )}
           {errTotal > 0 && (
@@ -710,9 +766,20 @@ function ModelDetailView({
                   return (
                     <Table.Tr key={x.name}>
                       <Table.Td>
-                        <Text size="sm" ff="monospace">
-                          {x.name}
-                        </Text>
+                        {listTab === 'skills' || listTab === 'mcp' ? (
+                          <UnstyledButton
+                            data-testid={`stats-item-${listTab === 'skills' ? 'skill' : 'mcp'}-${x.name}`}
+                            onClick={() => onItem(listTab === 'skills' ? 'skill' : 'mcp', x.name)}
+                          >
+                            <Text size="sm" ff="monospace" c="accent">
+                              {x.name} ↗
+                            </Text>
+                          </UnstyledButton>
+                        ) : (
+                          <Text size="sm" ff="monospace">
+                            {x.name}
+                          </Text>
+                        )}
                       </Table.Td>
                       <Table.Td ta="right" style={NUM}>
                         {f.int(x.calls)}
@@ -807,7 +874,7 @@ function ModelDetailView({
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right" style={NUM}>
-                    {f.int(x.turns)}
+                    {metrics.turns ? f.int(x.turns) : '—'}
                   </Table.Td>
                   <Table.Td ta="right" style={NUM}>
                     {f.int(x.toolCalls)}
@@ -816,7 +883,7 @@ function ModelDetailView({
                     {s.tool === 'claude' ? f.int(x.mistakes) : '—'}
                   </Table.Td>
                   <Table.Td ta="right" style={NUM}>
-                    {f.tok(x.output)}
+                    {metrics.tokens ? f.tok(x.output) : '—'}
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -842,11 +909,9 @@ function ModelDetailView({
                     </Text>
                   </Table.Td>
                   <Table.Td ta="right" style={NUM}>
-                    {f.int(p.turns)}
+                    {metrics.turns ? f.int(p.turns) : '—'}
                   </Table.Td>
-                  <Table.Td w={110}>
-                    <ShareBar v={p.turns / projMax} />
-                  </Table.Td>
+                  <Table.Td w={110}>{metrics.turns && <ShareBar v={p.turns / projMax} />}</Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -869,7 +934,9 @@ function Stats(): React.JSX.Element {
   const [tool, setTool] = useState<string>('all')
   const [selected, setSelected] = useState<ModelKey | null>(null)
   const range = rangeOf(period, from, to)
-  const { data, indexing } = useStatsLoad<ModelSummary[]>([range], () => window.api.models(range))
+  const { data, indexing, error, lastIndexedAt } = useStatsLoad<ModelSummary[]>([range], () =>
+    window.api.models(range)
+  )
   useNavSelect((s) => {
     const k = parseModelKey(s)
     if (k) setSelected(k)
@@ -879,6 +946,24 @@ function Stats(): React.JSX.Element {
   const models = (data ?? []).filter((m) => tool === 'all' || m.tool === tool)
   const openSession = (sessionTool: string, id: string): void =>
     navigate('sessions', { select: `${sessionTool}:${id}` })
+  const openItem = (kind: 'skill' | 'mcp', name: string): void => {
+    if (kind === 'skill') {
+      navigate('skills', { select: name })
+      return
+    }
+    // Log names normalize punctuation; select only an unambiguous library server.
+    void window.api.mcp().then(
+      (data) => {
+        const server = resolveMcpUsageServer(
+          selected?.tool ?? '',
+          name,
+          data.servers.map((s) => s.name)
+        )
+        navigate('mcp', server ? { select: server } : undefined)
+      },
+      () => navigate('mcp')
+    )
+  }
 
   return (
     <Stack gap={0} style={{ flex: 1 }}>
@@ -979,6 +1064,11 @@ function Stats(): React.JSX.Element {
           {t('efficiency.mixedTools')}
         </Text>
       )}
+      {models.some((m) => !(m.metrics ?? modelMetricSupport(m.tool)).tokens) && (
+        <Text size="xs" c="dimmed" mb="sm">
+          {t('models.metricsUnavailable')}
+        </Text>
+      )}
       {models.some((m) => m.pricing) && (
         <Text size="xs" c="dimmed" mb="sm">
           {t('efficiency.priceNote', {
@@ -1003,7 +1093,16 @@ function Stats(): React.JSX.Element {
           })}
         </Text>
       )}
-      {data === undefined ? (
+      {lastIndexedAt && (
+        <Text size="xs" c="dimmed" mb="sm" data-testid="stats-indexed-at">
+          {t('models.lastIndexed', { at: new Date(lastIndexedAt).toLocaleString() })}
+        </Text>
+      )}
+      {error ? (
+        <Alert color="red" data-testid="stats-read-error">
+          {t('models.readFailed')}: {error}
+        </Alert>
+      ) : data === undefined ? (
         <Loading />
       ) : data === null ? (
         <Text size="sm" c="dimmed">
@@ -1033,7 +1132,9 @@ function Stats(): React.JSX.Element {
           )
         }
       >
-        {selected && <ModelDetailView k={selected} range={range} onSession={openSession} />}
+        {selected && (
+          <ModelDetailView k={selected} range={range} onSession={openSession} onItem={openItem} />
+        )}
       </DetailSheet>
     </Stack>
   )

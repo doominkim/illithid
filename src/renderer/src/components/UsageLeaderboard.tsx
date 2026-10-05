@@ -26,6 +26,7 @@ import { ToolIcon } from './ToolIcon'
 import { axisTicks, tickStep, placeLabels } from '../lib/scatterLayout'
 import { formatTokens } from '../lib/tokenFormat'
 import { modelGroups, tokenTotal } from '../lib/modelGroups'
+import { modelMetricSupport } from '../../../shared/modelMetrics'
 
 const toolName = (tool: string): string => TOOL_NAME[tool as ToolId] ?? tool
 type Metric =
@@ -149,8 +150,11 @@ export function UsageLeaderboard({
     }))
   )
   const costs = new Map(models.map((m) => [modelKeyStr(m), m.pricing]))
-  const value = (m: ModelSummary, metric: Metric): number | null =>
-    metric === 'tokens'
+  const value = (m: ModelSummary, metric: Metric): number | null => {
+    const support = m.metrics ?? modelMetricSupport(m.tool)
+    if ((metric === 'tokens' && !support.tokens) || (metric === 'requests' && !support.requests))
+      return null
+    return metric === 'tokens'
       ? tokenTotal(m)
       : metric === 'cost'
         ? (costs.get(modelKeyStr(m))?.total ?? null)
@@ -171,6 +175,7 @@ export function UsageLeaderboard({
                     : metric === 'output'
                       ? m.median.outputPerRequest
                       : m[metric]
+  }
   const rows = [...models].sort((a, b) => {
     const av = value(a, sort.key),
       bv = value(b, sort.key)
@@ -733,10 +738,23 @@ export function UsageLeaderboard({
                           ))}
                         </Text>
                       </Table.Td>
-                      <Table.Td ta="right" title={integer(g.tokens)}>
-                        {formatTokens(g.tokens, i18n.language)}
+                      <Table.Td
+                        ta="right"
+                        title={
+                          g.children.some((m) => (m.metrics ?? modelMetricSupport(m.tool)).tokens)
+                            ? integer(g.tokens)
+                            : undefined
+                        }
+                      >
+                        {g.children.some((m) => (m.metrics ?? modelMetricSupport(m.tool)).tokens)
+                          ? formatTokens(g.tokens, i18n.language)
+                          : '—'}
                       </Table.Td>
-                      <Table.Td ta="right">{integer(g.requests)}</Table.Td>
+                      <Table.Td ta="right">
+                        {g.children.some((m) => (m.metrics ?? modelMetricSupport(m.tool)).requests)
+                          ? integer(g.requests)
+                          : '—'}
+                      </Table.Td>
                       <Table.Td ta="right">
                         <Text size="xs" style={{ whiteSpace: 'nowrap' }}>
                           {g.first}
@@ -801,16 +819,34 @@ export function UsageLeaderboard({
                               </UnstyledButton>
                             </Table.Td>
                             <Table.Td ta="right">
-                              <Text size="xs" ff="monospace" title={integer(tokenTotal(m))}>
-                                {formatTokens(tokenTotal(m), i18n.language)}
+                              <Text
+                                size="xs"
+                                ff="monospace"
+                                title={
+                                  (m.metrics ?? modelMetricSupport(m.tool)).tokens
+                                    ? integer(tokenTotal(m))
+                                    : undefined
+                                }
+                              >
+                                {(m.metrics ?? modelMetricSupport(m.tool)).tokens
+                                  ? formatTokens(tokenTotal(m), i18n.language)
+                                  : '—'}
                               </Text>
                               {m.requests < 30 && (
                                 <Text size="xs" c="dimmed">
-                                  {t('models.small')}
+                                  {t(
+                                    (m.metrics ?? modelMetricSupport(m.tool)).requests
+                                      ? 'models.small'
+                                      : 'models.unmeasured'
+                                  )}
                                 </Text>
                               )}
                             </Table.Td>
-                            <Table.Td ta="right">{integer(m.requests)}</Table.Td>
+                            <Table.Td ta="right">
+                              {(m.metrics ?? modelMetricSupport(m.tool)).requests
+                                ? integer(m.requests)
+                                : '—'}
+                            </Table.Td>
                             <Table.Td ta="right">{integer(m.activeDays)}</Table.Td>
                             <Table.Td ta="right">
                               {m.median.responseSec === null

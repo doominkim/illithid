@@ -613,8 +613,18 @@ export interface ArtifactPreview {
 // ---- backup (engine backup.ts). Auto-backup switch is config.json `autoBackup`
 export interface BackupStatusView extends BackupStatus {
   autoBackup: boolean
+  /** Local snapshots remain available when remote synchronization fails. */
+  remoteError?: string
   /** Error while reading status (empty repo etc.). If set, some fields are estimates */
   error?: string
+}
+
+export interface BackupSnapshotView {
+  hash: string
+  committed: boolean
+  pushed: boolean
+  message: string
+  remoteError?: string
 }
 
 // ---- tool auto memory (engine toolMemory). Codex is read-only
@@ -1030,7 +1040,7 @@ export interface Api {
   backupStatus(): Promise<BackupStatusView>
   backupConnect(remoteUrl: string): Promise<WriteResult<BackupStatusView> | Refused>
   /** snapshotFirst: snapshot first when dirty */
-  backupSnapshot(message?: string): Promise<WriteResult<Snapshot | null> | Refused>
+  backupSnapshot(message?: string): Promise<WriteResult<BackupSnapshotView> | Refused>
   backupHistory(): Promise<WriteResult<Snapshot[]> | Refused>
   backupRestore(
     hash: string,
@@ -1101,6 +1111,10 @@ export interface ApplyPreviewView {
   items: ApplyPreviewItem[]
   importedChanged: ImportedChangedItem[]
   errors: string[]
+  /** Generated permission changes; no authentication or raw configuration values. */
+  policies?: ApplyPreviewPolicy[]
+  /** Conversion notes for the tools in use, including skipped unsupported formats. */
+  notes?: { tool: ToolId; path: string; text: string }[]
   notInitialized: NotInitializedView[]
   libraryDirect: LibraryDirectItem[]
   /** Rules edited on the tool side */
@@ -1110,6 +1124,14 @@ export interface ApplyPreviewView {
   inUse: ToolId[]
   /** planFingerprint of the plan shown — passed back to syncApplyOnce */
   fingerprint?: string
+}
+
+export interface ApplyPreviewPolicy {
+  tool: ToolId
+  path: string
+  key: string
+  before: string[]
+  after: string[]
 }
 
 export const CHANNELS = [

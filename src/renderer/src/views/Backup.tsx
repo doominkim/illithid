@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import {
   ActionIcon,
   Alert,
@@ -24,6 +24,7 @@ import {
   Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { notifications } from '@mantine/notifications'
 import type { BackupStatusView, Snapshot } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { EmptyState } from '../components/EmptyState'
@@ -31,6 +32,8 @@ import { Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
 import { PageHeader } from '../components/PageHeader'
 import { useReload } from '../lib/reload'
+import { RefreshContext } from '../lib/useApi'
+import { useConfig } from '../lib/config'
 import { fmtTime } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useSync } from '../lib/sync'
@@ -79,10 +82,13 @@ function Card({
   )
 }
 
-/** Backup screen (modeled on Skills Manager Backup). Placeholder only until engine backup.ts exists */
+/** Local snapshot durability and remote upload are shown separately. */
 function Backup(): React.JSX.Element {
   const { t } = useTranslation()
   const reload = useReload()
+  const tick = useContext(RefreshContext)
+  const { config } = useConfig()
+  const loadRevision = useRef(0)
   const { openPreview } = useSync()
   const [st, setSt] = useState<BackupStatusView | null>(null)
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -94,15 +100,25 @@ function Backup(): React.JSX.Element {
   const [restore, setRestore] = useState<Snapshot | null>(null)
   const [disconnect, setDisconnect] = useState(false)
 
-  const load = (): void => {
+  const load = useCallback((): void => {
+    const revision = ++loadRevision.current
     window.api.backupStatus().then((s) => {
+      if (revision !== loadRevision.current) return
       setSt(s)
       setUrl(s.remoteUrl ?? '')
       setDevice(s.deviceName)
     })
-    window.api.backupHistory().then((r) => setHistory('ok' in r && r.ok ? r.value : []))
-  }
-  useEffect(load, [])
+    window.api.backupHistory().then((r) => {
+      if (revision === loadRevision.current) setHistory('ok' in r && r.ok ? r.value : [])
+    })
+  }, [])
+  const cancelLoad = useCallback((): void => {
+    loadRevision.current++
+  }, [])
+  useEffect(() => {
+    load()
+    return cancelLoad
+  }, [tick, config?.libraryRoot, load, cancelLoad])
 
   const run = async <T,>(
     key: string,
@@ -121,6 +137,13 @@ function Backup(): React.JSX.Element {
   if (!st) return <Loading />
   const na = !st.libraryExists
   const connected = st.initialized && !!st.remoteUrl
+  const remoteComplete =
+    connected &&
+    !!st.lastSnapshot &&
+    !st.dirty &&
+    st.ahead === 0 &&
+    st.behind === 0 &&
+    !st.remoteError
 
   return (
     <Stack gap={0}>
@@ -138,6 +161,17 @@ function Backup(): React.JSX.Element {
             {st.error}
           </Alert>
         )}
+        {st.remoteError && (
+          <Alert
+            color="yellow"
+            variant="light"
+            radius="lg"
+            title={t('backup.remoteFailed')}
+            data-testid="backup-remote-error"
+          >
+            {st.remoteError}
+          </Alert>
+        )}
         {na && (
           <Alert color="gray" variant="light" radius="lg" title={t('sync.libraryMissing')}>
             {t('backup.needLibrary')}
@@ -146,21 +180,29 @@ function Backup(): React.JSX.Element {
         <Stack gap="md" maw={760}>
           <Card
             title={
-              connected && !st.dirty
+              remoteComplete
                 ? t('backup.backedUp')
-                : connected
+                : st.dirty && st.initialized
                   ? t('backup.dirty')
-                  : t('backup.notBackedUp')
+                  : st.lastSnapshot
+                    ? t(connected ? 'backup.remotePending' : 'backup.localSaved')
+                    : t('backup.notBackedUp')
             }
-            icon={connected && !st.dirty ? <ShieldCheck size={18} /> : <CircleOff size={18} />}
-            tone={connected && !st.dirty ? 'ok' : undefined}
+            icon={remoteComplete ? <ShieldCheck size={18} /> : <CircleOff size={18} />}
+            tone={remoteComplete ? 'ok' : undefined}
             right={
               <Button
                 leftSection={<CloudUpload size={14} />}
                 disabled={na || !st.initialized}
                 loading={busy === 'snap'}
                 onClick={() =>
-                  void run('snap', window.api.backupSnapshot(), t('backup.snapshotDone'))
+                  void run('snap', window.api.backupSnapshot()).then((saved) => {
+                    if (saved)
+                      notifications.show({
+                        color: saved.remoteError ? 'yellow' : 'accent',
+                        message: t(saved.pushed ? 'backup.snapshotDone' : 'backup.localSaved')
+                      })
+                  })
                 }
                 data-testid="backup-now"
               >

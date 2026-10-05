@@ -187,34 +187,39 @@ function judgeCall(cli: HookTool): string[] {
   switch (cli) {
     case 'claude':
       return [
-        `out=$(ILLITHID_JUDGE=1 claude --model "\${model:-haiku}" --tools "" --output-format json --json-schema "$schema" --settings '{"disableAllHooks":true}' -p "$prompt" 2>/dev/null)`
+        `out=$(ILLITHID_JUDGE=1 claude --model "\${model:-haiku}" --tools "" --output-format json --json-schema "$schema" --settings '{"disableAllHooks":true}' -p "$prompt" 2>/dev/null)`,
+        'judge_status=$?'
       ]
     case 'codex':
       return [
         'sf="${TMPDIR:-/tmp}/illithid-judge-$$.json"; of="${TMPDIR:-/tmp}/illithid-judge-$$.out"',
         `printf '%s' "$schema" > "$sf"`,
         'ILLITHID_JUDGE=1 codex exec --ephemeral --skip-git-repo-check --disable hooks --sandbox read-only ${model:+-m "$model"} --output-schema "$sf" -o "$of" "$prompt" >/dev/null 2>&1',
+        'judge_status=$?',
         'out=$(cat "$of" 2>/dev/null); rm -f "$sf" "$of"'
       ]
     case 'gemini':
       return [
-        'out=$(ILLITHID_JUDGE=1 gemini -p "$prompt" --approval-mode plan -o json ${model:+-m "$model"} 2>/dev/null)'
+        'out=$(ILLITHID_JUDGE=1 gemini -p "$prompt" --approval-mode plan -o json ${model:+-m "$model"} 2>/dev/null)',
+        'judge_status=$?'
       ]
     case 'copilot':
       return [
-        'out=$(ILLITHID_JUDGE=1 copilot -p "$prompt" -s --no-ask-user --output-format json ${model:+--model "$model"} 2>/dev/null)'
+        'out=$(ILLITHID_JUDGE=1 copilot -p "$prompt" -s --no-ask-user --output-format json ${model:+--model "$model"} 2>/dev/null)',
+        'judge_status=$?'
       ]
     case 'grok':
       return [
-        'out=$(ILLITHID_JUDGE=1 grok -p "$prompt" --json-schema "$schema" --permission-mode plan ${model:+-m "$model"} 2>/dev/null)'
+        'out=$(ILLITHID_JUDGE=1 grok -p "$prompt" --json-schema "$schema" --permission-mode plan ${model:+-m "$model"} 2>/dev/null)',
+        'judge_status=$?'
       ]
   }
 }
 
 /**
  * ask in a tool without LLM-judged hooks (and the all-tools library script): a CLI judges the event against the instruction.
- * The verdict is the last "ok": true|false (and "reason") anywhere in the CLI's output, so each CLI's JSON wrapping works
- * the same. Anything else — no CLI, an error, no verdict — lets the event through. "No" is enforced the tool's way:
+ * The verdict is a boolean in the CLI's JSON result, never text embedded in a quoted reason or another event.
+ * Anything else — no CLI, an error, no verdict — lets the event through. "No" is enforced the tool's way:
  * exit 2 with the reason, or Copilot's block decision at the end of a reply
  */
 function askLines(tool: HookTool, doc: HookDoc): string[] {
@@ -232,22 +237,61 @@ function askLines(tool: HookTool, doc: HookDoc): string[] {
       '[ "$active" = "true" ] && exit 0'
     )
   out.push(
-    `command -v ${cli} >/dev/null 2>&1 || exit 0`,
+    'skip_check() { printf \'Illithid AI check skipped: %s. The event is allowed.\\n\' "$1" >&2; exit 0; }',
+    `command -v ${cli} >/dev/null 2>&1 || skip_check ${q(`the ${cli} CLI is not installed`)}`,
     `model=${q(String(o.model || ''))}`,
     `schema=${q(JUDGE_SCHEMA)}`,
     'ev=$(printf \'%s\' "$input" | head -c 20000)',
     `prompt="$(printf '%s\\n\\nThe event, as JSON:\\n%s\\n\\n%s' ${q(instruction)} "$ev" ${q(JUDGE_REPLY[timing])})"`,
     ...judgeCall(cli),
-    `flat=$(printf '%s' "$out" | tr -d '\\\\')`,
-    `ok=$(printf '%s' "$flat" | grep -oE '"ok"[[:space:]]*:[[:space:]]*(true|false)' | tail -n 1 | grep -oE '(true|false)$')`,
+    '[ "$judge_status" = 0 ] || skip_check "the judging CLI failed (exit $judge_status)"',
+    'json_field() { printf \'%s\' "$1" | /usr/bin/plutil -extract "$2" "$3" -expect "$4" -o - - 2>/dev/null; }',
+    'verdict="$out"',
+    ...judgeResult(cli),
+    'ok=$(json_field "$verdict" ok raw bool)',
+    '[ "$ok" = "true" ] || [ "$ok" = "false" ] || skip_check "the judging CLI returned no valid JSON verdict"',
     '[ "$ok" = "false" ] || exit 0',
-    `reason=$(printf '%s' "$flat" | grep -oE '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' | tail -n 1 | sed -E 's/^"reason"[[:space:]]*:[[:space:]]*"//; s/"$//')`,
+    'reason=$(json_field "$verdict" reason raw string)',
     `[ -n "$reason" ] || reason=${q('The AI check said no.')}`
   )
   if (tool === 'copilot' && timing === 'stop')
     out.push(JESC, `printf '{"decision":"block","reason":"%s"}\\n' "$(jesc "$reason")"`, 'exit 0')
   else out.push(`printf '%s\\n' "$reason" >&2`, 'exit 2')
   return out
+}
+
+/** Select only the documented result field in a CLI envelope; a direct JSON verdict also works. */
+function judgeResult(cli: HookTool): string[] {
+  switch (cli) {
+    case 'claude':
+      return [
+        'wrapped=$(json_field "$out" structured_output json dictionary) || wrapped=$(json_field "$out" result raw string)',
+        '[ -z "$wrapped" ] || verdict="$wrapped"'
+      ]
+    case 'gemini':
+      return [
+        'wrapped=$(json_field "$out" response raw string)',
+        '[ -z "$wrapped" ] || verdict="$wrapped"'
+      ]
+    case 'grok':
+      return [
+        'wrapped=$(json_field "$out" result json dictionary) || wrapped=$(json_field "$out" result raw string)',
+        '[ -z "$wrapped" ] || verdict="$wrapped"'
+      ]
+    case 'copilot':
+      return [
+        // Copilot emits JSONL. Only its assistant message is a verdict, not another event's metadata.
+        "verdict=''",
+        'while IFS= read -r event; do',
+        '  [ "$(json_field "$event" type raw string)" = "assistant.message" ] || continue',
+        '  verdict=$(json_field "$event" data.content raw string)',
+        'done <<ILLITHID_JUDGE_OUTPUT',
+        '$out',
+        'ILLITHID_JUDGE_OUTPUT'
+      ]
+    case 'codex':
+      return []
+  }
 }
 
 /** Times one session may be sent back before the check lets the agent finish */
@@ -432,20 +476,12 @@ export function renderPermissionGuard(
   return out.join('\n')
 }
 
-/** Reply format Claude Code expects from a prompt hook, per timing */
-const ASK_REPLY: Record<'before-tool' | 'stop' | 'prompt', string> = {
-  'before-tool':
-    'Reply with JSON only: {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow" or "deny", "permissionDecisionReason": "<why>"}}',
-  stop: 'Reply with JSON only. To make Claude keep working: {"decision": "block", "reason": "<what is left to do>"}. Otherwise reply {}',
-  prompt:
-    'Reply with JSON only. To stop this prompt: {"decision": "block", "reason": "<why>"}. Otherwise reply {}'
-}
-
 /** Claude Code prompt for an ask hook ($ in the instruction is escaped so only $ARGUMENTS is substituted) */
 export function renderAskPrompt(doc: HookDoc): string {
   if (doc.options.verbatim === true) return doc.body.trim()
   const instruction = doc.body.trim().replace(/\$/g, '\\$')
-  const reply = ASK_REPLY[doc.when as keyof typeof ASK_REPLY] ?? ASK_REPLY.stop
+  // Prompt hooks use { ok, reason } for every supported event, unlike command-hook responses.
+  const reply = JUDGE_REPLY[doc.when as keyof typeof JUDGE_REPLY] ?? JUDGE_REPLY.stop
   return `${instruction}\n\nThe event, as JSON: $ARGUMENTS\n\n${reply}`
 }
 

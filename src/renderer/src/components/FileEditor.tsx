@@ -3,6 +3,7 @@ import { Group, Select, Stack } from '@mantine/core'
 import { FolderOpen } from 'lucide-react'
 import { ErrorAlert, Loading } from './Layout'
 import { MarkdownEditor } from './MarkdownEditor'
+import { useConfig } from '../lib/config'
 import type { WriteResult } from '../../../shared/api'
 
 /** A folder's files: pick one, edit it raw. The pick can be held by the caller (e.g. to open a file it just added) */
@@ -28,6 +29,8 @@ export function FileEditor({
   /** Buttons next to the file picker (e.g. add or delete a file) */
   actions?: React.ReactNode
 }): React.JSX.Element {
+  const { config } = useConfig()
+  const workspaceRoot = config?.libraryRoot
   const [own, setOwn] = useState<string>(files[0])
   const rel = value ?? own
   const pick = (v: string): void => (onChange ? onChange(v) : setOwn(v))
@@ -49,7 +52,7 @@ export function FileEditor({
     }
     // read is a new function each render; the folder and file decide what to load
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, rel])
+  }, [id, rel, workspaceRoot])
 
   return (
     <Stack gap="sm">
@@ -71,7 +74,7 @@ export function FileEditor({
         <Loading />
       ) : (
         <MarkdownEditor
-          key={`${id}/${rel}`}
+          key={`${workspaceRoot}/${id}/${rel}`}
           value={text}
           onSave={async (next) => {
             const ok = await save(rel, next)

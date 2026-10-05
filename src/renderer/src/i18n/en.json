@@ -159,7 +159,7 @@
       "fetchConfirm": "Illithid runs the server to ask for its tools: {{command}}",
       "fetched": "Loaded {{count}} tools",
       "saved": "Tool rules saved",
-      "noteClaude": "Claude Code and Grok CLI: block and ask win over allow, so with this default an allowed tool still asks or is blocked.",
+      "noteClaude": "Claude Code and Grok CLI: block takes precedence over ask and allow, and ask takes precedence over allow. A stricter server default can prevent a tool override.",
       "noteCodex": "Codex: with a blocked server, only the tools allowed or asked here are offered.",
       "noteGemini": "Gemini CLI: a server name with \"_\" can make its rules miss.",
       "noteCopilot": "GitHub Copilot: tool rules can't be set in its config files."
@@ -442,7 +442,10 @@
     "connected": "Backup connected",
     "snapshotFirst": "Snapshot current state first",
     "snapshotFirstHint": "There are changes not yet backed up.",
-    "autoHint": "Creates a snapshot whenever the library is applied to the tools."
+    "autoHint": "Creates a snapshot whenever the library is applied to the tools.",
+    "localSaved": "Saved locally",
+    "remotePending": "Remote upload pending",
+    "remoteFailed": "Remote synchronization failed"
   },
   "memory": {
     "new": "New note",
@@ -503,7 +506,10 @@
     "rename": "Rename",
     "delete": "Delete",
     "deleteTitle": "Delete workspace",
-    "switchRemoves": "Removed from tools {{n}}"
+    "switchRemoves": "Removed from tools {{n}}",
+    "switchPreviewFailed": "Could not check the changes. Try again before switching.",
+    "switchPreviewLoading": "Checking changes…",
+    "switchUnsaved": "Unsaved edits will be discarded when you switch workspaces."
   },
   "preview": {
     "title": "Apply to tools",
@@ -533,7 +539,12 @@
     "editedIn": "Edited in {{tool}}",
     "keepEdited": "Keep this version",
     "keptEdited": "Saved to the library",
-    "codexTrust": "Trust again in Codex /hooks after applying"
+    "codexTrust": "Trust again in Codex /hooks after applying",
+    "policies": "Permission changes",
+    "policyKey": "Setting",
+    "before": "Before",
+    "after": "After",
+    "notes": "Conversion notes"
   },
   "onboarding": {
     "title": "Set up Illithid",
@@ -626,7 +637,8 @@
     "recentTitle": "{{n}} calls in the last 30 days",
     "sort": "Sort",
     "sortName": "Name",
-    "sortUsage": "Most used"
+    "sortUsage": "Most used",
+    "readFailed": "Could not read usage data"
   },
   "combo": {
     "title": "Also use Claude Code?",
@@ -784,7 +796,11 @@
       "s": "{{s}}s",
       "ms": "{{m}}m {{s}}s",
       "hm": "{{h}}h {{m}}m"
-    }
+    },
+    "readFailed": "Could not read session statistics",
+    "metricsUnavailable": "These logs do not collect all metrics. Unavailable values are shown as —, not zero.",
+    "unmeasured": "Not collected",
+    "lastIndexed": "Last indexed: {{at}}"
   },
   "leaderboard": {
     "zoomIn": "Zoom in",
@@ -990,7 +1006,8 @@
       "judgeHint": "Claude Code checks with its built-in prompt hook. Other tools run this CLI once more to check (slower, uses your plan).",
       "model": "Model",
       "modelHint": "Leave empty for the CLI's default.",
-      "judgeSlow": "Before an action, every command waits for the check. Prefer “When a reply finishes” unless you need it."
+      "judgeSlow": "Before an action, every command waits for the check. Prefer “When a reply finishes” unless you need it.",
+      "judgeFailOpen": "For tools that run a judging CLI, a missing CLI, a failed command or an invalid JSON verdict skips the check and lets the event continue. Skipped checks are reported on stderr. Claude Code uses its own prompt-hook behavior."
     },
     "instruction": "Rule",
     "instructionHint": "An AI reads this rule with the event and lets it through or stops it.",

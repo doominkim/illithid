@@ -89,6 +89,7 @@ function App(): React.JSX.Element {
   }))
   useEffect(() => saveMenu(request.menu), [request.menu])
   const [tick, setTick] = useState(0)
+  const [workspaceTick, setWorkspaceTick] = useState(0)
   const status = useApi('status', () => window.api.status())
   const mcp = useApi('mcp', () => window.api.mcp())
   const rules = useApi('rules', () => window.api.rules())
@@ -330,6 +331,8 @@ function App(): React.JSX.Element {
   // After workspace switch or import: reload config and data (main already synced on switch)
   const onWorkspaceChange = useCallback((): void => {
     clearApiCache()
+    setConfig(undefined)
+    setWorkspaceTick((n) => n + 1)
     setCfgTick((n) => n + 1)
     setTick((n) => n + 1)
   }, [])
@@ -439,7 +442,7 @@ function App(): React.JSX.Element {
                     flexDirection: 'column'
                   }}
                 >
-                  <RefreshContext.Provider value={tick}>
+                  <RefreshContext.Provider key={workspaceTick} value={tick}>
                     <ReloadContext.Provider value={reload}>
                       {startError && (
                         <Alert

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Box, Group, Loader, SimpleGrid, Text } from '@mantine/core'
+import { Alert, Box, Group, Loader, SimpleGrid, Text } from '@mantine/core'
 import { BarChart, ChartTooltip, LineChart } from '@mantine/charts'
 import { useTranslation } from 'react-i18next'
 import type { ToolId, UsageKind, UsageStats } from '../../../shared/api'
@@ -15,6 +15,7 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
   const { t, i18n } = useTranslation()
   const [stats, setStats] = useState<UsageStats | null | undefined>(undefined)
   const [indexing, setIndexing] = useState(false)
+  const [error, setError] = useState<string>()
 
   useEffect(() => {
     let alive = true
@@ -26,8 +27,16 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
     )
     const load = (): void => {
       window.api.usage(kind, name).then(
-        (s) => alive && setStats(s),
-        () => alive && setStats(null)
+        (s) => {
+          if (!alive) return
+          setError(undefined)
+          setStats(s)
+        },
+        (e) => {
+          if (!alive) return
+          setError(String(e instanceof Error ? e.message : e))
+          setStats(null)
+        }
       )
     }
     load()
@@ -35,7 +44,12 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
     const off = window.api.onSearchIndexEvent((v) => {
       if (!alive) return
       setIndexing(v.running)
-      if (!v.running) load()
+      if (!v.running) {
+        if (v.error) {
+          setError(v.error)
+          setStats(null)
+        } else load()
+      }
     })
     return () => {
       alive = false
@@ -62,6 +76,15 @@ export function UsagePanel({ kind, name }: { kind: UsageKind; name: string }): R
     </SectionTitle>
   )
 
+  if (error && stats !== undefined)
+    return (
+      <Box data-testid="usage-panel">
+        {title}
+        <Alert color="red" data-testid="usage-read-error">
+          {t('usage.readFailed')}: {error}
+        </Alert>
+      </Box>
+    )
   if (stats === undefined)
     return (
       <Box data-testid="usage-panel">

@@ -13,7 +13,10 @@ import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, extname, join, resolve, sep } from 'node:path'
 import {
+  activeWorkspaceId,
   backupStatus,
+  libraryRoot,
+  workspaceRoot,
   claudeProjectSlug,
   connectBackup,
   moveClaudeMemory,
@@ -68,6 +71,11 @@ import { adoptEditedRule } from '../engine/editedRules'
 import { keepImportedOriginal } from './preview'
 import { shellEnvReady } from './shellEnv'
 import { marketHandlers } from './market'
+import {
+  advanceWorkspaceRevision,
+  assertWorkspaceCurrent,
+  captureWorkspace
+} from './workspaceGuard'
 import createWorker from './worker?nodeWorker'
 
 /** fixture HOME. Used by check scripts to inject a temp directory instead of the real HOME */
@@ -279,17 +287,25 @@ export function registerIpc(): void {
   }
   /** Latest artifacts scan result. preview only reads ids listed here */
   let artifacts = new Map<string, Artifact>()
+  const switchPreviews = new Map<string, ReturnType<typeof captureWorkspace>>()
   const str = (v: unknown): string => (typeof v === 'string' ? v : '')
   /** Tool file write: runs after passing the allowRealApply gate */
   const gated = <T>(fn: () => T): WriteResult<T> | Refused => W.gate(home) ?? W.wrap(fn)
   /** Library write: readiness gate → run → sync immediately if allowRealApply (result attached as sync) */
   const libWrite = async <T>(fn: () => T): Promise<WriteResult<T> | Refused> => {
+    const origin = captureWorkspace(home)
+    const workspaceId = activeWorkspaceId(home)
     const g = W.libGate(home)
     if (g) return g
     const env = await envNow()
     W.markSelfWrite()
-    const r = W.wrap(fn)
+    const r = W.wrap(() => {
+      assertWorkspaceCurrent(home, origin, false)
+      return fn()
+    })
     if (!r.ok) return r
+    advanceWorkspaceRevision()
+    scheduleAutoBackup(home, workspaceId)
     const sync = W.syncNow(home, env)
     W.markSelfWrite()
     return { ...r, sync }
@@ -297,7 +313,15 @@ export function registerIpc(): void {
   /** Engine backupStatus can throw a git log error on an empty repo before the first commit — guard so the UI survives */
   const backupView = async (): Promise<BackupStatusView> => {
     try {
-      return { ...(await backupStatus(home)), autoBackup: autoBackupOn(home) }
+      const root = libraryRoot(home)
+      const status = await backupStatus(home)
+      return {
+        ...status,
+        autoBackup: autoBackupOn(home),
+        ...(status.remoteUrl && backupErrors.has(root)
+          ? { remoteError: backupErrors.get(root) }
+          : {})
+      }
     } catch (e) {
       const st = W.libraryState(home)
       return {
@@ -502,14 +526,36 @@ export function registerIpc(): void {
         return W.workspaceDelete(home, str(id))
       }),
     workspaceSwitchPreview: async (id) => {
+      const origin = captureWorkspace(home)
       const env = await envNow()
-      return W.wrap(() => W.workspaceSwitchPreview(home, env, str(id)))
+      const r = W.wrap(() => {
+        assertWorkspaceCurrent(home, origin)
+        if (!W.workspaces(home).some((w) => w.id === str(id)))
+          throw Object.assign(new Error('Workspace no longer exists'), { code: 'notFound' })
+        return W.workspaceSwitchPreview(home, env, str(id))
+      })
+      if (r.ok) switchPreviews.set(str(id), origin)
+      return r
     },
     workspaceSwitch: async (id, apply) => {
+      const origin = captureWorkspace(home)
       const env = await envNow()
       W.markSelfWrite(5000)
-      const r = W.wrap(() => W.workspaceSwitch(home, str(id)))
+      const r = W.wrap(() => {
+        assertWorkspaceCurrent(home, origin)
+        if (apply !== false) {
+          const preview = switchPreviews.get(str(id))
+          if (!preview)
+            throw Object.assign(new Error('Review the workspace switch preview first'), {
+              code: 'previewRequired'
+            })
+          assertWorkspaceCurrent(home, preview)
+        }
+        return W.workspaceSwitch(home, str(id))
+      })
       if (!r.ok) return r
+      advanceWorkspaceRevision('switch')
+      switchPreviews.clear()
       reattachLibraryWatch()
       // apply=false (first run): switch only, the apply preview follows
       if (apply === false) return { ok: true, value: W.syncStatus() }
@@ -675,6 +721,7 @@ export function registerIpc(): void {
           secrets: defaultSecretBackend()
         })
         W.markSelfWrite()
+        scheduleAutoBackup(home)
         return { ok: true, value: tools }
       } catch (e) {
         const err = e as { code?: string; message?: string }
@@ -733,7 +780,11 @@ export function registerIpc(): void {
       libWrite(() => W.importApplyRun(home, str(sourceId), selections as never)),
     // ---- Sync
     syncStatus: async () => W.syncStatus(),
-    syncNow: async () => W.syncNow(home, await envNow()),
+    syncNow: async () => {
+      const status = W.syncNow(home, await envNow())
+      runSearchIndex()
+      return status
+    },
     syncPending: async () => ({
       pending: await inWorker<number>('syncPending', home),
       failed: W.syncFailedCount()
@@ -789,26 +840,36 @@ export function registerIpc(): void {
       const g = W.libGate(home)
       if (g) return g
       W.markSelfWrite(5000)
-      const r = fromGit(
-        await snapshot(home, typeof message === 'string' && message ? message : undefined)
+      const workspaceId = activeWorkspaceId(home)
+      const saved = await runSnapshot(
+        home,
+        typeof message === 'string' && message ? message : undefined,
+        workspaceId
       )
-      if (!r.ok) return r
-      const v = r.value as unknown as { snapshot?: unknown; skipped?: string }
-      return { ok: true, value: (v.snapshot ?? null) as never }
+      recordBackupResult(workspaceRoot(home, workspaceId), saved)
+      return fromGit(saved)
     },
     backupHistory: async () => W.libGate(home) ?? { ok: true, value: await historySafe() },
     backupRestore: async (hash, snapshotFirst) => {
+      const origin = captureWorkspace(home)
       const g = W.libGate(home)
       if (g) return g
       W.markSelfWrite(8000)
       if (snapshotFirst) {
-        const s0 = fromGit(await snapshot(home, 'before restore'))
+        const s0 = fromGit(await runSnapshot(home, 'before restore'))
         if (!s0.ok) return s0
       }
+      const current = W.wrap(() => assertWorkspaceCurrent(home, origin))
+      if (!current.ok) return current
       const r = fromGit(await restore(home, str(hash)))
       if (!r.ok) return r
+      const env = await envNow()
+      const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
+      if (!unchanged.ok) return unchanged
+      advanceWorkspaceRevision()
+      scheduleAutoBackup(home)
       // Apply the restored source to tools
-      const sync = W.syncNow(home, await envNow())
+      const sync = W.syncNow(home, env)
       W.markSelfWrite(3000)
       return { ok: true, value: sync }
     },
@@ -982,32 +1043,85 @@ export function syncOnStart(): void {
 
 /**
  * Library watch (engine watchLibrary) → sync → push to renderer. With auto backup on, snapshot 3 minutes after a change.
- * Events from the app's own writes (libWrite, libraryInit, backup) are ignored within the markSelfWrite window.
+ * Watcher events from app writes are ignored; successful app mutations schedule their own workspace-bound backup.
  * Re-attaches when the library root changes (settings change).
  */
 const AUTO_BACKUP_DEBOUNCE = 3 * 60_000
-let autoBackupTimer: NodeJS.Timeout | null = null
+const autoBackupTimers = new Map<
+  string,
+  { home: string; workspaceId: string; timer: NodeJS.Timeout }
+>()
+const backupErrors = new Map<string, string>()
+const backupInFlight = new Map<string, Promise<Awaited<ReturnType<typeof snapshot>>>>()
 
-function scheduleAutoBackup(home: string): void {
-  if (!autoBackupOn(home)) return
-  if (autoBackupTimer) clearTimeout(autoBackupTimer)
-  autoBackupTimer = setTimeout(() => {
-    autoBackupTimer = null
-    W.markSelfWrite(5000)
-    void snapshot(home, 'auto backup').catch(() => {})
-  }, AUTO_BACKUP_DEBOUNCE)
-  autoBackupTimer.unref()
+function recordBackupResult(root: string, result: Awaited<ReturnType<typeof snapshot>>): void {
+  const error = result.ok ? result.remoteError : result.reason
+  if (error) backupErrors.set(root, error)
+  else backupErrors.delete(root)
 }
 
-/** On app quit: one snapshot if auto backup is on and the repo is dirty */
+/** Every snapshot of a workspace waits for its preceding snapshot, including manual and quit snapshots. */
+function runSnapshot(
+  home: string,
+  message?: string,
+  workspaceId = activeWorkspaceId(home)
+): ReturnType<typeof snapshot> {
+  const root = workspaceRoot(home, workspaceId)
+  const previous = backupInFlight.get(root)
+  const pending = (previous ? previous.catch(() => {}) : Promise.resolve()).then(() => {
+    W.markSelfWrite(5000)
+    return snapshot(home, message, { workspaceId })
+  })
+  backupInFlight.set(root, pending)
+  void pending
+    .then((r) => recordBackupResult(root, r))
+    .catch((e) => backupErrors.set(root, String((e as Error).message)))
+    .finally(() => {
+      if (backupInFlight.get(root) === pending) backupInFlight.delete(root)
+    })
+  return pending
+}
+
+function scheduleAutoBackup(home: string, workspaceId = activeWorkspaceId(home)): void {
+  if (!autoBackupOn(home)) return
+  const root = workspaceRoot(home, workspaceId)
+  const existing = autoBackupTimers.get(root)
+  if (existing) clearTimeout(existing.timer)
+  const fixtureDelay =
+    resolveHome().fixture && process.env.ILLITHID_TEST === '1'
+      ? Number(process.env.ILLITHID_TEST_BACKUP_DELAY_MS)
+      : 0
+  const timer = setTimeout(
+    () => {
+      autoBackupTimers.delete(root)
+      if (!autoBackupOn(home)) return
+      W.markSelfWrite(5000)
+      void runSnapshot(home, 'auto backup', workspaceId).catch(() => {})
+    },
+    fixtureDelay > 0 ? fixtureDelay : AUTO_BACKUP_DEBOUNCE
+  )
+  timer.unref()
+  autoBackupTimers.set(root, { home, workspaceId, timer })
+}
+
+/** On quit, flush every queued workspace so switching never loses an earlier workspace's backup. */
 export async function snapshotOnQuit(): Promise<void> {
   const { home } = resolveHome()
-  if (!autoBackupOn(home) || !W.libraryState(home).ready) return
-  try {
-    const st = await backupStatus(home)
-    if (st.initialized && st.dirty) await snapshot(home, 'on quit')
-  } catch {
-    // Never block quitting
+  const queued: [string, { home: string; workspaceId: string }][] = [...autoBackupTimers.entries()]
+  for (const job of autoBackupTimers.values()) clearTimeout(job.timer)
+  autoBackupTimers.clear()
+  await Promise.allSettled([...backupInFlight.values()])
+  if (!autoBackupOn(home)) return
+  const active = activeWorkspaceId(home)
+  const activeRoot = workspaceRoot(home, active)
+  if (!queued.some(([root]) => root === activeRoot) && W.libraryState(home).ready)
+    queued.push([activeRoot, { home, workspaceId: active }])
+  for (const [root, job] of queued) {
+    try {
+      recordBackupResult(root, await runSnapshot(job.home, 'on quit', job.workspaceId))
+    } catch {
+      // Never block quitting on a backup failure.
+    }
   }
 }
 
@@ -1017,7 +1131,12 @@ export async function pullOnStartAndSync(): Promise<void> {
   if (!W.libraryState(home).ready) return
   try {
     W.markSelfWrite(8000)
+    const root = libraryRoot(home)
+    const origin = captureWorkspace(home)
     const r = await pullOnStart(home)
+    if (!r.ok) backupErrors.set(root, r.reason)
+    else backupErrors.delete(root)
+    assertWorkspaceCurrent(home, origin)
     if (r.ok && !r.skipped && r.summary) {
       const s = W.syncNow(home, { ...process.env })
       for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:syncEvent', s)
@@ -1054,6 +1173,7 @@ export function startLibraryWatch(): void {
       () => {
         if (W.isSelfWriteWindow()) return
         if (!W.libraryState(home).ready) return
+        advanceWorkspaceRevision()
         broadcast(W.syncNow(home, { ...process.env }))
         scheduleAutoBackup(home)
       },

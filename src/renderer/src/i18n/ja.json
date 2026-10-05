@@ -159,7 +159,7 @@
       "fetchConfirm": "ツール一覧を取得するためにサーバーを実行します: {{command}}",
       "fetched": "{{count}} 個のツールを読み込みました",
       "saved": "ツールの権限を保存しました",
-      "noteClaude": "Claude Code・Grok CLI: ブロック・確認が許可より優先されるため、この既定では許可したツールも確認またはブロックされます。",
+      "noteClaude": "Claude Code・Grok CLI: ブロックは確認・許可より、確認は許可より優先されます。厳しいサーバー既定値によってツール別の設定が適用されない場合があります。",
       "noteCodex": "Codex: サーバーをブロックすると、ここで許可・確認にしたツールだけが提供されます。",
       "noteGemini": "Gemini CLI: サーバー名に \"_\" があるとルールが一致しない場合があります。",
       "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。"
@@ -442,7 +442,10 @@
     "connected": "バックアップを接続しました",
     "snapshotFirst": "現在の状態を先にスナップショット",
     "snapshotFirstHint": "まだバックアップされていない変更があります。",
-    "autoHint": "ライブラリをツールに適用するたびにスナップショットを作ります。"
+    "autoHint": "ライブラリをツールに適用するたびにスナップショットを作ります。",
+    "localSaved": "ローカルに保存済み",
+    "remotePending": "リモートへの送信待ち",
+    "remoteFailed": "リモート同期に失敗"
   },
   "memory": {
     "new": "新規メモ",
@@ -503,7 +506,10 @@
     "rename": "名前を変更",
     "delete": "削除",
     "deleteTitle": "ワークスペースを削除",
-    "switchRemoves": "ツールから外れる項目 {{n}}"
+    "switchRemoves": "ツールから外れる項目 {{n}}",
+    "switchPreviewFailed": "変更内容を確認できませんでした。再確認してから切り替えてください。",
+    "switchPreviewLoading": "変更内容を確認中…",
+    "switchUnsaved": "ワークスペースを切り替えると未保存の編集内容は失われます。"
   },
   "preview": {
     "title": "ツールに反映",
@@ -533,7 +539,12 @@
     "editedIn": "{{tool}} で編集済み",
     "keepEdited": "この版を残す",
     "keptEdited": "ライブラリに保存しました",
-    "codexTrust": "反映後に Codex /hooks で再度信頼が必要"
+    "codexTrust": "反映後に Codex /hooks で再度信頼が必要",
+    "policies": "権限の変更",
+    "policyKey": "設定",
+    "before": "変更前",
+    "after": "変更後",
+    "notes": "変換に関する情報"
   },
   "onboarding": {
     "title": "Illithid をはじめる",
@@ -626,7 +637,8 @@
     "recentTitle": "直近30日の呼び出し {{n}}回",
     "sort": "並び替え",
     "sortName": "名前順",
-    "sortUsage": "使用量順"
+    "sortUsage": "使用量順",
+    "readFailed": "使用量を読み込めませんでした"
   },
   "combo": {
     "title": "Claude Code も一緒に使いますか？",
@@ -784,7 +796,11 @@
       "s": "{{s}}秒",
       "ms": "{{m}}分{{s}}秒",
       "hm": "{{h}}時間{{m}}分"
-    }
+    },
+    "readFailed": "セッション統計を読み込めませんでした",
+    "metricsUnavailable": "このログで収集されない指標は、0 ではなく — と表示されます。",
+    "unmeasured": "未収集",
+    "lastIndexed": "最終収集: {{at}}"
   },
   "leaderboard": {
     "zoomIn": "拡大",
@@ -990,7 +1006,8 @@
       "judgeHint": "Claude Code は内蔵の prompt フックですぐ確認します。他のツールはこの CLI をもう一度実行して確認します (遅く、プランの使用量を使います)。",
       "model": "モデル",
       "modelHint": "空なら CLI の既定モデルを使います。",
-      "judgeSlow": "作業の実行前にすると、すべてのコマンドが確認を待ちます。必要でなければ「応答が終わったとき」を使ってください。"
+      "judgeSlow": "作業の実行前にすると、すべてのコマンドが確認を待ちます。必要でなければ「応答が終わったとき」を使ってください。",
+      "judgeFailOpen": "判定用 CLI を実行するツールでは、CLI がない場合、実行に失敗した場合、JSON の判定が無効な場合は確認を省略し、イベントを許可します。省略した確認は標準エラーに表示されます。Claude Code は独自の prompt フックの動作に従います。"
     },
     "instruction": "ルール",
     "instructionHint": "AI がこのルールとイベントを見て、通すか止めるかを決めます。",

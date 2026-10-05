@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   jsonSubKeysRegion,
   mcpEntries,
@@ -8,6 +10,7 @@ import {
 } from '../text'
 import { allowlistFor } from '../permissions'
 import { claudeMcpRules } from '../mcpPermissions'
+import { mcpForTool, ownedServerNames } from './toggles'
 import { type Allowlist, type AllowlistEntry, type McpSource, type TargetDef } from '../types'
 
 type Json = Record<string, unknown>
@@ -15,6 +18,27 @@ type Json = Record<string, unknown>
 export const OWNED_PERMISSION_KEYS = ['allow', 'deny', 'ask'] as const
 
 type Permissions = { allow?: string[]; deny?: string[]; ask?: string[]; [k: string]: unknown }
+
+/** Resolve native server names before treating a separator as the boundary between server and tool. */
+function nativeServerNames(home: string | undefined): string[] {
+  if (!home) return []
+  const names = new Set<string>()
+  const add = (value: unknown): void => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    const servers = (value as Json).mcpServers
+    if (servers && typeof servers === 'object' && !Array.isArray(servers))
+      for (const name of Object.keys(servers)) names.add(name)
+  }
+  try {
+    const config = parseJsonObject(readFileSync(join(home, '.claude.json'), 'utf8'))
+    add(config)
+    if (config.projects && typeof config.projects === 'object' && !Array.isArray(config.projects))
+      for (const project of Object.values(config.projects)) add(project)
+  } catch {
+    // Unavailable native names leave compound rules ambiguous; keep those rules.
+  }
+  return [...names]
+}
 
 export function buildClaudePermissions(allowlist: Allowlist, mcp: McpSource, settings: Json): Json {
   const next = structuredClone(settings) as Json & { permissions?: Permissions }
@@ -59,22 +83,81 @@ export const claudePermissions: TargetDef = {
   seed: '{}\n',
   // Other permissions keys (defaultMode, additionalDirectories, etc.) are user-owned and not subject to drift
   region: (text) => jsonSubKeysRegion(text, 'permissions', [...OWNED_PERMISSION_KEYS]),
-  build(before, { sources }) {
-    if (!sources.hasPermissions) {
+  build(before, ctx) {
+    const { sources } = ctx
+    if (!sources.hasPermissions && ctx.retiring) {
       return {
         after: before,
         notes: ['library has no permissions.json — this target is left untouched']
       }
     }
     const settings = parseJsonObject(before)
-    const next = buildClaudePermissions(
-      allowlistFor(sources.allowlist, 'claude'),
-      sources.mcp,
-      settings
-    )
+    let allowlist = allowlistFor(sources.allowlist, 'claude')
+    const preservationNotes: string[] = []
+    if (!sources.hasPermissions) {
+      // MCP rules are independently owned. Without command rules, preserve the user's remaining permissions.
+      const owned = ownedServerNames(sources, 'claude', ctx, 'claudeMcp')
+      const ownedSet = new Set(owned)
+      const names = [...new Set([...owned, ...nativeServerNames(ctx.home)])].sort(
+        (a, b) => b.length - a.length
+      )
+      const mcp = mcpForTool(sources, 'claude')
+      const managedRules = new Set(
+        mcpEntries(mcp).flatMap(([name, server]) =>
+          Object.values(claudeMcpRules(name, server)).flat()
+        )
+      )
+      const ambiguousRules = new Set<string>()
+      const isOwnedRule = (rule: string): boolean => {
+        const owner = names.find(
+          (name) => rule === `mcp__${name}` || rule.startsWith(`mcp__${name}__`)
+        )
+        if (!owner || !ownedSet.has(owner)) return false
+        const prefix = `mcp__${owner}`
+        if (rule === prefix || managedRules.has(rule)) return true
+        // An unknown compound suffix can instead be a longer, unmanaged server name.
+        if (rule.slice(prefix.length + 2).includes('__')) {
+          ambiguousRules.add(rule)
+          return false
+        }
+        return true
+      }
+      const permissions = settings.permissions as Permissions | undefined
+      const keep = (list: string[] | undefined): string[] =>
+        (list ?? []).filter((rule) => !isOwnedRule(rule))
+      const nativeRules = {
+        allow: keep(permissions?.allow),
+        deny: keep(permissions?.deny),
+        ask: keep(permissions?.ask)
+      }
+      if (ambiguousRules.size)
+        preservationNotes.push(
+          `${ambiguousRules.size} ambiguous MCP permission rules preserved because prior state records server names only; review or remove these native Claude rules explicitly`
+        )
+      const hasMcpRules = mcpEntries(mcpForTool(sources, 'claude')).some(([name, server]) =>
+        Object.values(claudeMcpRules(name, server)).some((list) => list.length)
+      )
+      const hasOwnedRules = OWNED_PERMISSION_KEYS.some((key) => {
+        const list = permissions?.[key] ?? []
+        return nativeRules[key].length !== list.length
+      })
+      if (!hasMcpRules && !hasOwnedRules)
+        return {
+          after: before,
+          notes: ['no managed command or MCP permissions — left untouched', ...preservationNotes]
+        }
+      allowlist = {
+        bash: [],
+        claudeOnly: nativeRules
+      }
+    }
+    const next = buildClaudePermissions(allowlist, mcpForTool(sources, 'claude'), settings)
     const after = toJsonText(next, before)
     const { count, same } = untouchedKeysSame(settings, next, 'permissions')
-    const notes = [`${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`]
+    const notes = [
+      `${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`,
+      ...preservationNotes
+    ]
     return same ? { after, notes } : { after, notes, error: 'keys other than permissions changed' }
   }
 }
