@@ -74,7 +74,7 @@ Or download the DMG above.
 - **Sessions**: search and resume past conversations.
 - **Memory**: review and promote agent memories to the shared library.
 - **Artifacts**: browse reports, documents, and images produced by your agents.
-- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git.
+- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git. Configured builds can sign in with GitHub and create a private backup repository; existing repository URLs remain supported. See [GitHub backup setup](docs/github-backup.md).
 
 ## Safe by default
 
@@ -85,7 +85,7 @@ Or download the DMG above.
 ## FAQ
 
 **Does my code or prompts go through Illithid?**
-No. Illithid never talks to any model API. It edits local config files and reads local session logs. Network access is limited to Git backup (only if you connect a remote), the update check and the Market, which talks to skills.sh, the official MCP registry and GitHub. You can turn the Market off in Settings. Illithid also asks GitHub once a day whether a newer version is out; turn that off under Settings → Updates.
+No. Illithid never talks to any model API. It edits local config files and reads local session logs. Network access includes Git backup (only if you connect a remote), optional GitHub backup sign-in and repository setup, the update check and the Market, which talks to skills.sh, the official MCP registry and GitHub. You can turn the Market off in Settings. Illithid also asks GitHub once a day whether a newer version is out; turn that off under Settings → Updates.
 
 **Will it overwrite my existing setup?**
 On first run Illithid offers to import what you have. Imported originals are backed up before Illithid takes them over.

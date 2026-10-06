@@ -1,3 +1,4 @@
+import type { GitHubLoginView } from '../engine/githubBackup'
 /**
  * main ↔ renderer IPC contract. Read channels + library/tool write channels.
  * Engine types are type-only imports, so no engine code ends up in the renderer bundle.
@@ -1037,6 +1038,16 @@ export interface Api {
   ): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
   modelSet(tool: ToolId, key: string, value: string): Promise<WriteResult<SetModelResult> | Refused>
   // ---- backup (available=false / notAvailable until the engine is ready)
+  githubLoginStatus(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginStart(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginPoll(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginCancel(): Promise<WriteResult<GitHubLoginView>>
+  githubLogout(): Promise<WriteResult<GitHubLoginView>>
+  githubInstallationOpen(): Promise<WriteResult<void>>
+  githubRepositoryCreate(
+    name: string
+  ): Promise<WriteResult<{ id: number; name: string; url: string }> | Refused>
+  githubRepositoryConnect(name: string): Promise<WriteResult<BackupStatusView> | Refused>
   backupStatus(): Promise<BackupStatusView>
   backupConnect(remoteUrl: string): Promise<WriteResult<BackupStatusView> | Refused>
   /** snapshotFirst: snapshot first when dirty */
@@ -1252,6 +1263,14 @@ export const CHANNELS = [
   'editedRuleKeep',
   'deleteCandidates',
   'modelSet',
+  'githubLoginStatus',
+  'githubLoginStart',
+  'githubLoginPoll',
+  'githubLoginCancel',
+  'githubLogout',
+  'githubInstallationOpen',
+  'githubRepositoryCreate',
+  'githubRepositoryConnect',
   'backupStatus',
   'backupConnect',
   'backupSnapshot',
