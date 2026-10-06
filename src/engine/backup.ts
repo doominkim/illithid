@@ -13,6 +13,7 @@ import { hostname } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { simpleGit, type SimpleGit } from 'simple-git'
 import { APP_CONFIG_DIR, libraryRoot, readConfig, workspaceIds, workspaceRoot } from './config'
+import { backupGitEnvironment, type BackupGitAuth } from './backupGitAuth'
 import { MANIFEST_FILE } from './manifest'
 import type { GitResult } from './git'
 import { libraryExists } from './sources'
@@ -329,7 +330,7 @@ function looksDiverged(msg: string): boolean {
 export async function snapshot(
   home: string,
   message?: string,
-  opts: { workspaceId?: string } = {}
+  opts: { workspaceId?: string; auth?: BackupGitAuth | (() => Promise<BackupGitAuth>) } = {}
 ): Promise<SnapshotResult> {
   if (opts.workspaceId && !workspaceIds(home).includes(opts.workspaceId))
     return { ok: false, reason: 'Workspace no longer exists' }
@@ -362,6 +363,15 @@ export async function snapshot(
     const url = await remoteUrl(g)
     if (!url) return { ok: true, hash, committed, pushed: false, message: subject }
     try {
+      if (opts.auth) {
+        const pushUrl = (await g.raw(['remote', 'get-url', '--push', BACKUP_REMOTE])).trim()
+        g.env(
+          backupGitEnvironment(
+            pushUrl,
+            typeof opts.auth === 'function' ? await opts.auth() : opts.auth
+          )
+        )
+      }
       await pushCurrent(g, branch)
     } catch (e) {
       const msg = reasonOf(e)
@@ -399,7 +409,10 @@ export async function snapshot(
  * Catch up with the remote on startup (ff-only). skipped if there is no remote/upstream. reason 'diverged' if diverged.
  * Uncommitted changes are fine as long as the ff does not touch those files (if git refuses, its reason is returned).
  */
-export async function pullOnStart(home: string): Promise<PullResult> {
+export async function pullOnStart(
+  home: string,
+  opts: { auth?: BackupGitAuth | (() => Promise<BackupGitAuth>) } = {}
+): Promise<PullResult> {
   const root = libraryRoot(home)
   if (!isRepo(root)) return { ok: true, summary: '', skipped: 'notInitialized' }
   const g = git(root)
@@ -407,6 +420,10 @@ export async function pullOnStart(home: string): Promise<PullResult> {
     const url = await remoteUrl(g)
     const branch = await currentBranch(g)
     if (!url || !branch) return { ok: true, summary: '', skipped: 'noRemote' }
+    if (opts.auth)
+      g.env(
+        backupGitEnvironment(url, typeof opts.auth === 'function' ? await opts.auth() : opts.auth)
+      )
     await g.raw(['fetch', '-q', BACKUP_REMOTE])
     let remoteHas = true
     try {

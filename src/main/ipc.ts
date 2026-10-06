@@ -1,3 +1,10 @@
+import {
+  githubReady,
+  githubAuthForWorkspace,
+  bindGithubBackup,
+  unbindGithubBackup
+} from './githubBackup'
+import { GitHubBackupError } from '../engine/githubBackup'
 /**
  * IPC registration. Reads run on a worker thread, writes run synchronously in main (writes.ts).
  * - main decides paths. home = ILLITHID_HOME (fixture) or os.homedir(). git repo = library root.
@@ -287,6 +294,17 @@ export function registerIpc(): void {
   }
   /** Latest artifacts scan result. preview only reads ids listed here */
   let artifacts = new Map<string, Artifact>()
+  const githubWrite = async <T>(run: () => Promise<T>): Promise<WriteResult<T>> => {
+    try {
+      return { ok: true, value: await run() }
+    } catch (e) {
+      return {
+        ok: false,
+        code: e instanceof GitHubBackupError ? e.code : 'githubUnavailable',
+        message: e instanceof GitHubBackupError ? e.code : 'githubUnavailable'
+      }
+    }
+  }
   const switchPreviews = new Map<string, ReturnType<typeof captureWorkspace>>()
   const str = (v: unknown): string => (typeof v === 'string' ? v : '')
   /** Tool file write: runs after passing the allowRealApply gate */
@@ -827,13 +845,55 @@ export function registerIpc(): void {
     },
     modelSet: async (tool, key, value) =>
       gated(() => W.modelSet(home, tool as ToolId, str(key), str(value))),
+    githubLoginStatus: async () => githubWrite(async () => (await githubReady()).status()),
+    githubLoginStart: async () =>
+      githubWrite(async () => {
+        const client = await githubReady()
+        const view = await client.start()
+        await shell.openExternal('https://github.com/login/device')
+        return view
+      }),
+    githubLoginPoll: async () => githubWrite(async () => (await githubReady()).poll()),
+    githubLoginCancel: async () => githubWrite(async () => (await githubReady()).cancel()),
+    githubLogout: async () => githubWrite(async () => (await githubReady()).logout()),
+    githubInstallationOpen: async () =>
+      githubWrite(async () => {
+        await shell.openExternal((await githubReady()).installationUrl())
+      }),
+    githubRepositoryCreate: async (name) => {
+      const gate = W.libGate(home)
+      if (gate) return gate
+      return githubWrite(async () => (await githubReady()).createRepository(str(name)))
+    },
+    githubRepositoryConnect: async (name) => {
+      const origin = captureWorkspace(home)
+      const gate = W.libGate(home)
+      if (gate) return gate
+      return githubWrite(async () => {
+        const client = await githubReady()
+        const login = client.status().login
+        if (!login || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(str(name)))
+          throw new GitHubBackupError('invalidRepositoryName')
+        const url = `https://github.com/${login}/${str(name)}.git`
+        await client.gitCredentials(url)
+        assertWorkspaceCurrent(home, origin)
+        const root = libraryRoot(home)
+        W.markSelfWrite(5000)
+        const result = await connectBackup(home, url)
+        if (!result.ok) throw new GitHubBackupError('connectionFailed')
+        bindGithubBackup(root, url)
+        return backupView()
+      })
+    },
     // ---- Backup (library git). Remote access only via the user-provided URL
     backupStatus: async () => backupView(),
     backupConnect: async (url) => {
       const g = W.libGate(home)
       if (g) return g
       W.markSelfWrite(5000)
+      const root = libraryRoot(home)
       const r = fromGit(await connectBackup(home, str(url)))
+      if (r.ok) unbindGithubBackup(root)
       return r.ok ? { ok: true, value: await backupView() } : r
     },
     backupSnapshot: async (message) => {
@@ -876,7 +936,9 @@ export function registerIpc(): void {
     backupDisconnect: async () => {
       const g = W.libGate(home)
       if (g) return g
+      const root = libraryRoot(home)
       const r = fromGit(await disconnect(home))
+      if (r.ok) unbindGithubBackup(root)
       return r.ok ? { ok: true, value: await backupView() } : r
     },
     backupSetDevice: async (name) =>
@@ -1070,7 +1132,7 @@ function runSnapshot(
   const previous = backupInFlight.get(root)
   const pending = (previous ? previous.catch(() => {}) : Promise.resolve()).then(() => {
     W.markSelfWrite(5000)
-    return snapshot(home, message, { workspaceId })
+    return snapshot(home, message, { workspaceId, auth: githubAuthForWorkspace(home, workspaceId) })
   })
   backupInFlight.set(root, pending)
   void pending
@@ -1133,7 +1195,9 @@ export async function pullOnStartAndSync(): Promise<void> {
     W.markSelfWrite(8000)
     const root = libraryRoot(home)
     const origin = captureWorkspace(home)
-    const r = await pullOnStart(home)
+    const r = await pullOnStart(home, {
+      auth: githubAuthForWorkspace(home, activeWorkspaceId(home))
+    })
     if (!r.ok) backupErrors.set(root, r.reason)
     else backupErrors.delete(root)
     assertWorkspaceCurrent(home, origin)

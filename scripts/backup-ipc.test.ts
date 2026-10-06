@@ -26,7 +26,8 @@ type SnapshotPort = (
 /** Load the public IPC host with a controlled Git snapshot port and clock; no Electron or remote process is started. */
 function ipcHost(
   home: string,
-  snapshot: SnapshotPort
+  snapshot: SnapshotPort,
+  unbind: (root: string) => void = () => {}
 ): {
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
   fireTimers: () => void
@@ -69,6 +70,7 @@ function ipcHost(
     '../engine': { ...engine, snapshot },
     './writes': writes,
     './shellEnv': { shellEnvReady: async () => {} },
+    './githubBackup': { githubAuthForWorkspace: () => undefined, unbindGithubBackup: unbind },
     './market': { marketHandlers: () => ({}) },
     './workspaceGuard': { assertWorkspaceCurrent, advanceWorkspaceRevision, captureWorkspace },
     './worker?nodeWorker': {
@@ -112,6 +114,22 @@ const saved: SnapshotResult = {
   pushed: false,
   message: 'fixture'
 }
+
+test('manual remote connection and disconnection remove the previous GitHub credential binding', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'illithid-backup-manual-binding-'))
+  buildDemoHome(home, { tools: 'all' })
+  const removed: string[] = []
+  const host = ipcHost(
+    home,
+    async () => saved,
+    (root) => removed.push(root)
+  )
+  const result = await host.invoke('backupConnect', join(home, 'local-remote.git'))
+  assert.equal((result as { ok: boolean }).ok, true)
+  assert.deepEqual(removed, [engine.libraryRoot(home)])
+  await host.invoke('backupDisconnect')
+  assert.deepEqual(removed, [engine.libraryRoot(home), engine.libraryRoot(home)])
+})
 
 async function settle(): Promise<void> {
   await new Promise<void>((resolve) => setImmediate(resolve))

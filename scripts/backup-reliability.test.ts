@@ -34,6 +34,41 @@ function git(cwd: string, ...args: string[]): string {
   ).trim()
 }
 
+test('expired GitHub authentication preserves a local snapshot and leaves credentials out of Git config', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'illithid-backup-auth-expired-'))
+  const home = homeAt(root, 'local')
+  await connectBackup(home, 'https://github.com/fixture-user/illithid-backup.git')
+  const result = await snapshot(home, 'offline authenticated fixture', {
+    auth: async () => {
+      throw new Error('signInAgain')
+    }
+  })
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.committed, true)
+  assert.equal(result.pushed, false)
+  assert.match(result.remoteError!, /signInAgain/)
+  assert.equal((await history(home))[0].hash, result.hash)
+  const config = readFileSync(join(home, '.illithid/workspaces/default/.git/config'), 'utf8')
+  assert.equal(config.includes('extraHeader'), false)
+  assert.equal(config.includes('Authorization'), false)
+})
+
+test('authenticated startup pull refuses a changed remote before fetching or changing the library', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'illithid-backup-auth-mismatch-'))
+  const home = homeAt(root, 'local')
+  await connectBackup(home, join(root, 'unreachable.git'))
+  const result = await pullOnStart(home, {
+    auth: { remoteUrl: 'https://github.com/fixture-user/illithid-backup.git', token: 'ghu_fixture' }
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.reason, 'invalidRemote')
+  assert.equal(
+    readFileSync(join(home, '.illithid/workspaces/default/rules/keep.md'), 'utf8'),
+    'local content\n'
+  )
+})
+
 test('startup pull preserves an existing library before its first local snapshot', async () => {
   const root = mkdtempSync(join(tmpdir(), 'illithid-backup-preserve-'))
   const remote = join(root, 'remote.git')
