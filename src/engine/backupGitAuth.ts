@@ -26,6 +26,8 @@ export function backupGitEnvironment(
       delete env[key]
   const config = [
     ['http.extraHeader', ''],
+    // GitHub Actions may inject checkout credentials at the github.com host scope.
+    ['http.https://github.com/.extraHeader', ''],
     [
       `http.${remote}.extraHeader`,
       `Authorization: Basic ${Buffer.from(`x-access-token:${auth.token}`).toString('base64')}`

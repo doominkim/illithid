@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
 import { GitHubBackup } from '../src/engine/githubBackup'
@@ -245,8 +248,14 @@ test('backup credentials refresh without a client secret and require the selecte
 
 test('Git credentials are scoped to one HTTPS repository and never change the parent environment', async () => {
   const { backupGitEnvironment } = await import('../src/engine/backupGitAuth')
+  const globalConfig = join(mkdtempSync(join(tmpdir(), 'illithid-git-auth-')), 'config')
+  writeFileSync(
+    globalConfig,
+    '[http "https://github.com/"]\n\textraHeader = Authorization: Basic RUNNER_TOKEN\n'
+  )
   const parent = {
     PATH: '/usr/bin',
+    GIT_CONFIG_GLOBAL: globalConfig,
     GIT_TRACE: '1',
     GIT_CURL_VERBOSE: '1',
     GIT_CONFIG_COUNT: '1',
@@ -261,20 +270,20 @@ test('Git credentials are scoped to one HTTPS repository and never change the pa
   assert.equal(child.GIT_TRACE, undefined)
   assert.equal(child.GIT_CURL_VERBOSE, undefined)
   assert.equal(
-    child.GIT_CONFIG_KEY_1,
+    child.GIT_CONFIG_KEY_2,
     'http.https://github.com/fixture-user/illithid-backup.git.extraHeader'
   )
-  assert.equal(child.GIT_CONFIG_KEY_2, 'http.followRedirects')
-  assert.equal(child.GIT_CONFIG_VALUE_2, 'false')
+  assert.equal(child.GIT_CONFIG_KEY_3, 'http.followRedirects')
+  assert.equal(child.GIT_CONFIG_VALUE_3, 'false')
   assert.equal(parent.GIT_CONFIG_VALUE_0, 'inherited')
   const { inspect } = await import('node:util')
-  assert.equal(inspect({ env: child }).includes(child.GIT_CONFIG_VALUE_1!), false)
+  assert.equal(inspect({ env: child }).includes(child.GIT_CONFIG_VALUE_2!), false)
   const config = (url: string): string =>
     execFileSync('git', ['config', '--get-urlmatch', 'http.extraHeader', url], {
       env: child,
       encoding: 'utf8'
     })
-  assert.ok(config(auth.remoteUrl).includes(child.GIT_CONFIG_VALUE_1!))
+  assert.ok(config(auth.remoteUrl).includes(child.GIT_CONFIG_VALUE_2!))
   assert.equal(config('https://github.com/another-user/another-repo.git').trim(), '')
   assert.throws(
     () => backupGitEnvironment('https://evil.test/backup.git', auth, parent),
