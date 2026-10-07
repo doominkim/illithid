@@ -7,6 +7,9 @@ import { _electron as electron, type Locator } from 'playwright-core'
 import { createHook, savePermissionRules } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
+/** Hooks are generated as POSIX shell scripts and not written on Windows yet (phase 1) */
+const NO_HOOKS = process.platform === 'win32' && 'hooks are not written on Windows yet'
+
 async function launch(
   tools: string[],
   prepare?: (home: string) => void
@@ -39,7 +42,7 @@ async function launch(
 
 test(
   'REQ-PERM-UI-1 add a block rule, change it to ask, delete it; the tools follow, and guard hooks are listed with a link',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'gemini', 'copilot'], (home) =>
       createHook(home, 'guard-before-tool', {

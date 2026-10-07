@@ -7,11 +7,14 @@ import { _electron as electron } from 'playwright-core'
 import { createHook, createScript, readScript } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
+/** Hooks are generated as POSIX shell scripts and not written on Windows yet (phase 1) */
+const NO_HOOKS = process.platform === 'win32' && 'hooks are not written on Windows yet'
+
 const LIB = '.illithid/workspaces/default'
 
 test(
   'REQ-SCRIPTS-UI-1 write a library script, use it from a new hook, and see the hook from the script',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const home = mkdtempSync(join(tmpdir(), 'illithid-scripts-ui-'))
     buildDemoHome(home, { tools: 'all' })
@@ -127,7 +130,7 @@ test(
 
 test(
   'REQ-SCRIPTS-UI-3 a folder script: made and filled in the scripts menu, used by a hook, and the tool gets the whole folder',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const home = mkdtempSync(join(tmpdir(), 'illithid-scripts-ui-'))
     buildDemoHome(home, { tools: 'all' })

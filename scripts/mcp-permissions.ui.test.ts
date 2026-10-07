@@ -61,6 +61,14 @@ test(
         .click()
       await page.getByTestId('mcp-perm-add').fill('archive_task')
       await page.getByTestId('mcp-perm-add').press('Enter')
+      // A save toast can sit over the row on a small screen (Windows CI): name it, wait for it to go
+      const toasts = page.locator('.mantine-Notification-root')
+      const texts = await toasts.allInnerTexts()
+      if (texts.length) console.log(`toasts: ${texts.join(' | ')}`)
+      await toasts
+        .first()
+        .waitFor({ state: 'detached', timeout: 15_000 })
+        .catch(() => {})
       await page.getByTestId('mcp-perm-tool-archive_task').getByText('Ask', { exact: true }).click()
       await synced()
       const claude = JSON.parse(readFileSync(join(home, '.claude/settings.json'), 'utf8'))

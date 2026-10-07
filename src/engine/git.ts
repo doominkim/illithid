@@ -37,8 +37,11 @@ export interface GitCommitInfo {
 
 export type GitResult<T = object> = ({ ok: true } & T) | { ok: false; reason: string }
 
+/** Library files are written with LF; Git for Windows' default autocrlf would rewrite them on checkout */
+export const GIT_CONFIG = ['core.autocrlf=false']
+
 function git(repoDir: string): SimpleGit {
-  return simpleGit({ baseDir: repoDir })
+  return simpleGit({ baseDir: repoDir, config: GIT_CONFIG })
 }
 
 function reasonOf(e: unknown): string {

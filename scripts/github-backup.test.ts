@@ -254,7 +254,13 @@ test('Git credentials are scoped to one HTTPS repository and never change the pa
     '[http "https://github.com/"]\n\textraHeader = Authorization: Basic RUNNER_TOKEN\n'
   )
   const parent = {
-    PATH: '/usr/bin',
+    // Windows needs the real Path (and SystemRoot) to start git
+    ...(process.platform === 'win32'
+      ? {
+          Path: process.env.Path ?? process.env.PATH ?? '',
+          SystemRoot: process.env.SystemRoot ?? ''
+        }
+      : { PATH: '/usr/bin' }),
     GIT_CONFIG_GLOBAL: globalConfig,
     GIT_TRACE: '1',
     GIT_CURL_VERBOSE: '1',

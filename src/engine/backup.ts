@@ -15,7 +15,7 @@ import { simpleGit, type SimpleGit } from 'simple-git'
 import { APP_CONFIG_DIR, libraryRoot, readConfig, workspaceIds, workspaceRoot } from './config'
 import { backupGitEnvironment, type BackupGitAuth } from './backupGitAuth'
 import { MANIFEST_FILE } from './manifest'
-import type { GitResult } from './git'
+import { GIT_CONFIG, type GitResult } from './git'
 import { libraryExists } from './sources'
 import { atomicWrite, LEGACY_TMP_TAGS, TMP_TAG } from './write'
 
@@ -98,7 +98,7 @@ export type RestoreResult = GitResult<{
 export type PullResult = GitResult<{ summary: string; skipped?: 'noRemote' | 'notInitialized' }>
 
 function git(dir: string): SimpleGit {
-  return simpleGit({ baseDir: dir })
+  return simpleGit({ baseDir: dir, config: GIT_CONFIG })
 }
 
 function reasonOf(e: unknown): string {
