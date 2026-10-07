@@ -16,6 +16,7 @@ import {
   Check,
   CircleOff,
   Cloud,
+  CloudDownload,
   CloudUpload,
   History,
   Pencil,
@@ -99,6 +100,7 @@ function Backup(): React.JSX.Element {
   const [busy, setBusy] = useState<string | null>(null)
   const [restore, setRestore] = useState<Snapshot | null>(null)
   const [disconnect, setDisconnect] = useState(false)
+  const [pullConfirm, setPullConfirm] = useState(false)
 
   const load = useCallback((): void => {
     const revision = ++loadRevision.current
@@ -133,9 +135,32 @@ function Backup(): React.JSX.Element {
     return r
   }
 
+  /** Take the remote backup. Without confirmation only an empty library or a fast-forward is accepted */
+  const pull = async (replaceLocal: boolean): Promise<void> => {
+    const r = await run('pull', window.api.backupPull(replaceLocal))
+    if (!r) return
+    if (r.outcome === 'confirmRequired') {
+      setPullConfirm(true)
+      return
+    }
+    setPullConfirm(false)
+    notifications.show({
+      color: 'accent',
+      message: r.backupPath
+        ? `${t('backup.pulled')} · ${t('backup.pulledBackupAt', { path: r.backupPath })}`
+        : t('backup.pulled')
+    })
+    if (r.merged !== 'upToDate') {
+      reload()
+      openPreview()
+    }
+  }
+
   if (!st) return <Loading />
   const na = !st.libraryExists
   const connected = st.initialized && !!st.remoteUrl
+  const needsPullConfirm = st.remoteError === 'localUnsaved' || st.remoteError === 'diverged'
+  const replacedDir = '~/.config/illithid/backups/replaced'
   const remoteComplete =
     connected &&
     !!st.lastSnapshot &&
@@ -175,7 +200,30 @@ function Backup(): React.JSX.Element {
             {st.error}
           </Alert>
         )}
-        {st.remoteError && (
+        {st.remoteError && needsPullConfirm && (
+          <Alert
+            color="yellow"
+            variant="light"
+            radius="lg"
+            title={t('backup.pullTitle')}
+            data-testid="backup-pull-needed"
+          >
+            <Stack gap="xs" align="flex-start">
+              <Text size="sm">{t('backup.pullBody', { dir: replacedDir })}</Text>
+              <Button
+                size="xs"
+                leftSection={<CloudDownload size={13} />}
+                disabled={na || !!busy}
+                loading={busy === 'pull'}
+                onClick={() => setPullConfirm(true)}
+                data-testid="backup-pull-replace"
+              >
+                {t('backup.pullReplace')}
+              </Button>
+            </Stack>
+          </Alert>
+        )}
+        {st.remoteError && !needsPullConfirm && (
           <Alert
             color="yellow"
             variant="light"
@@ -205,29 +253,45 @@ function Backup(): React.JSX.Element {
             icon={remoteComplete ? <ShieldCheck size={18} /> : <CircleOff size={18} />}
             tone={remoteComplete ? 'ok' : undefined}
             right={
-              <Button
-                leftSection={<CloudUpload size={14} />}
-                disabled={na || !st.initialized}
-                loading={busy === 'snap'}
-                onClick={() =>
-                  void run('snap', window.api.backupSnapshot()).then((saved) => {
-                    if (saved)
-                      notifications.show({
-                        color: saved.remoteError ? 'yellow' : 'accent',
-                        message: t(saved.pushed ? 'backup.snapshotDone' : 'backup.localSaved')
-                      })
-                  })
-                }
-                data-testid="backup-now"
-              >
-                {t('backup.now')}
-              </Button>
+              <Group gap={6} wrap="nowrap">
+                {connected && st.behind > 0 && !needsPullConfirm && (
+                  <Button
+                    variant="default"
+                    leftSection={<CloudDownload size={14} />}
+                    disabled={na || !!busy}
+                    loading={busy === 'pull'}
+                    onClick={() => void pull(false)}
+                    data-testid="backup-pull"
+                  >
+                    {t('backup.pull')}
+                  </Button>
+                )}
+                <Button
+                  leftSection={<CloudUpload size={14} />}
+                  disabled={na || !st.initialized}
+                  loading={busy === 'snap'}
+                  onClick={() =>
+                    void run('snap', window.api.backupSnapshot()).then((saved) => {
+                      if (saved)
+                        notifications.show({
+                          color: saved.remoteError ? 'yellow' : 'accent',
+                          message: t(saved.pushed ? 'backup.snapshotDone' : 'backup.localSaved')
+                        })
+                    })
+                  }
+                  data-testid="backup-now"
+                >
+                  {t('backup.now')}
+                </Button>
+              </Group>
             }
           >
             <Stack gap={8}>
               {connected && (st.ahead > 0 || st.behind > 0) ? (
-                <Text size="sm" c="dimmed">
-                  {t('backup.aheadBehind', { ahead: st.ahead, behind: st.behind })}
+                <Text size="sm" c="dimmed" data-testid="backup-ahead-behind">
+                  {st.lastSnapshot
+                    ? t('backup.aheadBehind', { ahead: st.ahead, behind: st.behind })
+                    : t('backup.behindHint', { n: st.behind })}
                 </Text>
               ) : null}
               <Group gap="xl" wrap="wrap">
@@ -424,6 +488,16 @@ function Backup(): React.JSX.Element {
               )}
             </Stack>
           }
+        />
+        <ConfirmModal
+          opened={pullConfirm}
+          onClose={() => setPullConfirm(false)}
+          onConfirm={() => pull(true)}
+          danger
+          loading={busy === 'pull'}
+          title={t('backup.pullTitle')}
+          confirmLabel={t('backup.pullReplace')}
+          message={t('backup.pullBody', { dir: replacedDir })}
         />
         <ConfirmModal
           opened={disconnect}

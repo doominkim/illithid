@@ -8,11 +8,18 @@
  * - If the remote is ahead, ff-only pull and retry; if diverged, stop with {ok:false, reason:'diverged'} (no merge attempt).
  * - Failures are returned as { ok:false, reason } instead of thrown.
  */
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { hostname } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, sep } from 'node:path'
 import { simpleGit, type SimpleGit } from 'simple-git'
-import { APP_CONFIG_DIR, libraryRoot, readConfig, workspaceIds, workspaceRoot } from './config'
+import {
+  APP_CONFIG_DIR,
+  appConfigDir,
+  libraryRoot,
+  readConfig,
+  workspaceIds,
+  workspaceRoot
+} from './config'
 import { backupGitEnvironment, type BackupGitAuth } from './backupGitAuth'
 import { MANIFEST_FILE } from './manifest'
 import type { GitResult } from './git'
@@ -201,17 +208,20 @@ export async function backupStatus(home: string): Promise<BackupStatus> {
   ])
   let ahead = s.ahead
   let behind = s.behind
-  if (url && branch && last[0] && !s.tracking) {
+  if (url && branch && !s.tracking) {
     const ref = `refs/remotes/${BACKUP_REMOTE}/${branch}`
-    const remoteHead = (await g.raw(['rev-parse', '--verify', '-q', ref]).catch(() => '')).trim()
-    if (remoteHead) {
+    const remoteHead = await remoteBranchHead(g, branch)
+    if (last[0] && remoteHead) {
       const counts = (await g.raw(['rev-list', '--left-right', '--count', `HEAD...${ref}`]))
         .trim()
         .split(/\s+/)
       ahead = Number(counts[0])
       behind = Number(counts[1])
-    } else {
+    } else if (last[0]) {
       ahead = Number((await g.raw(['rev-list', '--count', 'HEAD'])).trim())
+    } else if (remoteHead) {
+      // No local snapshot yet: every remote snapshot is one this device has not taken
+      behind = await commitCount(g, ref)
     }
   }
   return {
@@ -274,14 +284,48 @@ async function ensureIdentity(g: SimpleGit, device: string): Promise<void> {
   if (!(await get('commit.gpgsign'))) await g.raw(['config', 'commit.gpgsign', 'false'])
 }
 
+/** Hash of the remote-tracking branch, '' when the remote has no such branch (or was never fetched) */
+async function remoteBranchHead(g: SimpleGit, branch: string): Promise<string> {
+  return (
+    await g
+      .raw(['rev-parse', '--verify', '-q', `refs/remotes/${BACKUP_REMOTE}/${branch}`])
+      .catch(() => '')
+  ).trim()
+}
+
+async function commitCount(g: SimpleGit, ref: string): Promise<number> {
+  return Number((await g.raw(['rev-list', '--count', ref])).trim()) || 0
+}
+
+type AuthOption = BackupGitAuth | (() => Promise<BackupGitAuth>)
+
+/** Attach the per-repository auth header for the next remote operation on `g` */
+async function applyAuth(g: SimpleGit, url: string, auth: AuthOption | undefined): Promise<void> {
+  if (!auth) return
+  g.env(backupGitEnvironment(url, typeof auth === 'function' ? await auth() : auth))
+}
+
+/** What connecting learned about the remote. The connection is saved either way. */
+export interface RemoteProbe {
+  /** fetch succeeded (offline or a missing repository gives false, with `error`) */
+  reachable: boolean
+  /** Snapshots on the remote branch this device does not have yet (0 when unreachable or empty) */
+  snapshots: number
+  error?: string
+}
+
 /**
- * Connect remote: git init the library (if needed) + set origin + ensure .gitignore.
- * If origin exists, only its URL changes. Does not talk to the remote (the first push happens in snapshot).
+ * Connect remote: git init the library (if needed) + set origin + ensure .gitignore + fetch once.
+ * If origin exists, only its URL changes. The fetch only updates remote-tracking refs — library files are untouched —
+ * and its failure does not undo the connection (offline connect is allowed; `remote` reports what happened).
  */
 export async function connectBackup(
   home: string,
-  remote: string
-): Promise<GitResult<{ root: string; initialized: boolean; remoteUrl: string }>> {
+  remote: string,
+  opts: { auth?: AuthOption } = {}
+): Promise<
+  GitResult<{ root: string; initialized: boolean; remoteUrl: string; remote: RemoteProbe }>
+> {
   const bad = validateRemoteUrl(remote)
   if (bad) return { ok: false, reason: bad }
   const root = libraryRoot(home)
@@ -301,10 +345,32 @@ export async function connectBackup(
     const cur = await remoteUrl(g)
     if (cur === undefined) await g.raw(['remote', 'add', BACKUP_REMOTE, url])
     else if (cur !== url) await g.raw(['remote', 'set-url', BACKUP_REMOTE, url])
-    return { ok: true, root, initialized, remoteUrl: url }
+    const probe = await probeRemote(g, url, (await currentBranch(g)) ?? BACKUP_DEFAULT_BRANCH, opts)
+    return { ok: true, root, initialized, remoteUrl: url, remote: probe }
   } catch (e) {
     return { ok: false, reason: reasonOf(e) }
   }
+}
+
+/** fetch + count the remote snapshots this device lacks. Never throws */
+async function probeRemote(
+  g: SimpleGit,
+  url: string,
+  branch: string,
+  opts: { auth?: AuthOption }
+): Promise<RemoteProbe> {
+  try {
+    await applyAuth(g, url, opts.auth)
+    await g.raw(['fetch', '-q', BACKUP_REMOTE])
+  } catch (e) {
+    return { reachable: false, snapshots: 0, error: reasonOf(e) }
+  }
+  const ref = `refs/remotes/${BACKUP_REMOTE}/${branch}`
+  if (!(await remoteBranchHead(g, branch))) return { reachable: true, snapshots: 0 }
+  const snapshots = (await hasHead(g))
+    ? Number((await g.raw(['rev-list', '--count', `HEAD..${ref}`])).trim()) || 0
+    : await commitCount(g, ref)
+  return { reachable: true, snapshots }
 }
 
 function stamp(): string {
@@ -437,29 +503,155 @@ export async function pullOnStart(
     }
     if (!remoteHas) return { ok: true, summary: 'Remote has no branch yet', skipped: 'noRemote' }
     if (!(await hasHead(g))) {
-      // An unborn Git branch can still contain the user's complete library. Never overwrite it.
-      if (hasUncommittedLibraryContent(root))
-        return {
-          ok: false,
-          reason:
-            'Local library has no snapshot; save a local snapshot before pulling remote history'
-        }
+      // An unborn Git branch can still contain the user's complete library. Never overwrite it unasked
+      // (pullFromRemote with replaceLocal is the user-confirmed path).
+      if (hasUncommittedLibraryContent(root)) return { ok: false, reason: PULL_LOCAL_UNSAVED }
       // Only a genuinely empty working tree can take the remote branch as is
-      await g.raw(['reset', '-q', `${BACKUP_REMOTE}/${branch}`])
-      await g.raw(['checkout', '-q', '--', '.'])
-      await g.raw(['branch', '-q', `--set-upstream-to=${BACKUP_REMOTE}/${branch}`])
+      await adoptRemoteBranch(g, branch)
       return { ok: true, summary: 'Fetched remote snapshot' }
     }
     const out = await g.raw(['merge', '--ff-only', '-q', `${BACKUP_REMOTE}/${branch}`])
-    try {
-      await g.raw(['branch', '-q', `--set-upstream-to=${BACKUP_REMOTE}/${branch}`])
-    } catch {
-      // Ignore failure to set upstream
-    }
+    await setUpstream(g, branch)
     return { ok: true, summary: out.trim() || 'Up to date' }
   } catch (e) {
     const msg = reasonOf(e)
-    return { ok: false, reason: looksDiverged(msg) ? 'diverged' : msg }
+    return { ok: false, reason: looksDiverged(msg) ? PULL_DIVERGED : msg }
+  }
+}
+
+/** Stable reasons the UI turns into a "take the remote backup" prompt */
+export const PULL_LOCAL_UNSAVED = 'localUnsaved'
+export const PULL_DIVERGED = 'diverged'
+export const PULL_NO_REMOTE_BRANCH = 'noRemoteBranch'
+
+export type RemotePullResult = GitResult<{
+  /** upToDate: nothing to take · ff: remote was strictly ahead · adopted: first snapshot on this device came from the remote · merged: two histories joined */
+  merged: 'upToDate' | 'ff' | 'adopted' | 'merged'
+  /** Where the previous local files were copied before the remote overwrote them (adopted/merged only) */
+  backupPath?: string
+}>
+
+async function setUpstream(g: SimpleGit, branch: string): Promise<void> {
+  try {
+    await g.raw(['branch', '-q', `--set-upstream-to=${BACKUP_REMOTE}/${branch}`])
+  } catch {
+    // Ignore failure to set upstream
+  }
+}
+
+/** Unborn branch → point it at the remote branch and write its files. Untracked local files stay */
+async function adoptRemoteBranch(g: SimpleGit, branch: string): Promise<void> {
+  await g.raw(['reset', '-q', `${BACKUP_REMOTE}/${branch}`])
+  await g.raw(['checkout', '-q', '--', '.'])
+  await setUpstream(g, branch)
+}
+
+/** add -A + commit when anything is staged. Returns whether a commit was made */
+async function commitAll(g: SimpleGit, subject: string, device: string): Promise<boolean> {
+  await g.raw(['add', '-A', '--', '.'])
+  if (!(await g.raw(['diff', '--cached', '--name-only'])).trim()) return false
+  await g.raw(['commit', '-q', '-m', subject, '-m', `${DEVICE_TRAILER}: ${device}`])
+  return true
+}
+
+/** Copy the library (without .git) to `<app config>/backups/replaced/<ts>/` and return that path */
+function copyLibraryAside(home: string, root: string): string {
+  const dest = join(
+    appConfigDir(home),
+    'backups/replaced',
+    new Date().toISOString().replace(/[:.]/g, '-')
+  )
+  mkdirSync(dest, { recursive: true, mode: 0o700 })
+  cpSync(root, dest, {
+    recursive: true,
+    verbatimSymlinks: true,
+    force: false,
+    filter: (src) => src !== join(root, '.git') && !src.startsWith(join(root, '.git') + sep)
+  })
+  return dest
+}
+
+/**
+ * User-triggered pull: take the remote backup onto this device.
+ * - Remote strictly ahead → fast-forward (no confirmation needed; `replaceLocal` is ignored).
+ * - No local snapshot but local files exist, or the two histories have diverged → refused with PULL_LOCAL_UNSAVED /
+ *   PULL_DIVERGED unless `replaceLocal`. With it, the current files are first copied to backups/replaced/<ts>/, then
+ *   the remote branch is adopted (unborn) or merged in with the remote winning conflicts (diverged). Local-only files
+ *   survive either way and are committed on top, so the next snapshot pushes cleanly. No history is discarded.
+ */
+export async function pullFromRemote(
+  home: string,
+  opts: { auth?: AuthOption; replaceLocal?: boolean } = {}
+): Promise<RemotePullResult> {
+  const root = libraryRoot(home)
+  if (!isRepo(root)) return { ok: false, reason: 'Backup is not connected' }
+  const g = git(root)
+  const device = deviceName(home)
+  try {
+    const url = await remoteUrl(g)
+    const branch = await currentBranch(g)
+    if (!url) return { ok: false, reason: 'Backup is not connected' }
+    if (!branch) return { ok: false, reason: 'Will not pull on a detached HEAD' }
+    await ensureIdentity(g, device)
+    ensureGitignore(root)
+    await applyAuth(g, url, opts.auth)
+    await g.raw(['fetch', '-q', BACKUP_REMOTE])
+    const ref = `${BACKUP_REMOTE}/${branch}`
+    const remoteHead = await remoteBranchHead(g, branch)
+    if (!remoteHead) return { ok: false, reason: PULL_NO_REMOTE_BRANCH }
+    const s0 = await g.status()
+    if (s0.conflicted.length)
+      return { ok: false, reason: `Conflicted files: ${s0.conflicted.join(', ')}` }
+
+    if (!(await hasHead(g))) {
+      let backupPath: string | undefined
+      if (hasUncommittedLibraryContent(root)) {
+        if (!opts.replaceLocal) return { ok: false, reason: PULL_LOCAL_UNSAVED }
+        backupPath = copyLibraryAside(home, root)
+      }
+      await adoptRemoteBranch(g, branch)
+      await commitAll(g, `merge local library from ${device}`, device)
+      return { ok: true, merged: 'adopted', ...(backupPath ? { backupPath } : {}) }
+    }
+
+    const head = (await g.revparse(['HEAD'])).trim()
+    if (head === remoteHead) {
+      await setUpstream(g, branch)
+      return { ok: true, merged: 'upToDate' }
+    }
+    // simple-git treats a silent non-zero exit as success, so count commits instead of trusting --is-ancestor's exit code
+    const isAncestor = async (a: string, b: string): Promise<boolean> =>
+      (await g.raw(['rev-list', '--count', `${b}..${a}`])).trim() === '0'
+    if (await isAncestor(ref, 'HEAD')) {
+      await setUpstream(g, branch)
+      return { ok: true, merged: 'upToDate' }
+    }
+    if (await isAncestor('HEAD', ref)) {
+      await g.raw(['merge', '--ff-only', '-q', ref])
+      await setUpstream(g, branch)
+      return { ok: true, merged: 'ff' }
+    }
+    if (!opts.replaceLocal) return { ok: false, reason: PULL_DIVERGED }
+    const backupPath = copyLibraryAside(home, root)
+    // Local work that was never snapshotted becomes a commit first, so the merge cannot drop it
+    await commitAll(g, `backup before pull from ${device}`, device)
+    await g.raw([
+      'merge',
+      '-q',
+      '--no-edit',
+      '--allow-unrelated-histories',
+      '-X',
+      'theirs',
+      '-m',
+      `merge remote backup on ${device}`,
+      '-m',
+      `${DEVICE_TRAILER}: ${device}`,
+      ref
+    ])
+    await setUpstream(g, branch)
+    return { ok: true, merged: 'merged', backupPath }
+  } catch (e) {
+    return { ok: false, reason: reasonOf(e) }
   }
 }
 

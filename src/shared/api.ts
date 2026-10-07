@@ -630,6 +630,21 @@ export interface BackupSnapshotView {
   remoteError?: string
 }
 
+/** Result of taking the remote backup onto this device (engine pullFromRemote + sync) */
+export type BackupPullView =
+  | {
+      outcome: 'pulled'
+      merged: 'upToDate' | 'ff' | 'adopted' | 'merged'
+      /** ~ path of the copy made of the previous local files (adopted/merged only) */
+      backupPath?: string
+      sync: SyncStatusView
+    }
+  | {
+      /** The remote history is not a plain continuation of this device's library; ask before replacing */
+      outcome: 'confirmRequired'
+      reason: 'localUnsaved' | 'diverged'
+    }
+
 // ---- tool auto memory (engine toolMemory). Codex is read-only
 export interface ToolMemoryView {
   claude: ClaudeMemoryScan
@@ -1059,6 +1074,8 @@ export interface Api {
     hash: string,
     snapshotFirst?: boolean
   ): Promise<WriteResult<SyncStatusView> | Refused>
+  /** replaceLocal: user confirmed that the remote backup replaces unsaved/diverged local files (they are copied aside first) */
+  backupPull(replaceLocal?: boolean): Promise<WriteResult<BackupPullView> | Refused>
   backupDisconnect(): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetDevice(name: string): Promise<WriteResult<BackupStatusView> | Refused>
   backupSetAuto(on: boolean): Promise<WriteResult<BackupStatusView> | Refused>
@@ -1276,6 +1293,7 @@ export const CHANNELS = [
   'backupSnapshot',
   'backupHistory',
   'backupRestore',
+  'backupPull',
   'backupDisconnect',
   'backupSetDevice',
   'backupSetAuto',
