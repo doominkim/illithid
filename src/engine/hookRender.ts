@@ -25,7 +25,8 @@ const TOOL_HOME: Readonly<Record<HookTool, string>> = {
   codex: '.codex',
   gemini: '.gemini',
   copilot: '.copilot',
-  grok: '.grok'
+  grok: '.grok',
+  qwen: '.qwen'
 }
 
 /** App-owned script folder inside a tool home */
@@ -153,5 +154,7 @@ export function hooksForTool(
 /** Timeout in the tool's own unit */
 export function toolTimeout(tool: HookTool, seconds: number | undefined): number | undefined {
   if (seconds === undefined) return undefined
+  // Qwen Code reads 1000 or more as legacy milliseconds
+  if (tool === 'qwen' && seconds >= 1000) return seconds * 1000
   return HOOK_CATALOG[tool].timeoutUnit === 'ms' ? seconds * 1000 : seconds
 }

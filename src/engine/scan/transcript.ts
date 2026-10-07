@@ -924,6 +924,105 @@ export async function readGrok(path: string, c: Collector): Promise<void> {
   })
 }
 
+// ---------------------------------------------------------------- Qwen Code
+
+/**
+ * Qwen Code chats: ~/.qwen/projects/<cwd with non-alphanumerics → '-'>/chats/<sessionId>.jsonl, one ChatRecord per line
+ * ({uuid, parentUuid, sessionId, timestamp, cwd, type: user|assistant|tool_result|system, message: {role, parts}, model?,
+ * usageMetadata?, toolCallResult?, isSidechain?}). Records form a tree through parentUuid; rewinding starts a new branch
+ */
+export function qwenFile(home: string, id: string): string | undefined {
+  const root = join(home, '.qwen/projects')
+  if (!existsSync(root) || !/^[A-Za-z0-9_-]+$/.test(id)) return undefined
+  return fg.sync(`*/chats/${id}.jsonl`, {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    suppressErrors: true
+  })[0]
+}
+
+/** Records on the active branch, oldest first: the parentUuid chain from the last main-session record (sidechains skipped) */
+export function qwenActiveChain(records: Json[]): Json[] {
+  const byId = new Map<string, Json>()
+  for (const r of records) if (typeof r.uuid === 'string') byId.set(r.uuid, r)
+  let cur: Json | undefined
+  for (let i = records.length - 1; i >= 0 && !cur; i--)
+    if (typeof records[i].uuid === 'string' && !records[i].isSidechain) cur = records[i]
+  const chain: Json[] = []
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur.uuid as string)) {
+    seen.add(cur.uuid as string)
+    chain.push(cur)
+    cur = typeof cur.parentUuid === 'string' ? byId.get(cur.parentUuid) : undefined
+  }
+  return chain.reverse()
+}
+
+/** Parts of a Qwen record's message (@google/genai Content) */
+export function qwenParts(r: Json): Json[] {
+  const parts = (r.message as Json | undefined)?.parts
+  return Array.isArray(parts) ? (parts as Json[]).filter((p) => p && typeof p === 'object') : []
+}
+
+/** User text of a Qwen user record (injected context blocks dropped, like Gemini) */
+export function qwenUserText(r: Json): string | undefined {
+  return cleanGeminiUserText(geminiText(qwenParts(r)))
+}
+
+/** usageMetadata uses Gemini names; promptTokenCount includes cached tokens */
+function qwenUsage(u: Json | undefined): TurnUsage {
+  const prompt = num(u?.promptTokenCount)
+  const cached = num(u?.cachedContentTokenCount)
+  return {
+    input: Math.max(0, prompt - cached),
+    cacheRead: cached,
+    cacheWrite: 0,
+    output: num(u?.candidatesTokenCount),
+    reasoning: num(u?.thoughtsTokenCount)
+  }
+}
+
+export async function readQwen(path: string, c: Collector): Promise<void> {
+  const toolNames = new Map<string, string>()
+  for (const r of qwenActiveChain(await readJsonLines(path))) {
+    const at = isoOrUndefined(r.timestamp)
+    if (r.type === 'user') {
+      const text = qwenUserText(r)
+      if (text) {
+        c.stats?.prompt(at)
+        c.push('user', text, at)
+      }
+    } else if (r.type === 'assistant') {
+      const model = typeof r.model === 'string' ? r.model : undefined
+      if (c.stats && r.usageMetadata)
+        c.stats.turn({ model, at, usage: qwenUsage(r.usageMetadata as Json) })
+      const texts: string[] = []
+      for (const p of qwenParts(r)) {
+        if (typeof p.text === 'string' && !p.thought && p.text.trim()) texts.push(p.text)
+        const call = p.functionCall as Json | undefined
+        if (!call || typeof call !== 'object') continue
+        if (texts.length) c.push('assistant', texts.splice(0).join('\n\n'), at)
+        const name = String(call.name ?? '')
+        if (typeof call.id === 'string') toolNames.set(call.id, name)
+        c.push('assistant', toolLine(name || 'tool', call.args), at, 'tool')
+        c.onCall?.({ name, input: call.args, model, at })
+      }
+      if (texts.length) c.push('assistant', texts.join('\n\n'), at)
+    } else if (r.type === 'tool_result' && c.stats) {
+      const res = r.toolCallResult as Json | undefined
+      if (res?.status !== 'error' && !res?.error) continue
+      const err = res.error as Json | undefined
+      const text = String(err?.message ?? res.resultDisplay ?? '')
+      c.stats.toolError({
+        name: typeof res.callId === 'string' ? toolNames.get(res.callId) : undefined,
+        kind: toolErrorKind(text),
+        at
+      })
+    }
+  }
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Transcript of a single session. Throws if the file is missing */
@@ -962,6 +1061,12 @@ export async function readSessionTranscript(
       const f = grokFile(home, id)
       if (!f) throw new Error('session file not found')
       await readGrok(f, c)
+      break
+    }
+    case 'qwen': {
+      const f = qwenFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readQwen(f, c)
       break
     }
     default: {

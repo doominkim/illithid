@@ -65,14 +65,16 @@ const SHELL: Record<HookTool, string> = {
   codex: 'Bash',
   gemini: 'run_shell_command',
   copilot: 'bash',
-  grok: 'run_terminal_command'
+  grok: 'run_terminal_command',
+  qwen: 'run_shell_command'
 }
 
 const EDIT: Partial<Record<HookTool, string>> = {
   claude: 'Write|Edit',
   gemini: 'write_file|replace',
   copilot: 'edit|create',
-  grok: 'search_replace'
+  grok: 'search_replace',
+  qwen: 'edit|write_file'
 }
 
 /** File edits including Codex's apply_patch: for script hooks, which read the tool's raw input (no file path needed) */
@@ -109,7 +111,7 @@ const WAITING: Partial<Record<HookTool, string>> = {
 }
 
 /** CLIs that can judge for an ask hook ('same' = the tool running the hook) */
-export const JUDGE_CLIS = ['same', 'claude', 'codex', 'gemini', 'copilot', 'grok'] as const
+export const JUDGE_CLIS = ['same', 'claude', 'codex', 'gemini', 'copilot', 'grok', 'qwen'] as const
 export type JudgeCli = (typeof JUDGE_CLIS)[number]
 
 export const NOTIFY_CHANNELS = ['mac', 'ntfy', 'slack'] as const

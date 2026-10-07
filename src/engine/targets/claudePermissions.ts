@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { parsePlainJsonConfig, toSettingsText } from './geminiMcp'
 import {
   jsonSubKeysRegion,
   mcpEntries,
@@ -158,6 +159,49 @@ export const claudePermissions: TargetDef = {
       `${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`,
       ...preservationNotes
     ]
+    return same ? { after, notes } : { after, notes, error: 'keys other than permissions changed' }
+  }
+}
+
+/**
+ * ~/.qwen/settings.json — Qwen Code reads Claude-syntax permissions.allow/ask/deny (`Bash(git status:*)`, `Read(.env)`,
+ * `mcp__server__tool`), so it gets the same lists as Claude Code. Without a library permissions.json they are left alone
+ */
+export const qwenPermissions: TargetDef = {
+  id: 'qwenPermissions',
+  tool: 'qwen',
+  rel: '.qwen/settings.json',
+  optional: false,
+  createIfInUse: true,
+  seed: '{}\n',
+  region: (text) => jsonSubKeysRegion(text, 'permissions', [...OWNED_PERMISSION_KEYS]),
+  build(before, ctx) {
+    const { sources } = ctx
+    if (!sources.hasPermissions)
+      return {
+        after: before,
+        notes: ['library has no permissions.json — Qwen permissions are left untouched']
+      }
+    const settings = parsePlainJsonConfig(before, 'settings.json')
+    const next = buildClaudePermissions(
+      allowlistFor(sources.allowlist, 'qwen'),
+      mcpForTool(sources, 'qwen'),
+      settings
+    )
+    const after =
+      JSON.stringify(next) === JSON.stringify(settings) ? before : toSettingsText(before, next)
+    const { count, same } = untouchedKeysSame(settings, next, 'permissions')
+    const notes = [`${count} keys other than permissions unchanged: ${same ? 'OK' : 'broken!'}`]
+    // The library owns these lists: rules only Qwen had are replaced — import them first to keep them
+    const was = (settings.permissions ?? {}) as Permissions
+    const now = next.permissions as Permissions
+    const dropped = OWNED_PERMISSION_KEYS.flatMap((k) =>
+      (Array.isArray(was[k]) ? was[k] : []).filter((r) => !(now[k] ?? []).includes(r))
+    )
+    if (dropped.length)
+      notes.push(
+        `Qwen rules not in the library are replaced (import them to keep): ${dropped.join(', ')}`
+      )
     return same ? { after, notes } : { after, notes, error: 'keys other than permissions changed' }
   }
 }

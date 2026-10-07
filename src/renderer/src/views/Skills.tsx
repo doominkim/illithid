@@ -98,7 +98,14 @@ function Skills(): React.JSX.Element {
           if (failure)
             return [tool, { on: true, problem: true, hint: lastSyncFailedText(t, failure) }]
           if (data.toolDisabled?.[tool]?.includes(name))
-            return [tool, { on: true, problem: true, hint: t('skills.disabledInGemini') }]
+            return [
+              tool,
+              {
+                on: true,
+                problem: true,
+                hint: t(tool === 'qwen' ? 'skills.disabledInQwen' : 'skills.disabledInGemini')
+              }
+            ]
           if (st === 'skipped') return [tool, pillFromCellState(st)]
           return [
             tool,

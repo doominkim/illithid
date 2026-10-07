@@ -6,6 +6,7 @@
  * Gemini CLI = aliases and model ids in the gemini-cli 0.60.0 bundle (2026-09-27; no effort setting) ·
  * GitHub Copilot = agent `model` ids from the Copilot CLI changelog and the VS Code Copilot extension bundle (2026-09-27; efforts
  * low/medium/high). Only used for agent files — the default model is not managed.
+ * Qwen Code = DEFAULT_QWEN_MODEL and MAINLINE_CODER_MODEL in qwen-code v0.25.0 (2026-10-07; no effort setting).
  */
 import type { ToolId } from '../engine/agents'
 
@@ -87,6 +88,13 @@ export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
   // Grok CLI (models_cache.json, 2026-09). Agent files carry no effort key, so no effort list
   grok: {
     models: [{ value: 'grok-4.7', label: 'grok-4.7' }],
+    efforts: []
+  },
+  qwen: {
+    models: [
+      { value: 'coder-model', label: 'coder-model' },
+      { value: 'qwen3.7-max', label: 'qwen3.7-max' }
+    ],
     efforts: []
   }
 }

@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { MANIFEST_KINDS, MANIFEST_TOOLS, type ManifestKind, type ToolId } from './toolIds'
+import {
+  DEFAULT_TOOLS_IN_USE,
+  MANIFEST_KINDS,
+  MANIFEST_TOOLS,
+  type ManifestKind,
+  type ToolId
+} from './toolIds'
 import { libraryRoot, toolsRetiring } from './config'
 import { assertInsideLibrary } from './libpath'
 import { atomicWrite } from './write'
@@ -194,7 +200,11 @@ export function seedNewToolToggles(home: string, tool: ToolId): number {
     if (!MANIFEST_TOOLS[kind].includes(tool) || !others.length) continue
     for (const [name, entry] of Object.entries(m[kind])) {
       if (entry[tool] !== undefined) continue
-      if (others.every((t) => entry[t] === false)) {
+      // Other later-added tools with no key yet (Grok, Qwen) didn't exist either: judge by the tools that have a say
+      const judged = others.filter(
+        (t) => entry[t] !== undefined || DEFAULT_TOOLS_IN_USE.includes(t)
+      )
+      if (judged.length && judged.every((t) => entry[t] === false)) {
         m[kind][name] = { ...entry, [tool]: false }
         n++
       }

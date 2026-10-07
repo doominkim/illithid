@@ -560,7 +560,7 @@ export interface NotInitializedView {
   /** Display path (~) */
   label: string
   /** Why the file is left alone instead of the tool's first run: COPILOT_HOME/GROK_HOME points elsewhere, or the file has JSONC syntax */
-  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
+  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'qwenHomeOverride' | 'jsoncUnsupported'
 }
 
 export interface DeleteCandidateRequest {

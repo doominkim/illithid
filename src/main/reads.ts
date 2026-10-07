@@ -232,13 +232,16 @@ export function skills(home: string, env: Env): SkillsData {
     syncError = (e as Error).message
   }
   markSkillOverrides(home, env, state, reasons)
-  let geminiOff: string[] = []
-  try {
-    if (toolsInUse(home).includes('gemini'))
-      geminiOff = geminiDisabledSkillsOf(home, readSources(home))
-  } catch {
-    geminiOff = []
-  }
+  // Library skills turned off by Gemini's or Qwen's own settings.json (skills.disabled / skills.enabled=false)
+  const toolDisabled: Partial<Record<'gemini' | 'qwen', string[]>> = {}
+  for (const tool of ['gemini', 'qwen'] as const)
+    try {
+      if (!toolsInUse(home).includes(tool)) continue
+      const off = geminiDisabledSkillsOf(home, readSources(home), tool)
+      if (off.length) toolDisabled[tool] = off
+    } catch {
+      // unreadable settings: no warning
+    }
   return {
     dir: tilde(home, canonicalPaths(home).skills),
     names,
@@ -247,7 +250,7 @@ export function skills(home: string, env: Env): SkillsData {
     ...(syncError ? { syncError } : {}),
     toggles: toggles(home, 'skills'),
     descriptions: skillDescriptions(home, names),
-    ...(geminiOff.length ? { toolDisabled: { gemini: geminiOff } } : {}),
+    ...(Object.keys(toolDisabled).length ? { toolDisabled } : {}),
     market: marketSkills(home),
     ...(grokClaudeReading(home).skills ? {} : { grokReadsClaude: false })
   }
@@ -762,7 +765,8 @@ const PERMISSION_TARGET: Partial<Record<ToolId, TargetId>> = {
   claude: 'claudePermissions',
   codex: 'codexRules',
   gemini: 'geminiPolicy',
-  copilot: 'copilotHooks'
+  copilot: 'copilotHooks',
+  qwen: 'qwenPermissions'
 }
 
 export function permissions(home: string, env: Env): PermissionsData {

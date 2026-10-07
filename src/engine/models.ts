@@ -97,7 +97,8 @@ export const MODEL_KEYS: Readonly<Record<ToolId, readonly string[]>> = {
   opencode: ['model', 'small_model'],
   gemini: ['model.name'],
   copilot: [],
-  grok: ['models.default']
+  grok: ['models.default'],
+  qwen: ['model.name']
 }
 
 export interface SetModelResult {

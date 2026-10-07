@@ -13,7 +13,8 @@ export const HOOK_TOOLS = [
   'codex',
   'gemini',
   'copilot',
-  'grok'
+  'grok',
+  'qwen'
 ] as const satisfies readonly ToolId[]
 export type HookTool = (typeof HOOK_TOOLS)[number]
 
@@ -152,6 +153,27 @@ export const HOOK_CATALOG: Readonly<Record<HookTool, HookToolInfo>> = {
     ],
     sources: [
       'https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/10-hooks.md'
+    ]
+  },
+  // Qwen Code takes Claude Code's event names and protocol (exit 2 blocks, hookSpecificOutput). Timeouts are seconds, but a
+  // value of 1000 or more is read as milliseconds (legacy) — toolTimeout writes long timeouts that way (checked 2026-10-07)
+  qwen: {
+    timeoutUnit: 's',
+    timeoutKey: 'timeout',
+    shape: 'nested',
+    events: [
+      ev('PreToolUse', 'before-tool', true, true),
+      ev('PostToolUse', 'after-tool', true, false),
+      ev('UserPromptSubmit', 'prompt', false, true),
+      ev('Stop', 'stop', false, true),
+      ev('SubagentStop', 'stop', false, true),
+      ev('SessionStart', 'session-start', true, false),
+      ev('SessionEnd', 'session-end', false, false),
+      ev('Notification', 'notification', true, false)
+    ],
+    sources: [
+      'https://github.com/QwenLM/qwen-code/blob/v0.25.0/packages/core/src/hooks/types.ts',
+      'https://github.com/QwenLM/qwen-code/blob/v0.25.0/packages/core/src/hooks/hook-timeout.ts'
     ]
   }
 }

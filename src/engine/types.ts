@@ -110,6 +110,9 @@ export type ExtraTargetId =
   | 'opencodeMcpPermissions'
   | 'geminiRules'
   | 'geminiMcp'
+  | 'qwenMcp'
+  | 'qwenHooks'
+  | 'qwenPermissions'
   | 'copilotMcp'
   | 'grokMcp'
   | 'grokCompat'
@@ -158,6 +161,7 @@ export interface FileChange {
    * - nothingToWrite      the library has nothing for this target — not an error, nothing to show
    * - toolNotInitialized  there is content, but the file is one the tool creates itself on first run (~/.claude.json) — run the tool once
    * - copilotHomeOverride COPILOT_HOME points elsewhere, so Copilot wouldn't read ~/.copilot — no Copilot file is written
+   *   (grokHomeOverride / qwenHomeOverride: the same for GROK_HOME / QWEN_HOME)
    * - jsoncUnsupported    (the file exists) the alternate being used (opencode.jsonc) is not plain JSON — left untouched to keep its comments
    */
   skip?:
@@ -165,6 +169,7 @@ export interface FileChange {
     | 'toolNotInitialized'
     | 'copilotHomeOverride'
     | 'grokHomeOverride'
+    | 'qwenHomeOverride'
     | 'jsoncUnsupported'
   /** Imported originals kept in place because they changed since import (opencodeRules: instructions entries) */
   importedChanged?: PendingRetire[]

@@ -256,7 +256,7 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
     a === 'replaceImported' ||
     a === 'retireImported'
   const targetTool = new Map<string, string>(ALL_TARGETS.map((t) => [t.id, t.tool]))
-  // A tool stays retiring while something is left to remove, or its copies can't be reached (a file error, COPILOT_HOME/GROK_HOME)
+  // A tool stays retiring while something is left to remove, or its copies can't be reached (a file error, COPILOT_HOME/GROK_HOME/QWEN_HOME)
   const busy = new Set<string>([
     ...p.targets
       .filter(
@@ -264,7 +264,8 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
           (c.changed && !c.error) ||
           c.error ||
           c.skip === 'copilotHomeOverride' ||
-          c.skip === 'grokHomeOverride'
+          c.skip === 'grokHomeOverride' ||
+          c.skip === 'qwenHomeOverride'
       )
       .map((c) => targetTool.get(c.id) ?? ''),
     ...p.rules.filter((x) => acts(x.action)).map((x) => x.tool ?? 'claude'),

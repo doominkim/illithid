@@ -1,4 +1,4 @@
-const SERVER_KEY_TOOLS = new Set(['claude', 'codex', 'gemini', 'grok'])
+const SERVER_KEY_TOOLS = new Set(['claude', 'codex', 'gemini', 'grok', 'qwen'])
 
 function mcpKey(name: string): string {
   // Keep this browser-safe normalization aligned with search/usage.mcpKey.

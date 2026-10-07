@@ -119,7 +119,8 @@
     "description": "Description",
     "body": "正文（SKILL.md 中说明下方的内容）",
     "files": "文件",
-    "disabledInGemini": "已在 Gemini CLI 设置中停用"
+    "disabledInGemini": "已在 Gemini CLI 设置中停用",
+    "disabledInQwen": "已在 Qwen Code 设置中停用"
   },
   "mcp": {
     "transport": "传输方式",
@@ -249,6 +250,7 @@
     "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
     "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
+    "qwenHomeOverride": "QWEN_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用",
     "why": {
       "lastSyncFailed": "上次同步失败: {{reason}}",
@@ -932,14 +934,16 @@
       "codex": "stdin JSON: tool_name, tool_input",
       "gemini": "stdin JSON: tool_name, tool_input",
       "copilot": "stdin JSON: toolName, toolArgs (JSON 字符串)",
-      "grok": "stdin JSON: toolName, toolInput"
+      "grok": "stdin JSON: toolName, toolInput",
+      "qwen": "stdin JSON: tool_name, tool_input"
     },
     "toolBlock": {
       "claude": "exit 2 (stderr 为原因) 或 JSON hookSpecificOutput.permissionDecision",
       "codex": "exit 2 或 JSON permissionDecision: deny",
       "gemini": "exit 2 或 JSON decision: deny",
       "copilot": "非零退出码或 JSON permissionDecision: deny (出错也会阻止)",
-      "grok": "exit 2 或 JSON decision: deny"
+      "grok": "exit 2 或 JSON decision: deny",
+      "qwen": "exit 2 (stderr 为原因) 或 JSON hookSpecificOutput.permissionDecision"
     },
     "codexTrust": "Codex 只有在 /hooks 中信任后才会运行新的或已更改的钩子。",
     "grokViaClaude": "Grok 通过 Claude Code 的设置运行此钩子",

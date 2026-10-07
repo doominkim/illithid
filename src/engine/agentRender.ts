@@ -6,6 +6,7 @@
  * - Gemini   ~/.gemini/agents/<name>.md          frontmatter name, description, model + body (no effort setting)
  * - Copilot  ~/.copilot/agents/<name>.agent.md   frontmatter name, description, model, reasoning-effort + body
  * - Grok     ~/.grok/agents/<name>.md            frontmatter name, description, model + body (the Claude format Grok also loads)
+ * - Qwen     ~/.qwen/agents/<name>.md            frontmatter name, description, model + body (Qwen mirrors the Claude format; no effort)
  * Keys without a value are omitted (the tool's default applies). The name is the library file name.
  */
 import { join } from 'node:path'
@@ -31,6 +32,8 @@ export function agentToolDir(
       return { dir: join(home, '.copilot/agents'), ext: '.agent.md' }
     case 'grok':
       return { dir: join(home, '.grok/agents'), ext: '.md' }
+    case 'qwen':
+      return { dir: join(home, '.qwen/agents'), ext: '.md' }
   }
 }
 
@@ -132,6 +135,7 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
         doc.body
       )
     case 'grok':
+    case 'qwen':
       return mdDoc(
         [
           ['name', doc.name],

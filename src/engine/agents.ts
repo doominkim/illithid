@@ -62,6 +62,7 @@ export function tools(home: string): ToolInfo[] {
   const opencodeConfig = join(home, '.config/opencode/opencode.json')
   const geminiSettings = join(home, '.gemini/settings.json')
   const copilotMcp = join(home, '.copilot/mcp-config.json')
+  const qwenSettings = join(home, '.qwen/settings.json')
   return [
     {
       id: 'claude',
@@ -158,8 +159,31 @@ export function tools(home: string): ToolInfo[] {
         dirs: [join(home, '.grok/agents')],
         ext: '.md'
       }
+    },
+    {
+      id: 'qwen',
+      displayName: 'Qwen Code',
+      configFile: qwenSettings,
+      // Qwen loads ~/.qwen/rules/**/*.md recursively; QWEN.md @imports cannot leave ~/.qwen, so rules are copied into an app-owned folder
+      rules: { kind: 'copyDir', dir: join(home, '.qwen/rules/illithid') },
+      skills: { kind: 'symlinkDir', dir: join(home, '.qwen/skills') },
+      models: { path: qwenSettings, format: 'json', keys: ['model.name'] },
+      roster: {
+        dirs: [join(home, '.qwen/agents')],
+        ext: '.md'
+      }
     }
   ]
+}
+
+/** `<VAR>` pointing somewhere other than `<home>/<dir>` (absolute path), else null. `~` and relative values resolve against home */
+function homeOverride(home: string, value: string | undefined, dir: string): string | null {
+  const v = value?.trim()
+  if (!v) return null
+  const abs = resolve(
+    v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v)
+  )
+  return abs === join(home, dir) ? null : abs
 }
 
 /**
@@ -170,12 +194,7 @@ export function grokHomeOverride(
   home: string,
   env: Record<string, string | undefined>
 ): string | null {
-  const v = env.GROK_HOME?.trim()
-  if (!v) return null
-  const abs = resolve(
-    v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v)
-  )
-  return abs === join(home, '.grok') ? null : abs
+  return homeOverride(home, env.GROK_HOME, '.grok')
 }
 
 /**
@@ -186,15 +205,18 @@ export function copilotHomeOverride(
   home: string,
   env: Record<string, string | undefined>
 ): string | null {
-  const v = env.COPILOT_HOME?.trim()
-  if (!v) return null
-  const abs = resolve(
-    v === '~' ? home : v.startsWith('~/') ? join(home, v.slice(2)) : resolve(home, v)
-  )
-  return abs === join(home, '.copilot') ? null : abs
+  return homeOverride(home, env.COPILOT_HOME, '.copilot')
 }
 
-/** Home override of a tool that has one (COPILOT_HOME, GROK_HOME) pointing away from the folder the app writes, else null */
+/** QWEN_HOME pointing somewhere other than ~/.qwen (absolute path), else null. Same handling as COPILOT_HOME */
+export function qwenHomeOverride(
+  home: string,
+  env: Record<string, string | undefined>
+): string | null {
+  return homeOverride(home, env.QWEN_HOME, '.qwen')
+}
+
+/** Home override of a tool that has one (COPILOT_HOME, GROK_HOME, QWEN_HOME) pointing away from the folder the app writes, else null */
 export function toolHomeOverride(
   home: string,
   id: ToolId,
@@ -202,6 +224,7 @@ export function toolHomeOverride(
 ): string | null {
   if (id === 'copilot') return copilotHomeOverride(home, env)
   if (id === 'grok') return grokHomeOverride(home, env)
+  if (id === 'qwen') return qwenHomeOverride(home, env)
   return null
 }
 

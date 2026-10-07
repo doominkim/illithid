@@ -40,6 +40,7 @@ export type ApplySkipReason =
   | 'toolNotInitialized'
   | 'copilotHomeOverride'
   | 'grokHomeOverride'
+  | 'qwenHomeOverride'
   | 'jsoncUnsupported'
 
 export interface ApplyResult {

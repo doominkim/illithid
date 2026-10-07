@@ -119,7 +119,8 @@
     "description": "Description",
     "body": "Content (below the description in SKILL.md)",
     "files": "Files",
-    "disabledInGemini": "Disabled in Gemini CLI settings"
+    "disabledInGemini": "Disabled in Gemini CLI settings",
+    "disabledInQwen": "Disabled in Qwen Code settings"
   },
   "mcp": {
     "transport": "Transport",
@@ -249,6 +250,7 @@
     "notInitialized": "Run {{tool}} once, then apply again",
     "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written",
     "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written",
+    "qwenHomeOverride": "QWEN_HOME points to another folder — {{tool}} files are not written",
     "jsoncUnsupported": "opencode.jsonc has comments — {{tool}} settings are not written until they are removed",
     "why": {
       "lastSyncFailed": "Last sync failed: {{reason}}",
@@ -932,14 +934,16 @@
       "codex": "JSON on stdin: tool_name, tool_input",
       "gemini": "JSON on stdin: tool_name, tool_input",
       "copilot": "JSON on stdin: toolName, toolArgs (a JSON string)",
-      "grok": "JSON on stdin: toolName, toolInput"
+      "grok": "JSON on stdin: toolName, toolInput",
+      "qwen": "JSON on stdin: tool_name, tool_input"
     },
     "toolBlock": {
       "claude": "exit 2 (stderr is the reason) or JSON hookSpecificOutput.permissionDecision",
       "codex": "exit 2 or JSON permissionDecision: deny",
       "gemini": "exit 2 or JSON decision: deny",
       "copilot": "Any non-zero exit or JSON permissionDecision: deny (errors also stop the tool)",
-      "grok": "exit 2 or JSON decision: deny"
+      "grok": "exit 2 or JSON decision: deny",
+      "qwen": "exit 2 (stderr is the reason) or JSON hookSpecificOutput.permissionDecision"
     },
     "codexTrust": "Codex runs a new or changed hook only after you trust it in /hooks.",
     "grokViaClaude": "Grok runs this hook from Claude Code's settings",

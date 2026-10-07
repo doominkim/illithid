@@ -4,7 +4,14 @@ import fg from 'fast-glob'
 import type { ToolId } from '../toolIds'
 import { clip, isoOrUndefined, readRange } from './common'
 import { SessionScanCache, sessionScanCachePath } from './sessionCache'
-import { geminiText, isGeminiInjected, replayGemini, titleText } from './transcript'
+import {
+  geminiText,
+  isGeminiInjected,
+  qwenActiveChain,
+  qwenUserText,
+  replayGemini,
+  titleText
+} from './transcript'
 
 export { readSessionTranscript, cleanUserText, titleText, toolLine } from './transcript'
 export type {
@@ -74,6 +81,9 @@ function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | un
       return cwd && isAbsolute(cwd)
         ? `cd -- ${shellWord(cwd)} && grok --resume ${id}`
         : `grok --resume ${id}`
+    case 'qwen':
+      // Qwen stores sessions per project (the directory it runs in)
+      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && qwen --resume ${id}` : undefined
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -530,6 +540,59 @@ function scanGrok(home: string): Session[] {
   return out
 }
 
+// ---------------------------------------------------------------- Qwen Code
+
+/**
+ * ~/.qwen/projects/<sanitized cwd>/chats/<sessionId>.jsonl (see transcript.ts qwenFile). cwd comes from the records (the folder
+ * name is lossy). Only the head and tail are read for large files, so the title is the first user prompt in the file
+ */
+function scanQwen(home: string): Session[] {
+  const root = join(home, '.qwen/projects')
+  if (!existsSync(root)) return []
+  const files = fg.sync('*/chats/*.jsonl', {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    followSymbolicLinks: false,
+    suppressErrors: true,
+    stats: true
+  })
+  const out: Session[] = []
+  for (const f of files) {
+    const size = f.stats?.size ?? 0
+    let head: Json[] = []
+    let tail: Json[] = []
+    try {
+      ;({ head, tail } = headTail(f.path, size))
+    } catch {
+      continue
+    }
+    const id = str(head.find((r) => str(r.sessionId))?.sessionId) ?? basename(f.path, '.jsonl')
+    const main = head.filter((r) => !r.isSidechain)
+    const cwd = str(main.find((r) => str(r.cwd))?.cwd)
+    let title: string | undefined
+    for (const r of main) if (r.type === 'user' && (title = qwenUserText(r))) break
+    const chain = head === tail ? qwenActiveChain(head) : undefined
+    out.push({
+      id,
+      tool: 'qwen',
+      title: clip(title ?? '', TITLE_MAX),
+      cwd,
+      project: projectOf(cwd),
+      startedAt: firstTimestamp(head),
+      updatedAt: lastTimestamp(tail) ?? f.stats?.mtime?.toISOString(),
+      ...(chain
+        ? {
+            messageCount: chain.filter((r) => r.type === 'user' || r.type === 'assistant').length
+          }
+        : {}),
+      path: f.path,
+      resumeCommand: resumeCommand('qwen', id, cwd)
+    })
+  }
+  return out
+}
+
 // ---------------------------------------------------------------- Entry point
 
 export interface ScanOptions {
@@ -551,7 +614,8 @@ export function scanSessions(
     gemini: scanGemini,
     // ~/.copilot/session-state format is unverified (no local samples) — not scanned yet
     copilot: () => [],
-    grok: scanGrok
+    grok: scanGrok,
+    qwen: scanQwen
   }
   const sessions: Session[] = []
   const errors: SessionScanResult['errors'] = []

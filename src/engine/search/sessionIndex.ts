@@ -18,6 +18,7 @@ import {
   readCodex,
   readGemini,
   readGrok,
+  readQwen,
   readClaudeSubagentStats,
   readOpencodeDb,
   type OpencodeDb,
@@ -448,6 +449,9 @@ export async function indexSessions(
             throw new Error('Copilot sessions are not supported yet')
           case 'grok':
             await readGrok(s.path, c)
+            break
+          case 'qwen':
+            await readQwen(s.path, c)
             break
           default: {
             const never: never = s.tool

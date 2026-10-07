@@ -178,6 +178,12 @@ export function listImportSources(home: string): ImportSource[] {
       path: join(home, '.grok'),
       available: toolConfigFound(home, 'grok'),
       kinds: ['rule', 'mcp', 'skill', 'agent', 'hook']
+    },
+    qwen: {
+      label: 'Qwen Code (~/.qwen)',
+      path: join(home, '.qwen'),
+      available: toolConfigFound(home, 'qwen'),
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent', 'hook']
     }
   }
   const out: ImportSource[] = [
@@ -685,7 +691,8 @@ const TOOL_DIRS = [
   '.config/opencode',
   '.local/share/opencode',
   '.gemini',
-  '.copilot'
+  '.copilot',
+  '.qwen'
 ] as const
 /** Tool plugin paths */
 const TOOL_PLUGIN_DIRS = [
@@ -693,7 +700,8 @@ const TOOL_PLUGIN_DIRS = [
   '.claude/plugins',
   '.config/opencode/plugin',
   '.config/opencode/plugins',
-  '.gemini/extensions'
+  '.gemini/extensions',
+  '.qwen/extensions'
 ]
 
 function expandHome(home: string, p: string): string {
@@ -823,8 +831,14 @@ const INSTRUCTION_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'AGENT.md', 'GEMINI
 export const GEMINI_MD_RULE = 'gemini-md.md'
 /** Rule candidate for ~/.copilot/copilot-instructions.md (copied, never moved) */
 export const COPILOT_MD_RULE = 'copilot-instructions.md'
+/** Rule candidate for ~/.qwen/QWEN.md (copied, never moved) */
+export const QWEN_MD_RULE = 'qwen-md.md'
 /** Tool notes files imported as rules: copied only, all tools start off */
-const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([GEMINI_MD_RULE, COPILOT_MD_RULE])
+const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([
+  GEMINI_MD_RULE,
+  COPILOT_MD_RULE,
+  QWEN_MD_RULE
+])
 
 /** Rule file verdict. name is the candidate name, path is the source file */
 export function rulePortability(
@@ -841,6 +855,7 @@ export function rulePortability(
   else if (name === GEMINI_MD_RULE && path === join(home, '.gemini/GEMINI.md')) r.push('toolNotes')
   else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md'))
     r.push('toolNotes')
+  else if (name === QWEN_MD_RULE && path === join(home, '.qwen/QWEN.md')) r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
@@ -937,7 +952,8 @@ const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
   gemini: new Set(['name', 'description', 'model', 'kind']),
   copilot: new Set(['name', 'description', 'model', 'reasoning-effort']),
-  grok: new Set(['name', 'description', 'model'])
+  grok: new Set(['name', 'description', 'model']),
+  qwen: new Set(['name', 'description', 'model'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
 const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set([
@@ -1065,6 +1081,23 @@ function agentRaw(
         model: model === 'inherit' ? undefined : model,
         body: agentBody(m.content),
         dropped: droppedKeys(d, AGENT_KEPT.gemini),
+        reasons
+      }
+    }
+    case 'qwen': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      // Tool and MCP limits can't be carried by the library — importing would widen what the agent may do
+      if (d.tools !== undefined || d.disallowedTools !== undefined || d.mcpServers !== undefined)
+        reasons.push('restrictedAgent')
+      const own = strOf(d.name)
+      if (own !== undefined && own !== name) reasons.push('nameMismatch')
+      const model = strOf(d.model)
+      return {
+        description: strOf(d.description) ?? '',
+        model: model === 'inherit' ? undefined : model,
+        body: agentBody(m.content),
+        dropped: droppedKeys(d, AGENT_KEPT.qwen),
         reasons
       }
     }
@@ -1344,6 +1377,18 @@ function ruleRetirements(
         continue
       }
       e = pendingEntry(home, 'rule', 'copilot', name, src.path)
+    } else if (
+      src.label === 'qwen' &&
+      within(join(home, '.qwen/rules'), src.path) &&
+      !within(join(home, '.qwen/rules/illithid'), src.path)
+    ) {
+      // Qwen loads ~/.qwen/rules recursively: the original would load next to the app copy
+      try {
+        if (!lstatSync(src.path).isFile()) continue
+      } catch {
+        continue
+      }
+      e = pendingEntry(home, 'rule', 'qwen', name, src.path)
     } else if (src.label === 'grok' && src.path === join(home, '.grok/rules', name)) {
       // The original already sits where the app copy goes (~/.grok/rules/<name>): nothing to retire — adopt it when the bytes match
       adoptGrokRule(home, name, src.path)
@@ -2496,6 +2541,60 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       })
       break
     }
+    case 'qwen': {
+      // ~/.qwen/rules/**/*.md outside the app folder → rules (file name); ~/.qwen/QWEN.md → qwen-md.md
+      const rd = join(home, '.qwen/rules')
+      const walk = (d: string): void => {
+        let names: string[]
+        try {
+          names = readdirSync(d).sort()
+        } catch {
+          return
+        }
+        for (const n of names) {
+          const p = join(d, n)
+          if (n.startsWith('.') || p === join(rd, 'illithid')) continue
+          const st = lstatSync(p)
+          if (st.isDirectory()) walk(p)
+          else if (st.isFile() && n.endsWith('.md'))
+            addFile(found.rules, n, p, ref(p), rulePortability(found.ctx, n, p))
+        }
+      }
+      walk(rd)
+      const qp = join(home, '.qwen/QWEN.md')
+      if (existsSync(qp) && lstatSync(qp).isFile() && readFileSync(qp, 'utf8').trim()) {
+        addFile(
+          found.rules,
+          QWEN_MD_RULE,
+          qp,
+          ref(qp),
+          rulePortability(found.ctx, QWEN_MD_RULE, qp)
+        )
+        found.notes.push(`${QWEN_MD_RULE} is ~/.qwen/QWEN.md — copied, the original stays`)
+      }
+      const sp = join(home, '.qwen/settings.json')
+      if (existsSync(sp)) {
+        const o = readGeminiSettings(sp)
+        if (!o) found.notes.push('~/.qwen/settings.json parse failed')
+        else {
+          if (isObj(o.mcpServers))
+            for (const [n, s] of Object.entries(o.mcpServers))
+              if (isObj(s)) addMcp(n, convertGemini(n, s), sp)
+          // Qwen Code permissions use Claude's rule syntax
+          if (isObj(o.permissions)) {
+            const { allowlist, warnings } = parseClaudePermissions(o.permissions)
+            if (hasRules(allowlist))
+              found.permissions.push(permissionsVariant(allowlist, ref(sp), warnings))
+          }
+        }
+      }
+      scanSkillDir(found, home, join(home, '.qwen/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -2869,7 +2968,9 @@ export function applyImport(
           exists ||
           (TOOL_NOTES_RULES.has(cand.name) &&
           v.sources.some(
-            (x) => x.origin === 'tool' && (x.label === 'gemini' || x.label === 'copilot')
+            (x) =>
+              x.origin === 'tool' &&
+              (x.label === 'gemini' || x.label === 'copilot' || x.label === 'qwen')
           )
             ? toolNotesToggles(home, cand.name, v.sources)
             : sourceToggles(home, 'rules', cand.name, v.sources))
