@@ -27,6 +27,7 @@
     <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
     <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
     <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+    <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
   </tr>
 </table>
 
@@ -44,13 +45,13 @@
 
 ## 用钩子自动检查
 
-钩子只需写一次，就会以各自的格式在 Claude Code、Codex、Gemini CLI、GitHub Copilot 和 Grok CLI 中运行。选择运行时机，然后运行你自己的脚本，或用自然语言规则检查结果。共用的脚本放在库中，也可以是带辅助文件的文件夹。
+钩子只需写一次，就会以各自的格式在 Claude Code、Codex、Gemini CLI、GitHub Copilot、Grok CLI 和 Qwen Code 中运行。选择运行时机，然后运行你自己的脚本，或用自然语言规则检查结果。共用的脚本放在库中，也可以是带辅助文件的文件夹。钩子在 macOS 上运行;在 Windows 上暂时只保存在库中。
 
 <p align="center"><img src="docs/demo/hooks.gif" width="960" alt="新建一个在回复结束时检查测试是否通过的钩子，并应用到各工具"></p>
 
 ## 决定智能体可以运行哪些命令
 
-只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI 和 GitHub Copilot 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。 MCP 服务器也一样：在服务器的权限标签页中为所有工具设置默认值，并单独调整某个工具，规则会应用到 Claude Code、Codex、Gemini CLI 和 OpenCode。
+只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI、GitHub Copilot 和 Qwen Code 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。 MCP 服务器也一样：在服务器的权限标签页中为所有工具设置默认值，并单独调整某个工具，规则会应用到 Claude Code、Codex、Gemini CLI、OpenCode 和 Qwen Code。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="一个阻止强制推送和硬重置、允许 git status 的 git 分组，应用到 4 个工具"></p>
 
@@ -68,13 +69,19 @@ brew install --cask doominkim/tap/illithid
 
 也可以从上方链接下载 DMG。
 
+### Windows(测试版)
+
+从[最新发布](https://github.com/doominkim/illithid/releases/latest)下载 `illithid-x64-setup.exe` 并运行(ARM 电脑通过 Windows 的 x64 仿真运行)。安装程序尚未进行代码签名,SmartScreen 可能会提示警告,请选择**更多信息 → 仍要运行**。
+
+Windows 版会同步规则、技能、子代理、MCP 服务器、权限和默认模型,并将 MCP 密钥保存在 Windows 凭据管理器中。钩子目前还不会在 Windows 上写入工具。
+
 ## 其他功能
 
 - **市场**：搜索并安装规则、技能和 MCP 服务器。
 - **会话**：搜索过去的对话并继续工作。
 - **记忆**：审阅智能体记忆，并提升到共享库。
 - **产物**：集中查看智能体生成的报告、文档和图片。
-- **工作区与备份**：分开管理配置，导出或导入，并通过 Git 备份配置库。
+- **工作区与备份**：分开管理配置，导出或导入，并通过 Git 备份配置库。可以用 GitHub 登录并创建私有备份仓库,或连接已有的仓库 URL。参见 [GitHub 备份设置](docs/github-backup.md)。
 
 ## 默认安全
 
@@ -85,7 +92,7 @@ brew install --cask doominkim/tap/illithid
 ## 常见问题
 
 **我的代码或提示词会经过 Illithid 吗?**
-不会。Illithid 不与任何模型 API 通信。它只编辑本地配置文件、读取本地会话记录。网络访问仅限 Git 备份（仅在连接远程仓库时）、更新检查和市场。市场会访问 skills.sh、官方 MCP 注册表和 GitHub，可在设置中关闭。Illithid 还会每天向 GitHub 查询一次是否有新版本，可在设置 → 更新中关闭。
+不会。Illithid 不与任何模型 API 通信。它只编辑本地配置文件、读取本地会话记录。网络访问仅限 Git 备份（仅在连接远程仓库时）、可选的 GitHub 备份登录与仓库设置、更新检查和市场。市场会访问 skills.sh、官方 MCP 注册表和 GitHub，可在设置中关闭。Illithid 还会每天向 GitHub 查询一次是否有新版本，可在设置 → 更新中关闭。
 
 **会覆盖我现有的配置吗?**
 首次启动时会询问是否导入现有配置。导入的原始文件在交由 Illithid 管理前会先备份。
@@ -93,8 +100,8 @@ brew install --cask doominkim/tap/illithid
 **不想用了怎么办?**
 退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。如果只想停止同步某个工具，在设置中关闭它即可，预览会列出将被清理的项目。
 
-**为什么只支持 macOS?**
-密钥保存在 macOS 钥匙串中，因此目前只发布 macOS 版本。
+**支持 Windows 吗?**
+支持,目前为测试版:x64 电脑上的 Windows 10 和 11,以及通过 x64 仿真运行的 Windows 11 ARM 电脑。钩子暂时只在 macOS 上生效,其余内容都会同步。
 
 ## 从源码构建
 
@@ -104,6 +111,7 @@ brew install --cask doominkim/tap/illithid
 npm install
 npm run dev          # 热重载运行
 npm run build:mac    # 在 dist/ 生成 DMG
+npm run build:win    # 在 dist/ 生成 Windows 安装程序 (在 Windows 上运行)
 ```
 
 没有 Developer ID 证书时，可用 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac` 构建未签名版本。

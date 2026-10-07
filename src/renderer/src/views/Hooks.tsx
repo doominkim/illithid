@@ -436,6 +436,17 @@ function Hooks(): React.JSX.Element {
           <ErrorAlert message={data.error} />
         </Box>
       )}
+      {data.platformUnsupported && (
+        <Alert
+          mb="md"
+          color="yellow"
+          variant="light"
+          title={t('hooks.windowsTitle')}
+          data-testid="hooks-windows"
+        >
+          {t('hooks.windowsBody')}
+        </Alert>
+      )}
       <Toolbar
         left={
           <>

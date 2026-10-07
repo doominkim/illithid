@@ -11,8 +11,11 @@ concurrency:
 
 jobs:
   check:
-    # The app ships for macOS only (Keychain secrets), so check on the same platform
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,5 +28,69 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       # Unit tests and fixtures that build their own temp HOME. Fixtures that copy the real library
-      # (npm run test:local) and the Electron UI tests (npm run test:ui) stay local
+      # (npm run test:local) stay local
       - run: npm test
+
+  ui-windows:
+    # The Electron UI tests on the platform no developer machine checks locally
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ui
+
+  package-windows:
+    # The x64 installer (ARM PCs run it through Windows' x64 emulation: an arm64 installer left the app's binaries out)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --win --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-setup-x64
+          path: dist/illithid-x64-setup.exe
+          if-no-files-found: error
+
+  smoke-windows:
+    # Install the installer silently on x64 and on ARM, and launch the installed app on each
+    needs: package-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-setup-x64
+          path: dist
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-x64-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
+          "installer exit code: $($p.ExitCode)"
+      - name: Launch the installed app
+        run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
+      - name: Keep the failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure-${{ matrix.runner }}
+          path: smoke-failure.png
+          if-no-files-found: ignore

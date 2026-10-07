@@ -42,19 +42,20 @@ function sync(home: string, env = baseEnv(home)): ReturnType<typeof syncAll> {
 }
 
 test('Qwen Code paths: settings.json, rules folder copy, skills folder, agents', () => {
-  const home = '/h'
+  const home = join(tmpdir(), 'h')
+  const at = (rel: string): string => join(home, rel)
   const qwen = tools(home).find((t) => t.id === 'qwen')
   assert.ok(qwen)
   assert.equal(qwen.displayName, 'Qwen Code')
-  assert.equal(qwen.configFile, '/h/.qwen/settings.json')
-  assert.deepEqual(qwen.rules, { kind: 'copyDir', dir: '/h/.qwen/rules/illithid' })
-  assert.deepEqual(qwen.skills, { kind: 'symlinkDir', dir: '/h/.qwen/skills' })
+  assert.equal(qwen.configFile, at('.qwen/settings.json'))
+  assert.deepEqual(qwen.rules, { kind: 'copyDir', dir: at('.qwen/rules/illithid') })
+  assert.deepEqual(qwen.skills, { kind: 'symlinkDir', dir: at('.qwen/skills') })
   assert.deepEqual(qwen.models, {
-    path: '/h/.qwen/settings.json',
+    path: at('.qwen/settings.json'),
     format: 'json',
     keys: ['model.name']
   })
-  assert.deepEqual(qwen.roster, { dirs: ['/h/.qwen/agents'], ext: '.md' })
+  assert.deepEqual(qwen.roster, { dirs: [at('.qwen/agents')], ext: '.md' })
 })
 
 test('Qwen Code is detected by its ~/.qwen folder', () => {
@@ -78,7 +79,7 @@ test('sync writes rules, skills, MCP servers and agents into ~/.qwen and keeps n
   const rule = join(home, '.qwen/rules/illithid/00-communication.md')
   assert.equal(
     readFileSync(rule, 'utf8'),
-    '<!-- Illithid copy. Edit the source instead: ~/.illithid/workspaces/default/rules/00-communication.md -->\n' +
+    `<!-- Illithid copy. Edit the source instead: ${join('~', '.illithid/workspaces/default/rules/00-communication.md')} -->\n` +
       readFileSync(join(home, '.illithid/workspaces/default/rules/00-communication.md'), 'utf8')
   )
   assert.ok(

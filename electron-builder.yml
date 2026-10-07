@@ -13,8 +13,15 @@ asarUnpack:
   - resources/**
 win:
   executableName: illithid
+  # x64 only for now (`electron-builder --win --x64`): ARM PCs run it through Windows' x64 emulation. An arm64 installer
+  # installed without the app's .exe and .dll files (electron-builder 26, checked in CI 2026-10-07)
+  target: nsis
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  # Fixed name like the DMGs (the update dialog and README point to it)
+  artifactName: ${name}-${arch}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

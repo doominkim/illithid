@@ -1,4 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs'
+import { tildeAliases } from '../pathUtil'
 import { join } from 'node:path'
 import { parseJsonObject, toJsonText, untouchedKeysSame } from '../text'
 import type { BuildContext, Sources, TargetDef } from '../types'
@@ -29,7 +30,7 @@ function ownedSet(sources: Sources, ctx: BuildContext | undefined): Set<string> 
   const cur = librarySkillsPath(sources)
   const base = [cur, ...previouslyOwned(ctx, 'opencodeSkills')]
   const out = new Set<string>([...base, ...legacyLibraryAliases(ctx?.home, base)])
-  if (ctx?.home && cur.startsWith(ctx.home + '/')) out.add('~' + cur.slice(ctx.home.length))
+  if (ctx?.home) for (const a of tildeAliases(ctx.home, cur)) out.add(a)
   return out
 }
 

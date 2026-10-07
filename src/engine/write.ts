@@ -115,13 +115,42 @@ export function atomicWrite(path: string, content: string, opts: AtomicWriteOpti
     if (opts.expectHash !== undefined && fileHash(real) !== opts.expectHash) {
       throw new ConcurrentChangeError('file changed at the re-check right before writing')
     }
-    renameSync(tmp, real)
+    renameWithRetry(tmp, real)
     committed = true
     fsyncDir(dir)
     return real
   } finally {
     if (fd !== undefined) closeSync(fd)
     if (!committed && existsSync(tmp)) unlinkSync(tmp)
+  }
+}
+
+const RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+
+/** Synchronous pause (the writers are synchronous) */
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * rename, retried a few times when the target is briefly locked — Windows refuses to replace a file another process (an editor,
+ * antivirus, the CLI itself) has open, with EPERM/EBUSY/EACCES. Other errors and a lock that outlasts the retries are rethrown
+ */
+export function renameWithRetry(
+  from: string,
+  to: string,
+  rename: (from: string, to: string) => void = renameSync,
+  wait: (ms: number) => void = pause
+): void {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      rename(from, to)
+      return
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (!code || !RETRY_CODES.has(code) || attempt >= 6) throw e
+      wait(20 * 2 ** attempt)
+    }
   }
 }
 
@@ -144,7 +173,7 @@ export function backup(path: string): string | null {
     } finally {
       closeSync(fd)
     }
-    renameSync(tmp, bak)
+    renameWithRetry(tmp, bak)
   } finally {
     if (existsSync(tmp)) unlinkSync(tmp)
   }

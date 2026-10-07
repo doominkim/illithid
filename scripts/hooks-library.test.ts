@@ -138,7 +138,9 @@ test('REQ-HOOKS-LIB-5 ask keeps its instruction in the body; script keeps a run.
   })
   const mine = readHook(home, 'mine')
   assert.equal(mine.scripts['run.sh'], '#!/bin/sh\necho hi\n')
-  assert.equal(statSync(join(libraryRoot(home), 'hooks/mine/run.sh')).mode & 0o111, 0o111)
+  // Windows has no exec bits
+  if (process.platform !== 'win32')
+    assert.equal(statSync(join(libraryRoot(home), 'hooks/mine/run.sh')).mode & 0o111, 0o111)
   saveHookScript(home, 'mine', 'run.sh', '#!/bin/sh\necho bye\n')
   assert.equal(readHook(home, 'mine').scripts['run.sh'], '#!/bin/sh\necho bye\n')
   // A tool-only script stays an advanced option of the script action

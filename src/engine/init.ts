@@ -77,6 +77,8 @@ export function initLibraryAt(root: string, opts: InitLibraryOptions = {}): Init
   let gitInitialized = false
   if (opts.git && !existsSync(join(root, '.git'))) {
     execFileSync('git', ['init', '-q', root], { stdio: 'ignore' })
+    // Library files are LF: keep Git for Windows' autocrlf default from rewriting them in a repo the app creates
+    execFileSync('git', ['-C', root, 'config', 'core.autocrlf', 'false'], { stdio: 'ignore' })
     gitInitialized = true
   }
   return { root, created, existed, gitInitialized }

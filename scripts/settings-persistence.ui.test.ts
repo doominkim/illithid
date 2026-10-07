@@ -75,6 +75,12 @@ test(
     try {
       const page = await first.firstWindow()
       await page.locator('[data-menu="settings"]').click()
+      // Picking the language already in effect changes nothing: first pick one that isn't (the system's varies)
+      const current = await page.evaluate(() => document.documentElement.lang)
+      const [other, label] = current.startsWith('ja') ? ['zh', '简体中文'] : ['ja', '日本語']
+      await page.getByTestId('settings-language').click()
+      await page.getByRole('option', { name: label, exact: true }).click()
+      await until(() => uiOf(home)?.language === other, `ui.language saved (${other})`)
       await page.getByTestId('settings-language').click()
       await page.getByRole('option', { name: 'English', exact: true }).click()
       await until(() => uiOf(home)?.language === 'en', 'ui.language saved')

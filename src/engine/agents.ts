@@ -1,4 +1,5 @@
 import { join, resolve } from 'node:path'
+import { homeTilde } from './pathUtil'
 import { libraryRoot } from './config'
 import type { ToolId } from './toolIds'
 
@@ -236,5 +237,5 @@ export function tool(home: string, id: ToolId): ToolInfo {
 
 /** Display path: replaces the home prefix with ~ */
 export function tilde(home: string, p: string): string {
-  return p === home ? '~' : p.startsWith(home + '/') ? '~' + p.slice(home.length) : p
+  return homeTilde(home, p)
 }

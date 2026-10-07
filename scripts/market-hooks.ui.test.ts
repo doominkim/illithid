@@ -6,6 +6,9 @@ import { join, resolve } from 'node:path'
 import { _electron as electron } from 'playwright-core'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
+/** Hooks are generated as POSIX shell scripts and not written on Windows yet (phase 1) */
+const NO_HOOKS = process.platform === 'win32' && 'hooks are not written on Windows yet'
+
 const LIB = '.illithid/workspaces/default'
 const API = 'https://api.github.com/repos/github/awesome-copilot'
 const RAW = 'https://raw.githubusercontent.com/github/awesome-copilot'
@@ -40,7 +43,7 @@ const ROUTES: Record<string, string> = {
 
 test(
   'REQ-MARKET-HOOKS-UI-1 the Hooks tab lists awesome-copilot packs; installing one adds a Copilot-only hook',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const home = mkdtempSync(join(tmpdir(), 'illithid-market-hooks-ui-'))
     buildDemoHome(home, { tools: 'all' })

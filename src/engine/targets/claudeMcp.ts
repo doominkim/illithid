@@ -21,19 +21,27 @@ import {
 type Json = Record<string, unknown>
 
 /** Servers whose secrets could not be resolved go into errors and are dropped from servers (existing entries stay) */
+/** Commands Windows resolves to a `.cmd` shim, which a plain process spawn can't start */
+const CMD_SHIM_RE = /^(npx|npm|pnpm|pnpx|yarn|bunx)$|\.(cmd|bat)$/i
+
 export function buildClaudeMcp(
   mcp: McpSource,
   state: Json,
   env: Env,
   secrets?: SecretBackend,
-  errors: Record<string, string> = {}
+  errors: Record<string, string> = {},
+  platform: NodeJS.Platform = process.platform
 ): Json {
   const next = structuredClone(state)
   const servers: Record<string, Json> = {}
   for (const [name, s] of mcpEntries(mcp)) {
     try {
       if (s.transport === 'stdio') {
-        const server: Json = { type: 'stdio', command: s.command, args: s.args ?? [] }
+        // Claude Code on native Windows needs `cmd /c` in front of npx-style commands
+        const server: Json =
+          platform === 'win32' && CMD_SHIM_RE.test(s.command ?? '')
+            ? { type: 'stdio', command: 'cmd', args: ['/c', s.command, ...(s.args ?? [])] }
+            : { type: 'stdio', command: s.command, args: s.args ?? [] }
         if (s.env) {
           server.env = Object.fromEntries(
             Object.entries(s.env).map(([k, v]) => [k, renderValue(v, 'claude', env, secrets)])

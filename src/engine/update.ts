@@ -53,7 +53,11 @@ export async function latestUpdate(fetchFn: FetchFn, current: string): Promise<U
   return { version, notes: str(r.body) ?? '', url }
 }
 
-/** Installed through the Homebrew cask (update with brew) or from the DMG */
-export function installKind(exists: (p: string) => boolean = existsSync): 'brew' | 'dmg' {
+/** Installed through the Homebrew cask (update with brew), from the DMG, or with the Windows setup installer */
+export function installKind(
+  exists: (p: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform
+): 'brew' | 'dmg' | 'nsis' {
+  if (platform === 'win32') return 'nsis'
   return CASKROOMS.some((p) => exists(p)) ? 'brew' : 'dmg'
 }

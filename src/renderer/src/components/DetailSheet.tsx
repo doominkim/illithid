@@ -4,6 +4,7 @@ import { notifications } from '@mantine/notifications'
 import { ArrowLeft, Copy, FolderOpen, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SheetFooterContext } from './sheetFooter'
+import { platformKey } from '../lib/platform'
 
 interface Props {
   opened: boolean
@@ -106,13 +107,13 @@ export function DetailSheet({
               {title}
             </Title>
             {onReveal && (
-              <Tooltip label={t('detail.reveal')} withArrow openDelay={300}>
+              <Tooltip label={t(platformKey('detail.reveal'))} withArrow openDelay={300}>
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="lg"
                   onClick={onReveal}
-                  aria-label={t('detail.reveal')}
+                  aria-label={t(platformKey('detail.reveal'))}
                   style={{ flexShrink: 0 }}
                   data-testid={revealTestId}
                 >

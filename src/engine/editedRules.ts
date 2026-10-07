@@ -6,6 +6,7 @@
  * The next apply restores the library version; adoptEditedRule saves the tool's version into the library instead, so it reaches
  * every tool. The memory index is left out (it's generated from memory/)
  */
+import { isUnder } from './pathUtil'
 import { readFileSync } from 'node:fs'
 import { canonicalPaths } from './agents'
 import { writeRule } from './library'
@@ -72,7 +73,8 @@ export function editedRules(home: string, env: Env = process.env): EditedRule[] 
     if (
       it.name === CLAUDE_MEMORY_RULE ||
       it.name === GROK_MEMORY_RULE_FILE ||
-      !it.source?.startsWith(rulesDir + '/')
+      !it.source ||
+      !isUnder(rulesDir, it.source)
     )
       continue
     const source = library.get(it.name)

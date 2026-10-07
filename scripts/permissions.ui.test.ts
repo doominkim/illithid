@@ -6,6 +6,10 @@ import { join, resolve } from 'node:path'
 import { _electron as electron, type Locator } from 'playwright-core'
 import { createHook, savePermissionRules } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
+import { clearToasts } from './lib/toasts'
+
+/** Hooks are generated as POSIX shell scripts and not written on Windows yet (phase 1) */
+const NO_HOOKS = process.platform === 'win32' && 'hooks are not written on Windows yet'
 
 async function launch(
   tools: string[],
@@ -39,7 +43,7 @@ async function launch(
 
 test(
   'REQ-PERM-UI-1 add a block rule, change it to ask, delete it; the tools follow, and guard hooks are listed with a link',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'gemini', 'copilot'], (home) =>
       createHook(home, 'guard-before-tool', {
@@ -177,6 +181,7 @@ test(
         .getByText('Exact', { exact: true })
         .click()
       await line('git status').getByText('git status', { exact: true }).waitFor()
+      await clearToasts(page)
       await page.getByTestId('perm-group-save').click()
       const renamed = page.locator('[data-testid="perm-group"][data-group="git danger"]')
       await renamed.getByText('git clean -fd').waitFor()
@@ -272,6 +277,7 @@ test(
       // Editing the group keeps each rule's tools: --force stays off for Codex
       await group.getByTestId('perm-group-open').click()
       await page.getByTestId('perm-group-description').fill('Hard to undo')
+      await clearToasts(page)
       await page.getByTestId('perm-group-save').click()
       await group.getByText('Hard to undo').waitFor()
       await synced()

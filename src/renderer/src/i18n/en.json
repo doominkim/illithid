@@ -59,6 +59,7 @@
     "updateAvailable": "{{version}} available",
     "checkFailed": "Couldn't check for updates. Check your connection and try again.",
     "themeHint": "System follows the macOS appearance.",
+    "themeHintWin": "System follows the Windows theme.",
     "cleanupEnabledHint": "Moves old backup copies to the Trash.",
     "cleanupNowHint": "Uses the rules above once, right away."
   },
@@ -141,7 +142,7 @@
     "deleted": "MCP removed (kept in .trash)",
     "deleteTitle": "Delete MCP",
     "deleteBody": "Move {{name}} to .trash.",
-    "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the Keychain.",
+    "headersHint": "HTTP headers sent to the server. ${VAR} reads an environment variable; other values are kept in the system's secure storage (Keychain or Credential Manager).",
     "timeoutHint": "How long to wait for the server. Left empty: the tool's default.",
     "description": "Description",
     "tabPermissions": "Permissions",
@@ -279,7 +280,8 @@
     "saved": "Toggle saved"
   },
   "sidebar": {
-    "shortcut": "⌘K to search"
+    "shortcut": "⌘K to search",
+    "shortcutWin": "Ctrl+K to search"
   },
   "spotlight": {
     "placeholder": "Go to screen or search skills, MCP, rules, agents…",
@@ -299,6 +301,7 @@
     "copyPath": "Copy path",
     "deleteItem": "Delete…",
     "reveal": "Show in Finder",
+    "revealWin": "Show in File Explorer",
     "notApplicable": "can't take this",
     "pendingSync": "Waits for the next sync"
   },
@@ -1055,12 +1058,15 @@
     "instructionExample": "If the tests have not passed yet, keep working.",
     "scriptStarter": "Starts with a template script. Edit it after creating.",
     "nameTaken": "A hook with this name exists",
+    "windowsTitle": "Hooks are not available on Windows yet",
+    "windowsBody": "You can keep and edit hooks in the library, but Illithid does not write them to any tool on Windows yet. They reach your tools on macOS.",
     "unsupported": {
       "wrongTiming": "Not at this timing in {{tool}}",
       "noEvent": "No event for this timing in {{tool}}",
       "noFilePath": "Not in {{tool}}: its hooks aren't told which file was edited",
       "claudeOnly": "Not in {{tool}}: no judgment hooks (Claude Code only)",
-      "noContext": "Not in {{tool}}: it ignores what a session start hook says"
+      "noContext": "Not in {{tool}}: it ignores what a session start hook says",
+      "windows": "Not on Windows yet"
     },
     "pending": "Not in the tools yet",
     "pendingHint": "Sync to write this hook into the tools.",

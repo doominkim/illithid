@@ -24,6 +24,7 @@ import { useSync } from '../lib/sync'
 import { TOOL_NAME } from '../lib/tools'
 import type { ToolId } from '../../../shared/api'
 import { WorkspaceBar } from './WorkspaceBar'
+import { platformKey } from '../lib/platform'
 
 const ICON: Record<Menu, React.ComponentType<{ size?: number }>> = {
   rules: BookOpen,
@@ -207,7 +208,7 @@ export function Sidebar({
       <Box px={8} pt={8}>
         <Text size="xs" c="dimmed">
           <Bot size={11} style={{ verticalAlign: -1, marginRight: 4 }} />
-          {t('sidebar.shortcut')}
+          {t(platformKey('sidebar.shortcut'))}
         </Text>
       </Box>
     </Box>

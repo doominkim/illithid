@@ -59,6 +59,7 @@
     "updateAvailable": "{{version}} 可用",
     "checkFailed": "无法检查更新。请检查网络连接后重试。",
     "themeHint": "“系统”跟随 macOS 外观。",
+    "themeHintWin": "跟随 Windows 主题。",
     "cleanupEnabledHint": "将旧的备份副本移到废纸篓。",
     "cleanupNowHint": "立即按上面的规则执行一次。"
   },
@@ -141,7 +142,7 @@
     "deleted": "MCP 已删除（保留在 .trash）",
     "deleteTitle": "删除 MCP",
     "deleteBody": "将 {{name}} 移到 .trash。",
-    "headersHint": "发送给服务器的 HTTP 头。${VAR} 读取环境变量，其他值保存在钥匙串中。",
+    "headersHint": "发送给服务器的 HTTP 头。${VAR} 读取环境变量，其他值保存在系统安全存储(钥匙串或凭据管理器)中。",
     "timeoutHint": "等待服务器响应的最长时间。留空则用工具默认值。",
     "description": "说明",
     "tabPermissions": "权限",
@@ -279,7 +280,8 @@
     "saved": "开关已保存"
   },
   "sidebar": {
-    "shortcut": "⌘K 搜索"
+    "shortcut": "⌘K 搜索",
+    "shortcutWin": "Ctrl+K 搜索"
   },
   "spotlight": {
     "placeholder": "跳转页面或搜索技能、MCP、规则、代理…",
@@ -299,6 +301,7 @@
     "copyPath": "复制路径",
     "deleteItem": "删除…",
     "reveal": "在 Finder 中显示",
+    "revealWin": "在文件资源管理器中显示",
     "notApplicable": "不可用",
     "pendingSync": "等待下次同步"
   },
@@ -1055,12 +1058,15 @@
     "instructionExample": "如果测试还没通过，就继续工作。",
     "scriptStarter": "从模板脚本开始。创建后再编辑。",
     "nameTaken": "已有同名钩子",
+    "windowsTitle": "Windows 上暂不支持钩子",
+    "windowsBody": "钩子可以保存在资料库中并编辑,但在 Windows 上暂不写入任何工具。在 macOS 上会同步到工具。",
     "unsupported": {
       "wrongTiming": "{{tool}} 不能在此时机运行此动作",
       "noEvent": "{{tool}} 没有此时机的事件",
       "noFilePath": "{{tool}} 不会把编辑的文件路径传给钩子",
       "claudeOnly": "{{tool}} 没有判断钩子 (仅 Claude Code)",
-      "noContext": "{{tool}} 会忽略会话开始钩子的输出"
+      "noContext": "{{tool}} 会忽略会话开始钩子的输出",
+      "windows": "Windows 上暂不支持"
     },
     "pending": "尚未写入工具",
     "pendingHint": "同步后此钩子会写入工具设置。",

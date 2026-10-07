@@ -46,6 +46,15 @@ function reasonOf(e: unknown): string {
 }
 
 /** Check that repoDir is a git repo root. Returns a reason string if not, null if it is. */
+/**
+ * Comparable form of an existing path. The native realpath expands Windows 8.3 short names (C:\Users\RUNNER~1), and Windows
+ * paths compare case-insensitively — git reports its top level as C:/Users/runneradmin/…
+ */
+function canonicalPath(p: string): string {
+  const real = realpathSync.native(p)
+  return process.platform === 'win32' ? real.toLowerCase() : real
+}
+
 async function checkRepoRoot(repoDir: string): Promise<string | null> {
   let real: string
   try {
@@ -55,7 +64,8 @@ async function checkRepoRoot(repoDir: string): Promise<string | null> {
   }
   try {
     const top = (await git(real).revparse(['--show-toplevel'])).trim()
-    if (realpathSync(top) !== real) return `not the repo root: ${repoDir} (root: ${top})`
+    if (canonicalPath(top) !== canonicalPath(real))
+      return `not the repo root: ${repoDir} (root: ${top})`
     return null
   } catch (e) {
     return `not a git repo: ${repoDir} (${reasonOf(e)})`

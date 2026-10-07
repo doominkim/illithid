@@ -1,0 +1,86 @@
+name: Release (Windows)
+
+# Builds the Windows installer for a published release, installs it silently on x64 and on ARM (x64 emulation), launches
+# the installed app on each, then attaches the installer and its SHA-256 sum to the release. The macOS build stays local (scripts/release-mac.sh).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (for example v0.4.0)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Version matches the tag
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "$TAG"
+      - run: npm run build
+      - run: npx electron-builder --win --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup-x64
+          path: dist/illithid-x64-setup.exe
+          if-no-files-found: error
+
+  smoke:
+    # The same installer on x64 and on ARM (x64 emulation): install silently, launch the installed app
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup-x64
+          path: dist
+      - name: Install silently
+        shell: pwsh
+        run: Start-Process -Wait -FilePath "dist\illithid-x64-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
+      - name: Launch the installed app
+        run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
+
+  publish:
+    needs: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup-x64
+          path: out
+      - name: SHA-256 sums
+        working-directory: out
+        run: sha256sum illithid-x64-setup.exe > SHA256SUMS-windows
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release upload "$TAG" out/illithid-x64-setup.exe out/SHA256SUMS-windows
+          --clobber -R "${{ github.repository }}"

@@ -10,12 +10,15 @@
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="Download"></a>
     <img src="https://img.shields.io/badge/macOS-12%2B-blue?style=flat-square" alt="macOS 12+">
     <img src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-lightgrey?style=flat-square" alt="Apple Silicon and Intel">
+    <img src="https://img.shields.io/badge/Windows-beta-blue?style=flat-square" alt="Windows beta">
   </p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-arm64.dmg">Download for Apple Silicon</a>
     &nbsp;·&nbsp;
     <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-x64.dmg">Download for Intel</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-x64-setup.exe">Windows (beta)</a>
   </p>
 </div>
 
@@ -27,6 +30,7 @@
     <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
     <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
     <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+    <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
   </tr>
 </table>
 
@@ -44,13 +48,13 @@ Import the configuration you already use. Choose your tools and review every cha
 
 ## Automate checks with hooks.
 
-Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot, and Grok CLI, each in its own format. Pick when it runs, then run your own script or check the work with a plain-language rule. Keep shared scripts in the library; a script can be a folder with its own helper files.
+Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot, Grok CLI, and Qwen Code, each in its own format. Pick when it runs, then run your own script or check the work with a plain-language rule. Keep shared scripts in the library; a script can be a folder with its own helper files. Hooks run on macOS; on Windows they stay in the library for now.
 
 <p align="center"><img src="docs/demo/hooks.gif" width="960" alt="A new hook that checks, when a reply finishes, that the tests pass, applied to the tools"></p>
 
 ## Decide which commands agents can run.
 
-Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, and GitHub Copilot, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, and OpenCode.
+Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, GitHub Copilot, and Qwen Code, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, OpenCode, and Qwen Code.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="A git group that blocks force pushes and hard resets and allows git status, applied to four tools"></p>
 
@@ -68,13 +72,19 @@ brew install --cask doominkim/tap/illithid
 
 Or download the DMG above.
 
+### Windows (beta)
+
+Download `illithid-x64-setup.exe` from the [latest release](https://github.com/doominkim/illithid/releases/latest) and run it (ARM PCs run it through Windows' x64 emulation). The installer is not code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**.
+
+The Windows build syncs rules, skills, subagents, MCP servers, permissions and default models, and keeps MCP secrets in Windows Credential Manager. Hooks are not written to tools on Windows yet.
+
 ## Also included
 
 - **Market**: discover and install rules, skills, and MCP servers.
 - **Sessions**: search and resume past conversations.
 - **Memory**: review and promote agent memories to the shared library.
 - **Artifacts**: browse reports, documents, and images produced by your agents.
-- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git. Configured builds can sign in with GitHub and create a private backup repository; existing repository URLs remain supported. See [GitHub backup setup](docs/github-backup.md).
+- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git. Sign in with GitHub to create a private backup repository, or connect an existing repository URL. See [GitHub backup setup](docs/github-backup.md).
 
 ## Safe by default
 
@@ -93,8 +103,8 @@ On first run Illithid offers to import what you have. Imported originals are bac
 **How do I stop using it?**
 Quit the app and uninstall. The files it wrote are plain rules, skills and config entries, so your tools keep working. To stop syncing one tool, turn it off in Settings; the preview shows what Illithid removes from it.
 
-**Why macOS only?**
-Secrets are stored in the macOS Keychain, so only macOS builds are published for now.
+**Does it run on Windows?**
+Yes, as a beta: Windows 10 and 11 on x64 PCs, and ARM PCs on Windows 11 through its x64 emulation. Hooks stay macOS-only for now; everything else syncs.
 
 ## Build from source
 
@@ -104,6 +114,7 @@ Requires Node.js 22 or newer.
 npm install
 npm run dev          # run with hot reload
 npm run build:mac    # DMGs in dist/
+npm run build:win    # Windows installers in dist/ (run on Windows)
 ```
 
 Without a Developer ID certificate, build unsigned with `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac`.

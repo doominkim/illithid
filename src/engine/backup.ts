@@ -291,6 +291,8 @@ export async function connectBackup(
     let initialized = false
     if (!isRepo(root)) {
       await git(root).raw(['init', '-q', `--initial-branch=${BACKUP_DEFAULT_BRANCH}`])
+      // Library files are LF: keep Git for Windows' autocrlf default from rewriting them in a repo the app creates
+      await git(root).raw(['config', 'core.autocrlf', 'false'])
       initialized = true
     }
     const g = git(root)

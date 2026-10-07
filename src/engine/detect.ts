@@ -3,7 +3,7 @@
  * Kept free of other engine modules so config.ts can use it (tools in use while config.toolsInUse is unset).
  */
 import { accessSync, constants as fsConstants, existsSync, statSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 import { TOOL_IDS, type ToolId } from './toolIds'
 
 /** Executable names looked up on PATH per tool */
@@ -63,11 +63,41 @@ export function toolConfigFound(home: string, tool: ToolId): boolean {
 function executableFile(p: string): boolean {
   try {
     if (!statSync(p).isFile()) return false
-    accessSync(p, fsConstants.X_OK)
+    // Windows has no execute bit: a file with a PATHEXT extension is runnable
+    if (process.platform !== 'win32') accessSync(p, fsConstants.X_OK)
     return true
   } catch {
     return false
   }
+}
+
+/**
+ * Absolute path of an executable on the environment's PATH, else undefined. On Windows the variable may be spelled `Path`,
+ * entries are `;`-separated and the name is tried with each PATHEXT extension (`claude.cmd`, `codex.exe`)
+ */
+export function findExecutable(
+  name: string,
+  env: Record<string, string | undefined>,
+  platform: NodeJS.Platform = process.platform,
+  isExec: (path: string) => boolean = executableFile
+): string | undefined {
+  const lib = platform === 'win32' ? win32 : posix
+  const key = Object.keys(env).find((k) =>
+    platform === 'win32' ? k.toUpperCase() === 'PATH' : k === 'PATH'
+  )
+  const dirs = (key ? (env[key] ?? '') : '')
+    .split(lib.delimiter)
+    .filter((d) => d && lib.isAbsolute(d))
+  const exts =
+    platform === 'win32'
+      ? (env.PATHEXT ?? env.Pathext ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+      : ['']
+  for (const d of dirs)
+    for (const ext of exts) {
+      const p = lib.join(d, name + ext)
+      if (isExec(p)) return p
+    }
+  return undefined
 }
 
 /**
@@ -80,10 +110,11 @@ export function detectTools(
   opts: DetectToolsOptions = {}
 ): ToolDetection[] {
   const isExec = opts.isExecutable ?? executableFile
-  const dirs = (env?.PATH ?? '').split(':').filter((d) => d && isAbsolute(d))
   return TOOL_IDS.map((tool) => {
     const configFound = toolConfigFound(home, tool)
-    const executable = dirs.map((d) => join(d, TOOL_EXECUTABLES[tool])).find((p) => isExec(p))
+    const executable = env
+      ? findExecutable(TOOL_EXECUTABLES[tool], env, process.platform, isExec)
+      : undefined
     return {
       tool,
       configFound,

@@ -21,7 +21,9 @@ export function homeFrom(path: string, suffix: string): string | null {
 export function tildeWith(home: string | null, p: string | undefined): string {
   if (!p) return ''
   if (!home) return p
-  return p === home ? '~' : p.startsWith(home + '/') ? '~' + p.slice(home.length) : p
+  if (p === home) return '~'
+  const rest = p.slice(home.length)
+  return p.startsWith(home) && /^[\\/]/.test(rest) ? '~' + rest : p
 }
 
 export function includesCI(hay: string | undefined, needle: string): boolean {

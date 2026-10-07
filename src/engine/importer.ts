@@ -705,7 +705,7 @@ const TOOL_PLUGIN_DIRS = [
 ]
 
 function expandHome(home: string, p: string): string {
-  return p === '~' ? home : p.startsWith('~/') ? join(home, p.slice(2)) : p
+  return p === '~' ? home : /^~[\\/]/.test(p) ? join(home, p.slice(2)) : p
 }
 
 function inAny(home: string, rels: readonly string[], abs: string): boolean {
@@ -714,10 +714,13 @@ function inAny(home: string, rels: readonly string[], abs: string): boolean {
 
 /** Machine-specific absolute paths (user home, local install paths) */
 const LOCAL_PATH_RE =
-  /(?:^|[\s"'=:,])(?:\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/|\/opt\/homebrew\/|\/usr\/local\/|\/opt\/local\/)/
+  /(?:^|[\s"'=:,])(?:\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/|\/opt\/homebrew\/|\/usr\/local\/|\/opt\/local\/|[A-Za-z]:\\Users\\[^\\\s]+\\)|%USERPROFILE%/i
 
-function isLocalPath(home: string, v: string): boolean {
-  return LOCAL_PATH_RE.test(v) || (home.length > 1 && v.includes(home + '/'))
+export function isLocalPath(home: string, v: string): boolean {
+  return (
+    LOCAL_PATH_RE.test(v) ||
+    (home.length > 1 && (v.includes(home + '/') || v.includes(home + '\\')))
+  )
 }
 
 export interface PortabilityContext {
@@ -1643,8 +1646,18 @@ function convertClaude(name: string, s: Json): Conv {
   const c = new Converter(name)
   const type = s.type ?? (s.command ? 'stdio' : s.url ? 'http' : undefined)
   if (type === 'stdio') {
-    const server: McpServer = { transport: 'stdio', command: String(s.command ?? '') }
-    server.args = c.args(s.args)
+    // `cmd /c npx …` is how Claude Code on Windows runs npx servers (written that way by the app too): keep the portable command
+    const raw = Array.isArray(s.args) ? (s.args as unknown[]) : []
+    const viaCmd =
+      /^cmd(\.exe)?$/i.test(String(s.command ?? '')) &&
+      typeof raw[0] === 'string' &&
+      /^\/c$/i.test(raw[0]) &&
+      typeof raw[1] === 'string'
+    const server: McpServer = {
+      transport: 'stdio',
+      command: viaCmd ? (raw[1] as string) : String(s.command ?? '')
+    }
+    server.args = c.args(viaCmd ? raw.slice(2) : s.args)
     if (isObj(s.env) && Object.keys(s.env).length)
       server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, v)]))
     return { server, c }

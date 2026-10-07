@@ -15,6 +15,9 @@ import { _electron as electron } from 'playwright-core'
 import { createHook, syncAll } from '../src/engine'
 import { baseEnv, buildDemoHome } from './readme-shots'
 
+/** Hooks are generated as POSIX shell scripts and not written on Windows yet (phase 1) */
+const NO_HOOKS = process.platform === 'win32' && 'hooks are not written on Windows yet'
+
 const LIB = '.illithid/workspaces/default'
 
 /** Electron with a demo HOME and the given tools in use */
@@ -51,7 +54,7 @@ async function launch(
 
 test(
   'REQ-HOOKS-UI-1 an existing recipe hook (notify) keeps its generated scripts; edit and advanced settings follow',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'codex', 'gemini'], 'illithid-hooks-ui-', (h) => {
       createHook(h, 'notify-stop', {
@@ -128,7 +131,7 @@ test(
 
 test(
   'REQ-HOOKS-UI-3 an AI check runs in every tool: a prompt hook in Claude Code, a judging CLI elsewhere',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'gemini'], 'illithid-hooks-ui-ask-')
     try {
@@ -208,7 +211,7 @@ test(
 
 test(
   'REQ-HOOKS-UI-2 import a Claude Code hook: it joins the library and its original entry is replaced',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const settingsPath = (home: string): string => join(home, '.claude/settings.json')
     const { home, app } = await launch(['claude'], 'illithid-hooks-ui-import-', (home) => {
@@ -263,7 +266,7 @@ test(
 
 test(
   'REQ-HOOKS-UI-4 one form for every hook: a script before shell commands, with a timeout, reaches each tool with its own shell tool name',
-  { timeout: 180000 },
+  { skip: NO_HOOKS, timeout: 180000 },
   async () => {
     const { home, app } = await launch(['claude', 'gemini', 'copilot'], 'illithid-hooks-ui-form-')
     try {

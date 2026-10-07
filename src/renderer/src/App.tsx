@@ -59,6 +59,7 @@ import {
   WORKSPACE_SWITCH_REQUEST
 } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
+import { IS_WINDOWS } from './lib/platform'
 
 export type { Menu }
 
@@ -407,8 +408,8 @@ function App(): React.JSX.Element {
     <NavContext.Provider value={{ request, navigate }}>
       <ConfigContext.Provider value={configCtx}>
         <SyncContext.Provider value={syncCtx}>
-          {/* Drag region for the macOS hiddenInset title bar */}
-          <div className="ac-dragbar" />
+          {/* Drag region for the macOS hiddenInset title bar (Windows keeps the native one) */}
+          {!IS_WINDOWS && <div className="ac-dragbar" />}
           {onboarding === null ? null : onboarding ? (
             <Onboarding
               onDone={(menu) => {

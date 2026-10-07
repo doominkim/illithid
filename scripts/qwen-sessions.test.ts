@@ -148,7 +148,12 @@ test('Qwen sessions are listed from ~/.qwen/projects/*/chats', () => {
   assert.equal(s.project, 'shop-api')
   assert.equal(s.startedAt, T(0))
   assert.equal(s.updatedAt, T(26))
-  assert.equal(s.resumeCommand, `cd -- ${CWD} && qwen --resume ${ID}`)
+  assert.equal(
+    s.resumeCommand,
+    process.platform === 'win32'
+      ? `Set-Location -LiteralPath '${CWD}'; qwen --resume ${ID}`
+      : `cd -- ${CWD} && qwen --resume ${ID}`
+  )
 })
 
 test('Qwen transcript follows the active branch and skips rewound and sidechain records', async () => {

@@ -303,6 +303,8 @@ export interface HooksData {
   error?: string
   /** false when Grok doesn't run Claude Code hooks (config.grokReadsClaude off or compat.claude.hooks = false) */
   grokReadsClaude?: boolean
+  /** true on Windows: hooks are not written to any tool yet */
+  platformUnsupported?: boolean
 }
 
 /** One library script and the hooks that run it */
@@ -465,8 +467,8 @@ export interface UpdateView {
   notes: string
   /** Release page */
   url: string
-  /** Installed through Homebrew (update with `command`) or from the DMG (download from `url`) */
-  install: 'brew' | 'dmg'
+  /** Installed through Homebrew (update with `command`), from the DMG or the Windows installer (download from `url`) */
+  install: 'brew' | 'dmg' | 'nsis'
   command: string | null
 }
 
