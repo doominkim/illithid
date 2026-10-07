@@ -468,6 +468,7 @@ export function notInitializedOf(changes: SyncAllResult['plan']['targets']): Not
     else if (
       c.skip === 'copilotHomeOverride' ||
       c.skip === 'grokHomeOverride' ||
+      c.skip === 'qwenHomeOverride' ||
       c.skip === 'jsoncUnsupported'
     )
       out.set(c.path, { tool, label: c.label, reason: c.skip })
@@ -604,9 +605,9 @@ export function toolsInUseSet(
     throw new ConfigError('toolsRetiring must be an array')
   const before = toolsInUse(home)
   setToolsInUse(home, list ?? undefined, retiring ? { retiring } : { wrote: toolsWritten(home) })
-  // Tools added to the app later (Grok CLI) don't inherit items that are explicitly off everywhere else
+  // Tools added to the app later (Grok CLI, Qwen Code) don't inherit items that are explicitly off everywhere else
   for (const t of toolsInUse(home))
-    if (t === 'grok' && !before.includes(t)) {
+    if ((t === 'grok' || t === 'qwen') && !before.includes(t)) {
       try {
         seedNewToolToggles(home, t)
       } catch {

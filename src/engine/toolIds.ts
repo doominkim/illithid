@@ -2,7 +2,7 @@
  * Tool ids and per-kind toggle tools. Dependency-free so config.ts and the renderer can use them without pulling in node modules.
  */
 
-const IDS = ['claude', 'codex', 'opencode', 'gemini', 'copilot', 'grok'] as const
+const IDS = ['claude', 'codex', 'opencode', 'gemini', 'copilot', 'grok', 'qwen'] as const
 
 export type ToolId = (typeof IDS)[number]
 
@@ -11,7 +11,7 @@ export const TOOL_IDS: readonly ToolId[] = IDS
 
 /**
  * Tools in use while config.toolsInUse is unset (users who never chose). Fixed to the tools that existed before the setting,
- * so tools added later (Gemini CLI, GitHub Copilot, Grok CLI) are only written once the user turns them on
+ * so tools added later (Gemini CLI, GitHub Copilot, Grok CLI, Qwen Code) are only written once the user turns them on
  */
 export const DEFAULT_TOOLS_IN_USE: readonly ToolId[] = ['claude', 'codex', 'opencode']
 
@@ -25,5 +25,5 @@ export const MANIFEST_TOOLS: Readonly<Record<ManifestKind, readonly ToolId[]>> =
   mcp: TOOL_IDS,
   agents: TOOL_IDS,
   // OpenCode has no command hooks (JS plugins only)
-  hooks: ['claude', 'codex', 'gemini', 'copilot', 'grok']
+  hooks: ['claude', 'codex', 'gemini', 'copilot', 'grok', 'qwen']
 }

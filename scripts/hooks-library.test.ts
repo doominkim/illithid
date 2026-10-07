@@ -103,7 +103,8 @@ test('REQ-HOOKS-LIB-4 triggers come from the action: the shell tool of each tool
     codex: { event: 'PreToolUse', matcher: 'Bash' },
     gemini: { event: 'BeforeTool', matcher: 'run_shell_command' },
     copilot: { event: 'preToolUse', matcher: 'bash' },
-    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' }
+    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' },
+    qwen: { event: 'PreToolUse', matcher: 'run_shell_command' }
   })
   const fmt = hookTriggers(readHook(home, 'fmt').doc)
   assert.deepEqual(fmt.claude, { event: 'PostToolUse', matcher: 'Write|Edit' })
@@ -219,14 +220,16 @@ test('REQ-HOOKS-LIB-8 a script hook before or after a tool call can target shell
     codex: { event: 'PreToolUse', matcher: 'Bash' },
     gemini: { event: 'BeforeTool', matcher: 'run_shell_command' },
     copilot: { event: 'preToolUse', matcher: 'bash' },
-    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' }
+    grok: { event: 'PreToolUse', matcher: 'run_terminal_command' },
+    qwen: { event: 'PreToolUse', matcher: 'run_shell_command' }
   })
   assert.deepEqual(hookTriggers(doc('edit')), {
     claude: { event: 'PreToolUse', matcher: 'Write|Edit' },
     codex: { event: 'PreToolUse', matcher: 'apply_patch' },
     gemini: { event: 'BeforeTool', matcher: 'write_file|replace' },
     copilot: { event: 'preToolUse', matcher: 'edit|create' },
-    grok: { event: 'PreToolUse', matcher: 'search_replace' }
+    grok: { event: 'PreToolUse', matcher: 'search_replace' },
+    qwen: { event: 'PreToolUse', matcher: 'edit|write_file' }
   })
   // Format still can't run in Codex (no file path), the script hook can
   assert.equal(hookSupport('format', 'after-tool', 'codex'), 'noFilePath')

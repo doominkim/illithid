@@ -47,7 +47,7 @@ function run(
     input: JSON.stringify(input),
     encoding: 'utf8',
     ...(opts.cwd ? { cwd: opts.cwd } : {}),
-    env: { ...process.env, ...opts.env }
+    env: { ...process.env, HOME: dir, TMPDIR: dir, ...opts.env }
   })
   return { code: r.status ?? -1, out: r.stdout, err: r.stderr }
 }
@@ -255,9 +255,13 @@ test('REQ-HOOKS-ACTIONS-5 ask wraps the instruction with the event and the reply
   })
   assert.match(p, /^Keep going until tests pass\. Budget: \\\$5\n/)
   assert.match(p, /\$ARGUMENTS/)
-  assert.match(p, /"decision": "block"/)
+  assert.ok(p.includes('{"ok": <true or false>, "reason": "<what is left to do>"}'))
   const pre = renderAskPrompt({ ...doc('ask', 'before-tool'), body: 'Deny anything touching prod' })
-  assert.match(pre, /permissionDecision/)
+  assert.ok(pre.includes('{"ok": <true or false>, "reason": "<one sentence>"}'))
+  assert.ok(pre.includes('ok false blocks the call.'))
+  const prompt = renderAskPrompt({ ...doc('ask', 'prompt'), body: 'Block requests for secrets.' })
+  assert.ok(prompt.includes('{"ok": <true or false>, "reason": "<one sentence>"}'))
+  assert.ok(prompt.includes('ok false blocks the prompt.'))
   // An imported prompt is written as is
   const raw = renderAskPrompt({
     ...doc('ask', 'stop', { verbatim: true }),
@@ -597,23 +601,35 @@ test("REQ-HOOKS-ACTIONS-19 the all-tools script behaves like each tool's own scr
  * Fake judging CLIs in each tool's output shape. FAKE_OK=true|false sets the verdict; every call records its arguments
  * and whether ILLITHID_JUDGE was set
  */
-function fakeJudges(ok: boolean): { path: string; calls: (name: string) => string[] } {
+function fakeJudges(
+  ok: boolean,
+  reason = 'Tests still fail',
+  exitCode = 0
+): { path: string; calls: (name: string) => string[] } {
   const dir = mkdtempSync(join(tmpdir(), 'illithid-fake-judge-'))
-  const verdict = `{"ok": ${ok}, "reason": "Tests still fail"}`
-  const esc = verdict.replace(/"/g, '\\"')
+  const verdict = { ok, reason }
   const out: Record<string, string> = {
-    claude: `printf '%s\\n' '{"type":"result","result":"","structured_output":${verdict}}'`,
-    // Codex writes the last message to the -o file
-    codex: `while [ $# -gt 0 ]; do [ "$1" = -o ] && { printf '%s' '${verdict}' > "$2"; shift; }; shift; done`,
-    gemini: `printf '%s\\n' '{"response":"${esc}","stats":{}}'`,
-    copilot: `printf '%s\\n' '{"type":"session.start"}' '{"type":"assistant.message","data":{"content":"${esc}"}}'`,
-    grok: `printf '%s\\n' '{"result":${verdict}}'`
+    claude: JSON.stringify({ type: 'result', result: '', structured_output: verdict }),
+    codex: JSON.stringify(verdict),
+    gemini: JSON.stringify({ response: JSON.stringify(verdict), stats: {} }),
+    copilot: [
+      JSON.stringify({ type: 'session.start' }),
+      JSON.stringify({ type: 'assistant.message', data: { content: JSON.stringify(verdict) } })
+    ].join('\n'),
+    grok: JSON.stringify({ result: verdict })
   }
   for (const [name, body] of Object.entries(out)) {
     const f = join(dir, name)
+    const response = join(dir, `${name}.response`)
+    writeFileSync(response, body)
+    // Codex writes the last message to the -o file; the other CLIs print their envelope.
+    const reply =
+      name === 'codex'
+        ? `while [ $# -gt 0 ]; do [ "$1" = -o ] && { cat '${response}' > "$2"; shift; }; shift; done`
+        : `cat '${response}'`
     writeFileSync(
       f,
-      `#!/bin/sh\nprintf '%s|%s\\n' "\${ILLITHID_JUDGE:-}" "$*" >> '${dir}/${name}.calls'\n${body}\n`
+      `#!/bin/sh\nprintf '%s|%s\\n' "\${ILLITHID_JUDGE:-}" "$*" >> '${dir}/${name}.calls'\n${reply}\nexit ${exitCode}\n`
     )
     chmodSync(f, 0o755)
   }
@@ -625,6 +641,68 @@ function fakeJudges(ok: boolean): { path: string; calls: (name: string) => strin
     }
   }
 }
+
+test('AI judgment blocks the exact false verdict and preserves quoted reasons in every CLI envelope', () => {
+  const reason = 'The text says "ok": true, but the path "prod\\deploy" is blocked.'
+  const d = { ...doc('ask', 'stop'), body: 'Block production changes.' }
+  for (const tool of TOOLS) {
+    const no = fakeJudges(false, reason)
+    const result = run(
+      renderActionScript(tool, 'production', d),
+      tool,
+      {},
+      {
+        env: { PATH: no.path }
+      }
+    )
+    if (tool === 'copilot') {
+      assert.equal(result.code, 0)
+      assert.deepEqual(JSON.parse(result.out), { decision: 'block', reason }, tool)
+    } else {
+      assert.equal(result.code, 2, `${tool} must use the boolean verdict, not quoted text`)
+      assert.equal(result.err, `${reason}\n`, tool)
+    }
+  }
+})
+
+test('AI judgment reports a failed CLI and allows the event even if its output looks like a verdict', () => {
+  const d = { ...doc('ask', 'stop'), body: 'Check that the tests pass.' }
+  for (const tool of TOOLS) {
+    const failed = fakeJudges(false, 'This output came from a failed CLI.', 7)
+    const result = run(
+      renderActionScript(tool, 'tests', d),
+      tool,
+      {},
+      {
+        env: { PATH: failed.path }
+      }
+    )
+    assert.equal(result.code, 0, `${tool} preserves the documented failure policy`)
+    assert.equal(result.out, '', tool)
+    assert.ok(result.err.includes('judging CLI failed (exit 7)'), tool)
+  }
+})
+
+test('AI judgment ignores verdict-shaped Copilot metadata when the assistant returned no verdict', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'illithid-judge-metadata-'))
+  const response = join(dir, 'response.jsonl')
+  writeFileSync(
+    response,
+    JSON.stringify({ type: 'session.start', ok: false, reason: 'Session metadata is not a check.' })
+  )
+  const cli = join(dir, 'copilot')
+  writeFileSync(cli, `#!/bin/sh\ncat '${response}'\n`)
+  chmodSync(cli, 0o755)
+  const result = run(
+    renderActionScript('copilot', 'tests', { ...doc('ask', 'stop'), body: 'Check the tests.' }),
+    'copilot',
+    {},
+    { env: { PATH: `${dir}:/usr/bin:/bin` } }
+  )
+  assert.equal(result.code, 0)
+  assert.equal(result.out, '')
+  assert.ok(result.err.includes('no valid JSON verdict'))
+})
 
 test('REQ-HOOKS-ACTIONS-20 AI judgment in every tool: the tool\'s own CLI judges with hooks off, and a "no" stops the agent the tool\'s way', () => {
   const d = { ...doc('ask', 'stop'), body: 'Keep working until the tests pass.' }
@@ -688,23 +766,31 @@ test("REQ-HOOKS-ACTIONS-21 AI judgment lets things through when it can't judge, 
   )
   assert.equal(f.calls('codex').length, 0)
   // No CLI installed, or an answer that isn't a verdict
-  assert.equal(
-    run(renderActionScript('gemini', 'tests', d), 'gemini', {}, { env: { PATH: '/usr/bin:/bin' } })
-      .code,
-    0
+  const missing = run(
+    renderActionScript('gemini', 'tests', d),
+    'gemini',
+    {},
+    {
+      env: { PATH: '/usr/bin:/bin' }
+    }
   )
+  assert.equal(missing.code, 0)
+  assert.equal(missing.out, '')
+  assert.ok(missing.err.includes('gemini CLI is not installed'))
   const junk = mkdtempSync(join(tmpdir(), 'illithid-junk-'))
   writeFileSync(join(junk, 'gemini'), '#!/bin/sh\necho "rate limited"\n')
   chmodSync(join(junk, 'gemini'), 0o755)
-  assert.equal(
-    run(
-      renderActionScript('gemini', 'tests', d),
-      'gemini',
-      {},
-      { env: { PATH: `${junk}:/usr/bin:/bin` } }
-    ).code,
-    0
+  const invalid = run(
+    renderActionScript('gemini', 'tests', d),
+    'gemini',
+    {},
+    {
+      env: { PATH: `${junk}:/usr/bin:/bin` }
+    }
   )
+  assert.equal(invalid.code, 0)
+  assert.equal(invalid.out, '')
+  assert.ok(invalid.err.includes('no valid JSON verdict'))
   // Codex hook judged by Claude Code
   const g = fakeJudges(false)
   const r = run(

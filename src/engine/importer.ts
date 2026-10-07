@@ -65,6 +65,8 @@ import {
   writePermissions
 } from './library'
 import { secretRefsOf, type SecretBackend } from './secrets'
+import { MCP_TOOL_NAME_RE, type McpDecision } from './mcpPermissions'
+import { secretAccountsInWorkspaces } from './workspace'
 import { canonicalSkills, dirContentHash } from './skills'
 import { MANIFEST_TOOLS, setToggle, type ManifestKind } from './manifest'
 import {
@@ -176,6 +178,12 @@ export function listImportSources(home: string): ImportSource[] {
       path: join(home, '.grok'),
       available: toolConfigFound(home, 'grok'),
       kinds: ['rule', 'mcp', 'skill', 'agent', 'hook']
+    },
+    qwen: {
+      label: 'Qwen Code (~/.qwen)',
+      path: join(home, '.qwen'),
+      available: toolConfigFound(home, 'qwen'),
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent', 'hook']
     }
   }
   const out: ImportSource[] = [
@@ -563,6 +571,38 @@ function readJsonSafe(path: string): Json | null {
   }
 }
 
+/** Match the target's alternate-path selection; import JSONC without rewriting the user's comments. */
+function opencodeConfigPath(home: string): string {
+  const plain = join(home, '.config/opencode/opencode.json')
+  return existsSync(plain) ? plain : join(home, '.config/opencode/opencode.jsonc')
+}
+
+function readOpencodeSettings(path: string): Json | null {
+  try {
+    const text = stripJsonComments(readFileSync(path, 'utf8'))
+    let normalized = ''
+    let inString = false
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]
+      if (inString) {
+        normalized += ch
+        if (ch === '\\') normalized += text[++i] ?? ''
+        else if (ch === '"') inString = false
+      } else if (ch === '"') {
+        inString = true
+        normalized += ch
+      } else if (ch === ',' && /^\s*[}\]]/.test(text.slice(i + 1))) {
+        // JSONC allows a trailing comma in objects and arrays, but string contents stay literal.
+        normalized += ' '
+      } else normalized += ch
+    }
+    const value: unknown = JSON.parse(normalized)
+    return isObj(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
 function addFile(
   map: Map<string, Map<string, FileVariant>>,
   name: string,
@@ -651,7 +691,8 @@ const TOOL_DIRS = [
   '.config/opencode',
   '.local/share/opencode',
   '.gemini',
-  '.copilot'
+  '.copilot',
+  '.qwen'
 ] as const
 /** Tool plugin paths */
 const TOOL_PLUGIN_DIRS = [
@@ -659,7 +700,8 @@ const TOOL_PLUGIN_DIRS = [
   '.claude/plugins',
   '.config/opencode/plugin',
   '.config/opencode/plugins',
-  '.gemini/extensions'
+  '.gemini/extensions',
+  '.qwen/extensions'
 ]
 
 function expandHome(home: string, p: string): string {
@@ -789,8 +831,14 @@ const INSTRUCTION_FILES = new Set(['CLAUDE.md', 'AGENTS.md', 'AGENT.md', 'GEMINI
 export const GEMINI_MD_RULE = 'gemini-md.md'
 /** Rule candidate for ~/.copilot/copilot-instructions.md (copied, never moved) */
 export const COPILOT_MD_RULE = 'copilot-instructions.md'
+/** Rule candidate for ~/.qwen/QWEN.md (copied, never moved) */
+export const QWEN_MD_RULE = 'qwen-md.md'
 /** Tool notes files imported as rules: copied only, all tools start off */
-const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([GEMINI_MD_RULE, COPILOT_MD_RULE])
+const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([
+  GEMINI_MD_RULE,
+  COPILOT_MD_RULE,
+  QWEN_MD_RULE
+])
 
 /** Rule file verdict. name is the candidate name, path is the source file */
 export function rulePortability(
@@ -807,6 +855,7 @@ export function rulePortability(
   else if (name === GEMINI_MD_RULE && path === join(home, '.gemini/GEMINI.md')) r.push('toolNotes')
   else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md'))
     r.push('toolNotes')
+  else if (name === QWEN_MD_RULE && path === join(home, '.qwen/QWEN.md')) r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
@@ -903,7 +952,8 @@ const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   opencode: new Set(['name', 'description', 'mode', 'model', 'reasoningEffort']),
   gemini: new Set(['name', 'description', 'model', 'kind']),
   copilot: new Set(['name', 'description', 'model', 'reasoning-effort']),
-  grok: new Set(['name', 'description', 'model'])
+  grok: new Set(['name', 'description', 'model']),
+  qwen: new Set(['name', 'description', 'model'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
 const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set([
@@ -1034,6 +1084,23 @@ function agentRaw(
         reasons
       }
     }
+    case 'qwen': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      // Tool and MCP limits can't be carried by the library — importing would widen what the agent may do
+      if (d.tools !== undefined || d.disallowedTools !== undefined || d.mcpServers !== undefined)
+        reasons.push('restrictedAgent')
+      const own = strOf(d.name)
+      if (own !== undefined && own !== name) reasons.push('nameMismatch')
+      const model = strOf(d.model)
+      return {
+        description: strOf(d.description) ?? '',
+        model: model === 'inherit' ? undefined : model,
+        body: agentBody(m.content),
+        dropped: droppedKeys(d, AGENT_KEPT.qwen),
+        reasons
+      }
+    }
     case 'copilot': {
       const m = matter(text, AGENT_MATTER)
       const d = structuredClone(m.data) as Json
@@ -1160,9 +1227,9 @@ function scanAgentsOfTool(found: Found, home: string, tool: ToolId, sourceId: st
   for (const dir of agentSourceDirs(home, tool))
     scanAgentDir(found, home, tool, dir, base, dir === slot ? managed : {})
   if (tool === 'opencode') {
-    const cp = join(home, '.config/opencode/opencode.json')
+    const cp = opencodeConfigPath(home)
     if (!existsSync(cp)) return
-    const o = readJsonSafe(cp)
+    const o = readOpencodeSettings(cp)
     if (!o || !isObj(o.agent)) return
     for (const [name, def] of Object.entries(o.agent)) {
       if (!isObj(def)) continue
@@ -1310,6 +1377,18 @@ function ruleRetirements(
         continue
       }
       e = pendingEntry(home, 'rule', 'copilot', name, src.path)
+    } else if (
+      src.label === 'qwen' &&
+      within(join(home, '.qwen/rules'), src.path) &&
+      !within(join(home, '.qwen/rules/illithid'), src.path)
+    ) {
+      // Qwen loads ~/.qwen/rules recursively: the original would load next to the app copy
+      try {
+        if (!lstatSync(src.path).isFile()) continue
+      } catch {
+        continue
+      }
+      e = pendingEntry(home, 'rule', 'qwen', name, src.path)
     } else if (src.label === 'grok' && src.path === join(home, '.grok/rules', name)) {
       // The original already sits where the app copy goes (~/.grok/rules/<name>): nothing to retire — adopt it when the bytes match
       adoptGrokRule(home, name, src.path)
@@ -1722,14 +1801,39 @@ function convertCodex(name: string, s: Json): Conv {
   if (typeof s.default_tools_approval_mode === 'string')
     cx.defaultToolsApprovalMode = s.default_tools_approval_mode
   if (Array.isArray(s.enabled_tools)) cx.enabledTools = s.enabled_tools.map(String)
+  if (Array.isArray(s.disabled_tools)) {
+    const denied: Record<string, McpDecision> = Object.create(null)
+    for (const tool of s.disabled_tools) {
+      if (typeof tool === 'string' && MCP_TOOL_NAME_RE.test(tool)) denied[tool] = 'deny'
+      else c.warnings.push('dropped an invalid disabled_tools entry (no library equivalent)')
+    }
+    if (Object.keys(denied).length) server.permissions = { tools: denied }
+  }
   if (isObj(s.tools)) {
-    const ta: Record<string, string> = {}
+    const ta: Record<string, string> = Object.create(null)
     for (const [t, o] of Object.entries(s.tools))
       if (isObj(o) && typeof o.approval_mode === 'string') ta[t] = o.approval_mode
     if (Object.keys(ta).length) cx.toolApprovals = ta
   }
   if (Object.keys(cx).length) server.codex = cx
   if (s.enabled === false) c.warnings.push('was disabled in codex (enabled=false)')
+  const supported = new Set([
+    'command',
+    'args',
+    'env',
+    'startup_timeout_sec',
+    'url',
+    'bearer_token_env_var',
+    'env_http_headers',
+    'http_headers',
+    'default_tools_approval_mode',
+    'enabled_tools',
+    'disabled_tools',
+    'tools',
+    'enabled'
+  ])
+  for (const key of Object.keys(s))
+    if (!supported.has(key)) c.warnings.push(`dropped ${key} (no library equivalent)`)
   return { server, c }
 }
 
@@ -2237,10 +2341,10 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       break
     }
     case 'opencode': {
-      const op = join(home, '.config/opencode/opencode.json')
+      const op = opencodeConfigPath(home)
       if (existsSync(op)) {
-        const o = readJsonSafe(op)
-        if (!o) found.notes.push('~/.config/opencode/opencode.json parse failed')
+        const o = readOpencodeSettings(op)
+        if (!o) found.notes.push(`~/.config/opencode/${basename(op)} parse failed`)
         else {
           if (isObj(o.mcp))
             for (const [n, s] of Object.entries(o.mcp))
@@ -2431,6 +2535,60 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
         }
       }
       scanSkillDir(found, home, join(home, '.grok/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
+    case 'qwen': {
+      // ~/.qwen/rules/**/*.md outside the app folder → rules (file name); ~/.qwen/QWEN.md → qwen-md.md
+      const rd = join(home, '.qwen/rules')
+      const walk = (d: string): void => {
+        let names: string[]
+        try {
+          names = readdirSync(d).sort()
+        } catch {
+          return
+        }
+        for (const n of names) {
+          const p = join(d, n)
+          if (n.startsWith('.') || p === join(rd, 'illithid')) continue
+          const st = lstatSync(p)
+          if (st.isDirectory()) walk(p)
+          else if (st.isFile() && n.endsWith('.md'))
+            addFile(found.rules, n, p, ref(p), rulePortability(found.ctx, n, p))
+        }
+      }
+      walk(rd)
+      const qp = join(home, '.qwen/QWEN.md')
+      if (existsSync(qp) && lstatSync(qp).isFile() && readFileSync(qp, 'utf8').trim()) {
+        addFile(
+          found.rules,
+          QWEN_MD_RULE,
+          qp,
+          ref(qp),
+          rulePortability(found.ctx, QWEN_MD_RULE, qp)
+        )
+        found.notes.push(`${QWEN_MD_RULE} is ~/.qwen/QWEN.md — copied, the original stays`)
+      }
+      const sp = join(home, '.qwen/settings.json')
+      if (existsSync(sp)) {
+        const o = readGeminiSettings(sp)
+        if (!o) found.notes.push('~/.qwen/settings.json parse failed')
+        else {
+          if (isObj(o.mcpServers))
+            for (const [n, s] of Object.entries(o.mcpServers))
+              if (isObj(s)) addMcp(n, convertGemini(n, s), sp)
+          // Qwen Code permissions use Claude's rule syntax
+          if (isObj(o.permissions)) {
+            const { allowlist, warnings } = parseClaudePermissions(o.permissions)
+            if (hasRules(allowlist))
+              found.permissions.push(permissionsVariant(allowlist, ref(sp), warnings))
+          }
+        }
+      }
+      scanSkillDir(found, home, join(home, '.qwen/skills'), {
         origin: 'tool',
         sourceId: src.id,
         label: tool
@@ -2810,7 +2968,9 @@ export function applyImport(
           exists ||
           (TOOL_NOTES_RULES.has(cand.name) &&
           v.sources.some(
-            (x) => x.origin === 'tool' && (x.label === 'gemini' || x.label === 'copilot')
+            (x) =>
+              x.origin === 'tool' &&
+              (x.label === 'gemini' || x.label === 'copilot' || x.label === 'qwen')
           )
             ? toolNotesToggles(home, cand.name, v.sources)
             : sourceToggles(home, 'rules', cand.name, v.sources))
@@ -2949,7 +3109,8 @@ export function applyImport(
         )
         if (opts.secrets && prevRefs.length) {
           const keep = new Set(secretRefsOf(readMcpServer(home, cand.name)).map((x) => x.account))
-          for (const a of prevRefs) if (!keep.has(a)) opts.secrets.delete(a)
+          const shared = secretAccountsInWorkspaces(home, activeWorkspaceId(home))
+          for (const a of prevRefs) if (!keep.has(a) && !shared.has(a)) opts.secrets.delete(a)
         }
         const togglesOk = exists || sourceToggles(home, 'mcp', cand.name, v.sources)
         const warnings = [...v.warnings, ...r.warnings, ...(togglesOk ? [] : ['togglesNotSet'])]

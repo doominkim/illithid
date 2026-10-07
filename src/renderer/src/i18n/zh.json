@@ -119,7 +119,8 @@
     "description": "Description",
     "body": "正文（SKILL.md 中说明下方的内容）",
     "files": "文件",
-    "disabledInGemini": "已在 Gemini CLI 设置中停用"
+    "disabledInGemini": "已在 Gemini CLI 设置中停用",
+    "disabledInQwen": "已在 Qwen Code 设置中停用"
   },
   "mcp": {
     "transport": "传输方式",
@@ -159,7 +160,7 @@
       "fetchConfirm": "为获取工具列表，Illithid 会运行该服务器：{{command}}",
       "fetched": "已加载 {{count}} 个工具",
       "saved": "已保存工具权限",
-      "noteClaude": "Claude Code、Grok CLI：阻止和询问优先于允许，因此在此默认值下，允许的工具仍会询问或被阻止。",
+      "noteClaude": "Claude Code、Grok CLI：阻止优先于询问和允许，询问优先于允许。更严格的服务器默认规则可能使工具级设置无法生效。",
       "noteCodex": "Codex：阻止服务器后，只提供此处设为允许或询问的工具。",
       "noteGemini": "Gemini CLI：服务器名含 \"_\" 时规则可能无法匹配。",
       "noteCopilot": "GitHub Copilot：无法在配置文件中设置工具权限。"
@@ -249,6 +250,7 @@
     "notInitialized": "请先运行一次 {{tool}}，然后重新应用",
     "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
+    "qwenHomeOverride": "QWEN_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用",
     "why": {
       "lastSyncFailed": "上次同步失败: {{reason}}",
@@ -442,7 +444,48 @@
     "connected": "备份已连接",
     "snapshotFirst": "先为当前状态创建快照",
     "snapshotFirstHint": "存在尚未备份的更改。",
-    "autoHint": "每次将资料库应用到工具时创建快照。"
+    "autoHint": "每次将资料库应用到工具时创建快照。",
+    "localSaved": "已保存到本地",
+    "remotePending": "等待上传到远程",
+    "remoteFailed": "远程同步失败",
+    "github": {
+      "title": "GitHub 备份",
+      "notConfigured": "此版本尚未配置 GitHub 登录。您仍可通过现有仓库 URL 连接。",
+      "signIn": "设置 GitHub 备份",
+      "enterCode": "在浏览器打开的 GitHub 页面中输入此代码。",
+      "signedIn": "已登录 {{login}}",
+      "signOut": "退出登录",
+      "repositoryName": "仓库名称",
+      "create": "创建备份仓库",
+      "installHint": "仅允许此 GitHub App 访问备份仓库。创建后，如有必要，请更新安装设置中的仓库选择。",
+      "install": "管理 GitHub 访问",
+      "connect": "连接仓库",
+      "created": "私有仓库已准备就绪。完成连接后即可备份。",
+      "confirmCreate": "将 {{repository}} 创建为空的私有仓库吗？仅创建仓库不会上传文件。连接后将按照手动或自动备份设置上传。",
+      "existingUrl": "仓库 URL",
+      "errors": {
+        "githubUnavailable": "暂时无法连接 GitHub，请重试。",
+        "signInAgain": "请重新登录 GitHub。",
+        "permissionDenied": "请在 GitHub 中授予所需权限。",
+        "repositoryExists": "此仓库名称不可用。请使用其他名称或连接现有仓库。",
+        "invalidRepositoryName": "请输入有效的仓库名称。",
+        "installationRequired": "请在 GitHub 中允许此应用访问备份仓库，然后重新连接。",
+        "secureStorageUnavailable": "无法使用安全凭据存储。",
+        "expired": "登录代码已过期，请重新开始。",
+        "denied": "GitHub 授权已取消。",
+        "loginFailed": "GitHub 登录失败，请重试。",
+        "invalidResponse": "无法验证 GitHub 响应。",
+        "connectionFailed": "无法连接备份仓库。",
+        "invalidRemote": "此仓库与已登录的 GitHub 账户不匹配。",
+        "notConfigured": "此版本尚未配置 GitHub 登录。"
+      },
+      "openRepository": "打开仓库",
+      "setupHint": "将配置备份到 GitHub 私有仓库。",
+      "allowAccess": "在 GitHub 授予访问权限",
+      "finishSetup": "完成连接",
+      "existingRepository": "连接现有仓库",
+      "accountSettings": "账户"
+    }
   },
   "memory": {
     "new": "新建笔记",
@@ -503,7 +546,10 @@
     "rename": "重命名",
     "delete": "删除",
     "deleteTitle": "删除工作区",
-    "switchRemoves": "将从工具中移除 {{n}}"
+    "switchRemoves": "将从工具中移除 {{n}}",
+    "switchPreviewFailed": "无法检查切换时的更改。请重试后再切换。",
+    "switchPreviewLoading": "正在检查更改…",
+    "switchUnsaved": "切换工作区将丢弃未保存的编辑。"
   },
   "preview": {
     "title": "应用到工具",
@@ -533,7 +579,12 @@
     "editedIn": "已在 {{tool}} 中修改",
     "keepEdited": "保留此版本",
     "keptEdited": "已保存到库",
-    "codexTrust": "应用后需在 Codex /hooks 中重新信任"
+    "codexTrust": "应用后需在 Codex /hooks 中重新信任",
+    "policies": "权限更改",
+    "policyKey": "设置",
+    "before": "更改前",
+    "after": "更改后",
+    "notes": "转换说明"
   },
   "onboarding": {
     "title": "开始使用 Illithid",
@@ -626,7 +677,8 @@
     "recentTitle": "最近 30 天调用 {{n}} 次",
     "sort": "排序",
     "sortName": "按名称",
-    "sortUsage": "按使用量"
+    "sortUsage": "按使用量",
+    "readFailed": "无法读取使用量"
   },
   "combo": {
     "title": "同时使用 Claude Code？",
@@ -784,7 +836,11 @@
       "s": "{{s}} 秒",
       "ms": "{{m}} 分 {{s}} 秒",
       "hm": "{{h}} 小时 {{m}} 分"
-    }
+    },
+    "readFailed": "无法读取会话统计",
+    "metricsUnavailable": "这些日志未收集的指标显示为 —，而非零。",
+    "unmeasured": "未收集",
+    "lastIndexed": "最近收集：{{at}}"
   },
   "leaderboard": {
     "zoomIn": "放大",
@@ -878,14 +934,16 @@
       "codex": "stdin JSON: tool_name, tool_input",
       "gemini": "stdin JSON: tool_name, tool_input",
       "copilot": "stdin JSON: toolName, toolArgs (JSON 字符串)",
-      "grok": "stdin JSON: toolName, toolInput"
+      "grok": "stdin JSON: toolName, toolInput",
+      "qwen": "stdin JSON: tool_name, tool_input"
     },
     "toolBlock": {
       "claude": "exit 2 (stderr 为原因) 或 JSON hookSpecificOutput.permissionDecision",
       "codex": "exit 2 或 JSON permissionDecision: deny",
       "gemini": "exit 2 或 JSON decision: deny",
       "copilot": "非零退出码或 JSON permissionDecision: deny (出错也会阻止)",
-      "grok": "exit 2 或 JSON decision: deny"
+      "grok": "exit 2 或 JSON decision: deny",
+      "qwen": "exit 2 (stderr 为原因) 或 JSON hookSpecificOutput.permissionDecision"
     },
     "codexTrust": "Codex 只有在 /hooks 中信任后才会运行新的或已更改的钩子。",
     "grokViaClaude": "Grok 通过 Claude Code 的设置运行此钩子",
@@ -990,7 +1048,8 @@
       "judgeHint": "Claude Code 用内置的 prompt 钩子直接检查。其他工具会再运行一次这个 CLI 来检查 (较慢，会消耗订阅用量)。",
       "model": "模型",
       "modelHint": "留空则使用 CLI 的默认模型。",
-      "judgeSlow": "放在操作执行前时，每条命令都要等待检查。非必要请使用“回复结束时”。"
+      "judgeSlow": "放在操作执行前时，每条命令都要等待检查。非必要请使用“回复结束时”。",
+      "judgeFailOpen": "对于运行检查 CLI 的工具，如果 CLI 不存在、命令执行失败或 JSON 判断无效，将跳过检查并允许事件继续。跳过的检查会显示在标准错误输出中。Claude Code 遵循其自身的 prompt 钩子行为。"
     },
     "instruction": "规则",
     "instructionHint": "AI 会根据此规则和事件决定放行还是阻止。",

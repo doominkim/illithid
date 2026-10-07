@@ -230,10 +230,15 @@ function SharedMemory({
 
 function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): React.JSX.Element {
   const { t } = useTranslation()
+  const { config } = useConfig()
+  const workspaceRoot = config?.libraryRoot
   const [text, setText] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- discard content from the previous file before loading
+    setText(null)
+    setErr(null)
     window.api.memoryRead(rel).then((r) => {
       if (!alive) return
       if (r.ok) setText(r.value)
@@ -242,7 +247,7 @@ function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): Rea
     return () => {
       alive = false
     }
-  }, [rel])
+  }, [rel, workspaceRoot])
   if (err) return <ErrorAlert message={err} />
   if (text === null) return <Loading />
   return (

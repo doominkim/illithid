@@ -806,6 +806,9 @@ function OptionFields({
               data-testid="hook-option-model"
             />
           </Group>
+          <Text size="xs" c="dimmed" data-testid="hook-ask-fail-open">
+            {t('hooks.opt.judgeFailOpen')}
+          </Text>
           {when === 'before-tool' && (
             <Text size="xs" c="orange" data-testid="hook-ask-slow">
               {t('hooks.opt.judgeSlow')}
@@ -1131,6 +1134,11 @@ function HookOverview({ edit }: { edit: HookEditView }): React.JSX.Element {
             ))}
           </Group>
         </Stack>
+      )}
+      {doc.action === 'ask' && (
+        <Text size="sm" c="dimmed" data-testid="hook-overview-fail-open">
+          {t('hooks.opt.judgeFailOpen')}
+        </Text>
       )}
       {(doc.action === 'ask' || doc.action === 'context') && doc.body.trim() && (
         <Stack gap={6}>

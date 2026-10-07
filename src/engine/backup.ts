@@ -8,11 +8,12 @@
  * - If the remote is ahead, ff-only pull and retry; if diverged, stop with {ok:false, reason:'diverged'} (no merge attempt).
  * - Failures are returned as { ok:false, reason } instead of thrown.
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { simpleGit, type SimpleGit } from 'simple-git'
-import { APP_CONFIG_DIR, libraryRoot, readConfig } from './config'
+import { APP_CONFIG_DIR, libraryRoot, readConfig, workspaceIds, workspaceRoot } from './config'
+import { backupGitEnvironment, type BackupGitAuth } from './backupGitAuth'
 import { MANIFEST_FILE } from './manifest'
 import type { GitResult } from './git'
 import { libraryExists } from './sources'
@@ -81,6 +82,8 @@ export type SnapshotResult = GitResult<{
   committed: boolean
   /** Whether it was pushed (false if no remote) */
   pushed: boolean
+  /** Local snapshot is durable even when uploading it fails. */
+  remoteError?: string
   message: string
 }>
 
@@ -144,8 +147,7 @@ async function currentBranch(g: SimpleGit): Promise<string | undefined> {
 
 async function hasHead(g: SimpleGit): Promise<boolean> {
   try {
-    await g.raw(['rev-parse', '--verify', '-q', 'HEAD'])
-    return true
+    return !!(await g.raw(['rev-parse', '--verify', '-q', 'HEAD'])).trim()
   } catch {
     return false
   }
@@ -197,6 +199,21 @@ export async function backupStatus(home: string): Promise<BackupStatus> {
     g.status(),
     history(home, 1)
   ])
+  let ahead = s.ahead
+  let behind = s.behind
+  if (url && branch && last[0] && !s.tracking) {
+    const ref = `refs/remotes/${BACKUP_REMOTE}/${branch}`
+    const remoteHead = (await g.raw(['rev-parse', '--verify', '-q', ref]).catch(() => '')).trim()
+    if (remoteHead) {
+      const counts = (await g.raw(['rev-list', '--left-right', '--count', `HEAD...${ref}`]))
+        .trim()
+        .split(/\s+/)
+      ahead = Number(counts[0])
+      behind = Number(counts[1])
+    } else {
+      ahead = Number((await g.raw(['rev-list', '--count', 'HEAD'])).trim())
+    }
+  }
   return {
     ...base,
     initialized: true,
@@ -204,8 +221,8 @@ export async function backupStatus(home: string): Promise<BackupStatus> {
     ...(branch ? { branch } : {}),
     ...(last[0] ? { lastSnapshot: last[0] } : {}),
     dirty: !s.isClean(),
-    ahead: s.ahead,
-    behind: s.behind
+    ahead,
+    behind
   }
 }
 
@@ -221,6 +238,26 @@ function ensureGitignore(root: string): void {
     missing.join('\n') +
     '\n'
   atomicWrite(p, next, existsSync(p) ? {} : { mode: 0o644 })
+}
+
+/** Only the exact generated ignore file and empty directories are safe to replace before the first snapshot. */
+function hasUncommittedLibraryContent(root: string): boolean {
+  const generatedIgnore = '# Illithid backup exclusions\n' + BACKUP_EXCLUDES.join('\n') + '\n'
+  const contains = (dir: string): boolean =>
+    readdirSync(dir).some((entry) => {
+      if (dir === root && entry === '.git') return false
+      const path = join(dir, entry)
+      const stat = lstatSync(path)
+      if (
+        dir === root &&
+        entry === '.gitignore' &&
+        stat.isFile() &&
+        readFileSync(path, 'utf8') === generatedIgnore
+      )
+        return false
+      return stat.isDirectory() ? contains(path) : true
+    })
+  return contains(root)
 }
 
 /** Fill in commit identity/signing settings locally in the repo if missing (global config is left alone) */
@@ -290,8 +327,14 @@ function looksDiverged(msg: string): boolean {
  * With no changes, skip the commit and only push (if ahead). Without a remote, only commit.
  * If push is rejected (remote ahead), ff-only pull and retry once; if it still fails, reason 'diverged'.
  */
-export async function snapshot(home: string, message?: string): Promise<SnapshotResult> {
-  const root = libraryRoot(home)
+export async function snapshot(
+  home: string,
+  message?: string,
+  opts: { workspaceId?: string; auth?: BackupGitAuth | (() => Promise<BackupGitAuth>) } = {}
+): Promise<SnapshotResult> {
+  if (opts.workspaceId && !workspaceIds(home).includes(opts.workspaceId))
+    return { ok: false, reason: 'Workspace no longer exists' }
+  const root = opts.workspaceId ? workspaceRoot(home, opts.workspaceId) : libraryRoot(home)
   if (!isRepo(root))
     return { ok: false, reason: 'Backup is not connected (run connectBackup first)' }
   const g = git(root)
@@ -320,17 +363,34 @@ export async function snapshot(home: string, message?: string): Promise<Snapshot
     const url = await remoteUrl(g)
     if (!url) return { ok: true, hash, committed, pushed: false, message: subject }
     try {
+      if (opts.auth) {
+        const pushUrl = (await g.raw(['remote', 'get-url', '--push', BACKUP_REMOTE])).trim()
+        g.env(
+          backupGitEnvironment(
+            pushUrl,
+            typeof opts.auth === 'function' ? await opts.auth() : opts.auth
+          )
+        )
+      }
       await pushCurrent(g, branch)
     } catch (e) {
       const msg = reasonOf(e)
-      if (!looksDiverged(msg)) return { ok: false, reason: msg }
+      if (!looksDiverged(msg))
+        return { ok: true, hash, committed, pushed: false, message: subject, remoteError: msg }
       // Remote is ahead → catch up ff-only, then try once more
       try {
         await g.raw(['fetch', '-q', BACKUP_REMOTE])
         await g.raw(['merge', '--ff-only', '-q', `${BACKUP_REMOTE}/${branch}`])
         await pushCurrent(g, branch)
       } catch {
-        return { ok: false, reason: 'diverged' }
+        return {
+          ok: true,
+          hash,
+          committed,
+          pushed: false,
+          message: subject,
+          remoteError: 'diverged'
+        }
       }
     }
     return {
@@ -349,7 +409,10 @@ export async function snapshot(home: string, message?: string): Promise<Snapshot
  * Catch up with the remote on startup (ff-only). skipped if there is no remote/upstream. reason 'diverged' if diverged.
  * Uncommitted changes are fine as long as the ff does not touch those files (if git refuses, its reason is returned).
  */
-export async function pullOnStart(home: string): Promise<PullResult> {
+export async function pullOnStart(
+  home: string,
+  opts: { auth?: BackupGitAuth | (() => Promise<BackupGitAuth>) } = {}
+): Promise<PullResult> {
   const root = libraryRoot(home)
   if (!isRepo(root)) return { ok: true, summary: '', skipped: 'notInitialized' }
   const g = git(root)
@@ -357,16 +420,29 @@ export async function pullOnStart(home: string): Promise<PullResult> {
     const url = await remoteUrl(g)
     const branch = await currentBranch(g)
     if (!url || !branch) return { ok: true, summary: '', skipped: 'noRemote' }
+    if (opts.auth)
+      g.env(
+        backupGitEnvironment(url, typeof opts.auth === 'function' ? await opts.auth() : opts.auth)
+      )
     await g.raw(['fetch', '-q', BACKUP_REMOTE])
     let remoteHas = true
     try {
-      await g.raw(['rev-parse', '--verify', '-q', `refs/remotes/${BACKUP_REMOTE}/${branch}`])
+      remoteHas = !!(
+        await g.raw(['rev-parse', '--verify', '-q', `refs/remotes/${BACKUP_REMOTE}/${branch}`])
+      ).trim()
     } catch {
       remoteHas = false
     }
     if (!remoteHas) return { ok: true, summary: 'Remote has no branch yet', skipped: 'noRemote' }
     if (!(await hasHead(g))) {
-      // Empty local repo → take the remote branch as is
+      // An unborn Git branch can still contain the user's complete library. Never overwrite it.
+      if (hasUncommittedLibraryContent(root))
+        return {
+          ok: false,
+          reason:
+            'Local library has no snapshot; save a local snapshot before pulling remote history'
+        }
+      // Only a genuinely empty working tree can take the remote branch as is
       await g.raw(['reset', '-q', `${BACKUP_REMOTE}/${branch}`])
       await g.raw(['checkout', '-q', '--', '.'])
       await g.raw(['branch', '-q', `--set-upstream-to=${BACKUP_REMOTE}/${branch}`])

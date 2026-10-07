@@ -11,6 +11,7 @@ interface Props {
   /** Red for destructive actions */
   danger?: boolean
   loading?: boolean
+  disabled?: boolean
 }
 
 /** Confirmation before destructive or hard-to-undo actions */
@@ -22,11 +23,20 @@ export function ConfirmModal({
   message,
   confirmLabel,
   danger,
-  loading
+  loading,
+  disabled
 }: Props): React.JSX.Element {
   const { t } = useTranslation()
   return (
-    <Modal opened={opened} onClose={onClose} title={title} centered radius="lg" size="md">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={title}
+      centered
+      radius="lg"
+      size="md"
+      zIndex={300}
+    >
       <Stack gap="md">
         <Text size="md" component="div">
           {message}
@@ -39,6 +49,7 @@ export function ConfirmModal({
             color={danger ? 'red' : 'accent'}
             onClick={() => void onConfirm()}
             loading={loading}
+            disabled={disabled}
             data-testid="confirm-ok"
           >
             {confirmLabel ?? t('common.confirm')}

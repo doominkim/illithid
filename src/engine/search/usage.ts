@@ -148,6 +148,19 @@ export function classify(tool: string, call: ToolCall): UsageHit[] {
       }
       return []
     }
+    case 'qwen': {
+      if (call.name === 'skill') {
+        const n = str(input?.skill)
+        return n ? [{ kind: 'skill', name: n }] : []
+      }
+      // MCP tools are registered as mcp__<server>__<tool>
+      if (call.name.startsWith('mcp__')) {
+        const [, server, ...rest] = call.name.split('__')
+        const n = str(server)
+        return n ? [{ kind: 'mcp', name: n, ...toolItem(rest.join('__')) }] : []
+      }
+      return []
+    }
     case 'grok': {
       // MCP tools are reached through use_tool with the qualified catalog key <server>__<tool>
       if (call.name === 'use_tool') {

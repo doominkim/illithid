@@ -11,7 +11,7 @@ import {
   unlinkSync
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { canonicalPaths, copilotHomeOverride, grokHomeOverride, tilde } from './agents'
+import { canonicalPaths, tilde, toolHomeOverride } from './agents'
 import { syncTools } from './config'
 import {
   dropPending,
@@ -237,7 +237,8 @@ export function planRuleSync(home: string, env: Env = process.env): RuleSyncItem
   return [
     ...planClaudeRules(home, env),
     ...planCopyRules(home, 'copilot', env),
-    ...planCopyRules(home, 'grok', env)
+    ...planCopyRules(home, 'grok', env),
+    ...planCopyRules(home, 'qwen', env)
   ]
 }
 
@@ -617,15 +618,15 @@ export function restoreLegacyRulesLink(home: string, previousLink: string): bool
 // ---------------------------------------------------------------- Rule copies of other tools (Copilot)
 
 /** Tools whose rules are copied file by file. undefined (absent) = Claude, handled above */
-export type CopyRuleTool = 'copilot' | 'grok'
-export const COPY_RULE_TOOLS: readonly CopyRuleTool[] = ['copilot', 'grok']
+export type CopyRuleTool = 'copilot' | 'grok' | 'qwen'
+export const COPY_RULE_TOOLS: readonly CopyRuleTool[] = ['copilot', 'grok', 'qwen']
 
 /** Grok's copy of the memory index. ~/.grok/rules is shared with the user, so the app's file carries the app name */
 export const GROK_MEMORY_RULE_FILE = 'illithid-memory.md'
 
-/** The tool's home override points elsewhere (COPILOT_HOME / GROK_HOME): the app's folder would not be read */
+/** The tool's home override points elsewhere (COPILOT_HOME / GROK_HOME / QWEN_HOME): the app's folder would not be read */
 function copyToolOverridden(home: string, tool: CopyRuleTool, env: Env): boolean {
-  return tool === 'copilot' ? !!copilotHomeOverride(home, env) : !!grokHomeOverride(home, env)
+  return !!toolHomeOverride(home, tool, env)
 }
 
 /** App-owned folder the tool reads rules from */
@@ -636,6 +637,9 @@ export function copyRulesDir(home: string, tool: CopyRuleTool): string {
     // Grok reads only *.md directly under rules/ — the folder is shared with the user (app copies tracked in state)
     case 'grok':
       return join(home, '.grok/rules')
+    // Qwen loads ~/.qwen/rules/**/*.md recursively, so an app-owned subfolder works
+    case 'qwen':
+      return join(home, '.qwen/rules', CLAUDE_RULES_DIR)
   }
 }
 
@@ -646,6 +650,8 @@ export function copyRuleFile(tool: CopyRuleTool, name: string): string {
       return name.replace(/\.md$/, '') + '.instructions.md'
     case 'grok':
       return name === CLAUDE_MEMORY_RULE ? GROK_MEMORY_RULE_FILE : name
+    case 'qwen':
+      return name
   }
 }
 
@@ -662,6 +668,7 @@ export function copyRuleContent(tool: CopyRuleTool, text: string): string {
       return text.replace(/^---(\r?\n)/, (m, eol: string) => `${m}applyTo: "**"${eol}`)
     }
     case 'grok':
+    case 'qwen':
       return text
   }
 }

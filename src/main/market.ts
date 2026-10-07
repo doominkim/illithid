@@ -2,6 +2,11 @@
  * Marketplace handlers (main process only — the renderer CSP has no network access). Network work happens here,
  * library writes go through the caller's libWrite so they sync like any other edit.
  */
+import { createHash } from 'node:crypto'
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { assertInsideLibrary } from '../engine/libpath'
+import { itemPath } from '../engine/market/origins'
 import {
   AWESOME_COPILOT_REPO,
   defaultSecretBackend,
@@ -37,6 +42,7 @@ import {
   type RegistryServer,
   type RepoTrees
 } from '../engine'
+import { assertWorkspaceCurrent, captureWorkspace, type WorkspaceRevision } from './workspaceGuard'
 import type {
   Api,
   MarketBulkResult,
@@ -148,10 +154,45 @@ type MarketChannel =
   | 'marketUpdates'
   | 'marketUpdate'
 
+/** Compare the installed item without following symlinks or retaining its contents. */
+function itemRevision(home: string, kind: MarketKind, name: string): string {
+  const root = assertInsideLibrary(home, itemPath(home, kind, name))
+  if (!existsSync(root)) return 'missing'
+  const hash = createHash('sha256')
+  const visit = (path: string, rel: string): void => {
+    const stat = lstatSync(path)
+    hash.update(
+      JSON.stringify([
+        rel,
+        stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'symlink' : 'file'
+      ])
+    )
+    if (stat.isSymbolicLink()) hash.update(readlinkSync(path))
+    else if (stat.isDirectory()) {
+      for (const entry of readdirSync(path).sort()) visit(join(path, entry), `${rel}/${entry}`)
+    } else if (stat.isFile()) hash.update(readFileSync(path))
+  }
+  visit(root, '')
+  return hash.digest('hex')
+}
+
 /** IPC handlers take unchecked arguments and resolve to what the renderer API declares */
 type MarketHandlers = { [K in MarketChannel]: (...args: unknown[]) => ReturnType<Api[K]> }
 
 export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers {
+  const writeFrom = async <T>(
+    origin: WorkspaceRevision,
+    fn: () => T
+  ): Promise<WriteResult<T> | Refused> => {
+    try {
+      return await libWrite(() => {
+        assertWorkspaceCurrent(home, origin)
+        return fn()
+      })
+    } catch (e) {
+      return fail(e)
+    }
+  }
   return {
     marketSearch: async (
       kind: unknown,
@@ -264,6 +305,7 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
     ): Promise<WriteResult<{ name: string; warnings?: string[] }> | Refused> => {
       if (!marketEnabled(home))
         return { ok: false, code: 'disabled', message: 'Marketplace is off in settings' }
+      const origin = captureWorkspace(home)
       const o = (opts ?? {}) as MarketInstallOptions
       const name = typeof o.name === 'string' ? o.name.trim() : ''
       let k: MarketKind
@@ -277,25 +319,25 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
         if (k === 'skill') {
           const p = await prepSkill(sid)
           assertRef(k, p, o.ref)
-          return libWrite(() => marketCommitSkill(home, p, name))
+          return writeFrom(origin, () => marketCommitSkill(home, p, name))
         }
         if (k === 'mcp') {
           const s = await prepServer(sid)
           assertRef(k, s, o.ref)
           const values =
             o.values && typeof o.values === 'object' ? (o.values as Record<string, string>) : {}
-          return libWrite(() =>
+          return writeFrom(origin, () =>
             marketCommitMcp(home, s, String(o.choice ?? ''), values, name, defaultSecretBackend())
           )
         }
         if (k === 'hook') {
           const h = await prepHook(home, sid)
           assertRef(k, h, o.ref)
-          return libWrite(() => commitHooks(home, h))
+          return writeFrom(origin, () => commitHooks(home, h))
         }
         const r = await prepRule(home, sid)
         assertRef(k, r, o.ref)
-        return libWrite(() => marketCommitRule(home, r, name))
+        return writeFrom(origin, () => marketCommitRule(home, r, name))
       } catch (e) {
         return fail(e)
       }
@@ -317,6 +359,7 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
       } catch (e) {
         return fail(e)
       }
+      const origin = captureWorkspace(home)
       const list = [
         ...new Set(Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [])
       ].slice(0, 500)
@@ -361,7 +404,7 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
       for (let i = 0; i < todo.length; i += 4) await Promise.all(todo.slice(i, i + 4).map(prepOne))
       const order = new Map(list.map((id, i) => [id, i]))
       ready.sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-      return libWrite(() => {
+      return writeFrom(origin, () => {
         const installed: MarketBulkResult['installed'] = []
         for (const r of ready) {
           try {
@@ -391,27 +434,44 @@ export function marketHandlers(home: string, libWrite: LibWrite): MarketHandlers
       try {
         const k = kindOf(kind)
         const n = String(name ?? '')
+        const workspace = captureWorkspace(home)
         const origin = readOrigins(home)[`${k}:${n}`]
         if (!origin) throw new MarketError('notFound', 'not installed from the marketplace')
+        const before = itemRevision(home, k, n)
+        const assertItemCurrent = (): void => {
+          if (
+            itemRevision(home, k, n) !== before ||
+            JSON.stringify(readOrigins(home)[`${k}:${n}`]) !== JSON.stringify(origin)
+          )
+            throw new MarketError(
+              'changed',
+              'The installed item changed during the download. Review it and try again.'
+            )
+        }
+        const update = <T>(fn: () => T): Promise<WriteResult<T> | Refused> =>
+          writeFrom(workspace, () => {
+            assertItemCurrent()
+            return fn()
+          })
         prepCache.delete(`prep:${k}:${origin.id}`)
         if (k === 'skill') {
           const p = await prepSkill(origin.id)
-          return libWrite(() => marketCommitSkill(home, p, n, { update: true }))
+          return update(() => marketCommitSkill(home, p, n, { update: true }))
         }
         if (k === 'mcp') {
           const s = await prepServer(origin.id)
-          return libWrite(() => marketCommitMcpUpdate(home, n, s))
+          return update(() => marketCommitMcpUpdate(home, n, s))
         }
         if (k === 'hook') {
           const h = await prepHook(home, origin.id, true)
-          return libWrite(() => {
+          return update(() => {
             commitHooks(home, h, true)
             return { name: n }
           })
         }
         await marketListRules(fetchFn, home, { force: true })
         const r = await prepRule(home, origin.id)
-        return libWrite(() => marketCommitRule(home, r, n, { update: true }))
+        return update(() => marketCommitRule(home, r, n, { update: true }))
       } catch (e) {
         return fail(e)
       }

@@ -2,12 +2,12 @@ import { parse as parseToml } from 'smol-toml'
 import type { ToolId } from '../toolIds'
 import type { ServerChange, TargetDef, TargetId } from '../types'
 import { claudeMcp } from './claudeMcp'
-import { claudePermissions } from './claudePermissions'
+import { claudePermissions, qwenPermissions } from './claudePermissions'
 import { codexAgents } from './codexAgents'
 import { codexMcp } from './codexMcp'
 import { codexRules } from './codexRules'
 import { copilotMcp } from './copilotMcp'
-import { geminiMcp } from './geminiMcp'
+import { geminiMcp, qwenMcp } from './geminiMcp'
 import { geminiPolicy } from './geminiPolicy'
 import { grokCompat } from './grokCompat'
 import { codexHooksJson, HOOK_TARGETS } from './hooks'
@@ -41,10 +41,12 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   opencodeMcpPermissions,
   geminiRules,
   geminiMcp,
+  qwenMcp,
   copilotMcp,
   grokMcp,
   grokCompat,
   geminiPolicy,
+  qwenPermissions,
   // After the targets that write the same files (settings.json, config.toml)
   ...HOOK_TARGETS,
   // Imported Codex originals leave hooks.json in the sync that writes their hook into config.toml
@@ -63,7 +65,8 @@ export const MCP_TARGET_OF: Readonly<Record<ToolId, TargetId>> = {
   opencode: 'opencodeMcp',
   gemini: 'geminiMcp',
   copilot: 'copilotMcp',
-  grok: 'grokMcp'
+  grok: 'grokMcp',
+  qwen: 'qwenMcp'
 }
 
 /** MCP target id -> tool */
@@ -78,7 +81,8 @@ const MCP_TABLE: Readonly<Record<ToolId, { format: 'json' | 'toml'; key: string 
   opencode: { format: 'json', key: 'mcp' },
   gemini: { format: 'json', key: 'mcpServers' },
   copilot: { format: 'json', key: 'mcpServers' },
-  grok: { format: 'toml', key: 'mcp_servers' }
+  grok: { format: 'toml', key: 'mcp_servers' },
+  qwen: { format: 'json', key: 'mcpServers' }
 }
 
 /**

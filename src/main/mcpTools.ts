@@ -13,6 +13,11 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { readMcpServer, setMcpKnownTools, type Env, type McpServer } from '../engine'
 import { renderHttpHeaders, renderValue } from '../engine/targets/mcpRender'
 import type { SecretBackend } from '../engine/secrets'
+import {
+  advanceWorkspaceRevision,
+  assertWorkspaceCurrent,
+  captureWorkspace
+} from './workspaceGuard'
 
 export class McpToolsError extends Error {
   constructor(
@@ -101,7 +106,15 @@ export async function listMcpTools(home: string, name: string, opts: Opts): Prom
 
 /** Fetch the tool list and keep the names with the server */
 export async function fetchMcpTools(home: string, name: string, opts: Opts): Promise<string[]> {
+  const origin = captureWorkspace(home)
+  const definition = JSON.stringify(readMcpServer(home, name))
   const tools = await listMcpTools(home, name, opts)
+  assertWorkspaceCurrent(home, origin, false)
+  if (JSON.stringify(readMcpServer(home, name)) !== definition)
+    throw Object.assign(new Error('The MCP server changed while loading its tools. Try again.'), {
+      code: 'changed'
+    })
   setMcpKnownTools(home, name, tools)
+  advanceWorkspaceRevision()
   return tools
 }

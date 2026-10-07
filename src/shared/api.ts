@@ -1,3 +1,4 @@
+import type { GitHubLoginView } from '../engine/githubBackup'
 /**
  * main ↔ renderer IPC contract. Read channels + library/tool write channels.
  * Engine types are type-only imports, so no engine code ends up in the renderer bundle.
@@ -559,7 +560,7 @@ export interface NotInitializedView {
   /** Display path (~) */
   label: string
   /** Why the file is left alone instead of the tool's first run: COPILOT_HOME/GROK_HOME points elsewhere, or the file has JSONC syntax */
-  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
+  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'qwenHomeOverride' | 'jsoncUnsupported'
 }
 
 export interface DeleteCandidateRequest {
@@ -613,8 +614,18 @@ export interface ArtifactPreview {
 // ---- backup (engine backup.ts). Auto-backup switch is config.json `autoBackup`
 export interface BackupStatusView extends BackupStatus {
   autoBackup: boolean
+  /** Local snapshots remain available when remote synchronization fails. */
+  remoteError?: string
   /** Error while reading status (empty repo etc.). If set, some fields are estimates */
   error?: string
+}
+
+export interface BackupSnapshotView {
+  hash: string
+  committed: boolean
+  pushed: boolean
+  message: string
+  remoteError?: string
 }
 
 // ---- tool auto memory (engine toolMemory). Codex is read-only
@@ -1027,10 +1038,20 @@ export interface Api {
   ): Promise<WriteResult<DeleteCandidateResult[]> | Refused>
   modelSet(tool: ToolId, key: string, value: string): Promise<WriteResult<SetModelResult> | Refused>
   // ---- backup (available=false / notAvailable until the engine is ready)
+  githubLoginStatus(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginStart(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginPoll(): Promise<WriteResult<GitHubLoginView>>
+  githubLoginCancel(): Promise<WriteResult<GitHubLoginView>>
+  githubLogout(): Promise<WriteResult<GitHubLoginView>>
+  githubInstallationOpen(): Promise<WriteResult<void>>
+  githubRepositoryCreate(
+    name: string
+  ): Promise<WriteResult<{ id: number; name: string; url: string }> | Refused>
+  githubRepositoryConnect(name: string): Promise<WriteResult<BackupStatusView> | Refused>
   backupStatus(): Promise<BackupStatusView>
   backupConnect(remoteUrl: string): Promise<WriteResult<BackupStatusView> | Refused>
   /** snapshotFirst: snapshot first when dirty */
-  backupSnapshot(message?: string): Promise<WriteResult<Snapshot | null> | Refused>
+  backupSnapshot(message?: string): Promise<WriteResult<BackupSnapshotView> | Refused>
   backupHistory(): Promise<WriteResult<Snapshot[]> | Refused>
   backupRestore(
     hash: string,
@@ -1101,6 +1122,10 @@ export interface ApplyPreviewView {
   items: ApplyPreviewItem[]
   importedChanged: ImportedChangedItem[]
   errors: string[]
+  /** Generated permission changes; no authentication or raw configuration values. */
+  policies?: ApplyPreviewPolicy[]
+  /** Conversion notes for the tools in use, including skipped unsupported formats. */
+  notes?: { tool: ToolId; path: string; text: string }[]
   notInitialized: NotInitializedView[]
   libraryDirect: LibraryDirectItem[]
   /** Rules edited on the tool side */
@@ -1110,6 +1135,14 @@ export interface ApplyPreviewView {
   inUse: ToolId[]
   /** planFingerprint of the plan shown — passed back to syncApplyOnce */
   fingerprint?: string
+}
+
+export interface ApplyPreviewPolicy {
+  tool: ToolId
+  path: string
+  key: string
+  before: string[]
+  after: string[]
 }
 
 export const CHANNELS = [
@@ -1230,6 +1263,14 @@ export const CHANNELS = [
   'editedRuleKeep',
   'deleteCandidates',
   'modelSet',
+  'githubLoginStatus',
+  'githubLoginStart',
+  'githubLoginPoll',
+  'githubLoginCancel',
+  'githubLogout',
+  'githubInstallationOpen',
+  'githubRepositoryCreate',
+  'githubRepositoryConnect',
   'backupStatus',
   'backupConnect',
   'backupSnapshot',

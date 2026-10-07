@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Badge, Box, Button, Group, Textarea, Text } from '@mantine/core'
 import { Save, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useDirtyDraft } from '../lib/dirtyDraft'
 
 interface Props {
   /** Current file content. Edits are reset when it changes */
@@ -40,6 +41,7 @@ export function MarkdownEditor({
     setText(value)
   }
   const dirty = text !== value || extraDirty
+  useDirtyDraft(dirty)
   const save = async (): Promise<void> => {
     setSaving(true)
     try {

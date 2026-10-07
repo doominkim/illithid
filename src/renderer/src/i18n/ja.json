@@ -119,7 +119,8 @@
     "description": "Description",
     "body": "本文 (SKILL.md の説明の下)",
     "files": "ファイル",
-    "disabledInGemini": "Gemini CLI の設定で無効"
+    "disabledInGemini": "Gemini CLI の設定で無効",
+    "disabledInQwen": "Qwen Code の設定で無効"
   },
   "mcp": {
     "transport": "トランスポート",
@@ -159,7 +160,7 @@
       "fetchConfirm": "ツール一覧を取得するためにサーバーを実行します: {{command}}",
       "fetched": "{{count}} 個のツールを読み込みました",
       "saved": "ツールの権限を保存しました",
-      "noteClaude": "Claude Code・Grok CLI: ブロック・確認が許可より優先されるため、この既定では許可したツールも確認またはブロックされます。",
+      "noteClaude": "Claude Code・Grok CLI: ブロックは確認・許可より、確認は許可より優先されます。厳しいサーバー既定値によってツール別の設定が適用されない場合があります。",
       "noteCodex": "Codex: サーバーをブロックすると、ここで許可・確認にしたツールだけが提供されます。",
       "noteGemini": "Gemini CLI: サーバー名に \"_\" があるとルールが一致しない場合があります。",
       "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。"
@@ -249,6 +250,7 @@
     "notInitialized": "{{tool}} を一度起動してから再度反映してください",
     "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "grokHomeOverride": "GROK_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
+    "qwenHomeOverride": "QWEN_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "jsoncUnsupported": "opencode.jsonc にコメントがあるため {{tool}} の設定は書き込みません — コメントを削除すると反映されます",
     "why": {
       "lastSyncFailed": "前回の同期に失敗: {{reason}}",
@@ -442,7 +444,48 @@
     "connected": "バックアップを接続しました",
     "snapshotFirst": "現在の状態を先にスナップショット",
     "snapshotFirstHint": "まだバックアップされていない変更があります。",
-    "autoHint": "ライブラリをツールに適用するたびにスナップショットを作ります。"
+    "autoHint": "ライブラリをツールに適用するたびにスナップショットを作ります。",
+    "localSaved": "ローカルに保存済み",
+    "remotePending": "リモートへの送信待ち",
+    "remoteFailed": "リモート同期に失敗",
+    "github": {
+      "title": "GitHub バックアップ",
+      "notConfigured": "このビルドでは GitHub ログインがまだ設定されていません。既存のリポジトリ URL で接続できます。",
+      "signIn": "GitHubバックアップを設定",
+      "enterCode": "ブラウザで開いた GitHub ページにこのコードを入力してください。",
+      "signedIn": "{{login}} としてログイン中",
+      "signOut": "ログアウト",
+      "repositoryName": "リポジトリ名",
+      "create": "バックアップ用リポジトリを作成",
+      "installHint": "GitHub App にバックアップ用リポジトリのみを許可してください。作成後、必要に応じてインストール設定の選択を更新してください。",
+      "install": "GitHub のアクセスを管理",
+      "connect": "リポジトリを接続",
+      "created": "非公開リポジトリの準備ができました。接続を完了するとバックアップできます。",
+      "confirmCreate": "{{repository}} を空の非公開リポジトリとして作成しますか？作成だけではファイルはアップロードされません。接続後は手動または自動バックアップの設定に従ってアップロードされます。",
+      "existingUrl": "リポジトリURL",
+      "errors": {
+        "githubUnavailable": "GitHub に接続できません。再試行してください。",
+        "signInAgain": "GitHub に再度ログインしてください。",
+        "permissionDenied": "GitHub で必要な権限を許可してください。",
+        "repositoryExists": "このリポジトリ名は使用できません。別の名前を選ぶか既存のリポジトリを接続してください。",
+        "invalidRepositoryName": "有効なリポジトリ名を入力してください。",
+        "installationRequired": "GitHub でバックアップ用リポジトリへのアクセスを許可し、再度接続してください。",
+        "secureStorageUnavailable": "安全な認証情報ストレージを利用できません。",
+        "expired": "コードの有効期限が切れました。再度ログインしてください。",
+        "denied": "GitHub の認証がキャンセルされました。",
+        "loginFailed": "GitHub のログインに失敗しました。再試行してください。",
+        "invalidResponse": "GitHub の応答を検証できません。",
+        "connectionFailed": "バックアップ用リポジトリを接続できません。",
+        "invalidRemote": "ログイン中の GitHub アカウントと一致しないリポジトリです。",
+        "notConfigured": "このビルドでは GitHub ログインが未設定です。"
+      },
+      "openRepository": "リポジトリを開く",
+      "setupHint": "設定をGitHubの非公開リポジトリにバックアップします。",
+      "allowAccess": "GitHubでアクセスを許可",
+      "finishSetup": "接続を完了",
+      "existingRepository": "既存のリポジトリに接続",
+      "accountSettings": "アカウント"
+    }
   },
   "memory": {
     "new": "新規メモ",
@@ -503,7 +546,10 @@
     "rename": "名前を変更",
     "delete": "削除",
     "deleteTitle": "ワークスペースを削除",
-    "switchRemoves": "ツールから外れる項目 {{n}}"
+    "switchRemoves": "ツールから外れる項目 {{n}}",
+    "switchPreviewFailed": "変更内容を確認できませんでした。再確認してから切り替えてください。",
+    "switchPreviewLoading": "変更内容を確認中…",
+    "switchUnsaved": "ワークスペースを切り替えると未保存の編集内容は失われます。"
   },
   "preview": {
     "title": "ツールに反映",
@@ -533,7 +579,12 @@
     "editedIn": "{{tool}} で編集済み",
     "keepEdited": "この版を残す",
     "keptEdited": "ライブラリに保存しました",
-    "codexTrust": "反映後に Codex /hooks で再度信頼が必要"
+    "codexTrust": "反映後に Codex /hooks で再度信頼が必要",
+    "policies": "権限の変更",
+    "policyKey": "設定",
+    "before": "変更前",
+    "after": "変更後",
+    "notes": "変換に関する情報"
   },
   "onboarding": {
     "title": "Illithid をはじめる",
@@ -626,7 +677,8 @@
     "recentTitle": "直近30日の呼び出し {{n}}回",
     "sort": "並び替え",
     "sortName": "名前順",
-    "sortUsage": "使用量順"
+    "sortUsage": "使用量順",
+    "readFailed": "使用量を読み込めませんでした"
   },
   "combo": {
     "title": "Claude Code も一緒に使いますか？",
@@ -784,7 +836,11 @@
       "s": "{{s}}秒",
       "ms": "{{m}}分{{s}}秒",
       "hm": "{{h}}時間{{m}}分"
-    }
+    },
+    "readFailed": "セッション統計を読み込めませんでした",
+    "metricsUnavailable": "このログで収集されない指標は、0 ではなく — と表示されます。",
+    "unmeasured": "未収集",
+    "lastIndexed": "最終収集: {{at}}"
   },
   "leaderboard": {
     "zoomIn": "拡大",
@@ -878,14 +934,16 @@
       "codex": "stdin の JSON: tool_name, tool_input",
       "gemini": "stdin の JSON: tool_name, tool_input",
       "copilot": "stdin の JSON: toolName, toolArgs (JSON 文字列)",
-      "grok": "stdin の JSON: toolName, toolInput"
+      "grok": "stdin の JSON: toolName, toolInput",
+      "qwen": "stdin の JSON: tool_name, tool_input"
     },
     "toolBlock": {
       "claude": "exit 2 (stderr が理由) または JSON hookSpecificOutput.permissionDecision",
       "codex": "exit 2 または JSON permissionDecision: deny",
       "gemini": "exit 2 または JSON decision: deny",
       "copilot": "0 以外の終了コードまたは JSON permissionDecision: deny (エラーでも止まる)",
-      "grok": "exit 2 または JSON decision: deny"
+      "grok": "exit 2 または JSON decision: deny",
+      "qwen": "exit 2 (stderr が理由) または JSON hookSpecificOutput.permissionDecision"
     },
     "codexTrust": "Codex は新しいフックや変更したフックを /hooks で信頼するまで実行しません。",
     "grokViaClaude": "Grok は Claude Code の設定からこのフックを実行します",
@@ -990,7 +1048,8 @@
       "judgeHint": "Claude Code は内蔵の prompt フックですぐ確認します。他のツールはこの CLI をもう一度実行して確認します (遅く、プランの使用量を使います)。",
       "model": "モデル",
       "modelHint": "空なら CLI の既定モデルを使います。",
-      "judgeSlow": "作業の実行前にすると、すべてのコマンドが確認を待ちます。必要でなければ「応答が終わったとき」を使ってください。"
+      "judgeSlow": "作業の実行前にすると、すべてのコマンドが確認を待ちます。必要でなければ「応答が終わったとき」を使ってください。",
+      "judgeFailOpen": "判定用 CLI を実行するツールでは、CLI がない場合、実行に失敗した場合、JSON の判定が無効な場合は確認を省略し、イベントを許可します。省略した確認は標準エラーに表示されます。Claude Code は独自の prompt フックの動作に従います。"
     },
     "instruction": "ルール",
     "instructionHint": "AI がこのルールとイベントを見て、通すか止めるかを決めます。",

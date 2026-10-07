@@ -86,3 +86,47 @@ test(
     }
   }
 )
+
+test(
+  'MCP permissions warn when a Claude block default prevents a per-tool ask override',
+  { timeout: 90000 },
+  async () => {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-mcp-deny-ask-ui-'))
+    buildDemoHome(home, { tools: 'all' })
+    const config = join(home, '.config/illithid/config.json')
+    writeFileSync(
+      config,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(config, 'utf8')),
+        toolsInUse: ['claude'],
+        updateCheck: false,
+        marketEnabled: false,
+        ui: { language: 'en', views: { mcp: 'list' } }
+      })
+    )
+    upsertMcpServer(home, 'deny-ask-fixture', {
+      transport: 'http',
+      url: 'https://fixture.example/mcp',
+      permissions: { default: 'deny', tools: { inspect: 'ask' } }
+    })
+    const env = {
+      ...baseEnv(home),
+      ILLITHID_HOME: home,
+      ILLITHID_USER_DATA: mkdtempSync(join(tmpdir(), 'illithid-mcp-deny-ask-ud-')),
+      ILLITHID_TEST: '1'
+    } as Record<string, string>
+    delete env.ELECTRON_RUN_AS_NODE
+    delete env.ELECTRON_RENDERER_URL
+    const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
+    try {
+      const page = await app.firstWindow()
+      await page.locator('[data-menu="mcp"]').click()
+      await page.locator('main .ac-row', { hasText: 'deny-ask-fixture' }).click()
+      await page.getByTestId('mcp-tab-permissions').click()
+      await page.getByTestId('mcp-perm-tool-inspect').waitFor()
+      await page.getByTestId('mcp-perm-note-claude').waitFor({ timeout: 3000 })
+    } finally {
+      await app.close()
+    }
+  }
+)

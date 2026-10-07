@@ -91,12 +91,13 @@ export function McpPermissionsTab({ server }: { server: McpServerView }): React.
 
   // Where a tool can't follow the rules (only for tools in use)
   const hasRules = !!rules.default || Object.keys(rules.tools ?? {}).length > 0
-  const allowUnderStricter =
-    (rules.default === 'ask' || rules.default === 'deny') &&
-    Object.values(rules.tools ?? {}).includes('allow')
+  const claudeConflict = Object.values(rules.tools ?? {}).some(
+    (decision) =>
+      (rules.default === 'ask' && decision === 'allow') ||
+      (rules.default === 'deny' && (decision === 'allow' || decision === 'ask'))
+  )
   const notes: [string, string][] = []
-  if (allowUnderStricter && inUse.includes('claude'))
-    notes.push(['claude', t('mcp.perm.noteClaude')])
+  if (claudeConflict && inUse.includes('claude')) notes.push(['claude', t('mcp.perm.noteClaude')])
   if (rules.default === 'deny' && inUse.includes('codex'))
     notes.push(['codex', t('mcp.perm.noteCodex')])
   if (hasRules && name.includes('_') && inUse.includes('gemini'))

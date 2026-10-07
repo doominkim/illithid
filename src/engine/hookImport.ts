@@ -46,9 +46,9 @@ const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
 /** Tools whose original entries the next sync replaces (the app edits their settings.json entry by entry) */
-export const HOOK_REPLACE_TOOLS: readonly HookTool[] = ['claude', 'gemini']
+export const HOOK_REPLACE_TOOLS: readonly HookTool[] = ['claude', 'gemini', 'qwen']
 
-/** Whether the next sync replaces this original: Claude Code and Gemini CLI settings, and Codex hooks.json */
+/** Whether the next sync replaces this original: Claude Code, Gemini CLI and Qwen Code settings, and Codex hooks.json */
 function replacesOriginal(home: string, tool: HookTool, configPath: string): boolean {
   return (
     HOOK_REPLACE_TOOLS.includes(tool) ||
@@ -217,6 +217,10 @@ function scanTool(home: string, tool: HookTool, notes: string[]): FoundEntry[] {
       const p = join(home, '.gemini/settings.json')
       return fromJson(p, (o) => nested(tool, o.hooks, p))
     }
+    case 'qwen': {
+      const p = join(home, '.qwen/settings.json')
+      return fromJson(p, (o) => nested(tool, o.hooks, p))
+    }
     case 'codex': {
       const hooksJson = join(home, CODEX_HOOKS_JSON)
       const toml = join(home, '.codex/config.toml')
@@ -291,7 +295,8 @@ function ownFolder(home: string, script: string): string | null {
 function seconds(tool: HookTool, handler: Json): number | undefined {
   const v = tool === 'copilot' ? (handler.timeoutSec ?? handler.timeout) : handler.timeout
   if (typeof v !== 'number' || !(v > 0)) return undefined
-  const s = tool === 'gemini' ? Math.ceil(v / 1000) : Math.ceil(v)
+  // Qwen reads 1000 or more as legacy milliseconds
+  const s = tool === 'gemini' || (tool === 'qwen' && v >= 1000) ? Math.ceil(v / 1000) : Math.ceil(v)
   return Math.min(Math.max(s, 1), 3600)
 }
 
@@ -333,7 +338,7 @@ export function hookImportCandidates(
         : `#!/usr/bin/env bash\n${e.command}\n`
     const warnings: HookImportWarning[] = []
     if (!ask && !scriptPath) warnings.push('inlineCommand')
-    if (/\b(CLAUDE|GEMINI|CODEX)_[A-Z_]*DIR\b/.test(e.command)) warnings.push('toolVariable')
+    if (/\b(CLAUDE|GEMINI|CODEX|QWEN)_[A-Z_]*DIR\b/.test(e.command)) warnings.push('toolVariable')
     // A script calling files next to it: with its own folder, or not at all (the original then stays)
     const siblings = !!scriptPath && SIBLING_RE.test(script)
     const folderPath = siblings ? ownFolder(home, scriptPath!) : null

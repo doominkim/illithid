@@ -66,6 +66,25 @@ function isPlainJson(text: string): boolean {
   }
 }
 
+type HomeOverrideTool = 'copilot' | 'grok' | 'qwen'
+/** Tools with a home override env var (agents.ts toolHomeOverride): skip reason and note when it points elsewhere */
+const HOME_OVERRIDE: Readonly<
+  Record<HomeOverrideTool, { skip: NonNullable<FileChange['skip']>; note: string }>
+> = {
+  copilot: {
+    skip: 'copilotHomeOverride',
+    note: `COPILOT_HOME is set to another folder — Copilot doesn't read ~/.copilot, so nothing is written`
+  },
+  grok: {
+    skip: 'grokHomeOverride',
+    note: `GROK_HOME is set to another folder — Grok doesn't read ~/.grok, so nothing is written`
+  },
+  qwen: {
+    skip: 'qwenHomeOverride',
+    note: `QWEN_HOME is set to another folder — Qwen Code doesn't read ~/.qwen, so nothing is written`
+  }
+}
+
 /** Plan for one target. Also used by apply to recompute when writing the same file in sequence */
 export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): FileChange {
   // A retiring tool (every item off via offTools) also loses the memory index and leaves permissions as they are
@@ -95,12 +114,8 @@ export function planTarget(home: string, t: TargetDef, planCtx: BuildContext): F
       before: exists ? readFileSync(path, 'utf8') : '',
       after: exists ? readFileSync(path, 'utf8') : '',
       changed: false,
-      notes: [
-        t.tool === 'grok'
-          ? `GROK_HOME is set to another folder — Grok doesn't read ~/.grok, so nothing is written`
-          : `COPILOT_HOME is set to another folder — Copilot doesn't read ~/.copilot, so nothing is written`
-      ],
-      skip: t.tool === 'grok' ? 'grokHomeOverride' : 'copilotHomeOverride',
+      notes: [HOME_OVERRIDE[t.tool as HomeOverrideTool].note],
+      skip: HOME_OVERRIDE[t.tool as HomeOverrideTool].skip,
       beforeRegionHash: null,
       afterRegionHash: null
     }

@@ -103,6 +103,9 @@ const MODES: Record<TargetId, number> = {
   opencodeMcpPermissions: 0o644, // same file as opencodeMcp (not a default target)
   geminiRules: 0o644, // not a default target
   geminiMcp: 0o600, // not a default target
+  qwenMcp: 0o600, // not a default target
+  qwenHooks: 0o600, // same file as qwenMcp (not a default target)
+  qwenPermissions: 0o600, // same file as qwenMcp (not a default target)
   copilotMcp: 0o600, // not a default target
   grokMcp: 0o600, // not a default target
   grokCompat: 0o600, // same file as grokMcp (not a default target)

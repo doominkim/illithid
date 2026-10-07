@@ -152,8 +152,14 @@ export async function prepareSkill(
   const md = files.find((f) => f.rel === 'SKILL.md' || f.rel === 'skill.md')
   let fm: Record<string, unknown> = {}
   try {
-    fm = matter(new TextDecoder().decode(md!.data)).data
-  } catch {
+    const rejectExecutable = (): never => {
+      throw new MarketError('invalid', 'executable skill frontmatter is not supported')
+    }
+    fm = matter(new TextDecoder().decode(md!.data), {
+      engines: { js: rejectExecutable, javascript: rejectExecutable }
+    }).data
+  } catch (e) {
+    if (e instanceof MarketError) throw e
     fm = {}
   }
   // A repository-root SKILL.md is only accepted when it is the skill that was asked for

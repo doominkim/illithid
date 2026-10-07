@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { GithubBackupConnection } from '../components/GithubBackupConnection'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import {
   ActionIcon,
   Alert,
+  Badge,
   Box,
   Button,
   Group,
@@ -19,11 +21,11 @@ import {
   Pencil,
   RefreshCw,
   RotateCcw,
-  Save,
   ShieldCheck,
   Unplug
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { notifications } from '@mantine/notifications'
 import type { BackupStatusView, Snapshot } from '../../../shared/api'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { EmptyState } from '../components/EmptyState'
@@ -31,6 +33,8 @@ import { Loading } from '../components/Layout'
 import { ListCard, ListRow } from '../components/ListRow'
 import { PageHeader } from '../components/PageHeader'
 import { useReload } from '../lib/reload'
+import { RefreshContext } from '../lib/useApi'
+import { useConfig } from '../lib/config'
 import { fmtTime } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useSync } from '../lib/sync'
@@ -79,30 +83,41 @@ function Card({
   )
 }
 
-/** Backup screen (modeled on Skills Manager Backup). Placeholder only until engine backup.ts exists */
+/** Local snapshot durability and remote upload are shown separately. */
 function Backup(): React.JSX.Element {
   const { t } = useTranslation()
   const reload = useReload()
+  const tick = useContext(RefreshContext)
+  const { config } = useConfig()
+  const loadRevision = useRef(0)
   const { openPreview } = useSync()
   const [st, setSt] = useState<BackupStatusView | null>(null)
   const [history, setHistory] = useState<Snapshot[]>([])
   const [snapshotFirst, setSnapshotFirst] = useState(true)
-  const [url, setUrl] = useState('')
   const [device, setDevice] = useState('')
   const [editingDevice, setEditingDevice] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [restore, setRestore] = useState<Snapshot | null>(null)
   const [disconnect, setDisconnect] = useState(false)
 
-  const load = (): void => {
+  const load = useCallback((): void => {
+    const revision = ++loadRevision.current
     window.api.backupStatus().then((s) => {
+      if (revision !== loadRevision.current) return
       setSt(s)
-      setUrl(s.remoteUrl ?? '')
       setDevice(s.deviceName)
     })
-    window.api.backupHistory().then((r) => setHistory('ok' in r && r.ok ? r.value : []))
-  }
-  useEffect(load, [])
+    window.api.backupHistory().then((r) => {
+      if (revision === loadRevision.current) setHistory('ok' in r && r.ok ? r.value : [])
+    })
+  }, [])
+  const cancelLoad = useCallback((): void => {
+    loadRevision.current++
+  }, [])
+  useEffect(() => {
+    load()
+    return cancelLoad
+  }, [tick, config?.libraryRoot, load, cancelLoad])
 
   const run = async <T,>(
     key: string,
@@ -121,6 +136,28 @@ function Backup(): React.JSX.Element {
   if (!st) return <Loading />
   const na = !st.libraryExists
   const connected = st.initialized && !!st.remoteUrl
+  const remoteComplete =
+    connected &&
+    !!st.lastSnapshot &&
+    !st.dirty &&
+    st.ahead === 0 &&
+    st.behind === 0 &&
+    !st.remoteError
+  const repositoryPage = /^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\.git$/.test(
+    st.remoteUrl ?? ''
+  )
+    ? st.remoteUrl!.slice(0, -4)
+    : null
+  const connectionControls = (
+    <GithubBackupConnection
+      key={`${st.root}:${st.remoteUrl ?? ''}`}
+      disabled={na || busy === 'connect' || busy === 'disconnect'}
+      onConnected={load}
+      onConnectUrl={async (url) =>
+        !!(await run('connect', window.api.backupConnect(url), t('backup.connected')))
+      }
+    />
+  )
 
   return (
     <Stack gap={0}>
@@ -138,6 +175,17 @@ function Backup(): React.JSX.Element {
             {st.error}
           </Alert>
         )}
+        {st.remoteError && (
+          <Alert
+            color="yellow"
+            variant="light"
+            radius="lg"
+            title={t('backup.remoteFailed')}
+            data-testid="backup-remote-error"
+          >
+            {st.remoteError}
+          </Alert>
+        )}
         {na && (
           <Alert color="gray" variant="light" radius="lg" title={t('sync.libraryMissing')}>
             {t('backup.needLibrary')}
@@ -146,21 +194,29 @@ function Backup(): React.JSX.Element {
         <Stack gap="md" maw={760}>
           <Card
             title={
-              connected && !st.dirty
+              remoteComplete
                 ? t('backup.backedUp')
-                : connected
+                : st.dirty && st.initialized
                   ? t('backup.dirty')
-                  : t('backup.notBackedUp')
+                  : st.lastSnapshot
+                    ? t(connected ? 'backup.remotePending' : 'backup.localSaved')
+                    : t('backup.notBackedUp')
             }
-            icon={connected && !st.dirty ? <ShieldCheck size={18} /> : <CircleOff size={18} />}
-            tone={connected && !st.dirty ? 'ok' : undefined}
+            icon={remoteComplete ? <ShieldCheck size={18} /> : <CircleOff size={18} />}
+            tone={remoteComplete ? 'ok' : undefined}
             right={
               <Button
                 leftSection={<CloudUpload size={14} />}
                 disabled={na || !st.initialized}
                 loading={busy === 'snap'}
                 onClick={() =>
-                  void run('snap', window.api.backupSnapshot(), t('backup.snapshotDone'))
+                  void run('snap', window.api.backupSnapshot()).then((saved) => {
+                    if (saved)
+                      notifications.show({
+                        color: saved.remoteError ? 'yellow' : 'accent',
+                        message: t(saved.pushed ? 'backup.snapshotDone' : 'backup.localSaved')
+                      })
+                  })
                 }
                 data-testid="backup-now"
               >
@@ -169,26 +225,12 @@ function Backup(): React.JSX.Element {
             }
           >
             <Stack gap={8}>
-              <Text size="sm" c="dimmed">
-                {st.lastSnapshot
-                  ? t('backup.latest', {
-                      title: st.lastSnapshot.message,
-                      at: fmtTime(st.lastSnapshot.at)
-                    })
-                  : t('backup.noSnapshot')}
-                {connected && (st.ahead || st.behind)
-                  ? ` · ${t('backup.aheadBehind', { ahead: st.ahead, behind: st.behind })}`
-                  : ''}
-              </Text>
+              {connected && (st.ahead > 0 || st.behind > 0) ? (
+                <Text size="sm" c="dimmed">
+                  {t('backup.aheadBehind', { ahead: st.ahead, behind: st.behind })}
+                </Text>
+              ) : null}
               <Group gap="xl" wrap="wrap">
-                <Box>
-                  <Text size="xs" c="dimmed">
-                    {t('backup.repo')}
-                  </Text>
-                  <Text size="sm" ff="monospace" truncate="end" maw={420}>
-                    {st.remoteUrl ?? '—'}
-                  </Text>
-                </Box>
                 <Box>
                   <Text size="xs" c="dimmed">
                     {t('backup.branch')}
@@ -246,45 +288,36 @@ function Backup(): React.JSX.Element {
           </Card>
 
           <Card title={t('backup.connection')} icon={<Cloud size={18} />}>
-            <Group gap={6} wrap="nowrap">
-              <TextInput
-                style={{ flex: 1 }}
-                value={url}
-                onChange={(e) => setUrl(e.currentTarget.value)}
-                placeholder="https://github.com/<user>/<repo>.git"
-                ff="monospace"
-                disabled={na}
-                data-testid="backup-url"
-              />
-              <Button
-                leftSection={<Save size={13} />}
-                disabled={na || !url.trim()}
-                loading={busy === 'connect'}
-                onClick={() =>
-                  void run('connect', window.api.backupConnect(url.trim()), t('backup.connected'))
-                }
-                data-testid="backup-connect"
-              >
-                {t('common.save')}
-              </Button>
-            </Group>
+            {connected ? (
+              <Stack gap="md">
+                <Group justify="space-between" data-testid="backup-connected-summary">
+                  <Text fw={500} size="sm" style={{ overflowWrap: 'anywhere' }}>
+                    {repositoryPage
+                      ? repositoryPage.replace('https://github.com/', '')
+                      : st.remoteUrl}
+                  </Text>
+                  <Badge color="accent" variant="light">
+                    {t('backup.connected')}
+                  </Badge>
+                </Group>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  leftSection={<Unplug size={13} />}
+                  disabled={na || !!busy}
+                  loading={busy === 'disconnect'}
+                  onClick={() => setDisconnect(true)}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  {t('backup.disconnect')}
+                </Button>
+              </Stack>
+            ) : (
+              connectionControls
+            )}
           </Card>
 
-          <Card
-            title={t('backup.history')}
-            icon={<History size={18} />}
-            right={
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                color="gray"
-                leftSection={<RefreshCw size={11} />}
-                onClick={load}
-              >
-                {t('common.reload')}
-              </Button>
-            }
-          >
+          <Card title={t('backup.history')} icon={<History size={18} />}>
             <ListCard>
               {history.length === 0 ? (
                 <EmptyState title={t('backup.noSnapshot')} />
@@ -350,19 +383,6 @@ function Backup(): React.JSX.Element {
             <Text size="sm" c="dimmed">
               {t('backup.autoHint')}
             </Text>
-          </Card>
-          <Card title={t('backup.disconnectTitle')} icon={<Unplug size={18} />}>
-            <Text size="sm" c="dimmed" mb="sm">
-              {t('backup.disconnectBody')}
-            </Text>
-            <Button
-              variant="default"
-              leftSection={<Unplug size={13} />}
-              disabled={na || !st.initialized}
-              onClick={() => setDisconnect(true)}
-            >
-              {t('backup.disconnect')}
-            </Button>
           </Card>
         </Stack>
 
