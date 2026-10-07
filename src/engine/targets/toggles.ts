@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import type { ToolId } from '../agents'
 import {
   appDataRoot,
@@ -70,19 +70,19 @@ export function legacyLibraryAliases(home: string | undefined, items: string[]):
   ]
   const out = new Set<string>()
   for (const x of items) {
-    const abs = x.startsWith('~/') ? join(h, x.slice(2)) : x
+    const abs = /^~[\\/]/.test(x) ? join(h, x.slice(2)) : x
     let rel: string | null = null
     for (const r of dataRoots) {
       const ws = join(r, WORKSPACES_DIR)
-      if (abs.startsWith(ws + '/')) {
+      if (abs.startsWith(ws + sep)) {
         const rest = abs.slice(ws.length + 1)
-        const i = rest.indexOf('/')
+        const i = rest.indexOf(sep)
         rel = i < 0 ? '' : rest.slice(i)
-      } else if (abs === r || abs.startsWith(r + '/')) rel = abs.slice(r.length)
+      } else if (abs === r || abs.startsWith(r + sep)) rel = abs.slice(r.length)
       if (rel !== null) break
     }
     if (rel === null)
-      for (const r of libRoots) if (abs === r || abs.startsWith(r + '/')) rel = abs.slice(r.length)
+      for (const r of libRoots) if (abs === r || abs.startsWith(r + sep)) rel = abs.slice(r.length)
     if (rel === null) continue
     for (const r of roots) {
       const p = r + rel

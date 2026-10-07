@@ -4,6 +4,7 @@ import {
   bindGithubBackup,
   unbindGithubBackup
 } from './githubBackup'
+import { isExecutablePath } from './openGuard'
 import { GitHubBackupError } from '../engine/githubBackup'
 /**
  * IPC registration. Reads run on a worker thread, writes run synchronously in main (writes.ts).
@@ -18,7 +19,7 @@ import { trayCommand, traySessions, updateTray } from './tray'
 import { checkForUpdate, clearUpdate, openUpgradeInTerminal, updateAvailable } from './update'
 import { open } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, extname, join, resolve, sep } from 'node:path'
+import { dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import {
   activeWorkspaceId,
   backupStatus,
@@ -441,8 +442,7 @@ export function registerIpc(): void {
       const a = typeof id === 'string' ? artifacts.get(id) : undefined
       if (!a) return { ok: false, code: 'notFound', message: 'unknownId' }
       // Never open executables with the default app (that would be the same as double-click running them)
-      if (/\.(command|app|sh|tool|terminal|scpt|workflow|pkg|dmg)$/i.test(a.path))
-        return { ok: false, code: 'refused', message: 'executable' }
+      if (isExecutablePath(a.path)) return { ok: false, code: 'refused', message: 'executable' }
       const err = await shell.openPath(a.path)
       return err ? { ok: false, code: 'openFailed', message: err } : { ok: true, value: undefined }
     },
@@ -783,8 +783,8 @@ export function registerIpc(): void {
     toolMemorySlug: async (path) => {
       const p = str(path)
         .trim()
-        .replace(/^~(?=\/|$)/, home)
-      return p.startsWith('/') ? claudeProjectSlug(p) : ''
+        .replace(/^~(?=[\\/]|$)/, home)
+      return isAbsolute(p) ? claudeProjectSlug(p) : ''
     },
     toolMemoryPromote: async (slug, file, type) =>
       W.gate(home) ?? libWrite(() => promoteClaudeMemory(home, str(slug), str(file), str(type))),

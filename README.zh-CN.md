@@ -68,6 +68,12 @@ brew install --cask doominkim/tap/illithid
 
 也可以从上方链接下载 DMG。
 
+### Windows(测试版)
+
+从[最新发布](https://github.com/doominkim/illithid/releases/latest)下载 `illithid-x64-setup.exe`(ARM 电脑下载 `illithid-arm64-setup.exe`)并运行。安装程序尚未进行代码签名,SmartScreen 可能会提示警告,请选择**更多信息 → 仍要运行**。
+
+Windows 版会同步规则、技能、子代理、MCP 服务器、权限和默认模型,并将 MCP 密钥保存在 Windows 凭据管理器中。钩子目前还不会在 Windows 上写入工具。
+
 ## 其他功能
 
 - **市场**：搜索并安装规则、技能和 MCP 服务器。
@@ -93,8 +99,8 @@ brew install --cask doominkim/tap/illithid
 **不想用了怎么办?**
 退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。如果只想停止同步某个工具，在设置中关闭它即可，预览会列出将被清理的项目。
 
-**为什么只支持 macOS?**
-密钥保存在 macOS 钥匙串中，因此目前只发布 macOS 版本。
+**支持 Windows 吗?**
+支持,目前为测试版(Windows 10 和 11,x64 和 ARM)。钩子暂时只在 macOS 上生效,其余内容都会同步。
 
 ## 从源码构建
 
@@ -104,6 +110,7 @@ brew install --cask doominkim/tap/illithid
 npm install
 npm run dev          # 热重载运行
 npm run build:mac    # 在 dist/ 生成 DMG
+npm run build:win    # 在 dist/ 生成 Windows 安装程序 (在 Windows 上运行)
 ```
 
 没有 Developer ID 证书时，可用 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac` 构建未签名版本。

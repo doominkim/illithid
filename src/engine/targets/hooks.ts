@@ -44,7 +44,7 @@ const isObj = (v: unknown): v is Json => !!v && typeof v === 'object' && !Array.
  */
 const appCommand = (dir: string, tool: HookTool): RegExp =>
   new RegExp(
-    `/\\.${dir}/hooks/illithid/(?:_scripts/[^']+' ${tool} ([a-z0-9][a-z0-9._-]{0,63})|([^/']+)/[^/']+' ${tool})$`
+    `[\\\\/]\\.${dir}[\\\\/]hooks[\\\\/]illithid[\\\\/](?:_scripts[\\\\/][^']+' ${tool} ([a-z0-9][a-z0-9._-]{0,63})|([^\\\\/']+)[\\\\/][^\\\\/']+' ${tool})$`
   )
 const APP_COMMAND: Readonly<Record<HookTool, RegExp>> = {
   claude: appCommand('claude', 'claude'),

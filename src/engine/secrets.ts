@@ -1,6 +1,7 @@
 /**
  * MCP secret store. The library keeps only `secret:<server>/<headers|env>/<KEY>` references;
- * actual values live in a backend (default: macOS Keychain, service `Illithid`). Sync writes them as literals into tool config files.
+ * actual values live in a backend (default: macOS Keychain or Windows Credential Manager, service `Illithid`). Sync writes them as
+ * literals into tool config files.
  * Values under the previous app-name service (`HarnessSync`) are read when missing from the new one (writes go to the new service, deletes hit both).
  *
  * - The engine does not depend on electron. Every function takes a SecretBackend (fixtures use memory/file backends).
@@ -8,6 +9,7 @@
  * - The macOS `security` CLI is invoked via execFile (no shell strings).
  */
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
 import { atomicWrite } from './write'
 
@@ -209,11 +211,55 @@ export function macKeychainBackend(opts: KeychainOptions = {}): SecretBackend {
 }
 
 /** Backend that errors on use (default on non-macOS platforms). Never called if there are no references */
+/** The part of @napi-rs/keyring's Entry the backend uses */
+type KeyringEntry = new (
+  service: string,
+  account: string
+) => {
+  getPassword(): string | null
+  setPassword(value: string): void
+  deleteCredential(): boolean
+}
+
+export interface CredentialStoreOptions {
+  service?: string
+  /** Entry class for tests (default: @napi-rs/keyring, loaded on first use) */
+  Entry?: KeyringEntry
+}
+
+/**
+ * OS credential store through @napi-rs/keyring — Windows Credential Manager (generic credential, target `<account>.<service>`).
+ * The native module is loaded only when this backend is used. Errors name the account, never the value
+ */
+export function credentialStoreBackend(opts: CredentialStoreOptions = {}): SecretBackend {
+  const service = opts.service ?? SECRET_SERVICE
+  let Entry = opts.Entry
+  const entry = (account: string): InstanceType<KeyringEntry> => {
+    Entry ??= (createRequire(__filename)('@napi-rs/keyring') as { Entry: KeyringEntry }).Entry
+    return new Entry(service, account)
+  }
+  const guard = <T>(account: string, what: string, fn: () => T): T => {
+    try {
+      return fn()
+    } catch {
+      throw new SecretError('backendFailed', `Credential store ${what} failed: ${account}`)
+    }
+  }
+  return {
+    get: (a) => guard(a, 'read', () => entry(a).getPassword() ?? null),
+    set(a, v) {
+      assertStorableSecret(v)
+      guard(a, 'write', () => entry(a).setPassword(v))
+    },
+    delete: (a) => guard(a, 'delete', () => entry(a).deleteCredential())
+  }
+}
+
 export function unsupportedSecretBackend(): SecretBackend {
   const fail = (): never => {
     throw new SecretError(
       'unsupportedPlatform',
-      'Secret storage is only supported via the macOS Keychain'
+      'Secret storage is only supported via the macOS Keychain or Windows Credential Manager'
     )
   }
   return { get: fail, set: fail, delete: fail }
@@ -245,7 +291,7 @@ export function withLegacySecrets(primary: SecretBackend, legacy: SecretBackend[
 
 let defaultBackend: SecretBackend | null = null
 
-/** Default backend for the app and CLI: Keychain on macOS, an explicit error elsewhere. Created on first use */
+/** Default backend for the app and CLI: Keychain on macOS, Credential Manager on Windows, an explicit error elsewhere */
 export function defaultSecretBackend(): SecretBackend {
   if (defaultBackend) return defaultBackend
   let inner: SecretBackend | null = null
@@ -256,7 +302,9 @@ export function defaultSecretBackend(): SecretBackend {
             macKeychainBackend(),
             LEGACY_SECRET_SERVICES.map((service) => macKeychainBackend({ service }))
           )
-        : unsupportedSecretBackend())
+        : process.platform === 'win32'
+          ? credentialStoreBackend()
+          : unsupportedSecretBackend())
   defaultBackend = {
     get: (a) => lazy().get(a),
     set: (a, v) => lazy().set(a, v),

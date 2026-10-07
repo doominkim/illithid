@@ -8,6 +8,8 @@
  * Grok also runs the hooks in ~/.claude/settings.json unless `[compat.claude] hooks = false`. While Grok reads Claude's files
  * (config.grokReadsClaude not false) a hook that is on for Claude is not written for Grok again — it would run twice.
  */
+import { hooksSupported } from './platform'
+import { isUnder } from './pathUtil'
 import { join } from 'node:path'
 import { readConfig, toolInUse } from './config'
 import { HOOK_CATALOG, type HookTool } from './hookEvents'
@@ -65,7 +67,9 @@ export function toolHookCommand(home: string, tool: HookTool, h: ToolHook): stri
 
 /** Whether a command runs an app-owned script copy of this tool */
 export function isAppHookCommand(home: string, tool: HookTool, command: unknown): boolean {
-  return typeof command === 'string' && command.startsWith(`'${hookCopyRoot(home, tool)}/`)
+  if (typeof command !== 'string' || !command.startsWith("'")) return false
+  const end = command.indexOf("'", 1)
+  return end > 1 && isUnder(hookCopyRoot(home, tool), command.slice(1, end))
 }
 
 /**
@@ -129,6 +133,7 @@ export function hooksForTool(
   /** permissions.json (null when absent): deny rules for tools that keep none become a check hook */
   allowlist: Allowlist | null = null
 ): ToolHook[] {
+  if (!hooksSupported()) return []
   const viaClaude = tool === 'grok' && grokReadsClaudeHooks(home) && toolInUse(home, 'claude')
   const library = hooks
     .filter((h) => runsIn(h, tool, manifest))

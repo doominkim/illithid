@@ -31,6 +31,7 @@ import { ToolComboDialog } from '../components/ToolComboDialog'
 import { claudeCombos } from '../lib/toolCombos'
 import type { ToolId, ToolsInUseView, UpdateView } from '../../../shared/api'
 import { DEFAULT_TOOLS_IN_USE } from '../../../engine/toolIds'
+import { platformKey } from '../lib/platform'
 
 function Section({
   title,
@@ -516,7 +517,7 @@ function Settings(): React.JSX.Element {
           />
           <Row
             label={t('settings.theme')}
-            hint={t('settings.themeHint')}
+            hint={t(platformKey('settings.themeHint'))}
             control={
               <SegmentedControl
                 value={colorScheme}

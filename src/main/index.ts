@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow } from 'electron'
-import { refreshTraySessions, setupTray } from './tray'
+import { refreshTraySessions, setupTray, noteClosedToTray } from './tray'
 import { startUpdateCheck } from './update'
 import { cpSync, existsSync } from 'fs'
 import { basename, join } from 'path'
@@ -89,8 +89,8 @@ async function acquireSingleInstance(): Promise<boolean> {
   return waitForLock(() => app.requestSingleInstanceLock(data))
 }
 
-/** macOS outside tests: closing the window hides it and the app stays in the menu bar (Cmd+Q quits) */
-const MENU_BAR = process.platform === 'darwin' && !TEST_MODE
+/** macOS and Windows outside tests: closing the window hides it and the app stays in the menu bar / notification area */
+const MENU_BAR = (process.platform === 'darwin' || process.platform === 'win32') && !TEST_MODE
 let mainWindow: BrowserWindow | null = null
 let quitting = false
 
@@ -161,6 +161,7 @@ function createWindow(): void {
     e.preventDefault()
     win.hide()
     app.dock?.hide()
+    noteClosedToTray()
     void refreshTraySessions()
   })
   win.on('closed', () => {

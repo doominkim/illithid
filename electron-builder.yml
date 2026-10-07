@@ -13,8 +13,17 @@ asarUnpack:
   - resources/**
 win:
   executableName: illithid
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  # One installer per architecture, fixed names like the DMGs (the update dialog points to them)
+  artifactName: ${name}-${arch}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

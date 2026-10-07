@@ -2,6 +2,7 @@
  * Actual computation behind the IPC read channels. Everything uses sync fs, so it runs in a worker thread (worker.ts).
  * This file only reads. Raw target file text (which may contain tokens) is processed here and never sent to the renderer.
  */
+import { hooksSupported } from '../engine/platform'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -705,7 +706,7 @@ export function hooks(home: string, env: Env): HooksData {
     const reasons: Partial<Record<ToolId, string>> = {}
     const unsupported: Partial<Record<ToolId, HookSupport>> = {}
     for (const t of perTool) {
-      const support = hookSupport(h.doc.action, h.doc.when, t.tool)
+      const support = hooksSupported() ? hookSupport(h.doc.action, h.doc.when, t.tool) : 'windows'
       if (support !== 'ok') unsupported[t.tool] = support
       if (support !== 'ok' || t.unused) {
         tools[t.tool] = 'notApplicable'
@@ -754,6 +755,7 @@ export function hooks(home: string, env: Env): HooksData {
     dir,
     hooks: view,
     toggles: toggles(home, 'hooks'),
+    ...(hooksSupported() ? {} : { platformUnsupported: true }),
     ...(grokReadsClaudeHooks(home) ? {} : { grokReadsClaude: false })
   }
 }
@@ -815,6 +817,11 @@ export function permissions(home: string, env: Env): PermissionsData {
       continue
     }
     const c = changes.find((x) => x.id === id)
+    if (tool === 'copilot' && !hooksSupported()) {
+      // Copilot keeps deny rules through a check hook, and Windows gets no hooks yet
+      tools.copilot = 'notApplicable'
+      continue
+    }
     if (tool === 'copilot') {
       // Only the deny check hook belongs to permissions
       const entry = (text: string | undefined): string | undefined =>

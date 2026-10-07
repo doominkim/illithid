@@ -10,6 +10,7 @@ import {
   symlinkSync,
   unlinkSync
 } from 'node:fs'
+import { isUnder } from './pathUtil'
 import { dirname, join, resolve } from 'node:path'
 import { canonicalPaths, tilde, toolHomeOverride } from './agents'
 import { syncTools } from './config'
@@ -891,7 +892,7 @@ function applyCopyRules(
     )
     // Originals live in the tool's instructions folder, outside the app-owned one
     const root = dirname(dir)
-    if (!resolve(it.path).startsWith(root + '/') || resolve(it.path).startsWith(dir + '/')) {
+    if (!isUnder(root, it.path) || isUnder(dir, it.path)) {
       out(it, 'refused', { reason: 'outOfScope' })
       continue
     }

@@ -21,7 +21,7 @@ import {
   renameSync,
   statSync
 } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, posix, relative, resolve, sep, win32 } from 'node:path'
 import matter from 'gray-matter'
 import { listMemoryFiles, readMemoryFile, TRASH_DIR, writeMemoryFile } from './library'
 import { assertInsideLibrary, LibraryError, libraryRealRoot } from './libpath'
@@ -320,7 +320,7 @@ function sessionCwd(dir: string): string | undefined {
       if (!line.includes('"cwd"')) continue
       try {
         const cwd = (JSON.parse(line) as { cwd?: unknown }).cwd
-        if (typeof cwd === 'string' && cwd.startsWith('/')) return cwd
+        if (typeof cwd === 'string' && (posix.isAbsolute(cwd) || win32.isAbsolute(cwd))) return cwd
       } catch {
         // truncated line
       }

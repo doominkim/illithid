@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { tildeAliases } from '../pathUtil'
 import { LEGACY_LIBRARY_DIR } from '../config'
 import { retireHash, UNREADABLE_HASH, type PendingRetire } from '../pendingRetire'
 import { isEnabled } from '../manifest'
@@ -40,7 +41,7 @@ export function legacyRuleGlobs(sources: Sources, home?: string): string[] {
       join(sources.agentsDir, 'rules', '*.md')
     ]) {
       out.add(abs)
-      if (abs.startsWith(home + '/')) out.add('~' + abs.slice(home.length))
+      for (const a of tildeAliases(home, abs)) out.add(a)
     }
   }
   return [...out]

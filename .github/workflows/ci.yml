@@ -11,8 +11,11 @@ concurrency:
 
 jobs:
   check:
-    # The app ships for macOS only (Keychain secrets), so check on the same platform
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,5 +28,17 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       # Unit tests and fixtures that build their own temp HOME. Fixtures that copy the real library
-      # (npm run test:local) and the Electron UI tests (npm run test:ui) stay local
+      # (npm run test:local) stay local
       - run: npm test
+
+  ui-windows:
+    # The Electron UI tests on the platform no developer machine checks locally
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ui

@@ -27,7 +27,14 @@ export type HookAction = (typeof HOOK_ACTIONS)[number]
 
 /** Why a tool can't run an action at a timing */
 export type HookSupport =
-  'ok' | 'wrongTiming' | 'noEvent' | 'noFilePath' | 'claudeOnly' | 'noContext'
+  | 'ok'
+  | 'wrongTiming'
+  | 'noEvent'
+  | 'noFilePath'
+  | 'claudeOnly'
+  | 'noContext'
+  /** Hooks are not written on Windows yet */
+  | 'windows'
 
 export interface HookActionInfo {
   /** Timings the action makes sense at; the first is the default */

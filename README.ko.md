@@ -68,6 +68,12 @@ brew install --cask doominkim/tap/illithid
 
 또는 위에서 DMG를 받으세요.
 
+### Windows (베타)
+
+[최신 릴리스](https://github.com/doominkim/illithid/releases/latest)에서 `illithid-x64-setup.exe`(ARM PC는 `illithid-arm64-setup.exe`)를 받아 실행하세요. 설치 파일은 아직 코드 서명이 없어 SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 누르세요.
+
+Windows 빌드는 룰, 스킬, 서브에이전트, MCP 서버, 권한, 기본 모델을 동기화하고 MCP 비밀값은 Windows 자격 증명 관리자에 보관합니다. 훅은 아직 Windows에서 도구에 쓰지 않습니다.
+
 ## 그 밖의 기능
 
 - **마켓**: 룰, 스킬, MCP 서버를 검색하고 설치합니다.
@@ -93,8 +99,8 @@ brew install --cask doominkim/tap/illithid
 **그만 쓰려면 어떻게 하나요?**
 앱을 종료하고 삭제하면 됩니다. Illithid가 쓴 파일은 평범한 룰, 스킬, 설정 항목이라 각 툴은 계속 동작합니다. 한 툴만 동기화를 멈추려면 설정에서 그 툴을 끄세요. 미리보기에 치울 항목이 나옵니다.
 
-**왜 macOS만 지원하나요?**
-비밀값을 macOS 키체인에 저장하기 때문에 지금은 macOS 빌드만 배포합니다.
+**Windows에서도 되나요?**
+네, 베타로 지원합니다(Windows 10·11, x64·ARM). 훅은 당분간 macOS에서만 동작하고 나머지는 모두 동기화됩니다.
 
 ## 소스에서 빌드
 
@@ -104,6 +110,7 @@ Node.js 22 이상이 필요합니다.
 npm install
 npm run dev          # 핫 리로드로 실행
 npm run build:mac    # dist/에 DMG 생성
+npm run build:win    # dist/에 Windows 설치 파일 생성 (Windows에서 실행)
 ```
 
 Developer ID 인증서가 없으면 `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac`으로 서명 없이 빌드합니다.

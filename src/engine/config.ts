@@ -146,7 +146,7 @@ export function defaultConfig(): AppConfig {
 /** Expand `~` / `~/x` against home. Relative paths are rejected (null) */
 export function expandHome(home: string, p: string): string | null {
   if (p === '~') return home
-  if (p.startsWith('~/')) return join(home, p.slice(2))
+  if (/^~[\\/]/.test(p)) return join(home, p.slice(2))
   return isAbsolute(p) ? resolve(p) : null
 }
 

@@ -13,7 +13,7 @@
  * A copy of each original entry is saved to backups/imported at import time.
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, sep } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { activeWorkspaceId } from './config'
 import { hookEventInfo, isHookTool, type HookTiming, type HookTool } from './hookEvents'
@@ -251,8 +251,11 @@ function scriptFileOf(home: string, command: string): string | null {
   if ((c.startsWith("'") && c.endsWith("'")) || (c.startsWith('"') && c.endsWith('"')))
     c = c.slice(1, -1)
   if (!c || /\s/.test(c)) return null
-  c = c.replace(/^~\//, `${home}/`).replace(/^\$\{?HOME\}?\//, `${home}/`)
-  if (!c.startsWith('/')) return null
+  c = c
+    .replace(/^~[\\/]/, `${home}${sep}`)
+    .replace(/^\$\{?HOME\}?[\\/]/, `${home}${sep}`)
+    .replace(/^%USERPROFILE%[\\/]/i, `${home}${sep}`)
+  if (!isAbsolute(c)) return null
   try {
     return lstatSync(c).isFile() ? c : null
   } catch {

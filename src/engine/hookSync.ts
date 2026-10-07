@@ -9,6 +9,7 @@
  * - skip            not a regular file (notRegularFile)
  * - deleteCandidate a recorded copy whose hook was removed, turned off or no longer runs this file → moved to backups/deleted
  */
+import { hooksSupported } from './platform'
 import {
   chmodSync,
   copyFileSync,
@@ -130,6 +131,7 @@ function entryRuns(dir: string, entry: string): boolean {
 
 /** Plan. Read-only */
 export function planHookSync(home: string, env: Env = process.env): HookSyncItem[] {
+  if (!hooksSupported()) return []
   const mf = readPlanManifest(home)
   if (mf.error) throw new Error(`${MANIFEST_FILE}: ${mf.error}`)
   const hooks = readHooks(home)

@@ -59,6 +59,7 @@
     "updateAvailable": "{{version}} が利用可能",
     "checkFailed": "アップデートを確認できませんでした。接続を確認してもう一度お試しください。",
     "themeHint": "システムは macOS の外観に従います。",
+    "themeHintWin": "システムは Windows のテーマに従います。",
     "cleanupEnabledHint": "古いバックアップのコピーをゴミ箱に移します。",
     "cleanupNowHint": "上のルールを今すぐ一度だけ使います。"
   },
@@ -141,7 +142,7 @@
     "deleted": "MCP 削除（.trash に保管）",
     "deleteTitle": "MCP を削除",
     "deleteBody": "{{name}} を .trash に移します。",
-    "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はキーチェーンに保管します。",
+    "headersHint": "サーバーに送る HTTP ヘッダー。${VAR} は環境変数を読み、それ以外の値はシステムの安全な保管場所(キーチェーンまたは資格情報マネージャー)に保管します。",
     "timeoutHint": "サーバーの応答を待つ最大時間。空ならツールの既定値。",
     "description": "説明",
     "tabPermissions": "権限",
@@ -279,7 +280,8 @@
     "saved": "切替を保存"
   },
   "sidebar": {
-    "shortcut": "⌘K で検索"
+    "shortcut": "⌘K で検索",
+    "shortcutWin": "Ctrl+K で検索"
   },
   "spotlight": {
     "placeholder": "画面移動またはスキル・MCP・ルール・エージェントを検索…",
@@ -299,6 +301,7 @@
     "copyPath": "パスをコピー",
     "deleteItem": "削除…",
     "reveal": "Finder で表示",
+    "revealWin": "エクスプローラーで表示",
     "notApplicable": "使えません",
     "pendingSync": "次の同期待ち"
   },
@@ -1055,12 +1058,15 @@
     "instructionExample": "テストがまだ通っていなければ作業を続けて。",
     "scriptStarter": "テンプレートのスクリプトから始めます。作成後に編集してください。",
     "nameTaken": "同じ名前のフックがあります",
+    "windowsTitle": "Windows ではまだフックを使えません",
+    "windowsBody": "フックはライブラリに保存して編集できますが、Windows ではまだどのツールにも書き込みません。macOS ではツールに反映されます。",
     "unsupported": {
       "wrongTiming": "{{tool}} はこのタイミングでこの動作を実行できません",
       "noEvent": "{{tool}} にはこのタイミングのイベントがありません",
       "noFilePath": "{{tool}} は編集したファイルのパスをフックに渡しません",
       "claudeOnly": "{{tool}} には判断フックがありません (Claude Code 専用)",
-      "noContext": "{{tool}} はセッション開始フックの出力を無視します"
+      "noContext": "{{tool}} はセッション開始フックの出力を無視します",
+      "windows": "Windows ではまだ未対応"
     },
     "pending": "まだツールに反映されていません",
     "pendingHint": "同期するとこのフックがツールの設定に入ります。",

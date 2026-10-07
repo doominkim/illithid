@@ -68,6 +68,12 @@ brew install --cask doominkim/tap/illithid
 
 または上のリンクから DMG をダウンロードしてください。
 
+### Windows (ベータ)
+
+[最新リリース](https://github.com/doominkim/illithid/releases/latest)から `illithid-x64-setup.exe`(ARM PC は `illithid-arm64-setup.exe`)をダウンロードして実行してください。インストーラーはまだコード署名されていないため、SmartScreen の警告が出ることがあります。**詳細情報 → 実行**を選んでください。
+
+Windows 版はルール、スキル、サブエージェント、MCP サーバー、権限、既定のモデルを同期し、MCP のシークレットは Windows 資格情報マネージャーに保管します。フックはまだ Windows ではツールに書き込みません。
+
 ## その他の機能
 
 - **マーケット**: ルール、スキル、MCP サーバーを検索してインストールできます。
@@ -93,8 +99,8 @@ brew install --cask doominkim/tap/illithid
 **使うのをやめるには?**
 アプリを終了してアンインストールするだけです。Illithid が書いたのは普通のルール、スキル、設定項目なので、各ツールはそのまま動きます。1 つのツールだけ同期をやめるには、設定でそのツールをオフにします。片付く項目はプレビューに表示されます。
 
-**なぜ macOS だけ?**
-シークレットを macOS キーチェーンに保存するため、現在は macOS 版のみ配布しています。
+**Windows でも使えますか?**
+はい、ベータとして対応しています(Windows 10・11、x64・ARM)。フックは当面 macOS のみで、それ以外はすべて同期されます。
 
 ## ソースからビルド
 
@@ -104,6 +110,7 @@ Node.js 22 以上が必要です。
 npm install
 npm run dev          # ホットリロードで起動
 npm run build:mac    # dist/ に DMG を生成
+npm run build:win    # dist/ に Windows インストーラーを生成 (Windows で実行)
 ```
 
 Developer ID 証明書がない場合は `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac` で署名なしでビルドできます。

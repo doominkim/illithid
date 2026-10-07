@@ -61,7 +61,9 @@ export async function checkForUpdate(home: string, explicit = false): Promise<Up
       !explicit && !!u && !!cfg.updateSkip && compareVersions(u.version, cfg.updateSkip) <= 0
     const forced = process.env['ILLITHID_UPDATE_INSTALL']
     const install =
-      !app.isPackaged && (forced === 'brew' || forced === 'dmg') ? forced : installKind()
+      !app.isPackaged && (forced === 'brew' || forced === 'dmg' || forced === 'nsis')
+        ? forced
+        : installKind()
     publish(
       u && !skipped
         ? {

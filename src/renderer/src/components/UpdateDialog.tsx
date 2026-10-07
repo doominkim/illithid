@@ -52,7 +52,11 @@ export function UpdateDialog({
               </Group>
             </Stack>
           ) : (
-            <Text size="sm">Download the new version and replace the app in Applications.</Text>
+            <Text size="sm" data-testid="update-how">
+              {u.install === 'nsis'
+                ? 'Download the setup file for your PC (illithid-x64-setup.exe or illithid-arm64-setup.exe) and run it. It updates this installation.'
+                : 'Download the new version and replace the app in Applications.'}
+            </Text>
           )}
           <Group justify="space-between">
             <Button

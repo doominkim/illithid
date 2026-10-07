@@ -10,12 +10,15 @@
     <a href="https://github.com/doominkim/illithid/releases/latest"><img src="https://img.shields.io/github/v/release/doominkim/illithid?style=flat-square&label=download" alt="Download"></a>
     <img src="https://img.shields.io/badge/macOS-12%2B-blue?style=flat-square" alt="macOS 12+">
     <img src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-lightgrey?style=flat-square" alt="Apple Silicon and Intel">
+    <img src="https://img.shields.io/badge/Windows-beta-blue?style=flat-square" alt="Windows beta">
   </p>
 
   <p>
     <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-arm64.dmg">Download for Apple Silicon</a>
     &nbsp;·&nbsp;
     <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-x64.dmg">Download for Intel</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/doominkim/illithid/releases/latest/download/illithid-x64-setup.exe">Windows (beta)</a>
   </p>
 </div>
 
@@ -68,6 +71,12 @@ brew install --cask doominkim/tap/illithid
 
 Or download the DMG above.
 
+### Windows (beta)
+
+Download `illithid-x64-setup.exe` (or `illithid-arm64-setup.exe` for ARM PCs) from the [latest release](https://github.com/doominkim/illithid/releases/latest) and run it. The installer is not code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**.
+
+The Windows build syncs rules, skills, subagents, MCP servers, permissions and default models, and keeps MCP secrets in Windows Credential Manager. Hooks are not written to tools on Windows yet.
+
 ## Also included
 
 - **Market**: discover and install rules, skills, and MCP servers.
@@ -93,8 +102,8 @@ On first run Illithid offers to import what you have. Imported originals are bac
 **How do I stop using it?**
 Quit the app and uninstall. The files it wrote are plain rules, skills and config entries, so your tools keep working. To stop syncing one tool, turn it off in Settings; the preview shows what Illithid removes from it.
 
-**Why macOS only?**
-Secrets are stored in the macOS Keychain, so only macOS builds are published for now.
+**Does it run on Windows?**
+Yes, as a beta (Windows 10 and 11, x64 and ARM). Hooks stay macOS-only for now; everything else syncs.
 
 ## Build from source
 
@@ -104,6 +113,7 @@ Requires Node.js 22 or newer.
 npm install
 npm run dev          # run with hot reload
 npm run build:mac    # DMGs in dist/
+npm run build:win    # Windows installers in dist/ (run on Windows)
 ```
 
 Without a Developer ID certificate, build unsigned with `CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:mac`.

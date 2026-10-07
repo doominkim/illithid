@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { basename, isAbsolute, join } from 'node:path'
+import { basename, join, posix, relative, win32 } from 'node:path'
+import { toPosix } from '../pathUtil'
 import fg from 'fast-glob'
 import type { ToolId } from '../toolIds'
 import { clip, isoOrUndefined, readRange } from './common'
@@ -62,8 +63,21 @@ function shellWord(s: string): string {
   return /^[A-Za-z0-9_./+-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`
 }
 
-function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | undefined {
+/** PowerShell (the Windows terminal default): `Set-Location -LiteralPath '<cwd>'; <command>` with `'` doubled */
+function inDir(cwd: string, command: string, platform: NodeJS.Platform): string {
+  return platform === 'win32'
+    ? `Set-Location -LiteralPath '${cwd.replace(/'/g, "''")}'; ${command}`
+    : `cd -- ${shellWord(cwd)} && ${command}`
+}
+
+export function resumeCommand(
+  tool: SessionTool,
+  id: string,
+  cwd?: string,
+  platform: NodeJS.Platform = process.platform
+): string | undefined {
   if (!SAFE_ID.test(id)) return undefined
+  const abs = !!cwd && (platform === 'win32' ? win32.isAbsolute(cwd) : posix.isAbsolute(cwd))
   switch (tool) {
     case 'claude':
       return `claude --resume ${id}`
@@ -76,14 +90,12 @@ function resumeCommand(tool: SessionTool, id: string, cwd?: string): string | un
       return undefined
     case 'gemini':
       // Gemini looks sessions up per project (the directory it runs in)
-      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && gemini --resume ${id}` : undefined
+      return abs ? inDir(cwd!, `gemini --resume ${id}`, platform) : undefined
     case 'grok':
-      return cwd && isAbsolute(cwd)
-        ? `cd -- ${shellWord(cwd)} && grok --resume ${id}`
-        : `grok --resume ${id}`
+      return abs ? inDir(cwd!, `grok --resume ${id}`, platform) : `grok --resume ${id}`
     case 'qwen':
       // Qwen stores sessions per project (the directory it runs in)
-      return cwd && isAbsolute(cwd) ? `cd -- ${shellWord(cwd)} && qwen --resume ${id}` : undefined
+      return abs ? inDir(cwd!, `qwen --resume ${id}`, platform) : undefined
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -466,7 +478,7 @@ function scanGemini(home: string): Session[] {
     const { meta, messages } = replayGemini(records)
     const id = str(meta.sessionId)
     if (!id) continue
-    const slug = f.path.slice(root.length + 1).split('/')[0]
+    const slug = toPosix(relative(root, f.path)).split('/')[0]
     const cwd = geminiCwd(root, slug, projects)
     const first = str(meta.summary)
       ? undefined
