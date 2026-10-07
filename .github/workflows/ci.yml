@@ -107,3 +107,36 @@ jobs:
           name: smoke-failure-${{ matrix.arch }}
           path: smoke-failure.png
           if-no-files-found: ignore
+
+  diag-windows-install:
+    # Temporary: where does the arm64 install lose the app's binaries — the installer or the ARM machine?
+    needs: package-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - setup: arm64
+            runner: windows-latest
+          - setup: x64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-setup-${{ matrix.setup }}
+          path: dist
+      - name: Install ${{ matrix.setup }} on ${{ matrix.runner }}
+        shell: pwsh
+        run: |
+          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.setup }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-diag'
+          "installer exit code: $($p.ExitCode)"
+          Get-ChildItem C:\illithid-diag -Include *.exe,*.dll -Recurse | Select-Object FullName, Length | Format-Table
+      - name: Launch (x64 app under emulation on ARM)
+        if: matrix.setup == 'x64'
+        run: npx tsx scripts/smoke-packaged.ts C:\illithid-diag\illithid.exe
