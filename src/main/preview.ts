@@ -104,18 +104,14 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
     new Set(hookRecords.filter((r) => c.retired?.includes(r.path)).map((r) => r.name))
   const items: ApplyPreviewItem[] = []
   const policies: ApplyPreviewPolicy[] = []
-  const notes: NonNullable<ApplyPreviewView['notes']> = []
 
   // Config files: several targets can write one file (opencode.json) — one row per file
   const files = new Map<string, ApplyPreviewItem>()
   const errors = [...p.errors]
   for (const c of p.targets) {
     const tool = TARGET_TOOL.get(c.id)
-    if (tool && inUse.includes(tool)) {
-      notes.push(...c.notes.map((text) => ({ tool, path: c.label, text })))
-      if (!c.error && c.changed)
-        policies.push(...policyDiff(tool, c.label, c.id, c.before, c.after))
-    }
+    if (tool && inUse.includes(tool) && !c.error && c.changed)
+      policies.push(...policyDiff(tool, c.label, c.id, c.before, c.after))
     for (const [name, error] of Object.entries(c.serverErrors ?? {}))
       errors.push(`${c.label} · ${name}: ${error}`)
     if (c.error) {
@@ -223,7 +219,6 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
     importedChanged,
     errors,
     policies,
-    notes,
     notInitialized: notInitializedOf(p.targets),
     libraryDirect: libraryDirect(home, inUse, items),
     edited: editedRules(home, env).map((e) => ({

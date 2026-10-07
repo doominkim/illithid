@@ -581,8 +581,7 @@
     "policies": "権限の変更",
     "policyKey": "設定",
     "before": "変更前",
-    "after": "変更後",
-    "notes": "変換に関する情報"
+    "after": "変更後"
   },
   "onboarding": {
     "title": "Illithid をはじめる",
