@@ -583,8 +583,7 @@
     "policies": "权限更改",
     "policyKey": "设置",
     "before": "更改前",
-    "after": "更改后",
-    "notes": "转换说明"
+    "after": "更改后"
   },
   "onboarding": {
     "title": "开始使用 Illithid",

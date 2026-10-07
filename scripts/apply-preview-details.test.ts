@@ -68,3 +68,23 @@ test('OpenCode permission rule reordering is visible even when individual action
     )
   )
 })
+
+test('apply preview carries no conversion notes, even when the targets log some', () => {
+  const h = home()
+  const cfg = join(h, '.config/illithid/config.json')
+  writeFileSync(
+    cfg,
+    JSON.stringify({
+      ...JSON.parse(readFileSync(cfg, 'utf8')),
+      toolsInUse: ['claude', 'codex', 'opencode', 'gemini']
+    })
+  )
+  // A library server already in Codex outside the markers: the Codex target logs that it takes it over
+  writeFileSync(
+    join(h, '.codex/config.toml'),
+    'model = "gpt-5.5"\n\n[mcp_servers.playwright]\ncommand = "npx"\nargs = ["old"]\n'
+  )
+  const view = applyPreview(h, baseEnv(h), memorySecretBackend())
+  assert.ok(view.items.some((i) => i.path === '~/.codex/config.toml'))
+  assert.equal('notes' in view, false)
+})

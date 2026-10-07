@@ -583,8 +583,7 @@
     "policies": "권한 변경",
     "policyKey": "설정",
     "before": "변경 전",
-    "after": "변경 후",
-    "notes": "변환 안내"
+    "after": "변경 후"
   },
   "onboarding": {
     "title": "Illithid 시작하기",

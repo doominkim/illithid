@@ -583,8 +583,7 @@
     "policies": "Permission changes",
     "policyKey": "Setting",
     "before": "Before",
-    "after": "After",
-    "notes": "Conversion notes"
+    "after": "After"
   },
   "onboarding": {
     "title": "Set up Illithid",
