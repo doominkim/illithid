@@ -68,3 +68,10 @@ jobs:
         run: Start-Process -Wait -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
       - name: Launch the installed app
         run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
+      - name: Keep the failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure-${{ matrix.arch }}
+          path: smoke-failure.png
+          if-no-files-found: ignore
