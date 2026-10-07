@@ -225,7 +225,7 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
     policies,
     notes,
     notInitialized: notInitializedOf(p.targets),
-    libraryDirect: libraryDirect(home, inUse, items),
+    libraryDirect: libraryDirect(home, inUse, items, p),
     edited: editedRules(home, env).map((e) => ({
       tool: e.tool,
       name: e.name,
@@ -388,11 +388,17 @@ function skillDenyDiff(
 function libraryDirect(
   home: string,
   inUse: ToolId[],
-  items: ApplyPreviewItem[]
+  items: ApplyPreviewItem[],
+  p: SyncPlan
 ): LibraryDirectItem[] {
   if (!inUse.includes('opencode')) return []
   const mf = readManifest(home)
   if (mf.error) return []
+  // Items another tool already has as is: an add is a first copy to a newly used tool, not a library change
+  const steady = new Set([
+    ...p.rules.filter((x) => x.action === 'inSync').map((x) => `rule:${x.name}`),
+    ...p.skills.filter((x) => x.action === 'inSync').map((x) => `skill:${x.name}`)
+  ])
   const listed = new Set(
     items.filter((x) => x.tool === 'opencode').map((x) => `${x.kind}:${x.name}`)
   )
@@ -401,7 +407,7 @@ function libraryDirect(
     if (x.tool === 'opencode' || x.parent || (x.kind !== 'rule' && x.kind !== 'skill')) continue
     if (x.action !== 'add' && x.action !== 'update' && x.action !== 'replace') continue
     const k = `${x.kind}:${x.name}`
-    if (listed.has(k) || out.has(k)) continue
+    if (listed.has(k) || out.has(k) || (x.action === 'add' && steady.has(k))) continue
     if (!isEnabled(mf.manifest, x.kind === 'rule' ? 'rules' : 'skills', x.name, 'opencode'))
       continue
     out.set(k, { tool: 'opencode', kind: x.kind, name: x.name })
