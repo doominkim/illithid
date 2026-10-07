@@ -65,7 +65,12 @@ jobs:
       - run: npx electron-builder --win --${{ matrix.arch }} --publish never
       - name: Install silently
         shell: pwsh
-        run: Start-Process -Wait -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
+        run: |
+          Get-ChildItem dist -Filter *.exe | Select-Object Name, Length | Format-Table
+          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
+          "installer exit code: $($p.ExitCode)"
+          Get-ChildItem C:\illithid-smoke -ErrorAction SilentlyContinue | Select-Object Name | Format-Table
+          Get-ChildItem "$env:LOCALAPPDATA\Programs", "$env:ProgramFiles" -Recurse -Filter illithid.exe -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table
       - name: Launch the installed app
         run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
       - name: Keep the failure screenshot
