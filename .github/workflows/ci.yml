@@ -67,6 +67,7 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem dist -Filter *.exe | Select-Object Name, Length | Format-Table
+          Get-ChildItem dist\win-*unpacked -Filter illithid* | Select-Object FullName | Format-Table
           $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
           "installer exit code: $($p.ExitCode)"
           Get-ChildItem C:\illithid-smoke -ErrorAction SilentlyContinue | Select-Object Name | Format-Table
