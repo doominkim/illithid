@@ -44,7 +44,34 @@ jobs:
       - run: npm run test:ui
 
   package-windows:
-    # Build each installer, install it silently and launch the installed app (the release workflow does the same, then uploads)
+    # Both installers are built on x64 Windows: an installer built on the ARM runner left the app's .exe and .dll files out
+    # when it installed. arm64 is a cross build with the arm64 credential-store module added
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: arm64 native module
+        if: matrix.arch == 'arm64'
+        run: npm install --no-save --force @napi-rs/keyring-win32-arm64-msvc@2.1.0
+      - run: npm run build
+      - run: npx electron-builder --win --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-setup-${{ matrix.arch }}
+          path: dist/illithid-${{ matrix.arch }}-setup.exe
+          if-no-files-found: error
+
+  smoke-windows:
+    # Install each installer silently on its own architecture and launch the installed app
+    needs: package-windows
     strategy:
       fail-fast: false
       matrix:
@@ -61,19 +88,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: npx electron-builder --win --${{ matrix.arch }} --publish never
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-setup-${{ matrix.arch }}
+          path: dist
       - name: Install silently
         shell: pwsh
         run: |
-          Get-ChildItem dist -Filter *.exe | Select-Object Name, Length | Format-Table
-          Get-ChildItem dist\win-*unpacked -Include *.exe,*.dll -Recurse | Select-Object FullName, Length | Format-Table
-          Get-MpThreatDetection -ErrorAction SilentlyContinue | Select-Object -First 10 InitialDetectionTime, Resources | Format-List
-          Get-MpComputerStatus -ErrorAction SilentlyContinue | Select-Object RealTimeProtectionEnabled, AMProductVersion | Format-List
           $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
           "installer exit code: $($p.ExitCode)"
-          Get-ChildItem C:\illithid-smoke -ErrorAction SilentlyContinue | Select-Object Name | Format-Table
-          Get-ChildItem "$env:LOCALAPPDATA\Programs", "$env:ProgramFiles" -Recurse -Filter illithid.exe -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table
+          Get-ChildItem C:\illithid-smoke -Include *.exe,*.dll -Recurse | Select-Object FullName, Length | Format-Table
       - name: Launch the installed app
         run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
       - name: Keep the failure screenshot
