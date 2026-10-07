@@ -95,7 +95,12 @@ const TARGET_OF: Partial<Record<Resource, Partial<Record<ToolId, TargetId>>>> = 
   rules: { codex: 'codexAgents', opencode: 'opencodeRules', gemini: 'geminiRules' },
   skills: { opencode: 'opencodeSkills' }, // withSkillOverride merges in the tool's own skill-disable settings
   mcp: MCP_TARGET_OF,
-  permissions: { claude: 'claudePermissions', codex: 'codexRules', gemini: 'geminiPolicy' }
+  permissions: {
+    claude: 'claudePermissions',
+    codex: 'codexRules',
+    gemini: 'geminiPolicy',
+    qwen: 'qwenPermissions'
+  }
 }
 
 /** Ordered by severity (when mixed, the earlier one wins) */
@@ -123,13 +128,16 @@ function changeCell(
       state: 'notApplicable',
       detail: `${c.label} absent — nothing to write`
     }
-  if (c.skip === 'copilotHomeOverride' || c.skip === 'grokHomeOverride')
+  if (
+    c.skip === 'copilotHomeOverride' ||
+    c.skip === 'grokHomeOverride' ||
+    c.skip === 'qwenHomeOverride'
+  )
     return {
       ...base,
       target,
       state: 'notApplicable',
-      detail:
-        c.notes[0] ?? `${c.skip === 'grokHomeOverride' ? 'GROK_HOME' : 'COPILOT_HOME'} override`
+      detail: c.notes[0] ?? `${c.skip.replace('HomeOverride', '').toUpperCase()}_HOME override`
     }
   if (c.skip === 'jsoncUnsupported')
     return {
@@ -323,9 +331,9 @@ export function statusReport(
   const roster = readRoster(home)
   const cells: StatusCell[] = []
   const inUse = toolsInUse(home)
-  const geminiOff = (): string[] => {
+  const settingsOff = (tool: 'gemini' | 'qwen'): string[] => {
     try {
-      return geminiDisabledSkillsOf(home, readSources(home))
+      return geminiDisabledSkillsOf(home, readSources(home), tool)
     } catch {
       return []
     }
@@ -344,7 +352,7 @@ export function statusReport(
           ? withSkillOverride(cell, byId.get(overrideId), sourcesError)
           : cell
       if (resource === 'rules' && tool === 'claude') cells.push(claudeRulesCell(home, ruleItems))
-      else if (resource === 'rules' && (tool === 'copilot' || tool === 'grok'))
+      else if (resource === 'rules' && (tool === 'copilot' || tool === 'grok' || tool === 'qwen'))
         cells.push(copyRulesCell(home, tool, ruleItems))
       else if (targetId) {
         cells.push(overrideOf(changeCell(resource, tool, byId.get(targetId), sourcesError)))
@@ -356,11 +364,15 @@ export function statusReport(
             sync
           )
         )
-        // Gemini's own settings turning library skills off: shown (warning in the detail), never changed
-        const off = tool === 'gemini' ? geminiOff() : []
+        // Gemini's or Qwen's own settings turning library skills off: shown (warning in the detail), never changed
+        const off = tool === 'gemini' || tool === 'qwen' ? settingsOff(tool) : []
+        const label = tool === 'qwen' ? 'Qwen' : 'Gemini'
         cells.push(
           off.length
-            ? { ...cell, detail: `${cell.detail} · disabled in Gemini settings: ${off.join(', ')}` }
+            ? {
+                ...cell,
+                detail: `${cell.detail} · disabled in ${label} settings: ${off.join(', ')}`
+              }
             : cell
         )
       } else if (resource === 'models') {

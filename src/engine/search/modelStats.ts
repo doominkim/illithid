@@ -24,8 +24,8 @@ export const MIN_REQUESTS = 30
 export const MIN_TOOL_CALLS = 100
 const MIN_COST_TURNS = 30
 
-/** Tools that start a subagent (Claude, Codex, OpenCode) */
-const SUBAGENT_TOOLS = new Set(['Agent', 'Task', 'spawn_agent', 'task'])
+/** Tools that start a subagent (Claude, Codex, OpenCode, Qwen Code) */
+const SUBAGENT_TOOLS = new Set(['Agent', 'Task', 'spawn_agent', 'task', 'agent'])
 
 const ERROR_KINDS: readonly ToolErrorKind[] = [
   'mistake',

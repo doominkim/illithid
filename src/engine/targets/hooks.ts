@@ -51,7 +51,8 @@ const APP_COMMAND: Readonly<Record<HookTool, RegExp>> = {
   codex: appCommand('codex', 'codex'),
   gemini: appCommand('gemini', 'gemini'),
   copilot: appCommand('copilot', 'copilot'),
-  grok: appCommand('grok', 'grok')
+  grok: appCommand('grok', 'grok'),
+  qwen: appCommand('qwen', 'qwen')
 }
 
 /** Identity of one original handler (event + matcher + handler) — stays the same as long as the user doesn't edit it */
@@ -241,10 +242,16 @@ function userEntries(tool: HookTool, table: unknown): string {
   )
 }
 
-/** Settings-file targets (Claude, Gemini): only `hooks` changes, and inside it only app entries */
-function settingsHooksTarget(id: TargetId, tool: 'claude' | 'gemini', rel: string): TargetDef {
+/** Settings-file targets (Claude, Gemini, Qwen): only `hooks` changes, and inside it only app entries */
+function settingsHooksTarget(
+  id: TargetId,
+  tool: 'claude' | 'gemini' | 'qwen',
+  rel: string
+): TargetDef {
+  // Gemini and Qwen read settings.json with comments allowed; the app only edits plain JSON
+  const plain = tool !== 'claude'
   const parse = (text: string): Json =>
-    tool === 'gemini' ? parsePlainJsonConfig(text, 'settings.json') : parseJsonObject(text)
+    plain ? parsePlainJsonConfig(text, 'settings.json') : parseJsonObject(text)
   return {
     id,
     tool,
@@ -275,7 +282,7 @@ function settingsHooksTarget(id: TargetId, tool: 'claude' | 'gemini', rel: strin
       const next: Json = { ...settings }
       if (table && Object.keys(table).length) next.hooks = table
       else delete next.hooks
-      const after = tool === 'gemini' ? toSettingsText(before, next) : toJsonText(next, before)
+      const after = plain ? toSettingsText(before, next) : toJsonText(next, before)
       const others = untouchedKeysSame(settings, next, 'hooks')
       const same = others.same && userEntries(tool, cleaned.table) === userEntries(tool, next.hooks)
       const notes = [
@@ -292,6 +299,7 @@ function settingsHooksTarget(id: TargetId, tool: 'claude' | 'gemini', rel: strin
 
 export const claudeHooks = settingsHooksTarget('claudeHooks', 'claude', '.claude/settings.json')
 export const geminiHooks = settingsHooksTarget('geminiHooks', 'gemini', '.gemini/settings.json')
+export const qwenHooks = settingsHooksTarget('qwenHooks', 'qwen', '.qwen/settings.json')
 
 /** App-owned whole files (Copilot, Grok) */
 function ownFileTarget(id: TargetId, tool: 'copilot' | 'grok', rel: string): TargetDef {
@@ -445,7 +453,8 @@ export const HOOK_TARGETS: readonly TargetDef[] = [
   codexHooks,
   geminiHooks,
   copilotHooks,
-  grokHooks
+  grokHooks,
+  qwenHooks
 ]
 
 export const HOOK_TARGET_OF: Readonly<Record<HookTool, TargetId>> = {
@@ -453,7 +462,8 @@ export const HOOK_TARGET_OF: Readonly<Record<HookTool, TargetId>> = {
   codex: 'codexHooks',
   gemini: 'geminiHooks',
   copilot: 'copilotHooks',
-  grok: 'grokHooks'
+  grok: 'grokHooks',
+  qwen: 'qwenHooks'
 }
 
 export const HOOK_TARGET_TOOL: Partial<Record<TargetId, HookTool>> = Object.fromEntries(

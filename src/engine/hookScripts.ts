@@ -52,7 +52,8 @@ const FILE_ARG: Record<HookTool, string> = {
   codex: 'file_path',
   gemini: 'file_path',
   copilot: 'path',
-  grok: 'file_path'
+  grok: 'file_path',
+  qwen: 'file_path'
 }
 
 /**
@@ -96,7 +97,7 @@ const JESC = `jesc() { printf '%s' "$1" | tr -d '\\001-\\011\\013-\\037' | sed '
 
 /**
  * context: what the agent should know when a session starts — the git branch and uncommitted changes, and the hook's note.
- * Claude Code and Codex read plain stdout; Gemini CLI wants hookSpecificOutput.additionalContext, Copilot additionalContext
+ * Claude Code and Codex read plain stdout; Gemini CLI and Qwen Code want hookSpecificOutput.additionalContext, Copilot additionalContext
  */
 function contextLines(tool: HookTool, doc: HookDoc): string[] {
   const out = ["text=''"]
@@ -114,7 +115,7 @@ function contextLines(tool: HookTool, doc: HookDoc): string[] {
   const note = doc.body.trim()
   if (note) out.push(`note=${q(note)}`, 'text="${text:+$text', '', '}$note"')
   out.push('[ -n "$text" ] || exit 0')
-  if (tool === 'gemini')
+  if (tool === 'gemini' || tool === 'qwen')
     out.push(
       JESC,
       `printf '{"hookSpecificOutput":{"additionalContext":"%s"}}\\n' "$(jesc "$text")"`
@@ -208,6 +209,12 @@ function judgeCall(cli: HookTool): string[] {
         'out=$(ILLITHID_JUDGE=1 copilot -p "$prompt" -s --no-ask-user --output-format json ${model:+--model "$model"} 2>/dev/null)',
         'judge_status=$?'
       ]
+    case 'qwen':
+      // Text output is the final reply alone (-o json prints every message as an array)
+      return [
+        'out=$(ILLITHID_JUDGE=1 qwen -p "$prompt" --approval-mode plan ${model:+-m "$model"} 2>/dev/null)',
+        'judge_status=$?'
+      ]
     case 'grok':
       return [
         'out=$(ILLITHID_JUDGE=1 grok -p "$prompt" --json-schema "$schema" --permission-mode plan ${model:+-m "$model"} 2>/dev/null)',
@@ -288,6 +295,12 @@ function judgeResult(cli: HookTool): string[] {
         'done <<ILLITHID_JUDGE_OUTPUT',
         '$out',
         'ILLITHID_JUDGE_OUTPUT'
+      ]
+    case 'qwen':
+      // Plain text reply: keep the outermost {…} so a fenced or prefaced answer still reads as the verdict
+      return [
+        "wrapped=$(printf '%s' \"$out\" | tr '\\n' ' ' | sed -e 's/^[^{]*//' -e 's/[^}]*$//')",
+        '[ -z "$wrapped" ] || verdict="$wrapped"'
       ]
     case 'codex':
       return []

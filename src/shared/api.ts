@@ -560,7 +560,7 @@ export interface NotInitializedView {
   /** Display path (~) */
   label: string
   /** Why the file is left alone instead of the tool's first run: COPILOT_HOME/GROK_HOME points elsewhere, or the file has JSONC syntax */
-  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'jsoncUnsupported'
+  reason?: 'copilotHomeOverride' | 'grokHomeOverride' | 'qwenHomeOverride' | 'jsoncUnsupported'
 }
 
 export interface DeleteCandidateRequest {
@@ -1124,8 +1124,6 @@ export interface ApplyPreviewView {
   errors: string[]
   /** Generated permission changes; no authentication or raw configuration values. */
   policies?: ApplyPreviewPolicy[]
-  /** Conversion notes for the tools in use, including skipped unsupported formats. */
-  notes?: { tool: ToolId; path: string; text: string }[]
   notInitialized: NotInitializedView[]
   libraryDirect: LibraryDirectItem[]
   /** Rules edited on the tool side */

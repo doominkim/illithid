@@ -218,18 +218,6 @@ export function ApplyPreviewBody({
           </Table>
         </Box>
       )}
-      {(view.notes?.length ?? 0) > 0 && (
-        <Box data-testid="apply-preview-notes" style={{ maxHeight: 160, overflow: 'auto' }}>
-          <Text fw={600} size="sm">
-            {t('preview.notes')}
-          </Text>
-          {view.notes!.map((n, i) => (
-            <Text key={`${n.tool}:${n.path}:${i}`} size="xs" c="dimmed">
-              {TOOL_NAME[n.tool]} · {n.path}: {n.text}
-            </Text>
-          ))}
-        </Box>
-      )}
       {!view.libraryMissing && tools.length === 0 && (
         <Text size="md" c="dimmed" data-testid="apply-preview-empty">
           {t('preview.nothing')}

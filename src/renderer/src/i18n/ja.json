@@ -119,7 +119,8 @@
     "description": "Description",
     "body": "本文 (SKILL.md の説明の下)",
     "files": "ファイル",
-    "disabledInGemini": "Gemini CLI の設定で無効"
+    "disabledInGemini": "Gemini CLI の設定で無効",
+    "disabledInQwen": "Qwen Code の設定で無効"
   },
   "mcp": {
     "transport": "トランスポート",
@@ -249,6 +250,7 @@
     "notInitialized": "{{tool}} を一度起動してから再度反映してください",
     "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "grokHomeOverride": "GROK_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
+    "qwenHomeOverride": "QWEN_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "jsoncUnsupported": "opencode.jsonc にコメントがあるため {{tool}} の設定は書き込みません — コメントを削除すると反映されます",
     "why": {
       "lastSyncFailed": "前回の同期に失敗: {{reason}}",
@@ -581,8 +583,7 @@
     "policies": "権限の変更",
     "policyKey": "設定",
     "before": "変更前",
-    "after": "変更後",
-    "notes": "変換に関する情報"
+    "after": "変更後"
   },
   "onboarding": {
     "title": "Illithid をはじめる",
@@ -932,14 +933,16 @@
       "codex": "stdin の JSON: tool_name, tool_input",
       "gemini": "stdin の JSON: tool_name, tool_input",
       "copilot": "stdin の JSON: toolName, toolArgs (JSON 文字列)",
-      "grok": "stdin の JSON: toolName, toolInput"
+      "grok": "stdin の JSON: toolName, toolInput",
+      "qwen": "stdin の JSON: tool_name, tool_input"
     },
     "toolBlock": {
       "claude": "exit 2 (stderr が理由) または JSON hookSpecificOutput.permissionDecision",
       "codex": "exit 2 または JSON permissionDecision: deny",
       "gemini": "exit 2 または JSON decision: deny",
       "copilot": "0 以外の終了コードまたは JSON permissionDecision: deny (エラーでも止まる)",
-      "grok": "exit 2 または JSON decision: deny"
+      "grok": "exit 2 または JSON decision: deny",
+      "qwen": "exit 2 (stderr が理由) または JSON hookSpecificOutput.permissionDecision"
     },
     "codexTrust": "Codex は新しいフックや変更したフックを /hooks で信頼するまで実行しません。",
     "grokViaClaude": "Grok は Claude Code の設定からこのフックを実行します",

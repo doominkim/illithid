@@ -5,6 +5,7 @@ import geminiSvg from '@lobehub/icons-static-svg/icons/geminicli-color.svg?raw'
 import copilotSvg from '@lobehub/icons-static-svg/icons/githubcopilot.svg?raw'
 import grokSvg from '@lobehub/icons-static-svg/icons/grok.svg?raw'
 import opencodeSvg from '@lobehub/icons-static-svg/icons/opencode.svg?raw'
+import qwenSvg from '@lobehub/icons-static-svg/icons/qwen-color.svg?raw'
 import type { ToolId } from '../../../shared/api'
 
 /** Tools with icons: sync target tools + cursor for artifact attribution */
@@ -18,6 +19,7 @@ const SVG: Record<IconToolId, string> = {
   gemini: geminiSvg,
   copilot: copilotSvg,
   grok: grokSvg,
+  qwen: qwenSvg,
   cursor: cursorSvg
 }
 
@@ -36,6 +38,7 @@ const MARKUP: Record<IconToolId, { __html: string }> = {
   gemini: { __html: fit(SVG.gemini) },
   copilot: { __html: fit(SVG.copilot) },
   grok: { __html: fit(SVG.grok) },
+  qwen: { __html: fit(SVG.qwen) },
   cursor: { __html: fit(SVG.cursor) }
 }
 

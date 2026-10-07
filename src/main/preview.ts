@@ -104,18 +104,14 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
     new Set(hookRecords.filter((r) => c.retired?.includes(r.path)).map((r) => r.name))
   const items: ApplyPreviewItem[] = []
   const policies: ApplyPreviewPolicy[] = []
-  const notes: NonNullable<ApplyPreviewView['notes']> = []
 
   // Config files: several targets can write one file (opencode.json) — one row per file
   const files = new Map<string, ApplyPreviewItem>()
   const errors = [...p.errors]
   for (const c of p.targets) {
     const tool = TARGET_TOOL.get(c.id)
-    if (tool && inUse.includes(tool)) {
-      notes.push(...c.notes.map((text) => ({ tool, path: c.label, text })))
-      if (!c.error && c.changed)
-        policies.push(...policyDiff(tool, c.label, c.id, c.before, c.after))
-    }
+    if (tool && inUse.includes(tool) && !c.error && c.changed)
+      policies.push(...policyDiff(tool, c.label, c.id, c.before, c.after))
     for (const [name, error] of Object.entries(c.serverErrors ?? {}))
       errors.push(`${c.label} · ${name}: ${error}`)
     if (c.error) {
@@ -223,9 +219,8 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
     importedChanged,
     errors,
     policies,
-    notes,
     notInitialized: notInitializedOf(p.targets),
-    libraryDirect: libraryDirect(home, inUse, items),
+    libraryDirect: libraryDirect(home, inUse, items, p),
     edited: editedRules(home, env).map((e) => ({
       tool: e.tool,
       name: e.name,
@@ -388,11 +383,17 @@ function skillDenyDiff(
 function libraryDirect(
   home: string,
   inUse: ToolId[],
-  items: ApplyPreviewItem[]
+  items: ApplyPreviewItem[],
+  p: SyncPlan
 ): LibraryDirectItem[] {
   if (!inUse.includes('opencode')) return []
   const mf = readManifest(home)
   if (mf.error) return []
+  // Items another tool already has as is: an add is a first copy to a newly used tool, not a library change
+  const steady = new Set([
+    ...p.rules.filter((x) => x.action === 'inSync').map((x) => `rule:${x.name}`),
+    ...p.skills.filter((x) => x.action === 'inSync').map((x) => `skill:${x.name}`)
+  ])
   const listed = new Set(
     items.filter((x) => x.tool === 'opencode').map((x) => `${x.kind}:${x.name}`)
   )
@@ -401,7 +402,7 @@ function libraryDirect(
     if (x.tool === 'opencode' || x.parent || (x.kind !== 'rule' && x.kind !== 'skill')) continue
     if (x.action !== 'add' && x.action !== 'update' && x.action !== 'replace') continue
     const k = `${x.kind}:${x.name}`
-    if (listed.has(k) || out.has(k)) continue
+    if (listed.has(k) || out.has(k) || (x.action === 'add' && steady.has(k))) continue
     if (!isEnabled(mf.manifest, x.kind === 'rule' ? 'rules' : 'skills', x.name, 'opencode'))
       continue
     out.set(k, { tool: 'opencode', kind: x.kind, name: x.name })
