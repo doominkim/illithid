@@ -44,12 +44,7 @@ jobs:
       - run: npm run test:ui
 
   package-windows:
-    # Both installers are built on x64 Windows: an installer built on the ARM runner left the app's .exe and .dll files out
-    # when it installed. arm64 is a cross build with the arm64 credential-store module added
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x64, arm64]
+    # The x64 installer (ARM PCs run it through Windows' x64 emulation: an arm64 installer left the app's binaries out)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,28 +53,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: arm64 native module
-        if: matrix.arch == 'arm64'
-        run: npm install --no-save --force @napi-rs/keyring-win32-arm64-msvc@2.1.0
       - run: npm run build
-      - run: npx electron-builder --win --${{ matrix.arch }} --publish never
+      - run: npx electron-builder --win --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: ci-setup-${{ matrix.arch }}
-          path: dist/illithid-${{ matrix.arch }}-setup.exe
+          name: ci-setup-x64
+          path: dist/illithid-x64-setup.exe
           if-no-files-found: error
 
   smoke-windows:
-    # Install each installer silently on its own architecture and launch the installed app
+    # Install the installer silently on x64 and on ARM, and launch the installed app on each
     needs: package-windows
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-          - arch: arm64
-            runner: windows-11-arm
+        runner: [windows-latest, windows-11-arm]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -90,53 +78,19 @@ jobs:
       - run: npm ci
       - uses: actions/download-artifact@v4
         with:
-          name: ci-setup-${{ matrix.arch }}
+          name: ci-setup-x64
           path: dist
       - name: Install silently
         shell: pwsh
         run: |
-          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.arch }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
+          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-x64-setup.exe" -ArgumentList '/S','/D=C:\illithid-smoke'
           "installer exit code: $($p.ExitCode)"
-          Get-ChildItem C:\illithid-smoke -Include *.exe,*.dll -Recurse | Select-Object FullName, Length | Format-Table
       - name: Launch the installed app
         run: npx tsx scripts/smoke-packaged.ts C:\illithid-smoke\illithid.exe
       - name: Keep the failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-failure-${{ matrix.arch }}
+          name: smoke-failure-${{ matrix.runner }}
           path: smoke-failure.png
           if-no-files-found: ignore
-
-  diag-windows-install:
-    # Temporary: where does the arm64 install lose the app's binaries — the installer or the ARM machine?
-    needs: package-windows
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - setup: arm64
-            runner: windows-latest
-          - setup: x64
-            runner: windows-11-arm
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - uses: actions/download-artifact@v4
-        with:
-          name: ci-setup-${{ matrix.setup }}
-          path: dist
-      - name: Install ${{ matrix.setup }} on ${{ matrix.runner }}
-        shell: pwsh
-        run: |
-          $p = Start-Process -Wait -PassThru -FilePath "dist\illithid-${{ matrix.setup }}-setup.exe" -ArgumentList '/S','/D=C:\illithid-diag'
-          "installer exit code: $($p.ExitCode)"
-          Get-ChildItem C:\illithid-diag -Include *.exe,*.dll -Recurse | Select-Object FullName, Length | Format-Table
-      - name: Launch (x64 app under emulation on ARM)
-        if: matrix.setup == 'x64'
-        run: npx tsx scripts/smoke-packaged.ts C:\illithid-diag\illithid.exe

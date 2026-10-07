@@ -70,7 +70,7 @@ brew install --cask doominkim/tap/illithid
 
 ### Windows(测试版)
 
-从[最新发布](https://github.com/doominkim/illithid/releases/latest)下载 `illithid-x64-setup.exe`(ARM 电脑下载 `illithid-arm64-setup.exe`)并运行。安装程序尚未进行代码签名,SmartScreen 可能会提示警告,请选择**更多信息 → 仍要运行**。
+从[最新发布](https://github.com/doominkim/illithid/releases/latest)下载 `illithid-x64-setup.exe` 并运行(ARM 电脑通过 Windows 的 x64 仿真运行)。安装程序尚未进行代码签名,SmartScreen 可能会提示警告,请选择**更多信息 → 仍要运行**。
 
 Windows 版会同步规则、技能、子代理、MCP 服务器、权限和默认模型,并将 MCP 密钥保存在 Windows 凭据管理器中。钩子目前还不会在 Windows 上写入工具。
 
@@ -100,7 +100,7 @@ Windows 版会同步规则、技能、子代理、MCP 服务器、权限和默�
 退出并卸载应用即可。Illithid 写入的只是普通的规则、技能和配置项，各工具会继续正常工作。如果只想停止同步某个工具，在设置中关闭它即可，预览会列出将被清理的项目。
 
 **支持 Windows 吗?**
-支持,目前为测试版(Windows 10 和 11,x64 和 ARM)。钩子暂时只在 macOS 上生效,其余内容都会同步。
+支持,目前为测试版:x64 电脑上的 Windows 10 和 11,以及通过 x64 仿真运行的 Windows 11 ARM 电脑。钩子暂时只在 macOS 上生效,其余内容都会同步。
 
 ## 从源码构建
 

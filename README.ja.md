@@ -70,7 +70,7 @@ brew install --cask doominkim/tap/illithid
 
 ### Windows (ベータ)
 
-[最新リリース](https://github.com/doominkim/illithid/releases/latest)から `illithid-x64-setup.exe`(ARM PC は `illithid-arm64-setup.exe`)をダウンロードして実行してください。インストーラーはまだコード署名されていないため、SmartScreen の警告が出ることがあります。**詳細情報 → 実行**を選んでください。
+[最新リリース](https://github.com/doominkim/illithid/releases/latest)から `illithid-x64-setup.exe` をダウンロードして実行してください(ARM PC では Windows の x64 エミュレーションで動作します)。インストーラーはまだコード署名されていないため、SmartScreen の警告が出ることがあります。**詳細情報 → 実行**を選んでください。
 
 Windows 版はルール、スキル、サブエージェント、MCP サーバー、権限、既定のモデルを同期し、MCP のシークレットは Windows 資格情報マネージャーに保管します。フックはまだ Windows ではツールに書き込みません。
 
@@ -100,7 +100,7 @@ Windows 版はルール、スキル、サブエージェント、MCP サーバ�
 アプリを終了してアンインストールするだけです。Illithid が書いたのは普通のルール、スキル、設定項目なので、各ツールはそのまま動きます。1 つのツールだけ同期をやめるには、設定でそのツールをオフにします。片付く項目はプレビューに表示されます。
 
 **Windows でも使えますか?**
-はい、ベータとして対応しています(Windows 10・11、x64・ARM)。フックは当面 macOS のみで、それ以外はすべて同期されます。
+はい、ベータとして対応しています。x64 PC の Windows 10・11 と、Windows 11 の ARM PC(x64 エミュレーション)で動作します。フックは当面 macOS のみで、それ以外はすべて同期されます。
 
 ## ソースからビルド
 

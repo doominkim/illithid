@@ -73,7 +73,7 @@ Or download the DMG above.
 
 ### Windows (beta)
 
-Download `illithid-x64-setup.exe` (or `illithid-arm64-setup.exe` for ARM PCs) from the [latest release](https://github.com/doominkim/illithid/releases/latest) and run it. The installer is not code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**.
+Download `illithid-x64-setup.exe` from the [latest release](https://github.com/doominkim/illithid/releases/latest) and run it (ARM PCs run it through Windows' x64 emulation). The installer is not code-signed yet, so SmartScreen may warn: choose **More info → Run anyway**.
 
 The Windows build syncs rules, skills, subagents, MCP servers, permissions and default models, and keeps MCP secrets in Windows Credential Manager. Hooks are not written to tools on Windows yet.
 
@@ -103,7 +103,7 @@ On first run Illithid offers to import what you have. Imported originals are bac
 Quit the app and uninstall. The files it wrote are plain rules, skills and config entries, so your tools keep working. To stop syncing one tool, turn it off in Settings; the preview shows what Illithid removes from it.
 
 **Does it run on Windows?**
-Yes, as a beta (Windows 10 and 11, x64 and ARM). Hooks stay macOS-only for now; everything else syncs.
+Yes, as a beta: Windows 10 and 11 on x64 PCs, and ARM PCs on Windows 11 through its x64 emulation. Hooks stay macOS-only for now; everything else syncs.
 
 ## Build from source
 

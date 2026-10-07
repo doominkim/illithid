@@ -13,11 +13,11 @@ asarUnpack:
   - resources/**
 win:
   executableName: illithid
-  # One architecture per run (`electron-builder --win --x64` / `--arm64`, as the release workflow does). Listing both here
-  # builds both plus a combined installer in every run, and the arm64 app lost its .exe that way
+  # x64 only for now (`electron-builder --win --x64`): ARM PCs run it through Windows' x64 emulation. An arm64 installer
+  # installed without the app's .exe and .dll files (electron-builder 26, checked in CI 2026-10-07)
   target: nsis
 nsis:
-  # One installer per architecture, fixed names like the DMGs (the update dialog points to them)
+  # Fixed name like the DMGs (the update dialog and README point to it)
   artifactName: ${name}-${arch}-setup.${ext}
   oneClick: false
   perMachine: false

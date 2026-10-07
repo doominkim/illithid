@@ -70,7 +70,7 @@ brew install --cask doominkim/tap/illithid
 
 ### Windows (베타)
 
-[최신 릴리스](https://github.com/doominkim/illithid/releases/latest)에서 `illithid-x64-setup.exe`(ARM PC는 `illithid-arm64-setup.exe`)를 받아 실행하세요. 설치 파일은 아직 코드 서명이 없어 SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 누르세요.
+[최신 릴리스](https://github.com/doominkim/illithid/releases/latest)에서 `illithid-x64-setup.exe`를 받아 실행하세요(ARM PC에서는 Windows의 x64 에뮬레이션으로 동작합니다). 설치 파일은 아직 코드 서명이 없어 SmartScreen 경고가 뜰 수 있습니다. **추가 정보 → 실행**을 누르세요.
 
 Windows 빌드는 룰, 스킬, 서브에이전트, MCP 서버, 권한, 기본 모델을 동기화하고 MCP 비밀값은 Windows 자격 증명 관리자에 보관합니다. 훅은 아직 Windows에서 도구에 쓰지 않습니다.
 
@@ -100,7 +100,7 @@ Windows 빌드는 룰, 스킬, 서브에이전트, MCP 서버, 권한, 기본 �
 앱을 종료하고 삭제하면 됩니다. Illithid가 쓴 파일은 평범한 룰, 스킬, 설정 항목이라 각 툴은 계속 동작합니다. 한 툴만 동기화를 멈추려면 설정에서 그 툴을 끄세요. 미리보기에 치울 항목이 나옵니다.
 
 **Windows에서도 되나요?**
-네, 베타로 지원합니다(Windows 10·11, x64·ARM). 훅은 당분간 macOS에서만 동작하고 나머지는 모두 동기화됩니다.
+네, 베타로 지원합니다. x64 PC의 Windows 10·11, 그리고 Windows 11 ARM PC(x64 에뮬레이션)에서 동작합니다. 훅은 당분간 macOS에서만 동작하고 나머지는 모두 동기화됩니다.
 
 ## 소스에서 빌드
 
