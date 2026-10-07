@@ -30,6 +30,7 @@
     <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
     <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
     <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+    <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
   </tr>
 </table>
 
@@ -47,13 +48,13 @@ Import the configuration you already use. Choose your tools and review every cha
 
 ## Automate checks with hooks.
 
-Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot, and Grok CLI, each in its own format. Pick when it runs, then run your own script or check the work with a plain-language rule. Keep shared scripts in the library; a script can be a folder with its own helper files.
+Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot, Grok CLI, and Qwen Code, each in its own format. Pick when it runs, then run your own script or check the work with a plain-language rule. Keep shared scripts in the library; a script can be a folder with its own helper files. Hooks run on macOS; on Windows they stay in the library for now.
 
 <p align="center"><img src="docs/demo/hooks.gif" width="960" alt="A new hook that checks, when a reply finishes, that the tests pass, applied to the tools"></p>
 
 ## Decide which commands agents can run.
 
-Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, and GitHub Copilot, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, and OpenCode.
+Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, GitHub Copilot, and Qwen Code, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, OpenCode, and Qwen Code.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="A git group that blocks force pushes and hard resets and allows git status, applied to four tools"></p>
 
@@ -83,7 +84,7 @@ The Windows build syncs rules, skills, subagents, MCP servers, permissions and d
 - **Sessions**: search and resume past conversations.
 - **Memory**: review and promote agent memories to the shared library.
 - **Artifacts**: browse reports, documents, and images produced by your agents.
-- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git. Configured builds can sign in with GitHub and create a private backup repository; existing repository URLs remain supported. See [GitHub backup setup](docs/github-backup.md).
+- **Workspaces & backup**: keep separate setups, export or import them, and back up the library with Git. Sign in with GitHub to create a private backup repository, or connect an existing repository URL. See [GitHub backup setup](docs/github-backup.md).
 
 ## Safe by default
 

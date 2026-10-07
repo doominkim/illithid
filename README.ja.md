@@ -27,6 +27,7 @@
     <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
     <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
     <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+    <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
   </tr>
 </table>
 
@@ -44,13 +45,13 @@
 
 ## フックでチェックを自動化
 
-フックを一度作れば、Claude Code、Codex、Gemini CLI、GitHub Copilot、Grok CLI でそれぞれの形式で実行されます。実行するタイミングを選び、自分のスクリプトを実行するか、自然言語のルールで結果を確認できます。共有スクリプトはライブラリに置き、補助ファイルを含むフォルダとしても作れます。
+フックを一度作れば、Claude Code、Codex、Gemini CLI、GitHub Copilot、Grok CLI、Qwen Code でそれぞれの形式で実行されます。実行するタイミングを選び、自分のスクリプトを実行するか、自然言語のルールで結果を確認できます。共有スクリプトはライブラリに置き、補助ファイルを含むフォルダとしても作れます。フックは macOS で動作し、Windows では当面ライブラリに保管されるだけです。
 
 <p align="center"><img src="docs/demo/hooks.gif" width="960" alt="応答の終了時にテストが通るか確認する新しいフックを作り、ツールに反映"></p>
 
 ## エージェントが実行できるコマンドを決める
 
-シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。 MCP サーバーも同じように決められます。サーバーの権限タブで全ツールの既定値を決め、ツールごとに個別に変えると、Claude Code、Codex、Gemini CLI、OpenCode に反映されます。
+シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot、Qwen Code にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。 MCP サーバーも同じように決められます。サーバーの権限タブで全ツールの既定値を決め、ツールごとに個別に変えると、Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code に反映されます。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="force push と hard reset をブロックし git status を許可する git グループを 4 つのツールに反映"></p>
 
@@ -80,7 +81,7 @@ Windows 版はルール、スキル、サブエージェント、MCP サーバ�
 - **セッション**: 過去の会話を検索し、作業を再開できます。
 - **メモリ**: エージェントのメモリを見直し、共有ライブラリへ取り込めます。
 - **成果物**: エージェントが作成したレポート、文書、画像をまとめて閲覧できます。
-- **ワークスペースとバックアップ**: 設定を分けて管理し、エクスポートやインポート、Git バックアップを利用できます。
+- **ワークスペースとバックアップ**: 設定を分けて管理し、エクスポートやインポート、Git バックアップを利用できます。GitHub でサインインして非公開のバックアップリポジトリを作るか、既存のリポジトリ URL を接続できます。[GitHub バックアップの設定](docs/github-backup.md)を参照してください。
 
 ## 安全なデフォルト
 
@@ -91,7 +92,7 @@ Windows 版はルール、スキル、サブエージェント、MCP サーバ�
 ## よくある質問
 
 **コードやプロンプトは Illithid を経由しますか?**
-いいえ。Illithid はどのモデル API とも通信しません。ローカルの設定ファイルを編集し、ローカルのセッションログを読むだけです。ネットワークを使うのは Git バックアップ（リモートを接続した場合のみ）、アップデートの確認、マーケットだけです。マーケットは skills.sh、公式 MCP レジストリ、GitHub にアクセスし、設定でオフにできます。新しいバージョンが出ているかも 1 日 1 回 GitHub に確認します。設定 → アップデートでオフにできます。
+いいえ。Illithid はどのモデル API とも通信しません。ローカルの設定ファイルを編集し、ローカルのセッションログを読むだけです。ネットワークを使うのは Git バックアップ（リモートを接続した場合のみ）、GitHub バックアップのサインインとリポジトリ設定（任意）、アップデートの確認、マーケットだけです。マーケットは skills.sh、公式 MCP レジストリ、GitHub にアクセスし、設定でオフにできます。新しいバージョンが出ているかも 1 日 1 回 GitHub に確認します。設定 → アップデートでオフにできます。
 
 **既存の設定は上書きされますか?**
 初回起動時に、今の設定をインポートするか確認します。インポートした元のファイルは、Illithid が管理を始める前にバックアップされます。
