@@ -22,11 +22,11 @@
 <table align="center">
   <tr>
     <td align="center"><img src="docs/agents/claude.svg" width="40" height="40" alt="Claude Code"><br>Claude Code</td>
-    <td align="center"><img src="docs/agents/codex.svg" width="40" height="40" alt="Codex"><br>Codex</td>
-    <td align="center"><img src="docs/agents/opencode.svg" width="40" height="40" alt="OpenCode"><br>OpenCode</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/codex-dark.svg"><img src="docs/agents/codex.svg" width="40" height="40" alt="Codex"></picture><br>Codex</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/opencode-dark.svg"><img src="docs/agents/opencode.svg" width="40" height="40" alt="OpenCode"></picture><br>OpenCode</td>
     <td align="center"><img src="docs/agents/gemini.svg" width="40" height="40" alt="Gemini CLI"><br>Gemini CLI</td>
-    <td align="center"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"><br>GitHub Copilot</td>
-    <td align="center"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"><br>Grok CLI</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/copilot-dark.svg"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"></picture><br>GitHub Copilot</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/grok-dark.svg"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"></picture><br>Grok CLI</td>
     <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
   </tr>
 </table>
