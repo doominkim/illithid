@@ -36,6 +36,9 @@ import {
   disconnect,
   history,
   pullOnStart,
+  pullFromRemote,
+  PULL_DIVERGED,
+  PULL_LOCAL_UNSAVED,
   readSessionTranscript,
   restore,
   snapshot,
@@ -875,13 +878,15 @@ export function registerIpc(): void {
         if (!login || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(str(name)))
           throw new GitHubBackupError('invalidRepositoryName')
         const url = `https://github.com/${login}/${str(name)}.git`
-        await client.gitCredentials(url)
+        const auth = await client.gitCredentials(url)
         assertWorkspaceCurrent(home, origin)
         const root = libraryRoot(home)
         W.markSelfWrite(5000)
-        const result = await connectBackup(home, url)
+        const result = await connectBackup(home, url, { auth })
         if (!result.ok) throw new GitHubBackupError('connectionFailed')
         bindGithubBackup(root, url)
+        // Take what the remote already has (empty library / fast-forward); anything else surfaces as remoteError
+        await pullAndSync(home)
         return backupView()
       })
     },
@@ -893,8 +898,10 @@ export function registerIpc(): void {
       W.markSelfWrite(5000)
       const root = libraryRoot(home)
       const r = fromGit(await connectBackup(home, str(url)))
-      if (r.ok) unbindGithubBackup(root)
-      return r.ok ? { ok: true, value: await backupView() } : r
+      if (!r.ok) return r
+      unbindGithubBackup(root)
+      await pullAndSync(home)
+      return { ok: true, value: await backupView() }
     },
     backupSnapshot: async (message) => {
       const g = W.libGate(home)
@@ -932,6 +939,43 @@ export function registerIpc(): void {
       const sync = W.syncNow(home, env)
       W.markSelfWrite(3000)
       return { ok: true, value: sync }
+    },
+    backupPull: async (replaceLocal) => {
+      const origin = captureWorkspace(home)
+      const g = W.libGate(home)
+      if (g) return g
+      const root = libraryRoot(home)
+      W.markSelfWrite(8000)
+      const r = await pullFromRemote(home, {
+        auth: githubAuthForWorkspace(home, activeWorkspaceId(home)),
+        replaceLocal: replaceLocal === true
+      })
+      if (!r.ok && (r.reason === PULL_LOCAL_UNSAVED || r.reason === PULL_DIVERGED)) {
+        backupErrors.set(root, r.reason)
+        return { ok: true, value: { outcome: 'confirmRequired', reason: r.reason } }
+      }
+      if (!r.ok) {
+        backupErrors.set(root, r.reason)
+        return fromGit(r)
+      }
+      backupErrors.delete(root)
+      const env = await envNow()
+      const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
+      if (!unchanged.ok) return unchanged
+      advanceWorkspaceRevision()
+      // A merge/adopt leaves a local commit the remote does not have yet
+      if (r.merged !== 'upToDate') scheduleAutoBackup(home)
+      const sync = W.syncNow(home, env)
+      W.markSelfWrite(3000)
+      return {
+        ok: true,
+        value: {
+          outcome: 'pulled',
+          merged: r.merged,
+          ...(r.backupPath ? { backupPath: tilde(home, r.backupPath) } : {}),
+          sync
+        }
+      }
     },
     backupDisconnect: async () => {
       const g = W.libGate(home)
@@ -1187,9 +1231,12 @@ export async function snapshotOnQuit(): Promise<void> {
   }
 }
 
-/** On app start: pull from remote (only when connected) and sync if anything changed */
-export async function pullOnStartAndSync(): Promise<void> {
-  const { home } = resolveHome()
+/**
+ * Catch up with the remote without touching unsaved local work (empty library or fast-forward only) and sync if
+ * anything changed. Refusals (localUnsaved / diverged / offline) are kept as the workspace's remoteError so the
+ * Backup screen can offer the confirmed pull. Used on app start and right after connecting a remote.
+ */
+async function pullAndSync(home: string): Promise<void> {
   if (!W.libraryState(home).ready) return
   try {
     W.markSelfWrite(8000)
@@ -1208,6 +1255,12 @@ export async function pullOnStartAndSync(): Promise<void> {
   } catch {
     // Offline etc. — skip silently
   }
+}
+
+/** On app start: pull from remote (only when connected) and sync if anything changed */
+export async function pullOnStartAndSync(): Promise<void> {
+  const { home } = resolveHome()
+  await pullAndSync(home)
 }
 
 /** After a workspace switch, move the watcher to the new root without waiting for the 5s poll */

@@ -451,6 +451,13 @@
     "localSaved": "Saved locally",
     "remotePending": "Remote upload pending",
     "remoteFailed": "Remote synchronization failed",
+    "pull": "Pull from remote",
+    "pullReplace": "Take the remote backup",
+    "pullTitle": "The remote holds a different backup history",
+    "pullBody": "This device's library is not yet a continuation of the remote backup. Taking the remote backup replaces files with the same name with the remote version; the current files are first copied to {{dir}}. Local files that do not collide stay and go into the next snapshot. Changes that reach the tools are shown before they are applied.",
+    "pulled": "Pulled the remote backup",
+    "pulledBackupAt": "Previous files copied to {{path}}",
+    "behindHint": "{{n}} remote snapshots not on this device",
     "github": {
       "title": "GitHub backup",
       "notConfigured": "GitHub sign-in is not available in this build yet. You can still connect an existing repository URL.",

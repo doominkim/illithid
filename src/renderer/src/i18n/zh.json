@@ -451,6 +451,13 @@
     "localSaved": "已保存到本地",
     "remotePending": "等待上传到远程",
     "remoteFailed": "远程同步失败",
+    "pull": "从远程获取",
+    "pullReplace": "采用远程备份",
+    "pullTitle": "远程存在不同的备份历史",
+    "pullBody": "此设备的库尚未与远程备份历史衔接。采用远程备份后，同名文件将替换为远程内容，当前文件会先复制到 {{dir}}。不冲突的本地文件会保留并计入下一次快照。应用到工具的变更会在应用前显示。",
+    "pulled": "已获取远程备份",
+    "pulledBackupAt": "先前文件的副本：{{path}}",
+    "behindHint": "此设备缺少 {{n}} 个远程快照",
     "github": {
       "title": "GitHub 备份",
       "notConfigured": "此版本尚未配置 GitHub 登录。您仍可通过现有仓库 URL 连接。",

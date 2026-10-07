@@ -164,6 +164,10 @@ export {
   history,
   restore,
   pullOnStart,
+  pullFromRemote,
+  PULL_LOCAL_UNSAVED,
+  PULL_DIVERGED,
+  PULL_NO_REMOTE_BRANCH,
   disconnect,
   deviceName,
   validateRemoteUrl,
@@ -171,7 +175,15 @@ export {
   BACKUP_EXCLUDES,
   BACKUP_NOT_INCLUDED
 } from './backup'
-export type { BackupStatus, Snapshot, SnapshotResult, RestoreResult, PullResult } from './backup'
+export type {
+  BackupStatus,
+  Snapshot,
+  SnapshotResult,
+  RestoreResult,
+  PullResult,
+  RemotePullResult,
+  RemoteProbe
+} from './backup'
 export { deliverFile, deliverDir, deliveredShape, shapeMatches, DELIVER_STRATEGY } from './deliver'
 export type { DeliverStrategy, DeliveredShape } from './deliver'
 export { watchLibrary, isIgnoredLibraryPath } from './watch'
