@@ -15,7 +15,7 @@ import { simpleGit, type SimpleGit } from 'simple-git'
 import { APP_CONFIG_DIR, libraryRoot, readConfig, workspaceIds, workspaceRoot } from './config'
 import { backupGitEnvironment, type BackupGitAuth } from './backupGitAuth'
 import { MANIFEST_FILE } from './manifest'
-import { GIT_CONFIG, type GitResult } from './git'
+import type { GitResult } from './git'
 import { libraryExists } from './sources'
 import { atomicWrite, LEGACY_TMP_TAGS, TMP_TAG } from './write'
 
@@ -98,7 +98,7 @@ export type RestoreResult = GitResult<{
 export type PullResult = GitResult<{ summary: string; skipped?: 'noRemote' | 'notInitialized' }>
 
 function git(dir: string): SimpleGit {
-  return simpleGit({ baseDir: dir, config: GIT_CONFIG })
+  return simpleGit({ baseDir: dir })
 }
 
 function reasonOf(e: unknown): string {
@@ -291,6 +291,8 @@ export async function connectBackup(
     let initialized = false
     if (!isRepo(root)) {
       await git(root).raw(['init', '-q', `--initial-branch=${BACKUP_DEFAULT_BRANCH}`])
+      // Library files are LF: keep Git for Windows' autocrlf default from rewriting them in a repo the app creates
+      await git(root).raw(['config', 'core.autocrlf', 'false'])
       initialized = true
     }
     const g = git(root)
