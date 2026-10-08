@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, sep } from 'node:path'
 import fg from 'fast-glob'
 import { tilde } from '../agents'
+import { isUnder, toPosix } from '../pathUtil'
 import { expandHome, libraryRoot, readConfig } from '../config'
 import { pathId, readHead } from './common'
 
@@ -93,7 +94,7 @@ function configuredArtifactSources(home: string): ArtifactSource[] {
     if (!expanded) continue
     const root = expanded.replace(/[\\/]+$/, '') || expanded
     out.push({
-      label: c.label ?? tilde(home, root),
+      label: c.label ?? artifactSourceKey(home, root),
       root,
       mode: c.mode ?? 'dir',
       ...(c.depth ? { depth: c.depth } : {}),
@@ -101,6 +102,11 @@ function configuredArtifactSources(home: string): ArtifactSource[] {
     })
   }
   return out
+}
+
+/** `~/…` with forward slashes for a path under home (the form config.json and the Settings list use on every platform), else the path */
+export function artifactSourceKey(home: string, p: string): string {
+  return isUnder(home, p) ? '~/' + toPosix(relative(home, p)) : p
 }
 
 /** One row of the Settings list: built-in locations (existing ones only) first, then every configured one */
@@ -115,13 +121,13 @@ export interface ArtifactSourceEntry {
 export function listArtifactSources(home: string): ArtifactSourceEntry[] {
   const out: ArtifactSourceEntry[] = defaultArtifactSources(home).map((s) => ({
     label: s.label,
-    root: tilde(home, s.root),
+    root: artifactSourceKey(home, s.root),
     builtin: true,
     exists: true
   }))
   const seen = new Set(out.map((s) => s.root))
   for (const c of configuredArtifactSources(home)) {
-    const root = tilde(home, c.root)
+    const root = artifactSourceKey(home, c.root)
     if (seen.has(root)) continue
     seen.add(root)
     out.push({ label: c.label, root, builtin: false, exists: existsSync(c.root) })

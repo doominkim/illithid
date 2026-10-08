@@ -24,6 +24,8 @@ import {
   activeWorkspaceId,
   backupStatus,
   listArtifactSources,
+  artifactSourceKey,
+  expandHome,
   readConfig,
   libraryRoot,
   workspaceRoot,
@@ -468,9 +470,10 @@ export function registerIpc(): void {
       const picked = r.canceled ? undefined : r.filePaths[0]
       if (!picked) return { ok: true, value: null }
       return W.wrap(() => {
-        const root = tilde(home, picked)
+        const root = artifactSourceKey(home, picked)
         const cur = readConfig(home).config.artifactSources ?? []
-        if (!cur.some((s) => s.root === root))
+        // Entries may hold the native form (~\x) of the same folder
+        if (!cur.some((s) => expandHome(home, s.root) === expandHome(home, root)))
           W.configSet(home, { artifactSources: [...cur, { root, project: 'first-segment' }] })
         return listArtifactSources(home)
       })
@@ -478,7 +481,8 @@ export function registerIpc(): void {
     artifactSourceRemove: async (root) =>
       W.wrap(() => {
         const cur = readConfig(home).config.artifactSources ?? []
-        const next = cur.filter((s) => s.root !== str(root))
+        const target = expandHome(home, str(root))
+        const next = cur.filter((s) => expandHome(home, s.root) !== target)
         W.configSet(home, { artifactSources: next.length ? next : undefined })
         return listArtifactSources(home)
       }),
