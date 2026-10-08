@@ -268,6 +268,9 @@ async function preview(a: Artifact): Promise<ArtifactPreview> {
 }
 
 /** GitResult → WriteResult */
+/** Artifacts shown in the menu bar popover */
+const TRAY_ARTIFACTS = 10
+
 function fromGit<T extends object>(r: GitResult<T>): WriteResult<T> {
   if (r.ok) {
     const { ok, ...rest } = r
@@ -506,6 +509,12 @@ export function registerIpc(): void {
     detectTools: async () => detectTools(home, await envNow()),
     traySet: async (state) => updateTray(state as TrayState),
     traySessions: async () => traySessions(),
+    trayArtifacts: async () => {
+      const list = await inWorker<Artifact[]>('artifacts', home)
+      // Register the ids so artifactOpen / artifactReveal from the popover resolve them
+      for (const a of list) artifacts.set(a.id, a)
+      return [...list].sort((a, b) => b.mtime.localeCompare(a.mtime)).slice(0, TRAY_ARTIFACTS)
+    },
     trayCommand: async (c) => trayCommand(c as TrayCommand),
     appVersion: async () => app.getVersion(),
     updateStatus: async () => updateAvailable(),

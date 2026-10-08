@@ -455,9 +455,9 @@ export interface TraySession {
   resumeCommand: string
 }
 
-/** Menu bar popover buttons */
+/** Menu bar popover buttons. `hide` closes the popover after an action that opens something else (an artifact) */
 export type TrayCommand =
-  { kind: 'open' | 'settings' | 'update' | 'quit' } | { kind: 'workspace'; id: string }
+  { kind: 'open' | 'settings' | 'update' | 'quit' | 'hide' } | { kind: 'workspace'; id: string }
 
 /** A newer release than the running app */
 export interface UpdateView {
@@ -903,6 +903,8 @@ export interface Api {
   onTrayAction(cb: (a: TrayAction) => void): () => void
   /** Menu bar popover: last read recent sessions (fresh ones follow through onTraySessions) */
   traySessions(): Promise<TraySession[]>
+  /** Menu bar popover: the newest artifacts (same scan as the Artifacts screen, without the search index run) */
+  trayArtifacts(): Promise<Artifact[]>
   /** Menu bar popover buttons */
   trayCommand(c: TrayCommand): Promise<void>
   /** Menu bar popover: recent sessions re-read. Returns an unsubscribe function */
@@ -1301,6 +1303,7 @@ export const CHANNELS = [
   'backupCleanupRun',
   'traySet',
   'traySessions',
+  'trayArtifacts',
   'trayCommand',
   'appVersion',
   'updateStatus',
