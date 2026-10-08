@@ -61,7 +61,14 @@
     "themeHint": "시스템은 macOS 화면 모드를 따릅니다.",
     "themeHintWin": "시스템은 Windows 테마를 따릅니다.",
     "cleanupEnabledHint": "오래된 백업 사본을 휴지통으로 옮깁니다.",
-    "cleanupNowHint": "위 규칙을 지금 한 번 적용합니다."
+    "cleanupNowHint": "위 규칙을 지금 한 번 적용합니다.",
+    "artifactSources": "산출물 위치",
+    "artifactSourcesHint": "산출물 화면과 메뉴 막대 팝오버가 읽는 폴더입니다. 추가한 폴더에서는 바로 아래 폴더 이름이 프로젝트가 됩니다.",
+    "artifactSourceAdd": "폴더 추가",
+    "artifactSourceAdded": "폴더를 추가했습니다",
+    "artifactSourceBuiltin": "기본 위치",
+    "artifactSourceCustom": "추가한 위치",
+    "artifactSourceMissing": "폴더가 없습니다"
   },
   "common": {
     "gridView": "격자 보기",
@@ -884,7 +891,6 @@
     "recorded": "OpenCode 기록 비용",
     "converted": "API 환산 비용",
     "referenceTool": "비교 기준 툴",
-    "mixedTools": "툴 차이가 섞여 있음. 같은 툴을 선택하면 동일한 기준으로 비교할 수 있어.",
     "priceNote": "단가 기준일: {{date}} · {{source}}. API 환산 비용이며 구독 실제 지출이 아님. 대표 비용은 서브에이전트·미완료 요청을 포함한 측정된 모델 턴당 중앙값. 요청 중앙값과 분포는 완료 요청 기준.",
     "turnMedian": "모델 턴당 비용 중앙값",
     "requestMedian": "요청당 비용 중앙값",

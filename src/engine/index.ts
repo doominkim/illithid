@@ -261,7 +261,8 @@ export type { EnsureLibraryResult } from './startup'
 export type { RenamePlan, RenameResult, RenameMove } from './rename'
 export type { AppConfig, ConfigRead, ArtifactSourceConfig } from './config'
 export type { UiPrefs, UiPrefsPatch } from './uiPrefs'
-export { artifactSources } from './scan/artifacts'
+export { artifactSources, artifactSourceKey, listArtifactSources } from './scan/artifacts'
+export type { ArtifactSourceEntry } from './scan/artifacts'
 export {
   readManifest,
   setToggle,

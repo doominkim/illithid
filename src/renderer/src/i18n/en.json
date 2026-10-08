@@ -61,7 +61,14 @@
     "themeHint": "System follows the macOS appearance.",
     "themeHintWin": "System follows the Windows theme.",
     "cleanupEnabledHint": "Moves old backup copies to the Trash.",
-    "cleanupNowHint": "Uses the rules above once, right away."
+    "cleanupNowHint": "Uses the rules above once, right away.",
+    "artifactSources": "Artifact locations",
+    "artifactSourcesHint": "Folders the Artifacts screen and the menu bar popover read. In an added folder, each subfolder becomes a project.",
+    "artifactSourceAdd": "Add folder",
+    "artifactSourceAdded": "Folder added",
+    "artifactSourceBuiltin": "Built in",
+    "artifactSourceCustom": "Added",
+    "artifactSourceMissing": "Folder not found"
   },
   "common": {
     "gridView": "Grid view",
@@ -884,7 +891,6 @@
     "recorded": "Recorded OpenCode cost",
     "converted": "API-equivalent cost",
     "referenceTool": "Reference tool",
-    "mixedTools": "Tool differences are mixed into this comparison.",
     "priceNote": "Price date: {{date}} · {{source}}. API price equivalent, not subscription spending. The representative cost is the median per measured model turn, including subagents and unfinished requests. Request medians and the distribution use completed requests.",
     "turnMedian": "Median cost / model turn",
     "requestMedian": "Median cost / request",

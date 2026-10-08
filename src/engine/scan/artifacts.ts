@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, sep } from 'node:path'
 import fg from 'fast-glob'
 import { tilde } from '../agents'
+import { isUnder, toPosix } from '../pathUtil'
 import { expandHome, libraryRoot, readConfig } from '../config'
 import { pathId, readHead } from './common'
 
@@ -73,21 +74,63 @@ export function defaultArtifactSources(home: string): ArtifactSource[] {
   ].filter((s) => existsSync(s.root))
 }
 
-/** Effective source locations: config.artifactSources ?? defaultArtifactSources */
+/** Effective source locations: the defaults, then config.artifactSources (bad or repeated roots are dropped) */
 export function artifactSources(home: string): ArtifactSource[] {
-  const configured = readConfig(home).config.artifactSources
-  if (!configured) return defaultArtifactSources(home)
+  const out = defaultArtifactSources(home)
+  const seen = new Set(out.map((s) => s.root))
+  for (const c of configuredArtifactSources(home)) {
+    if (seen.has(c.root)) continue
+    seen.add(c.root)
+    out.push(c)
+  }
+  return out
+}
+
+/** config.artifactSources with roots expanded (~/ and absolute only; trailing separators removed). Not deduplicated */
+function configuredArtifactSources(home: string): ArtifactSource[] {
   const out: ArtifactSource[] = []
-  for (const c of configured) {
-    const root = expandHome(home, c.root)
-    if (!root) continue
+  for (const c of readConfig(home).config.artifactSources ?? []) {
+    const expanded = expandHome(home, c.root)
+    if (!expanded) continue
+    const root = expanded.replace(/[\\/]+$/, '') || expanded
     out.push({
-      label: c.label ?? tilde(home, root),
+      label: c.label ?? artifactSourceKey(home, root),
       root,
       mode: c.mode ?? 'dir',
       ...(c.depth ? { depth: c.depth } : {}),
       ...(c.project ? { project: c.project } : {})
     })
+  }
+  return out
+}
+
+/** `~/…` with forward slashes for a path under home (the form config.json and the Settings list use on every platform), else the path */
+export function artifactSourceKey(home: string, p: string): string {
+  return isUnder(home, p) ? '~/' + toPosix(relative(home, p)) : p
+}
+
+/** One row of the Settings list: built-in locations (existing ones only) first, then every configured one */
+export interface ArtifactSourceEntry {
+  label: string
+  /** ~ form, the key for removing a configured entry */
+  root: string
+  builtin: boolean
+  exists: boolean
+}
+
+export function listArtifactSources(home: string): ArtifactSourceEntry[] {
+  const out: ArtifactSourceEntry[] = defaultArtifactSources(home).map((s) => ({
+    label: s.label,
+    root: artifactSourceKey(home, s.root),
+    builtin: true,
+    exists: true
+  }))
+  const seen = new Set(out.map((s) => s.root))
+  for (const c of configuredArtifactSources(home)) {
+    const root = artifactSourceKey(home, c.root)
+    if (seen.has(root)) continue
+    seen.add(root)
+    out.push({ label: c.label, root, builtin: false, exists: existsSync(c.root) })
   }
   return out
 }
