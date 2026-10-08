@@ -139,6 +139,8 @@ export function trayCommand(c: TrayCommand): void {
     case 'workspace':
       send({ kind: 'workspace', id: c.id })
       break
+    case 'hide':
+      break
   }
 }
 
