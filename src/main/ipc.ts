@@ -23,6 +23,8 @@ import { dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import {
   activeWorkspaceId,
   backupStatus,
+  listArtifactSources,
+  readConfig,
   libraryRoot,
   workspaceRoot,
   claudeProjectSlug,
@@ -458,6 +460,28 @@ export function registerIpc(): void {
       shell.showItemInFolder(a.path)
       return { ok: true, value: undefined }
     },
+    artifactSourceList: async () => listArtifactSources(home),
+    artifactSourceAdd: async () => {
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+      const opts = { properties: ['openDirectory'] as 'openDirectory'[] }
+      const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      const picked = r.canceled ? undefined : r.filePaths[0]
+      if (!picked) return { ok: true, value: null }
+      return W.wrap(() => {
+        const root = tilde(home, picked)
+        const cur = readConfig(home).config.artifactSources ?? []
+        if (!cur.some((s) => s.root === root))
+          W.configSet(home, { artifactSources: [...cur, { root, project: 'first-segment' }] })
+        return listArtifactSources(home)
+      })
+    },
+    artifactSourceRemove: async (root) =>
+      W.wrap(() => {
+        const cur = readConfig(home).config.artifactSources ?? []
+        const next = cur.filter((s) => s.root !== str(root))
+        W.configSet(home, { artifactSources: next.length ? next : undefined })
+        return listArtifactSources(home)
+      }),
     artifactThumb: async (id) => {
       const a = typeof id === 'string' ? artifacts.get(id) : undefined
       if (!a || (a.kind !== 'image' && a.kind !== 'html')) return null

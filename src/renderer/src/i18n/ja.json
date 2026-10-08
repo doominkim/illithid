@@ -61,7 +61,14 @@
     "themeHint": "システムは macOS の外観に従います。",
     "themeHintWin": "システムは Windows のテーマに従います。",
     "cleanupEnabledHint": "古いバックアップのコピーをゴミ箱に移します。",
-    "cleanupNowHint": "上のルールを今すぐ一度だけ使います。"
+    "cleanupNowHint": "上のルールを今すぐ一度だけ使います。",
+    "artifactSources": "成果物の場所",
+    "artifactSourcesHint": "成果物画面とメニューバーのポップオーバーが読むフォルダです。追加したフォルダでは直下のフォルダ名がプロジェクトになります。",
+    "artifactSourceAdd": "フォルダを追加",
+    "artifactSourceAdded": "フォルダを追加しました",
+    "artifactSourceBuiltin": "標準の場所",
+    "artifactSourceCustom": "追加した場所",
+    "artifactSourceMissing": "フォルダがありません"
   },
   "common": {
     "gridView": "グリッド表示",
@@ -884,7 +891,6 @@
     "recorded": "OpenCode記録費用",
     "converted": "API換算費用",
     "referenceTool": "比較基準ツール",
-    "mixedTools": "ツールの違いが混在しています。同じツールを選んで比較できます。",
     "priceNote": "単価基準日: {{date}} · {{source}}。API単価換算でありサブスクリプションの実際の支出ではありません。代表費用はサブエージェントと未完了リクエストを含む、計測済みモデルターンあたりの中央値です。リクエスト中央値と分布は完了リクエストが対象です。",
     "turnMedian": "モデルターンあたりの費用の中央値",
     "requestMedian": "リクエストあたりの費用の中央値",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
@@ -15,7 +15,7 @@ import {
   useMantineColorScheme
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { Command, ShieldAlert } from 'lucide-react'
+import { Command, FolderPlus, ShieldAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { PageHeader, SectionTitle } from '../components/PageHeader'
@@ -29,7 +29,7 @@ import { TOOL_NAME, TOOLS } from '../lib/tools'
 import { ToolIcon } from '../components/ToolIcon'
 import { ToolComboDialog } from '../components/ToolComboDialog'
 import { claudeCombos } from '../lib/toolCombos'
-import type { ToolId, ToolsInUseView, UpdateView } from '../../../shared/api'
+import type { ArtifactSourceEntry, ToolId, ToolsInUseView, UpdateView } from '../../../shared/api'
 import { DEFAULT_TOOLS_IN_USE } from '../../../engine/toolIds'
 import { platformKey } from '../lib/platform'
 
@@ -465,6 +465,101 @@ function BackupCleanup(): React.JSX.Element {
   )
 }
 
+/** Artifact locations: the built-in ones (read only) plus folders the user adds; each subfolder of an added one is a project */
+function ArtifactSources(): React.JSX.Element {
+  const { t } = useTranslation()
+  const reload = useReload()
+  const [list, setList] = useState<ArtifactSourceEntry[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = useCallback((): void => {
+    window.api.artifactSourceList().then(setList, () => setList([]))
+  }, [])
+  useEffect(load, [load])
+  const add = async (): Promise<void> => {
+    setBusy('add')
+    const r = await runWrite(window.api.artifactSourceAdd())
+    setBusy(null)
+    if (!r) return
+    setList(r)
+    notifications.show({
+      color: 'accent',
+      message: t('settings.artifactSourceAdded'),
+      autoClose: 2500
+    })
+    reload()
+  }
+  const remove = async (root: string): Promise<void> => {
+    setBusy(root)
+    const r = await runWrite(window.api.artifactSourceRemove(root), {
+      success: t('settings.saved')
+    })
+    setBusy(null)
+    if (!r) return
+    setList(r)
+    reload()
+  }
+  return (
+    <Section
+      title={t('settings.artifactSources')}
+      right={
+        <Button
+          size="xs"
+          variant="default"
+          leftSection={<FolderPlus size={13} />}
+          loading={busy === 'add'}
+          disabled={!!busy}
+          onClick={() => void add()}
+          data-testid="artifact-source-add"
+        >
+          {t('settings.artifactSourceAdd')}
+        </Button>
+      }
+    >
+      <Text size="sm" c="dimmed" mb="xs">
+        {t('settings.artifactSourcesHint')}
+      </Text>
+      <Stack gap={2}>
+        {(list ?? []).map((s) => (
+          <Group
+            key={s.root}
+            justify="space-between"
+            wrap="nowrap"
+            gap="lg"
+            py={4}
+            data-testid={s.builtin ? 'artifact-source-builtin' : 'artifact-source-custom'}
+          >
+            <Box style={{ minWidth: 0, flex: 1 }}>
+              <Text size="sm" ff="monospace" truncate="end" title={s.root}>
+                {s.root}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {s.builtin
+                  ? t('settings.artifactSourceBuiltin')
+                  : s.exists
+                    ? t('settings.artifactSourceCustom')
+                    : t('settings.artifactSourceMissing')}
+              </Text>
+            </Box>
+            {!s.builtin && (
+              <Button
+                size="compact-xs"
+                variant="subtle"
+                color="gray"
+                loading={busy === s.root}
+                disabled={!!busy && busy !== s.root}
+                onClick={() => void remove(s.root)}
+                data-testid="artifact-source-remove"
+              >
+                {t('common.remove')}
+              </Button>
+            )}
+          </Group>
+        ))}
+      </Stack>
+    </Section>
+  )
+}
+
 function Settings(): React.JSX.Element {
   const { t, i18n } = useTranslation()
   const { colorScheme, setColorScheme } = useMantineColorScheme()
@@ -621,6 +716,7 @@ function Settings(): React.JSX.Element {
           />
         </Section>
 
+        <ArtifactSources />
         <BackupCleanup />
 
         <ConfirmModal

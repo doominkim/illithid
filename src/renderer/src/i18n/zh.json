@@ -61,7 +61,14 @@
     "themeHint": "“系统”跟随 macOS 外观。",
     "themeHintWin": "跟随 Windows 主题。",
     "cleanupEnabledHint": "将旧的备份副本移到废纸篓。",
-    "cleanupNowHint": "立即按上面的规则执行一次。"
+    "cleanupNowHint": "立即按上面的规则执行一次。",
+    "artifactSources": "产物位置",
+    "artifactSourcesHint": "产物页面和菜单栏弹出窗口读取的文件夹。在添加的文件夹中，每个直接子文件夹即为一个项目。",
+    "artifactSourceAdd": "添加文件夹",
+    "artifactSourceAdded": "已添加文件夹",
+    "artifactSourceBuiltin": "内置位置",
+    "artifactSourceCustom": "已添加",
+    "artifactSourceMissing": "找不到文件夹"
   },
   "common": {
     "gridView": "网格视图",
@@ -884,7 +891,6 @@
     "recorded": "OpenCode记录费用",
     "converted": "API折算费用",
     "referenceTool": "比较基准工具",
-    "mixedTools": "比较中混有工具差异。请选择相同工具进行比较。",
     "priceNote": "单价日期：{{date}} · {{source}}。API单价换算，并非订阅实际支出。代表费用为已测量的模型轮次中位数，包括子代理和未完成请求。请求中位数及分布以已完成请求为准。",
     "turnMedian": "每次模型轮次的费用中位数",
     "requestMedian": "每次请求的费用中位数",

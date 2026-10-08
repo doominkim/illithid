@@ -1,4 +1,6 @@
 import type { GitHubLoginView } from '../engine/githubBackup'
+import type { ArtifactSourceEntry } from '../engine/scan/artifacts'
+export type { ArtifactSourceEntry }
 /**
  * main ↔ renderer IPC contract. Read channels + library/tool write channels.
  * Engine types are type-only imports, so no engine code ends up in the renderer bundle.
@@ -828,6 +830,12 @@ export interface Api {
   artifactOpen(id: string): Promise<WriteResult>
   /** Reveal in Finder (ids from the last scan only) */
   artifactReveal(id: string): Promise<WriteResult>
+  /** Settings: built-in artifact locations (existing ones) followed by the configured ones */
+  artifactSourceList(): Promise<ArtifactSourceEntry[]>
+  /** Pick a folder and add it as an artifact location (subfolders become projects). null when the dialog is cancelled */
+  artifactSourceAdd(): Promise<WriteResult<ArtifactSourceEntry[] | null>>
+  /** Remove a configured location by its ~ root */
+  artifactSourceRemove(root: string): Promise<WriteResult<ArtifactSourceEntry[]>>
   sessions(): Promise<SessionScanResult>
   sessionTranscript(tool: ToolId, id: string, opts?: TranscriptOptions): Promise<TranscriptView>
   /** Search conversation content (FTS for 3+ chars, LIKE for 1–2) */
@@ -1178,6 +1186,9 @@ export const CHANNELS = [
   'artifactThumb',
   'artifactOpen',
   'artifactReveal',
+  'artifactSourceList',
+  'artifactSourceAdd',
+  'artifactSourceRemove',
   'sessions',
   'sessionTranscript',
   'sessionSearch',
