@@ -1059,40 +1059,6 @@ function Stats(): React.JSX.Element {
         />
       </Group>
 
-      {tool === 'all' && tools.length > 1 && (
-        <Text size="xs" c="dimmed" mb="sm" data-testid="stats-mixed-tools">
-          {t('efficiency.mixedTools')}
-        </Text>
-      )}
-      {models.some((m) => !(m.metrics ?? modelMetricSupport(m.tool)).tokens) && (
-        <Text size="xs" c="dimmed" mb="sm">
-          {t('models.metricsUnavailable')}
-        </Text>
-      )}
-      {models.some((m) => m.pricing) && (
-        <Text size="xs" c="dimmed" mb="sm">
-          {t('efficiency.priceNote', {
-            date: [...new Set(models.flatMap((m) => (m.pricing ? [m.pricing.date] : [])))]
-              .sort()
-              .join(' / '),
-            source: [
-              ...new Set(
-                models.flatMap((m) =>
-                  m.pricing
-                    ? [
-                        t(
-                          m.pricing.priceSource === 'cache'
-                            ? 'efficiency.cache'
-                            : 'efficiency.snapshot'
-                        )
-                      ]
-                    : []
-                )
-              )
-            ].join(' / ')
-          })}
-        </Text>
-      )}
       {lastIndexedAt && (
         <Text size="xs" c="dimmed" mb="sm" data-testid="stats-indexed-at">
           {t('models.lastIndexed', { at: new Date(lastIndexedAt).toLocaleString() })}
