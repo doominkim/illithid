@@ -39,6 +39,8 @@ jobs:
           name: setup-x64
           path: dist/illithid-x64-setup.exe
           if-no-files-found: error
+          # The publish job attaches it to the release; the artifact itself is only a hand-off
+          retention-days: 1
 
   smoke:
     # The same installer on x64 and on ARM (x64 emulation): install silently, launch the installed app
