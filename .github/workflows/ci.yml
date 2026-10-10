@@ -14,8 +14,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          # macOS runs on the Mac Studio self-hosted runner (GitHub-hosted macOS minutes were the largest Actions cost)
+          - os: macos
+            runner: [self-hosted, macOS, ARM64, illithid]
+          - os: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
