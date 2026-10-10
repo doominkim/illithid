@@ -60,6 +60,8 @@ jobs:
           name: ci-setup-x64
           path: dist/illithid-x64-setup.exe
           if-no-files-found: error
+          # Only the smoke jobs below need it; the cleanup job deletes it right after
+          retention-days: 1
 
   smoke-windows:
     # Install the installer silently on x64 and on ARM, and launch the installed app on each
@@ -94,3 +96,20 @@ jobs:
           name: smoke-failure-${{ matrix.runner }}
           path: smoke-failure.png
           if-no-files-found: ignore
+          retention-days: 3
+
+  cleanup:
+    # The 114 MB installer per run filled the account's 0.5 GB Actions storage; drop it once the smoke jobs are done
+    needs: smoke-windows
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete this run's installer artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+          --jq '.artifacts[] | select(.name == "ci-setup-x64") | .id'
+          | xargs -r -I{} gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/{}"
