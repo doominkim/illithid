@@ -19,24 +19,51 @@ export function parseJsonObject(text: string): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-/** Replace only the marker block; append at end of file if no markers. */
+/**
+ * Position of the marker block: the first BEGIN and the first END after it. null if either is missing.
+ * The END is searched after the BEGIN because a tool rewriting its config can leave a stray END above the block
+ * (Codex inserting its own tables before our END) — searching from the top would then miss the block on every pass
+ */
+export function markerSpan(
+  text: string,
+  begin: string,
+  end: string
+): { i: number; j: number } | null {
+  const i = text.indexOf(begin)
+  if (i === -1) return null
+  const j = text.indexOf(end, i + begin.length)
+  return j === -1 ? null : { i, j }
+}
+
+/** Drop whole lines that are only a marker — leftovers outside the block from an earlier broken write */
+function dropMarkerLines(text: string, markers: readonly string[]): string {
+  return text
+    .split('\n')
+    .filter((line) => !markers.includes(line.trim()))
+    .join('\n')
+}
+
+/**
+ * Replace only the marker block; append at end of file if no markers. Stray copies of the markers outside the block
+ * are removed, so a file whose markers got out of order ends up with exactly one block
+ */
 export function spliceBlock(original: string, begin: string, end: string, body: string): string {
   const block = `${begin}\n${body}\n${end}`
-  const i = original.indexOf(begin)
-  const j = original.indexOf(end)
-  if (i !== -1 && j !== -1 && j > i) {
-    return original.slice(0, i) + block + original.slice(j + end.length)
+  const span = markerSpan(original, begin, end)
+  if (span) {
+    const head = dropMarkerLines(original.slice(0, span.i), [begin, end])
+    const tail = dropMarkerLines(original.slice(span.j + end.length), [begin, end])
+    return head + block + tail
   }
-  const base = original.trimEnd()
+  const base = dropMarkerLines(original, [begin, end]).trimEnd()
   return (base ? base + '\n\n' : '') + block + '\n'
 }
 
 /** Everything outside the marker block — where hand-written/runtime content lives */
 export function outsideBlock(text: string, begin: string, end: string): string {
-  const i = text.indexOf(begin)
-  const j = text.indexOf(end)
-  if (i === -1 || j === -1 || j < i) return text
-  return text.slice(0, i) + text.slice(j + end.length)
+  const span = markerSpan(text, begin, end)
+  if (!span) return text
+  return text.slice(0, span.i) + text.slice(span.j + end.length)
 }
 
 export function normalizeEntry(e: AllowlistEntry): { argv: string[]; claudeExact: boolean } {
@@ -87,12 +114,10 @@ export function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex')
 }
 
-/** Body between markers. null if markers are missing or out of order */
+/** Body between markers. null if there is no BEGIN followed by an END */
 export function blockBody(text: string, begin: string, end: string): string | null {
-  const i = text.indexOf(begin)
-  const j = text.indexOf(end)
-  if (i === -1 || j === -1 || j < i) return null
-  return text.slice(i + begin.length, j)
+  const span = markerSpan(text, begin, end)
+  return span ? text.slice(span.i + begin.length, span.j) : null
 }
 
 function parseObjectOrNull(text: string): Record<string, unknown> | null {
@@ -158,11 +183,9 @@ export function toggleNotes(removed: string[], keptUnowned: string[]): string[] 
 /** Marker pair [begin, end] */
 export type MarkerPair = readonly [string, string]
 
-/** Position of a marker pair in text. null if missing or out of order */
+/** Position of a marker pair in text. null if there is no BEGIN followed by an END */
 function findBlock(text: string, [begin, end]: MarkerPair): { i: number; j: number } | null {
-  const i = text.indexOf(begin)
-  const j = text.indexOf(end)
-  return i !== -1 && j !== -1 && j > i ? { i, j } : null
+  return markerSpan(text, begin, end)
 }
 
 /** First marker pair present in text (in priority order). null if none */
@@ -185,7 +208,12 @@ export function spliceBlockMulti(
   if (!found) return spliceBlock(original, current[0], current[1], body)
   const { i, j } = findBlock(original, found)!
   const block = `${current[0]}\n${body}\n${current[1]}`
-  return original.slice(0, i) + block + original.slice(j + found[1].length)
+  const markers = [...found, ...current]
+  return (
+    dropMarkerLines(original.slice(0, i), markers) +
+    block +
+    dropMarkerLines(original.slice(j + found[1].length), markers)
+  )
 }
 
 /** Body of the current or legacy marker block. null if none */
