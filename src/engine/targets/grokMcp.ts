@@ -6,6 +6,7 @@
 import { parse as parseToml } from 'smol-toml'
 import {
   blockBodyMulti,
+  markerSpan,
   mcpEntries,
   outsideBlockMulti,
   presentMarkers,
@@ -119,8 +120,9 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 function stripOwnedTables(text: string, names: string[]): string {
   const p = presentMarkers(text, [GROK_COMPAT_MARKERS])
   if (!p) return stripCodexManagedTables(text, names)
-  const i = text.indexOf(p[0])
-  const j = text.indexOf(p[1]) + p[1].length
+  const span = markerSpan(text, p[0], p[1])!
+  const i = span.i
+  const j = span.j + p[1].length
   return (
     stripCodexManagedTables(text.slice(0, i), names) +
     text.slice(i, j) +
