@@ -52,13 +52,10 @@ for (const fixture of [
         await app.evaluate(({ ipcMain }, channel) => {
           const state = globalThis as typeof globalThis & {
             qaSearchReady?: boolean
-            qaSearchCalled?: boolean
           }
           state.qaSearchReady = false
-          state.qaSearchCalled = false
           ipcMain.removeHandler(channel)
           ipcMain.handle(channel, () => {
-            state.qaSearchCalled = true
             if (!state.qaSearchReady) throw new Error('Fixture search offline')
             return { results: [], mode: 'fts', limited: false, ms: 0 }
           })
@@ -67,17 +64,8 @@ for (const fixture of [
         await page.getByTestId(fixture.mode).getByText('Content', { exact: true }).click()
         const input = page.getByPlaceholder(fixture.placeholder)
         await input.fill('fixture query')
-        const until = Date.now() + 10000
-        while (
-          !(await app.evaluate(
-            () => (globalThis as typeof globalThis & { qaSearchCalled?: boolean }).qaSearchCalled
-          ))
-        ) {
-          assert.ok(Date.now() < until, 'the content search request must reach the IPC boundary')
-          await new Promise((r) => setTimeout(r, 20))
-        }
-        await page.waitForTimeout(100)
         const alert = page.getByRole('alert').filter({ hasText: 'Fixture search offline' })
+        await alert.waitFor({ timeout: 10000 })
         assert.equal(
           await alert.count(),
           1,
