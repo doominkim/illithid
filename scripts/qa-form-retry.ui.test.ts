@@ -34,6 +34,8 @@ async function launch(): Promise<Awaited<ReturnType<typeof electron.launch>>> {
     env,
     timeout: 60_000
   })
+  // The window is created after IPC registration; replacing handlers earlier can abort startup.
+  await app.firstWindow()
   await app.evaluate(({ ipcMain }) => {
     globalThis.fetch = (async () => {
       throw new Error('Network disabled in local retry fixtures')
