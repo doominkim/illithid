@@ -97,7 +97,8 @@
     "save": "保存",
     "import": "取り込み",
     "back": "戻る",
-    "empty": "まだ何もありません。"
+    "empty": "まだ何もありません。",
+    "toggleAllTools": "{{name}}のすべてのツールを切り替え"
   },
   "rules": {
     "search": "ルールを検索",
@@ -172,7 +173,8 @@
       "noteCodex": "Codex: サーバーをブロックすると、ここで許可・確認にしたツールだけが提供されます。",
       "noteGemini": "Gemini CLI: サーバー名に \"_\" があるとルールが一致しない場合があります。",
       "noteCopilot": "GitHub Copilot: 設定ファイルではツールの権限を設定できません。"
-    }
+    },
+    "sharedCredentials": "同じサーバー名とフィールドを使用するワークスペース間で認証情報を共有します。編集すると、それらの接続にも反映されます。"
   },
   "agents": {
     "model": "モデル",
@@ -316,7 +318,10 @@
     "lines": "{{n}} 行",
     "revert": "元に戻す",
     "saved": "保存",
-    "unsaved": "未保存"
+    "unsaved": "未保存",
+    "discardTitle": "未保存の変更",
+    "discardMessage": "未保存の変更を破棄して続行しますか？",
+    "discard": "変更を破棄"
   },
   "refused": {
     "allowRealApplyOff": "自動反映が無効",
@@ -437,7 +442,10 @@
       "mcp": "MCP サーバー定義（${VAR} 参照のみ）",
       "memory": "メモリ",
       "permissions": "権限（allowlist）",
-      "toggles": "ツール別 on/off 設定"
+      "toggles": "ツール別 on/off 設定",
+      "agents": "エージェント",
+      "hooks": "フックとそのスクリプト",
+      "scripts": "スクリプト"
     },
     "scopeOut": {
       "secrets": "API キー・トークン・認証情報",

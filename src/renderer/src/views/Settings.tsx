@@ -186,6 +186,7 @@ function ToolsInUse(): React.JSX.Element {
           </Group>
           <Switch
             size="md"
+            aria-label={TOOL_NAME[tool]}
             checked={shown.includes(tool)}
             disabled={!view || busy}
             onChange={(e) => void set(tool, e.currentTarget.checked)}
@@ -391,6 +392,7 @@ function BackupCleanup(): React.JSX.Element {
         control={
           <Switch
             size="md"
+            aria-label={t('settings.cleanupEnabled')}
             checked={saved.enabled}
             disabled={!config || busy}
             onChange={(e) => void save({ enabled: e.currentTarget.checked })}
@@ -403,6 +405,7 @@ function BackupCleanup(): React.JSX.Element {
         control={
           <NumberInput
             w={110}
+            aria-label={t('settings.cleanupDays')}
             min={1}
             max={3650}
             allowDecimal={false}
@@ -418,6 +421,7 @@ function BackupCleanup(): React.JSX.Element {
         control={
           <NumberInput
             w={110}
+            aria-label={t('settings.cleanupKeepRollback')}
             min={1}
             max={100}
             allowDecimal={false}
@@ -602,6 +606,7 @@ function Settings(): React.JSX.Element {
             control={
               <Select
                 w={180}
+                aria-label={t('settings.language')}
                 data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
                 value={i18n.resolvedLanguage}
                 onChange={(value) => value && setLanguage(value as Language)}
@@ -649,6 +654,7 @@ function Settings(): React.JSX.Element {
             control={
               <Switch
                 size="md"
+                aria-label={t('settings.marketEnabled')}
                 checked={config?.config.marketEnabled !== false}
                 disabled={!config || saving === 'market'}
                 onChange={(e) =>
@@ -669,6 +675,7 @@ function Settings(): React.JSX.Element {
             control={
               <Switch
                 size="md"
+                aria-label={t('settings.updateCheck')}
                 checked={config?.config.updateCheck !== false}
                 disabled={!config || saving === 'update'}
                 onChange={(e) => {
@@ -704,6 +711,7 @@ function Settings(): React.JSX.Element {
             control={
               <Switch
                 size="md"
+                aria-label={t('settings.allowApply')}
                 checked={allowRealApply}
                 disabled={!config || saving === 'apply'}
                 onChange={(e) => {

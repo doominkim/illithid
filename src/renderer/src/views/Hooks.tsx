@@ -74,6 +74,7 @@ import { useToolsInUse } from '../lib/config'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { problemText } from '../lib/problemReason'
 import { useReload } from '../lib/reload'
 import { useToggleBusy } from '../lib/toggleBusy'
@@ -287,6 +288,7 @@ function useSummary(): (h: {
 
 function Hooks(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const inUse = useToolsInUse()
   const hookTools = HOOK_TOOLS.filter((tool) => inUse.includes(tool))
   const { request } = useNav()
@@ -297,6 +299,9 @@ function Hooks(): React.JSX.Element {
   const [toolFilter, setToolFilter] = useState<string>(ALL)
   const [view, setView] = useViewMode('hooks')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const pending = useToggleBusy()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -413,7 +418,7 @@ function Hooks(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => setSelected(NEW)}
+              onClick={() => selectItem(NEW)}
               data-testid="hook-new"
             >
               {t('hooks.new')}
@@ -516,7 +521,7 @@ function Hooks(): React.JSX.Element {
                 />
               }
               selected={h.name === selected}
-              onClick={() => setSelected(h.name)}
+              onClick={() => selectItem(h.name)}
             />
           ))}
         </CardGrid>
@@ -539,7 +544,7 @@ function Hooks(): React.JSX.Element {
                 />
               }
               active={h.name === selected}
-              onClick={() => setSelected(h.name)}
+              onClick={() => selectItem(h.name)}
             />
           ))}
         </ListCard>
@@ -946,23 +951,33 @@ function HookDetail({
   onChanged: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const [edit, setEdit] = useState<HookEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [tab, setTab] = useState<string | null>('preview')
+  const [retry, setRetry] = useState(0)
   // Reload HOOK.md and scripts whenever the list changes (after a save, toggle or sync)
   useEffect(() => {
     let alive = true
-    window.api.hookRead(hook.name).then((r) => {
-      if (!alive) return
-      if (r.ok) setEdit(r.value)
-      else setErr(r.message)
-    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new read clears the previous detail error
+    setErr(null)
+    window.api.hookRead(hook.name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) setEdit(r.value)
+        else setErr(r.message)
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [hook])
+  }, [hook, retry])
 
-  if (err) return <ErrorAlert message={err} />
+  if (err)
+    return <ErrorAlert message={err} onRetry={() => guardDraft(() => setRetry((n) => n + 1))} />
   if (!edit) return <Loading />
   const doc = edit.doc
 
@@ -1026,7 +1041,7 @@ function HookDetail({
         </Alert>
       ))}
 
-      <Tabs value={tab} onChange={setTab} keepMounted={false}>
+      <Tabs value={tab} onChange={setTab}>
         <Tabs.List mb="md">
           <Tabs.Tab value="preview" data-testid="hook-tab-preview">
             {t('detail.source')}
@@ -1295,6 +1310,7 @@ function ScriptEditors({
   onChanged: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const { navigate } = useNav()
   const doc = edit.doc
   const use = typeof doc.options.use === 'string' ? doc.options.use : ''
@@ -1343,12 +1359,15 @@ function ScriptEditors({
           }))
         ]}
         value={use}
-        onChange={(v) => void onSave({ ...doc, options: { ...doc.options, use: v ?? '' } })}
+        onChange={(v) => {
+          if ((v ?? '') !== use)
+            guardDraft(() => void onSave({ ...doc, options: { ...doc.options, use: v ?? '' } }))
+        }}
         allowDeselect={false}
         maw={360}
         data-testid="hook-script-use"
       />
-      <Tabs value={active} onChange={setTab} keepMounted={false}>
+      <Tabs value={active} onChange={setTab}>
         <Tabs.List>
           {files.map((x) => (
             <Tabs.Tab key={x.value} value={x.value} data-testid={`hook-script-tab-${x.value}`}>

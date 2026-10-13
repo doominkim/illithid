@@ -291,6 +291,9 @@ export function McpForm({ name: initialName, def, onSave, onCancel }: Props): Re
             </Stack>
           </Alert>
         )}
+        <Alert color="blue" variant="light" radius="md">
+          {t('mcp.sharedCredentials')}
+        </Alert>
         <FormFooter>
           {onCancel && (
             <Button size="xs" variant="default" onClick={onCancel}>

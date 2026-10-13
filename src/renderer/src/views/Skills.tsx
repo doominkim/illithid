@@ -26,6 +26,7 @@ import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { useSyncFailures } from '../lib/sync'
 import {
   grokReadsFromClaude,
@@ -50,6 +51,7 @@ interface Row {
 
 function Skills(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
   const inUse = useToolsInUse()
   const cardTools = TOGGLE_TOOLS.filter((tool) => inUse.includes(tool))
@@ -61,6 +63,9 @@ function Skills(): React.JSX.Element {
   const [importOpen, setImportOpen] = useState(false)
   const [view, setView] = useViewMode('skills')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -189,10 +194,12 @@ function Skills(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => {
-                setSelected(null)
-                setCreating(true)
-              }}
+              onClick={() =>
+                guardDraft(() => {
+                  setSelected(null)
+                  setCreating(true)
+                })
+              }
               data-testid="skill-new"
             >
               {t('skills.new')}
@@ -253,7 +260,7 @@ function Skills(): React.JSX.Element {
                 />
               }
               selected={r.name === selected}
-              onClick={() => setSelected(r.name)}
+              onClick={() => selectItem(r.name)}
             />
           ))}
         </CardGrid>
@@ -278,7 +285,7 @@ function Skills(): React.JSX.Element {
                 </Group>
               }
               active={r.name === selected}
-              onClick={() => setSelected(r.name)}
+              onClick={() => selectItem(r.name)}
             />
           ))}
         </ListCard>
@@ -395,6 +402,7 @@ function SkillEditor({
   onRenamed: (to: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const [tab, setTab] = useState<string | null>('preview')
   const [files, setFiles] = useState<string[]>([])
   const [doc, setDoc] = useState<SkillDoc | null>(null)
@@ -404,25 +412,40 @@ function SkillEditor({
   const [renameErr, setRenameErr] = useState<string | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const retryRead = (): void => guardDraft(() => setRetry((n) => n + 1))
 
   useEffect(() => {
     let alive = true
-    window.api.skillFiles(name).then((r) => {
-      if (!alive) return
-      if (r.ok) setFiles(r.value)
-      else setErr(r.message)
-    })
-    window.api.skillDoc(name).then((r) => {
-      if (!alive) return
-      if (r.ok) {
-        setDoc(r.value)
-        setDesc(r.value.description)
-      } else setDocErr(r.message)
-    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a retry clears only the previous load errors
+    setErr(null)
+    setDocErr(null)
+    window.api.skillFiles(name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) setFiles(r.value)
+        else setErr(r.message)
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
+    window.api.skillDoc(name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) {
+          setDoc(r.value)
+          setDesc(r.value.description)
+        } else setDocErr(r.message)
+      },
+      (error) => {
+        if (alive) setDocErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [name])
+  }, [name, retry])
 
   // SKILL.md is edited via the description and body fields. If the frontmatter cannot be parsed, fall back to raw editing
   const others = docErr ? files : files.filter((f) => f !== 'SKILL.md')
@@ -449,9 +472,9 @@ function SkillEditor({
     return true
   }
 
-  if (err) return <ErrorAlert message={err} />
+  if (err) return <ErrorAlert message={err} onRetry={retryRead} />
   return (
-    <Tabs value={tab} onChange={setTab} keepMounted={false}>
+    <Tabs value={tab} onChange={setTab}>
       <Tabs.List mb="md">
         <Tabs.Tab value="preview">{t('detail.source')}</Tabs.Tab>
         <Tabs.Tab value="doc" data-testid="tab-edit">
@@ -463,7 +486,7 @@ function SkillEditor({
       </Tabs.List>
       <Tabs.Panel value="preview">
         {docErr ? (
-          <ErrorAlert message={docErr} />
+          <ErrorAlert message={docErr} onRetry={retryRead} />
         ) : !doc ? (
           <Loading />
         ) : (
@@ -490,7 +513,7 @@ function SkillEditor({
               variant="default"
               disabled={!trimmed || trimmed === name}
               loading={renaming}
-              onClick={() => void rename()}
+              onClick={() => guardDraft(() => void rename())}
               mb={renameErr ? 22 : 0}
               data-testid="skill-rename"
             >
@@ -498,7 +521,7 @@ function SkillEditor({
             </Button>
           </Group>
           {docErr ? (
-            <ErrorAlert message={docErr} />
+            <ErrorAlert message={docErr} onRetry={retryRead} />
           ) : !doc ? (
             <Loading />
           ) : (

@@ -42,16 +42,30 @@ export function McpPermissionsTab({ server }: { server: McpServerView }): React.
   const [newTool, setNewTool] = useState('')
   const [confirmFetch, setConfirmFetch] = useState(false)
   const [fetching, setFetching] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   const load = (): void => {
-    void window.api.mcpToolInfo(name).then((r) => {
-      if (r.ok) setInfo(r.value)
-      else setErr(r.message)
-    })
+    setErr(null)
+    setRetry((n) => n + 1)
   }
-  useEffect(load, [name])
+  useEffect(() => {
+    let alive = true
+    void window.api.mcpToolInfo(name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) {
+          setErr(null)
+          setInfo(r.value)
+        } else setErr(r.message)
+      },
+      (e) => alive && setErr(e instanceof Error ? e.message : String(e))
+    )
+    return () => {
+      alive = false
+    }
+  }, [name, retry])
 
-  if (err) return <ErrorAlert message={err} />
+  if (err) return <ErrorAlert message={err} onRetry={load} />
   if (!info) return <Loading />
 
   const rules = info.permissions

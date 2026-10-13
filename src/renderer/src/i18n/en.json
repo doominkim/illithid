@@ -97,7 +97,8 @@
     "save": "Save",
     "import": "Import",
     "back": "Back",
-    "empty": "Nothing here yet."
+    "empty": "Nothing here yet.",
+    "toggleAllTools": "Toggle all tools for {{name}}"
   },
   "rules": {
     "search": "Search rules",
@@ -172,7 +173,8 @@
       "noteCodex": "Codex: with a blocked server, only the tools allowed or asked here are offered.",
       "noteGemini": "Gemini CLI: a server name with \"_\" can make its rules miss.",
       "noteCopilot": "GitHub Copilot: tool rules can't be set in its config files."
-    }
+    },
+    "sharedCredentials": "Credential values are shared across workspaces that use the same server name and field. Editing them updates those connections."
   },
   "agents": {
     "model": "Model",
@@ -316,7 +318,10 @@
     "lines": "{{n}} lines",
     "revert": "Revert",
     "saved": "Saved",
-    "unsaved": "Unsaved"
+    "unsaved": "Unsaved",
+    "discardTitle": "Unsaved changes",
+    "discardMessage": "You have unsaved changes. Discard them and continue?",
+    "discard": "Discard changes"
   },
   "refused": {
     "allowRealApplyOff": "Auto apply is off",
@@ -437,7 +442,10 @@
       "mcp": "MCP server definitions (${VAR} references only)",
       "memory": "Memory",
       "permissions": "Permissions (allowlist)",
-      "toggles": "Per-tool on/off settings"
+      "toggles": "Per-tool on/off settings",
+      "agents": "Agents",
+      "hooks": "Hooks and their scripts",
+      "scripts": "Scripts"
     },
     "scopeOut": {
       "secrets": "API keys, tokens, credentials",

@@ -435,6 +435,8 @@ export const WORKSPACE_ZIP_FILES = [
 ] as const
 export const WORKSPACE_ZIP_MAX_FILES = 5000
 export const WORKSPACE_ZIP_MAX_BYTES = 50 * 1024 * 1024
+/** Compressed archive budget includes ZIP headers and incompressible payload overhead. */
+export const WORKSPACE_ZIP_MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 export const WORKSPACE_ZIP_EXT = '.illithid.zip'
 /** Export extensions from old app names (accepted on import) */
 export const LEGACY_WORKSPACE_ZIP_EXTS = ['.harnesssync.zip'] as const
@@ -456,9 +458,30 @@ export function exportWorkspace(
   const root = workspaceRoot(home, id)
   if (!existsSync(root)) throw new WorkspaceError('notFound', 'workspace not found')
   const name = workspaceName(home, id)
-  const files: Zippable = {}
+  const meta = {
+    name,
+    exportedAt: new Date().toISOString(),
+    ...(opts.appVersion ? { appVersion: opts.appVersion } : {})
+  }
+  const metaBytes = new TextEncoder().encode(JSON.stringify(meta, null, 2) + '\n')
+  const files: Zippable = { [WORKSPACE_FILE]: metaBytes }
   const skipped: string[] = []
-  let count = 0
+  let count = 1
+  let bytes = metaBytes.byteLength
+  if (bytes > WORKSPACE_ZIP_MAX_BYTES)
+    throw new WorkspaceError('tooLarge', 'uncompressed size limit exceeded')
+  const addFile = (abs: string, rel: string, size: number, mode: number): void => {
+    if (count + 1 > WORKSPACE_ZIP_MAX_FILES)
+      throw new WorkspaceError('tooLarge', `file count exceeds limit ${WORKSPACE_ZIP_MAX_FILES}`)
+    if (size > WORKSPACE_ZIP_MAX_BYTES - bytes)
+      throw new WorkspaceError('tooLarge', 'uncompressed size limit exceeded')
+    const body = new Uint8Array(readFileSync(abs))
+    if (body.byteLength > WORKSPACE_ZIP_MAX_BYTES - bytes)
+      throw new WorkspaceError('tooLarge', 'uncompressed size limit exceeded')
+    files[rel] = [body, { os: 3, attrs: (0o100000 | (mode & 0o111 ? 0o755 : 0o644)) << 16 }]
+    count++
+    bytes += body.byteLength
+  }
   const walk = (abs: string, rel: string): void => {
     for (const e of readdirSync(abs).sort()) {
       if (e === '.DS_Store') continue
@@ -467,10 +490,8 @@ export function exportWorkspace(
       const st = lstatSync(a)
       if (st.isSymbolicLink()) skipped.push(r)
       else if (st.isDirectory()) walk(a, r)
-      else if (st.isFile()) {
-        files[r] = new Uint8Array(readFileSync(a))
-        count++
-      } else skipped.push(r)
+      else if (st.isFile()) addFile(a, r, st.size, st.mode)
+      else skipped.push(r)
     }
   }
   const dirs = new Set<string>(WORKSPACE_ZIP_DIRS)
@@ -481,19 +502,12 @@ export function exportWorkspace(
     const st = lstatSync(a)
     if (st.isSymbolicLink()) skipped.push(e)
     else if (dirs.has(e) && st.isDirectory()) walk(a, e)
-    else if (fileTops.has(e) && st.isFile()) {
-      files[e] = new Uint8Array(readFileSync(a))
-      count++
-    }
+    else if (fileTops.has(e) && st.isFile()) addFile(a, e, st.size, st.mode)
   }
-  const meta = {
-    name,
-    exportedAt: new Date().toISOString(),
-    ...(opts.appVersion ? { appVersion: opts.appVersion } : {})
-  }
-  files[WORKSPACE_FILE] = new TextEncoder().encode(JSON.stringify(meta, null, 2) + '\n')
-  count++
-  return { data: zipSync(files, { level: 6 }), name, files: count, skipped }
+  const data = zipSync(files, { level: 6 })
+  if (data.byteLength > WORKSPACE_ZIP_MAX_ARCHIVE_BYTES)
+    throw new WorkspaceError('tooLarge', 'archive size limit exceeded')
+  return { data, name, files: count, skipped }
 }
 
 interface ZipEntryInfo {
@@ -502,6 +516,7 @@ interface ZipEntryInfo {
   compressedSize: number
   isDir: boolean
   isSymlink: boolean
+  executable: boolean
 }
 
 /** Parse the central directory (name·size·symlink). Rejects zip64 and split zips */
@@ -542,7 +557,8 @@ function readZipEntries(data: Uint8Array): ZipEntryInfo[] {
       size,
       compressedSize,
       isDir: name.endsWith('/'),
-      isSymlink: (mode & 0o170000) === 0o120000
+      isSymlink: (mode & 0o170000) === 0o120000,
+      executable: !!(mode & 0o111)
     })
     p += 46 + nameLen + extraLen + commentLen
   }
@@ -579,6 +595,17 @@ function entryProblem(name: string, isDir: boolean): string | null {
 
 /** Validate an import. Read-only (does not decompress — checks limits using declared sizes) */
 export function planImportWorkspace(data: Uint8Array): WorkspaceImportPlan {
+  if (data.byteLength > WORKSPACE_ZIP_MAX_ARCHIVE_BYTES)
+    return {
+      ok: false,
+      reason: 'tooLarge',
+      errors: [
+        `archive size ${data.byteLength} bytes — limit ${WORKSPACE_ZIP_MAX_ARCHIVE_BYTES} bytes`
+      ],
+      name: null,
+      files: 0,
+      bytes: 0
+    }
   const errors: string[] = []
   let entries: ZipEntryInfo[]
   try {
@@ -652,6 +679,11 @@ export function importWorkspace(
   if (!plan.ok) {
     throw new WorkspaceError(plan.reason ?? 'invalidZip', plan.errors.slice(0, 10).join('; '))
   }
+  const executable = new Set(
+    readZipEntries(data)
+      .filter((entry) => entry.executable)
+      .map((entry) => entry.name)
+  )
   let unz: Record<string, Uint8Array>
   try {
     unz = unzipSync(data)
@@ -683,7 +715,7 @@ export function importWorkspace(
         continue
       }
       mkdirSync(dirname(dst), { recursive: true, mode: 0o755 })
-      writeFileSync(dst, buf, { mode: 0o644, flag: 'wx' })
+      writeFileSync(dst, buf, { mode: executable.has(n) ? 0o755 : 0o644, flag: 'wx' })
       files++
     }
     // old app-name on/off file → new name (when the new file is absent, most recent generation first)

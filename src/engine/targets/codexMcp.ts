@@ -161,7 +161,8 @@ export function buildCodexMcpBody(
         }
         if (envMapped.length) {
           out.push('', `[mcp_servers.${key}.env_http_headers]`)
-          for (const [k, envName] of envMapped) out.push(`${k} = ${tomlString(envName)}`)
+          for (const [k, envName] of envMapped)
+            out.push(`${tomlString(k)} = ${tomlString(envName)}`)
         }
       }
       for (const [tool, mode] of Object.entries(cx.approvals)) {

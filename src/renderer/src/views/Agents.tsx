@@ -36,6 +36,7 @@ import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { useSyncFailures } from '../lib/sync'
 import { useToolsInUse } from '../lib/config'
 import {
@@ -63,6 +64,7 @@ const DEFAULT = '__default__'
 
 function Agents(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
   const inUse = useToolsInUse()
   const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
@@ -73,6 +75,9 @@ function Agents(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [view, setView] = useViewMode('agents')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const pending = useToggleBusy()
   const [importOpen, setImportOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -173,10 +178,12 @@ function Agents(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => {
-                setSelected(null)
-                setCreating(true)
-              }}
+              onClick={() =>
+                guardDraft(() => {
+                  setSelected(null)
+                  setCreating(true)
+                })
+              }
               data-testid="agent-new"
             >
               {t('agents.new')}
@@ -234,7 +241,7 @@ function Agents(): React.JSX.Element {
                 />
               }
               selected={r.name === selected}
-              onClick={() => setSelected(r.name)}
+              onClick={() => selectItem(r.name)}
             />
           ))}
         </CardGrid>
@@ -255,7 +262,7 @@ function Agents(): React.JSX.Element {
                 />
               }
               active={r.name === selected}
-              onClick={() => setSelected(r.name)}
+              onClick={() => selectItem(r.name)}
             />
           ))}
         </ListCard>
@@ -448,6 +455,7 @@ function AgentEditor({
   onRenamed: (to: string) => void
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const shown = useToolsInUse()
   const [doc, setDoc] = useState<AgentDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -456,21 +464,29 @@ function AgentEditor({
   const [nameDraft, setNameDraft] = useState(name)
   const [renameErr, setRenameErr] = useState<string | null>(null)
   const [renaming, setRenaming] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     let alive = true
-    window.api.agentDoc(name).then((r) => {
-      if (!alive) return
-      if (r.ok) {
-        setDoc(r.value)
-        setDesc(r.value.description)
-        setTools(r.value.tools)
-      } else setErr(r.message)
-    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- retry clears the previous load error
+    setErr(null)
+    window.api.agentDoc(name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) {
+          setDoc(r.value)
+          setDesc(r.value.description)
+          setTools(r.value.tools)
+        } else setErr(r.message)
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [name])
+  }, [name, retry])
 
   const trimmed = nameDraft.trim()
   const rename = async (): Promise<void> => {
@@ -494,7 +510,8 @@ function AgentEditor({
     return true
   }
 
-  if (err) return <ErrorAlert message={err} />
+  if (err)
+    return <ErrorAlert message={err} onRetry={() => guardDraft(() => setRetry((n) => n + 1))} />
   if (!doc) return <Loading />
   const cols = {
     base: 1,
@@ -502,7 +519,7 @@ function AgentEditor({
     xl: Math.max(1, shown.length)
   }
   return (
-    <Tabs defaultValue="preview" keepMounted={false}>
+    <Tabs defaultValue="preview">
       <Tabs.List mb="md">
         <Tabs.Tab value="preview">{t('detail.source')}</Tabs.Tab>
         <Tabs.Tab value="edit" data-testid="tab-edit">
@@ -542,7 +559,7 @@ function AgentEditor({
               variant="default"
               disabled={!trimmed || trimmed === name}
               loading={renaming}
-              onClick={() => void rename()}
+              onClick={() => guardDraft(() => void rename())}
               mb={renameErr ? 22 : 0}
               data-testid="agent-rename"
             >

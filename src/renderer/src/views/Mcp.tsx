@@ -334,7 +334,7 @@ function Mcp(): React.JSX.Element {
                 </Box>
               </Tabs.Panel>
               <Tabs.Panel value="edit" pt="md">
-                <McpEdit name={current.name} onSave={save} />
+                <McpEdit key={current.name} name={current.name} onSave={save} />
               </Tabs.Panel>
               <Tabs.Panel value="permissions" pt="md">
                 <McpPermissionsTab key={current.name} server={current} />
@@ -367,18 +367,28 @@ function McpEdit({
 }): React.JSX.Element {
   const [view, setView] = useState<McpEditView | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  const retryRead = (): void => {
+    setErr(null)
+    setRetry((n) => n + 1)
+  }
   useEffect(() => {
     let alive = true
-    window.api.mcpRead(name).then((r) => {
-      if (!alive) return
-      if (r.ok) setView(r.value)
-      else setErr(r.message)
-    })
+    window.api.mcpRead(name).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) {
+          setErr(null)
+          setView(r.value)
+        } else setErr(r.message)
+      },
+      (e) => alive && setErr(e instanceof Error ? e.message : String(e))
+    )
     return () => {
       alive = false
     }
-  }, [name])
-  if (err) return <ErrorAlert message={err} />
+  }, [name, retry])
+  if (err) return <ErrorAlert message={err} onRetry={retryRead} />
   if (!view) return <Loading />
   return <McpForm key={name} name={view.name} def={view.def} masked={view.masked} onSave={onSave} />
 }

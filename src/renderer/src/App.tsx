@@ -60,6 +60,8 @@ import {
 } from './lib/mutate'
 import type { SyncPendingView, SyncStatusView } from '../../shared/api'
 import { IS_WINDOWS } from './lib/platform'
+import { DraftGuardContext, hasDirtyDrafts } from './lib/dirtyDraft'
+import { ConfirmModal } from './components/ConfirmModal'
 
 export type { Menu }
 
@@ -88,6 +90,11 @@ function App(): React.JSX.Element {
     menu: savedMenu() ?? 'rules',
     seq: 0
   }))
+  const [discardTransition, setDiscardTransition] = useState<(() => void) | null>(null)
+  const guardDraft = useCallback((transition: () => void): void => {
+    if (hasDirtyDrafts()) setDiscardTransition(() => transition)
+    else transition()
+  }, [])
   useEffect(() => saveMenu(request.menu), [request.menu])
   const [tick, setTick] = useState(0)
   const [workspaceTick, setWorkspaceTick] = useState(0)
@@ -279,15 +286,19 @@ function App(): React.JSX.Element {
 
   const navigate = useCallback(
     (menu: Menu, opts?: { select?: string; tool?: ToolId | null; tab?: string }) => {
-      setRequest((r) => ({
-        menu,
-        select: opts?.select,
-        tool: opts && 'tool' in opts ? opts.tool : null,
-        ...(opts?.tab ? { tab: opts.tab } : {}),
-        seq: r.seq + 1
-      }))
+      const transition = (): void => {
+        setRequest((r) => ({
+          menu,
+          select: opts?.select,
+          tool: opts && 'tool' in opts ? opts.tool : null,
+          ...(opts?.tab ? { tab: opts.tab } : {}),
+          seq: r.seq + 1
+        }))
+      }
+      if (menu !== request.menu || opts?.select) guardDraft(transition)
+      else transition()
     },
-    []
+    [guardDraft, request.menu]
   )
   // New version notice: opens once per version per launch; the menu bar item reopens it
   const [update, setUpdate] = useState<UpdateView | null>(null)
@@ -405,83 +416,107 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <NavContext.Provider value={{ request, navigate }}>
-      <ConfigContext.Provider value={configCtx}>
-        <SyncContext.Provider value={syncCtx}>
-          {/* Drag region for the macOS hiddenInset title bar (Windows keeps the native one) */}
-          {!IS_WINDOWS && <div className="ac-dragbar" />}
-          {onboarding === null ? null : onboarding ? (
-            <Onboarding
-              onDone={(menu) => {
-                setOnboarding(false)
-                onWorkspaceChange()
-                if (menu) navigate(menu, { tool: null })
-              }}
-            />
-          ) : (
-            <Box style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
-              <Sidebar onWorkspaceChange={onWorkspaceChange} />
-              <Box
-                component="main"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  height: '100%',
-                  overflow: 'auto',
-                  position: 'relative'
+    <DraftGuardContext.Provider value={guardDraft}>
+      <NavContext.Provider value={{ request, navigate }}>
+        <ConfigContext.Provider value={configCtx}>
+          <SyncContext.Provider value={syncCtx}>
+            {/* Drag region for the macOS hiddenInset title bar (Windows keeps the native one) */}
+            {!IS_WINDOWS && <div className="ac-dragbar" />}
+            {onboarding === null ? null : onboarding ? (
+              <Onboarding
+                onDone={(menu) => {
+                  setOnboarding(false)
+                  onWorkspaceChange()
+                  if (menu) navigate(menu, { tool: null })
                 }}
-              >
+              />
+            ) : (
+              <Box style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+                <Sidebar onWorkspaceChange={onWorkspaceChange} />
                 <Box
-                  mx="auto"
-                  maw={1200}
-                  px={20}
-                  pt={48}
-                  pb={24}
+                  component="main"
                   style={{
-                    ...(FILL_MENUS.has(request.menu) ? { height: '100%' } : { minHeight: '100%' }),
-                    display: 'flex',
-                    flexDirection: 'column'
+                    flex: 1,
+                    minWidth: 0,
+                    height: '100%',
+                    overflow: 'auto',
+                    position: 'relative'
                   }}
                 >
-                  <RefreshContext.Provider key={workspaceTick} value={tick}>
-                    <ReloadContext.Provider value={reload}>
-                      {startError && (
-                        <Alert
-                          color="red"
-                          variant="light"
-                          radius="lg"
-                          mb="md"
-                          title={t(`library.${startError.code}`)}
-                        >
-                          {startError.detail}
-                        </Alert>
-                      )}
-                      {view[request.menu]}
-                    </ReloadContext.Provider>
-                  </RefreshContext.Provider>
+                  <Box
+                    mx="auto"
+                    maw={1200}
+                    px={20}
+                    pt={48}
+                    pb={24}
+                    style={{
+                      ...(FILL_MENUS.has(request.menu)
+                        ? { height: '100%' }
+                        : { minHeight: '100%' }),
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    <RefreshContext.Provider key={workspaceTick} value={tick}>
+                      <ReloadContext.Provider value={reload}>
+                        {startError && (
+                          <Alert
+                            color="red"
+                            variant="light"
+                            radius="lg"
+                            mb="md"
+                            title={t(`library.${startError.code}`)}
+                          >
+                            {startError.detail}
+                          </Alert>
+                        )}
+                        {view[request.menu]}
+                      </ReloadContext.Provider>
+                    </RefreshContext.Provider>
+                  </Box>
                 </Box>
               </Box>
-            </Box>
-          )}
-          <ApplyPreviewModal opened={previewOpen} onCancel={cancelPreview} onDone={finishPreview} />
-          <UpdateDialog
-            update={update}
-            opened={updateOpen}
-            onLater={() => setUpdateOpen(false)}
-            onSkip={(v) => void skipUpdate(v)}
-          />
-        </SyncContext.Provider>
-      </ConfigContext.Provider>
-      <Spotlight
-        actions={actions}
-        shortcut={['mod + K', 'mod + P']}
-        limit={12}
-        highlightQuery
-        radius="lg"
-        nothingFound={t('spotlight.nothing')}
-        searchProps={{ leftSection: <Search size={16} />, placeholder: t('spotlight.placeholder') }}
-      />
-    </NavContext.Provider>
+            )}
+            <ApplyPreviewModal
+              opened={previewOpen}
+              onCancel={cancelPreview}
+              onDone={finishPreview}
+            />
+            <UpdateDialog
+              update={update}
+              opened={updateOpen}
+              onLater={() => setUpdateOpen(false)}
+              onSkip={(v) => void skipUpdate(v)}
+            />
+          </SyncContext.Provider>
+        </ConfigContext.Provider>
+        <Spotlight
+          actions={actions}
+          shortcut={['mod + K', 'mod + P']}
+          limit={12}
+          highlightQuery
+          radius="lg"
+          nothingFound={t('spotlight.nothing')}
+          searchProps={{
+            leftSection: <Search size={16} />,
+            placeholder: t('spotlight.placeholder')
+          }}
+        />
+        <ConfirmModal
+          opened={discardTransition !== null}
+          onClose={() => setDiscardTransition(null)}
+          title={t('editor.discardTitle')}
+          message={t('editor.discardMessage')}
+          confirmLabel={t('editor.discard')}
+          danger
+          onConfirm={() => {
+            const transition = discardTransition
+            setDiscardTransition(null)
+            transition?.()
+          }}
+        />
+      </NavContext.Provider>
+    </DraftGuardContext.Provider>
   )
 }
 

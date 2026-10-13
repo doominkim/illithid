@@ -1,5 +1,7 @@
-import { Alert, Box, Center, Loader, ScrollArea, Stack, Text } from '@mantine/core'
+import { Alert, Box, Button, Center, Loader, ScrollArea, Stack, Text } from '@mantine/core'
+import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useReload } from '../lib/reload'
 
 /** Full-height vertical stack. The last child (split area) takes the remaining height */
 export function FillStack({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -69,11 +71,29 @@ export function Loading(): React.JSX.Element {
   )
 }
 
-export function ErrorAlert({ message }: { message: string }): React.JSX.Element {
+export function ErrorAlert({
+  message,
+  onRetry
+}: {
+  message: string
+  onRetry?: () => void
+}): React.JSX.Element {
   const { t } = useTranslation()
+  const reload = useReload()
   return (
     <Alert color="red" variant="light" radius="lg" title={t('common.error')}>
-      {message}
+      <Stack gap="sm">
+        <Text size="sm">{message}</Text>
+        <Button
+          variant="default"
+          size="xs"
+          leftSection={<RefreshCw size={13} />}
+          onClick={onRetry ?? reload}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {t('common.reload')}
+        </Button>
+      </Stack>
     </Alert>
   )
 }

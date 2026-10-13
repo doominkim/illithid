@@ -512,13 +512,15 @@ function PreviewCard({
   onClose,
   err,
   text,
-  footer
+  footer,
+  onRetry
 }: {
   title: string
   onClose: () => void
   err: string | null
   text: string | null
   footer?: React.ReactNode
+  onRetry: () => void
 }): React.JSX.Element {
   const { t } = useTranslation()
   return (
@@ -548,7 +550,7 @@ function PreviewCard({
       </Group>
       <Box style={{ flex: 1, minHeight: 0, overflow: 'auto' }} p="md" data-testid="tm-preview">
         {err ? (
-          <ErrorAlert message={err} />
+          <ErrorAlert message={err} onRetry={onRetry} />
         ) : text === null ? (
           <Loading />
         ) : (
@@ -574,18 +576,35 @@ function ToolMemoryPreview({
   const { t } = useTranslation()
   const [text, setText] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
   useEffect(() => {
     let alive = true
-    window.api.toolMemoryRead(slug, file).then((r) => {
-      if (!alive) return
-      if (r.ok) setText(r.value)
-      else setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
-    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- retry clears the previous preview error
+    setErr(null)
+    setText(null)
+    window.api.toolMemoryRead(slug, file).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) setText(r.value)
+        else setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [slug, file, t])
-  return <PreviewCard title={file} onClose={onClose} err={err} text={text} />
+  }, [slug, file, t, retry])
+  return (
+    <PreviewCard
+      title={file}
+      onClose={onClose}
+      err={err}
+      text={text}
+      onRetry={() => setRetry((n) => n + 1)}
+    />
+  )
 }
 
 /** Mounted only while open (resets state) */
@@ -661,19 +680,25 @@ function MoveModal({
   const { t } = useTranslation()
   const [picked, setPicked] = useState<string | null>(null)
   const [path, setPath] = useState('')
-  const [pathSlug, setPathSlug] = useState('')
-  const latest = useRef('')
+  const [resolved, setResolved] = useState<{ path: string; slug: string } | null>(null)
+  const [pathError, setPathError] = useState<string | null>(null)
+  const latest = useRef(0)
   const onPath = (v: string): void => {
     setPath(v)
-    latest.current = v
-    if (!v.trim()) {
-      setPathSlug('')
-      return
-    }
-    void window.api.toolMemorySlug(v).then((s) => {
-      if (latest.current === v) setPathSlug(s)
-    })
+    setResolved(null)
+    setPathError(null)
+    const seq = ++latest.current
+    if (!v.trim()) return
+    void window.api.toolMemorySlug(v).then(
+      (slug) => {
+        if (latest.current === seq) setResolved({ path: v, slug })
+      },
+      (error) => {
+        if (latest.current === seq) setPathError(String((error as Error).message ?? error))
+      }
+    )
   }
+  const pathSlug = resolved?.path === path ? resolved.slug : ''
   const options = projects
     .filter((p) => p.slug !== from.slug)
     .map((p) => ({ value: p.slug, label: p.cwd ?? p.slug }))
@@ -696,6 +721,7 @@ function MoveModal({
           label={t('memory.movePath')}
           value={path}
           onChange={(e) => onPath(e.currentTarget.value)}
+          error={pathError ?? undefined}
           data-testid="tm-move-path"
         />
         {path.trim() && (
@@ -728,27 +754,42 @@ function CodexPreview({ rel, onClose }: { rel: string; onClose: () => void }): R
   const [next, setNext] = useState<number | null>(null)
   const [size, setSize] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [retry, setRetry] = useState(0)
   useEffect(() => {
     let alive = true
-    window.api.codexMemoryRead(rel).then((r) => {
-      if (!alive) return
-      if (!r.ok) return setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
-      setText(r.value.text)
-      setSize(r.value.size)
-      setNext(r.value.nextOffset ?? null)
-    })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- retry reloads the current read-only preview
+    setErr(null)
+    setText(null)
+    setNext(null)
+    window.api.codexMemoryRead(rel).then(
+      (r) => {
+        if (!alive) return
+        if (!r.ok) return setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
+        setText(r.value.text)
+        setSize(r.value.size)
+        setNext(r.value.nextOffset ?? null)
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [rel, t])
+  }, [rel, t, retry])
   const more = async (): Promise<void> => {
     if (next === null) return
     setBusy(true)
-    const r = await window.api.codexMemoryRead(rel, next)
-    setBusy(false)
-    if (!r.ok) return setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
-    setText((x) => (x ?? '') + r.value.text)
-    setNext(r.value.nextOffset ?? null)
+    try {
+      const r = await window.api.codexMemoryRead(rel, next)
+      if (!r.ok) return setErr(t(`libError.${r.code}`, { defaultValue: r.code }))
+      setText((x) => (x ?? '') + r.value.text)
+      setNext(r.value.nextOffset ?? null)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
   }
   return (
     <PreviewCard
@@ -756,6 +797,7 @@ function CodexPreview({ rel, onClose }: { rel: string; onClose: () => void }): R
       onClose={onClose}
       err={err}
       text={text}
+      onRetry={() => setRetry((n) => n + 1)}
       footer={
         next !== null && (
           <Button
@@ -816,14 +858,30 @@ export function CodexMemory({ entries }: { entries: CodexMemoryEntry[] }): React
   const [inRollouts, setInRollouts] = useState(false)
   const [rollouts, setRollouts] = useState<CodexRolloutSummary[] | null>(null)
   const [rolloutErr, setRolloutErr] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    if (!inRollouts) return
+    let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a new folder read clears the previous list and error
+    setRollouts(null)
+    setRolloutErr(null)
+    window.api.codexRollouts().then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) setRollouts(r.value)
+        else setRolloutErr(t(`libError.${r.code}`, { defaultValue: r.code }))
+      },
+      (error) => {
+        if (alive) setRolloutErr(error instanceof Error ? error.message : String(error))
+      }
+    )
+    return () => {
+      alive = false
+    }
+  }, [inRollouts, t, retry])
   const openRollouts = (): void => {
     setInRollouts(true)
     setRel(null)
-    setRolloutErr(null)
-    void window.api.codexRollouts().then((r) => {
-      if (r.ok) setRollouts(r.value)
-      else setRolloutErr(t(`libError.${r.code}`, { defaultValue: r.code }))
-    })
   }
   if (entries.length === 0) return <EmptyState title={t('common.noResults')} />
   const dirName = `${ROLLOUT_DIR}/`
@@ -871,7 +929,7 @@ export function CodexMemory({ entries }: { entries: CodexMemoryEntry[] }): React
             </Group>
             <Box style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {rolloutErr ? (
-                <ErrorAlert message={rolloutErr} />
+                <ErrorAlert message={rolloutErr} onRetry={() => setRetry((n) => n + 1)} />
               ) : !rollouts ? (
                 <Loading />
               ) : (

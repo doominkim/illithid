@@ -122,6 +122,7 @@ function SyncButton(): React.JSX.Element {
       color={color}
       justify="flex-start"
       className="ac-sync"
+      style={{ flexShrink: 0, minHeight: 28 }}
       leftSection={
         n || busy ? <RefreshCw size={14} /> : <span className="ac-sync-dot" aria-hidden="true" />
       }
@@ -180,36 +181,46 @@ export function Sidebar({
       <WorkspaceBar onChanged={onWorkspaceChange} />
       <SyncButton />
       <NotInitializedHint />
-      <Stack gap={2}>
-        {PRIMARY.filter((m) => m !== 'market' || marketOn).map((m) =>
-          m === 'artifacts' ? (
-            <Box
-              key="sep"
-              pt={10}
-              mt={8}
-              style={{ borderTop: '1px solid var(--ac-border-subtle)' }}
-            >
-              {menuItem(m)}
-            </Box>
-          ) : (
-            menuItem(m)
-          )
-        )}
-      </Stack>
-
-      <Box style={{ flex: 1 }} />
-
-      <Box pt={10} style={{ borderTop: '1px solid var(--ac-border-subtle)' }}>
-        <Stack gap={2}>
-          {menuItem('backup')}
-          {menuItem('settings')}
+      <Box
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        <Stack gap={2} style={{ flexShrink: 0 }}>
+          {PRIMARY.filter((m) => m !== 'market' || marketOn).map((m) =>
+            m === 'artifacts' ? (
+              <Box
+                key="sep"
+                pt={10}
+                mt={8}
+                style={{ borderTop: '1px solid var(--ac-border-subtle)' }}
+              >
+                {menuItem(m)}
+              </Box>
+            ) : (
+              menuItem(m)
+            )
+          )}
         </Stack>
-      </Box>
-      <Box px={8} pt={8}>
-        <Text size="xs" c="dimmed">
-          <Bot size={11} style={{ verticalAlign: -1, marginRight: 4 }} />
-          {t(platformKey('sidebar.shortcut'))}
-        </Text>
+
+        <Box style={{ flex: 1 }} />
+
+        <Box pt={10} style={{ flexShrink: 0, borderTop: '1px solid var(--ac-border-subtle)' }}>
+          <Stack gap={2}>
+            {menuItem('backup')}
+            {menuItem('settings')}
+          </Stack>
+        </Box>
+        <Box px={8} pt={8} style={{ flexShrink: 0 }}>
+          <Text size="xs" c="dimmed">
+            <Bot size={11} style={{ verticalAlign: -1, marginRight: 4 }} />
+            {t(platformKey('sidebar.shortcut'))}
+          </Text>
+        </Box>
       </Box>
     </Box>
   )

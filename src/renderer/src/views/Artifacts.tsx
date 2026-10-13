@@ -404,15 +404,25 @@ function Artifacts(): React.JSX.Element {
   const [mode, setMode] = useState<'title' | 'content'>('title')
   /** Content search response tagged with its query (results for an older query are not shown) */
   const [found, setFound] = useState<{ q: string; tool: string; r: DocSearchResponse } | null>(null)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchRetry, setSearchRetry] = useState(0)
   const [indexRunning, setIndexRunning] = useState(false)
   const contentQ = mode === 'content' ? query.trim() : ''
   useEffect(() => window.api.onSearchIndexEvent((x) => setIndexRunning(x.running)), [])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- discard a previous query's results and error
+    setFound(null)
+    setSearchError(null)
+  }, [contentQ, tool])
   // Content search: 300ms after input, and again when indexing finishes
   useEffect(() => {
     if (!contentQ) return
     let alive = true
     const done = (r: DocSearchResponse): void => {
-      if (alive) setFound({ q: contentQ, tool, r })
+      if (alive) {
+        setFound({ q: contentQ, tool, r })
+        setSearchError(null)
+      }
     }
     const timer = setTimeout(() => {
       void window.api
@@ -420,13 +430,20 @@ function Artifacts(): React.JSX.Element {
           kind: 'artifact',
           ...(tool === ALL ? {} : { tool: tool as ArtifactTool })
         })
-        .then(done, () => done({ results: [], mode: 'fts', limited: false, ms: 0 }))
+        .then(done, (e: unknown) => {
+          if (alive) setSearchError(e instanceof Error ? e.message : String(e))
+        })
     }, 300)
     return () => {
       alive = false
       clearTimeout(timer)
     }
-  }, [contentQ, tool, indexRunning])
+  }, [contentQ, tool, indexRunning, searchRetry])
+  const retrySearch = (): void => {
+    setSearchError(null)
+    setFound(null)
+    setSearchRetry((n) => n + 1)
+  }
 
   const filtered = useMemo(() => {
     const q = mode === 'title' ? query.trim().toLowerCase() : ''
@@ -534,7 +551,9 @@ function Artifacts(): React.JSX.Element {
         detailWidth="55%"
         list={
           showResults ? (
-            !resultRows ? (
+            searchError ? (
+              <ErrorAlert message={searchError} onRetry={retrySearch} />
+            ) : !resultRows ? (
               <Loading />
             ) : resultRows.length ? (
               <ResultList rows={resultRows} selected={selected} onSelect={setSelected} />

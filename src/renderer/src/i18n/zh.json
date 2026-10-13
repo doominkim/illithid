@@ -97,7 +97,8 @@
     "save": "保存",
     "import": "导入",
     "back": "返回",
-    "empty": "这里还没有内容。"
+    "empty": "这里还没有内容。",
+    "toggleAllTools": "切换 {{name}} 的所有工具"
   },
   "rules": {
     "search": "搜索规则",
@@ -172,7 +173,8 @@
       "noteCodex": "Codex：阻止服务器后，只提供此处设为允许或询问的工具。",
       "noteGemini": "Gemini CLI：服务器名含 \"_\" 时规则可能无法匹配。",
       "noteCopilot": "GitHub Copilot：无法在配置文件中设置工具权限。"
-    }
+    },
+    "sharedCredentials": "使用相同服务器名称和字段的工作区会共享凭据。编辑凭据也会更新这些连接。"
   },
   "agents": {
     "model": "模型",
@@ -316,7 +318,10 @@
     "lines": "{{n}} 行",
     "revert": "还原",
     "saved": "已保存",
-    "unsaved": "未保存"
+    "unsaved": "未保存",
+    "discardTitle": "未保存的更改",
+    "discardMessage": "要放弃未保存的更改并继续吗？",
+    "discard": "放弃更改"
   },
   "refused": {
     "allowRealApplyOff": "自动同步已关闭",
@@ -437,7 +442,10 @@
       "mcp": "MCP 服务器定义（仅 ${VAR} 引用）",
       "memory": "记忆",
       "permissions": "权限（allowlist）",
-      "toggles": "各工具开/关设置"
+      "toggles": "各工具开/关设置",
+      "agents": "代理",
+      "hooks": "钩子及其脚本",
+      "scripts": "脚本"
     },
     "scopeOut": {
       "secrets": "API 密钥、令牌、凭据",

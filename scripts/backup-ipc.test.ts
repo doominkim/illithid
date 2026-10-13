@@ -7,11 +7,7 @@ import { createRequire } from 'node:module'
 import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 import * as engine from '../src/engine'
-import {
-  assertWorkspaceCurrent,
-  advanceWorkspaceRevision,
-  captureWorkspace
-} from '../src/main/workspaceGuard'
+import * as workspaceGuard from '../src/main/workspaceGuard'
 import { buildDemoHome } from './readme-shots'
 import type { SnapshotResult } from '../src/engine/backup'
 
@@ -72,7 +68,7 @@ function ipcHost(
     './shellEnv': { shellEnvReady: async () => {} },
     './githubBackup': { githubAuthForWorkspace: () => undefined, unbindGithubBackup: unbind },
     './market': { marketHandlers: () => ({}) },
-    './workspaceGuard': { assertWorkspaceCurrent, advanceWorkspaceRevision, captureWorkspace },
+    './workspaceGuard': workspaceGuard,
     './worker?nodeWorker': {
       default: () => {
         throw new Error('The backup IPC test must not run an index worker')
