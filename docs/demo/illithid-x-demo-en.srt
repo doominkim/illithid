@@ -1,0 +1,30 @@
+1
+00:00:00,000 --> 00:00:03,000
+Illithid
+Rules. Skills. MCP. One place.
+
+2
+00:00:03,000 --> 00:00:08,000
+One library for your coding-agent setup.
+
+3
+00:00:08,000 --> 00:00:18,000
+Edit a rule once.
+
+4
+00:00:18,000 --> 00:00:27,000
+Choose which tools receive each skill.
+
+5
+00:00:27,000 --> 00:00:37,000
+Manage MCP servers alongside your rules and skills.
+
+6
+00:00:37,000 --> 00:00:49,000
+Review planned changes for each tool before applying.
+
+7
+00:00:49,000 --> 00:00:55,000
+Keep your official tools and subscriptions.
+github.com/doominkim/illithid
+macOS + Windows beta • Open source

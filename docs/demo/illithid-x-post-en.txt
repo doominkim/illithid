@@ -1,0 +1,5 @@
+Using Claude Code and Codex together?
+Illithid syncs your rules, skills and MCP settings, with a preview before applying changes.
+Keep using the official tools and your existing subscriptions.
+macOS + Windows beta. Open source.
+https://github.com/doominkim/illithid
