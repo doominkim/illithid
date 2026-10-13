@@ -60,6 +60,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx electron-builder --win --x64 --publish never
+      - name: Verify packaged contents
+        run: npx tsx scripts/check-packaged-content.ts dist/win-unpacked/resources/app.asar
       - uses: actions/upload-artifact@v4
         with:
           name: ci-setup-x64

@@ -24,6 +24,7 @@ import { ViewToggle } from '../components/ViewToggle'
 import { includesCI } from '../lib/format'
 import { isRefused, runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { useSyncFailures } from '../lib/sync'
 import { pillFromCellState, TOOLS, type PillMap } from '../lib/tools'
 import { lastSyncFailedText } from '../lib/problemReason'
@@ -52,6 +53,7 @@ function cardTitle(name: string, text: string): string {
 
 function Rules(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   // Card switch and all-on/off cover the tools in use only (others are off by design and never written)
   const inUse = useToolsInUse()
   const cardTools = TOOLS.filter((tool) => inUse.includes(tool))
@@ -63,6 +65,9 @@ function Rules(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [view, setView] = useViewMode('rules')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const pending = useToggleBusy()
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -203,10 +208,12 @@ function Rules(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => {
-                setSelected(null)
-                setCreating(true)
-              }}
+              onClick={() =>
+                guardDraft(() => {
+                  setSelected(null)
+                  setCreating(true)
+                })
+              }
               data-testid="rule-new"
             >
               {t('rules.new')}
@@ -263,7 +270,7 @@ function Rules(): React.JSX.Element {
                 />
               }
               selected={f.name === selected}
-              onClick={() => setSelected(f.name)}
+              onClick={() => selectItem(f.name)}
             />
           ))}
         </CardGrid>
@@ -284,7 +291,7 @@ function Rules(): React.JSX.Element {
                 />
               }
               active={f.name === selected}
-              onClick={() => setSelected(f.name)}
+              onClick={() => selectItem(f.name)}
             />
           ))}
         </ListCard>
@@ -317,7 +324,7 @@ function Rules(): React.JSX.Element {
               busy={pending.of(current.name)}
               testId="rule-detail-tools"
             />
-            <Tabs key={current.name} defaultValue="source" keepMounted={false}>
+            <Tabs key={current.name} defaultValue="source">
               <Tabs.List>
                 <Tabs.Tab value="source">{t('detail.source')}</Tabs.Tab>
                 <Tabs.Tab value="edit" data-testid="tab-edit">
@@ -347,7 +354,7 @@ function Rules(): React.JSX.Element {
                       variant="default"
                       disabled={!nextName || nextName === current.name}
                       loading={renaming}
-                      onClick={() => void rename()}
+                      onClick={() => guardDraft(() => void rename())}
                       mb={renameErr ? 22 : 0}
                       data-testid="rule-rename"
                     >

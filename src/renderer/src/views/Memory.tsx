@@ -19,6 +19,7 @@ import { includesCI } from '../lib/format'
 import { useConfig } from '../lib/config'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { useApi } from '../lib/useApi'
 import type { IndexStat } from '../../../shared/api'
 import { nearLimit } from '../lib/memoryIndex'
@@ -50,12 +51,16 @@ function SharedMemory({
   limits: IndexStat
 }): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const { request } = useNav()
   const { config } = useConfig()
   const reload = useReload()
   const files = useApi('memoryFiles', loadFiles)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -155,7 +160,7 @@ function SharedMemory({
                   )
                 }
                 active={f === selected}
-                onClick={() => setSelected(f)}
+                onClick={() => selectItem(f)}
               />
             )
           })}
@@ -234,28 +239,34 @@ function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): Rea
   const workspaceRoot = config?.libraryRoot
   const [text, setText] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
   useEffect(() => {
     let alive = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- discard content from the previous file before loading
     setText(null)
     setErr(null)
-    window.api.memoryRead(rel).then((r) => {
-      if (!alive) return
-      if (r.ok) setText(r.value)
-      else setErr(r.message)
-    })
+    window.api.memoryRead(rel).then(
+      (r) => {
+        if (!alive) return
+        if (r.ok) setText(r.value)
+        else setErr(r.message)
+      },
+      (error) => {
+        if (alive) setErr(error instanceof Error ? error.message : String(error))
+      }
+    )
     return () => {
       alive = false
     }
-  }, [rel, workspaceRoot])
-  if (err) return <ErrorAlert message={err} />
+  }, [rel, workspaceRoot, retry])
+  if (err) return <ErrorAlert message={err} onRetry={() => setRetry((n) => n + 1)} />
   if (text === null) return <Loading />
   return (
     <Stack gap="lg">
       <Text size="md" c="dimmed">
         {firstHeading(text)}
       </Text>
-      <Tabs defaultValue="source" keepMounted={false}>
+      <Tabs defaultValue="source">
         <Tabs.List>
           <Tabs.Tab value="source">{t('detail.source')}</Tabs.Tab>
           <Tabs.Tab value="edit" data-testid="tab-edit">
@@ -290,13 +301,19 @@ function MemoryFile({ rel, onSaved }: { rel: string; onSaved: () => void }): Rea
 /** Memory: Shared · Claude · Codex tabs */
 function Memory(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const [tab, setTab] = useState<string | null>('shared')
   const tm = useApi('toolMemory', () => window.api.toolMemoryScan())
   const limits = tm.data?.claude.limits ?? { lines: 200, bytes: 25 * 1024 }
   return (
     <Stack gap={0} h="100%" style={{ minHeight: 0 }}>
       <PageHeader title={t('nav.memory')} actions={<ReloadButton />} />
-      <Tabs value={tab} onChange={setTab} mb="md" keepMounted={false}>
+      <Tabs
+        value={tab}
+        onChange={(next) => next !== tab && guardDraft(() => setTab(next))}
+        mb="md"
+        keepMounted={false}
+      >
         <Tabs.List>
           <Tabs.Tab
             value="shared"

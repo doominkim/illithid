@@ -93,15 +93,22 @@ function Market(): React.JSX.Element {
     setMcpMore([])
     setCursor(undefined)
     setLoading(true)
-    const r = await window.api.marketSearch(kind, kind === 'rule' || kind === 'hook' ? '' : q)
-    if (my !== seq.current) return
-    setLoading(false)
-    if (r.ok) {
-      setResult(r.value)
-      setCursor(r.value.nextCursor)
-    } else {
+    try {
+      const r = await window.api.marketSearch(kind, kind === 'rule' || kind === 'hook' ? '' : q)
+      if (my !== seq.current) return
+      setLoading(false)
+      if (r.ok) {
+        setResult(r.value)
+        setCursor(r.value.nextCursor)
+      } else {
+        setResult(null)
+        setError(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
+      }
+    } catch (e) {
+      if (my !== seq.current) return
+      setLoading(false)
       setResult(null)
-      setError(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -109,6 +116,10 @@ function Market(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- search again when the tab or query changes
     void search()
     // Rules load once per tab switch; skills and MCP follow the query
+    return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- invalidate the current request sequence, not a DOM ref
+      seq.current++
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, kind === 'rule' || kind === 'hook' ? '' : q])
 
@@ -116,14 +127,20 @@ function Market(): React.JSX.Element {
     if (!cursor) return
     const my = seq.current
     setLoading(true)
-    const r = await window.api.marketSearch('mcp', q, cursor)
-    // A newer search replaced the list meanwhile
-    if (my !== seq.current) return
-    setLoading(false)
-    if (r.ok) {
-      setMcpMore((prev) => [...prev, ...(r.value.mcp ?? [])])
-      setCursor(r.value.nextCursor)
-    } else setError(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
+    try {
+      const r = await window.api.marketSearch('mcp', q, cursor)
+      // A newer search replaced the list meanwhile
+      if (my !== seq.current) return
+      setLoading(false)
+      if (r.ok) {
+        setMcpMore((prev) => [...prev, ...(r.value.mcp ?? [])])
+        setCursor(r.value.nextCursor)
+      } else setError(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
+    } catch (e) {
+      if (my !== seq.current) return
+      setLoading(false)
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   const checkUpdates = async (): Promise<void> => {
@@ -222,7 +239,7 @@ function Market(): React.JSX.Element {
     ) : null
 
   const list = (): React.ReactNode => {
-    if (error) return <ErrorAlert message={error} />
+    if (error) return <ErrorAlert message={error} onRetry={() => void search()} />
     if (loading && !result) return <Loading />
     if (kind === 'skill') {
       const items = result?.skills ?? []
@@ -500,25 +517,39 @@ function MarketDetail({
   const [choice, setChoice] = useState<string | null>(null)
   const [values, setValues] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const initialized = useRef(false)
+  const retryRead = (): void => {
+    setErr(null)
+    setRetry((n) => n + 1)
+  }
 
   useEffect(() => {
     let alive = true
-    window.api.marketDetail(kind, id).then((r) => {
-      if (!alive) return
-      if (!r.ok) return setErr(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
-      setView(r.value)
-      setName(r.value.kind === 'hook' ? r.value.id : r.value.name)
-      if (r.value.kind === 'mcp') {
-        const first = r.value.choices.find((c) => c.supported)
-        setChoice(first?.id ?? null)
-      }
-    })
+    window.api.marketDetail(kind, id).then(
+      (r) => {
+        if (!alive) return
+        if (!r.ok)
+          return setErr(`${t(`libError.${r.code}`, { defaultValue: r.code })}: ${r.message}`)
+        setErr(null)
+        setView(r.value)
+        if (!initialized.current) {
+          setName(r.value.kind === 'hook' ? r.value.id : r.value.name)
+          if (r.value.kind === 'mcp') {
+            const first = r.value.choices.find((c) => c.supported)
+            setChoice(first?.id ?? null)
+          }
+          initialized.current = true
+        }
+      },
+      (e) => alive && setErr(e instanceof Error ? e.message : String(e))
+    )
     return () => {
       alive = false
     }
-  }, [kind, id, t])
+  }, [kind, id, t, retry])
 
-  if (err) return <ErrorAlert message={err} />
+  if (err) return <ErrorAlert message={err} onRetry={retryRead} />
   if (!view) return <Loading />
 
   const current: MarketInstallChoice | undefined =

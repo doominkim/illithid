@@ -129,6 +129,11 @@ import {
 } from '../engine/workspace'
 import { defaultSecretBackend, SecretError, type SecretBackend } from '../engine/secrets'
 import {
+  assertWorkspaceWritable,
+  workspaceWriteRefusal,
+  type WorkspaceRewriteOwner
+} from './workspaceGuard'
+import {
   MASK,
   type ConfigView,
   type DeleteCandidateRequest,
@@ -169,6 +174,8 @@ export function wrap<T>(fn: () => T): WriteResult<T> {
 
 /** Tool file write gate. Refused unless enabled */
 export function gate(home: string): Refused | null {
+  const busy = workspaceWriteRefusal(home)
+  if (busy) return busy
   const c = readConfig(home)
   if (c.error) return { refused: 'configError', message: `config.json: ${c.error}` }
   if (!c.config.allowRealApply)
@@ -236,6 +243,8 @@ function libraryIsEmpty(home: string): boolean {
 
 /** Library write gate */
 export function libGate(home: string): Refused | null {
+  const busy = workspaceWriteRefusal(home)
+  if (busy) return busy
   const c = readConfig(home)
   if (c.error) return { refused: 'configError', message: `config.json: ${c.error}` }
   const st = libraryState(home)
@@ -272,6 +281,7 @@ export function libraryInitRun(
   _path?: string,
   importLegacy = false
 ): LibraryInitResult {
+  assertWorkspaceWritable(home)
   void _path
   const r = initLibrary(home)
   const out: LibraryInitResult = { root: tilde(home, r.root), created: r.created }
@@ -489,10 +499,12 @@ export function syncNow(
   home: string,
   env: Env,
   approvedOnce = false,
-  expectFingerprint?: string
+  expectFingerprint?: string,
+  rewriteOwner?: WorkspaceRewriteOwner
 ): SyncStatusView {
   const at = new Date().toISOString()
   try {
+    assertWorkspaceWritable(home, rewriteOwner)
     const allowReal = approvedOnce || !!readConfig(home).config.allowRealApply
     const r = syncAll(home, env, {
       allowReal,
@@ -553,6 +565,7 @@ export function uiPrefsSet(home: string, patch: UiPrefsPatch): UiPrefs {
 
 /** Apply patch over the current settings. undefined values remove the key */
 export function configSet(home: string, patch: Partial<AppConfig>): void {
+  if ('activeWorkspace' in patch) assertWorkspaceWritable(home)
   const cur = readConfig(home)
   if (cur.error) throw new ConfigError(`config.json: ${cur.error}`)
   const next: Json = { ...(cur.config as unknown as Json), version: 1 }
@@ -599,6 +612,7 @@ export function toolsInUseSet(
   list: ToolId[] | null | undefined,
   retiring?: ToolId[]
 ): void {
+  assertWorkspaceWritable(home)
   if (list !== null && list !== undefined && !Array.isArray(list))
     throw new ConfigError('toolsInUse must be an array')
   if (retiring !== undefined && !Array.isArray(retiring))
@@ -965,6 +979,7 @@ export function workspaceCreate(
   name: string,
   from: 'empty' | 'current'
 ): WorkspaceView {
+  if (from === 'current') assertWorkspaceWritable(home)
   return createWorkspace(home, name, { from })
 }
 
@@ -975,6 +990,7 @@ export function workspaceSwitchPreview(home: string, env: Env, id: string): Swit
 
 /** Switch (saves config). The IPC layer handles the watcher and sync */
 export function workspaceSwitch(home: string, id: string): WorkspaceView {
+  assertWorkspaceWritable(home)
   return switchWorkspace(home, id)
 }
 
@@ -992,6 +1008,7 @@ export function workspaceExportData(
   home: string,
   appVersion: string
 ): ReturnType<typeof exportWorkspace> {
+  assertWorkspaceWritable(home)
   return exportWorkspace(home, { appVersion })
 }
 
@@ -1006,6 +1023,7 @@ export function tildePath(home: string, p: string): string {
 }
 
 export function workspaceRename(home: string, id: string, name: string): WorkspaceView {
+  assertWorkspaceWritable(home)
   return renameWorkspace(home, id, name)
 }
 

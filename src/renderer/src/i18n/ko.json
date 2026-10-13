@@ -97,7 +97,8 @@
     "save": "저장",
     "import": "가져오기",
     "back": "뒤로",
-    "empty": "아직 비어 있습니다."
+    "empty": "아직 비어 있습니다.",
+    "toggleAllTools": "{{name}} 모든 도구 켜기/끄기"
   },
   "rules": {
     "search": "룰 검색",
@@ -172,7 +173,8 @@
       "noteCodex": "Codex: 서버를 막으면 여기서 허용·물어보기로 정한 도구만 보입니다.",
       "noteGemini": "Gemini CLI: 서버 이름에 \"_\" 가 있으면 규칙이 맞지 않을 수 있습니다.",
       "noteCopilot": "GitHub Copilot: 설정 파일로는 도구 권한을 정할 수 없습니다."
-    }
+    },
+    "sharedCredentials": "서버 이름과 필드가 같으면 워크스페이스 간에 인증 정보를 공유합니다. 수정하면 해당 연결들에도 반영됩니다."
   },
   "agents": {
     "model": "모델",
@@ -316,7 +318,10 @@
     "lines": "{{n}}줄",
     "revert": "되돌리기",
     "saved": "저장됨",
-    "unsaved": "저장 안 됨"
+    "unsaved": "저장 안 됨",
+    "discardTitle": "저장하지 않은 변경 사항",
+    "discardMessage": "저장하지 않은 변경 사항을 버리고 계속하시겠습니까?",
+    "discard": "변경 사항 버리기"
   },
   "refused": {
     "allowRealApplyOff": "자동 반영 꺼짐",
@@ -437,7 +442,10 @@
       "mcp": "MCP 서버 정의 (${VAR} 참조만)",
       "memory": "메모리",
       "permissions": "권한 (allowlist)",
-      "toggles": "툴별 on/off 설정"
+      "toggles": "툴별 on/off 설정",
+      "agents": "에이전트",
+      "hooks": "훅 및 훅 스크립트",
+      "scripts": "스크립트"
     },
     "scopeOut": {
       "secrets": "API 키·토큰·자격증명",

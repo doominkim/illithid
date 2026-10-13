@@ -34,6 +34,7 @@ const dark: MantineColorsTuple = [
 export const theme = createTheme({
   primaryColor: 'accent',
   primaryShade: { light: 6, dark: 5 },
+  luminanceThreshold: 0.179,
   colors: { accent, dark },
   fontFamily:
     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
@@ -65,7 +66,7 @@ export const theme = createTheme({
       styles: { root: { backgroundColor: 'var(--ac-surface)' } }
     },
     Card: { defaultProps: { radius: 'lg', padding: 'md' } },
-    Button: { defaultProps: { radius: 'md', size: 'sm' } },
+    Button: { defaultProps: { radius: 'md', size: 'sm', autoContrast: true } },
     ActionIcon: { defaultProps: { radius: 'md' } },
     Badge: { defaultProps: { radius: 'xl' }, styles: { root: { textTransform: 'none' } } },
     TextInput: { defaultProps: { radius: 'md', size: 'sm' } },
@@ -98,6 +99,8 @@ export const cssVariablesResolver: CSSVariablesResolver = () => ({
     '--ac-accent-bg': 'rgba(5,150,105,.08)',
     '--ac-danger': '#DC2626',
     '--ac-warning': '#D97706',
+    '--ac-sync-pending-text': '#166534',
+    '--ac-sync-failed-text': '#B91C1C',
     '--ac-shadow-card': '0 1px 2px rgba(24,24,27,.04)',
     '--ac-shadow-card-hover': '0 4px 12px rgba(24,24,27,.07)'
   },

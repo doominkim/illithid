@@ -411,14 +411,24 @@ function Backup(): React.JSX.Element {
 
           <Card title={t('backup.scope')} icon={<ShieldCheck size={18} />}>
             <Stack gap={6}>
-              {(['rules', 'skills', 'mcp', 'memory', 'permissions', 'toggles'] as const).map(
-                (k) => (
-                  <Group key={k} gap={8} wrap="nowrap">
-                    <Check size={14} style={{ color: 'var(--ac-accent)', flexShrink: 0 }} />
-                    <Text size="sm">{t(`backup.scopeIn.${k}`)}</Text>
-                  </Group>
-                )
-              )}
+              {(
+                [
+                  'rules',
+                  'skills',
+                  'agents',
+                  'hooks',
+                  'scripts',
+                  'mcp',
+                  'memory',
+                  'permissions',
+                  'toggles'
+                ] as const
+              ).map((k) => (
+                <Group key={k} gap={8} wrap="nowrap">
+                  <Check size={14} style={{ color: 'var(--ac-accent)', flexShrink: 0 }} />
+                  <Text size="sm">{t(`backup.scopeIn.${k}`)}</Text>
+                </Group>
+              ))}
               {(['secrets', 'machine'] as const).map((k) => (
                 <Group key={k} gap={8} wrap="nowrap">
                   <CircleOff size={14} style={{ color: 'var(--ac-text-muted)', flexShrink: 0 }} />

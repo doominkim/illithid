@@ -29,6 +29,7 @@ import {
   readConfig,
   libraryRoot,
   workspaceRoot,
+  WORKSPACE_ZIP_MAX_ARCHIVE_BYTES,
   claudeProjectSlug,
   connectBackup,
   moveClaudeMemory,
@@ -89,6 +90,9 @@ import { marketHandlers } from './market'
 import {
   advanceWorkspaceRevision,
   assertWorkspaceCurrent,
+  assertWorkspaceWritable,
+  beginWorkspaceRewrite,
+  isWorkspaceRewriting,
   captureWorkspace
 } from './workspaceGuard'
 import createWorker from './worker?nodeWorker'
@@ -327,6 +331,8 @@ export function registerIpc(): void {
     const g = W.libGate(home)
     if (g) return g
     const env = await envNow()
+    const ready = W.libGate(home)
+    if (ready) return ready
     W.markSelfWrite()
     const r = W.wrap(() => {
       assertWorkspaceCurrent(home, origin, false)
@@ -647,8 +653,8 @@ export function registerIpc(): void {
       const file = r.canceled ? undefined : r.filePaths[0]
       if (!file) return { ok: true, value: null }
       return W.wrap(() => {
-        // Check file size before reading (reject if even the compressed file exceeds the limit)
-        if (statSync(file).size > 50 * 1024 * 1024)
+        // Bound the archive before reading; the engine separately validates uncompressed bytes and files.
+        if (statSync(file).size > WORKSPACE_ZIP_MAX_ARCHIVE_BYTES)
           throw Object.assign(new Error('file is too large'), { code: 'tooLarge' })
         W.markSelfWrite(3000)
         return W.workspaceImportData(home, new Uint8Array(readFileSync(file)))
@@ -862,20 +868,24 @@ export function registerIpc(): void {
       const env = await envNow()
       W.markSelfWrite()
       const req = (item ?? {}) as { kind?: unknown; tool?: unknown; path?: unknown }
-      return W.wrap(() =>
-        keepImportedOriginal(home, env, {
+      return W.wrap(() => {
+        assertWorkspaceWritable(home)
+        return keepImportedOriginal(home, env, {
           kind: req.kind as never,
           tool: req.tool as ToolId,
           path: str(req.path)
         })
-      )
+      })
     },
     editedRuleKeep: async (tool, name) => {
       const g = W.libGate(home)
       if (g) return g
       const env = await envNow()
       W.markSelfWrite()
-      const r = W.wrap(() => adoptEditedRule(home, env, tool as ToolId, str(name)))
+      const r = W.wrap(() => {
+        assertWorkspaceWritable(home)
+        return adoptEditedRule(home, env, tool as ToolId, str(name))
+      })
       W.markSelfWrite()
       return r
     },
@@ -958,60 +968,78 @@ export function registerIpc(): void {
       const origin = captureWorkspace(home)
       const g = W.libGate(home)
       if (g) return g
-      W.markSelfWrite(8000)
-      if (snapshotFirst) {
-        const s0 = fromGit(await runSnapshot(home, 'before restore'))
-        if (!s0.ok) return s0
+      const release = beginWorkspaceRewrite(home)
+      try {
+        W.markSelfWrite(8000)
+        if (snapshotFirst) {
+          const s0 = fromGit(await runSnapshot(home, 'before restore'))
+          if (!s0.ok) return s0
+        }
+        const current = W.wrap(() => assertWorkspaceCurrent(home, origin))
+        if (!current.ok) return current
+        const r = fromGit(
+          await runBackupOperation(origin.root, () => {
+            assertWorkspaceCurrent(home, origin)
+            return restore(home, str(hash))
+          })
+        )
+        if (!r.ok) return r
+        const env = await envNow()
+        const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
+        if (!unchanged.ok) return unchanged
+        advanceWorkspaceRevision()
+        scheduleAutoBackup(home)
+        // Apply the restored source to tools
+        const sync = W.syncNow(home, env, false, undefined, release)
+        W.markSelfWrite(3000)
+        return { ok: true, value: sync }
+      } finally {
+        release()
       }
-      const current = W.wrap(() => assertWorkspaceCurrent(home, origin))
-      if (!current.ok) return current
-      const r = fromGit(await restore(home, str(hash)))
-      if (!r.ok) return r
-      const env = await envNow()
-      const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
-      if (!unchanged.ok) return unchanged
-      advanceWorkspaceRevision()
-      scheduleAutoBackup(home)
-      // Apply the restored source to tools
-      const sync = W.syncNow(home, env)
-      W.markSelfWrite(3000)
-      return { ok: true, value: sync }
     },
     backupPull: async (replaceLocal) => {
       const origin = captureWorkspace(home)
       const g = W.libGate(home)
       if (g) return g
       const root = libraryRoot(home)
-      W.markSelfWrite(8000)
-      const r = await pullFromRemote(home, {
-        auth: githubAuthForWorkspace(home, activeWorkspaceId(home)),
-        replaceLocal: replaceLocal === true
-      })
-      if (!r.ok && (r.reason === PULL_LOCAL_UNSAVED || r.reason === PULL_DIVERGED)) {
-        backupErrors.set(root, r.reason)
-        return { ok: true, value: { outcome: 'confirmRequired', reason: r.reason } }
-      }
-      if (!r.ok) {
-        backupErrors.set(root, r.reason)
-        return fromGit(r)
-      }
-      backupErrors.delete(root)
-      const env = await envNow()
-      const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
-      if (!unchanged.ok) return unchanged
-      advanceWorkspaceRevision()
-      // A merge/adopt leaves a local commit the remote does not have yet
-      if (r.merged !== 'upToDate') scheduleAutoBackup(home)
-      const sync = W.syncNow(home, env)
-      W.markSelfWrite(3000)
-      return {
-        ok: true,
-        value: {
-          outcome: 'pulled',
-          merged: r.merged,
-          ...(r.backupPath ? { backupPath: tilde(home, r.backupPath) } : {}),
-          sync
+      const release = beginWorkspaceRewrite(home)
+      try {
+        W.markSelfWrite(8000)
+        const r = await runBackupOperation(root, () => {
+          assertWorkspaceCurrent(home, origin)
+          return pullFromRemote(home, {
+            auth: githubAuthForWorkspace(home, activeWorkspaceId(home)),
+            replaceLocal: replaceLocal === true
+          })
+        })
+        if (!r.ok && (r.reason === PULL_LOCAL_UNSAVED || r.reason === PULL_DIVERGED)) {
+          backupErrors.set(root, r.reason)
+          return { ok: true, value: { outcome: 'confirmRequired', reason: r.reason } }
         }
+        if (!r.ok) {
+          backupErrors.set(root, r.reason)
+          return fromGit(r)
+        }
+        backupErrors.delete(root)
+        const env = await envNow()
+        const unchanged = W.wrap(() => assertWorkspaceCurrent(home, origin))
+        if (!unchanged.ok) return unchanged
+        advanceWorkspaceRevision()
+        // A merge/adopt leaves a local commit the remote does not have yet
+        if (r.merged !== 'upToDate') scheduleAutoBackup(home)
+        const sync = W.syncNow(home, env, false, undefined, release)
+        W.markSelfWrite(3000)
+        return {
+          ok: true,
+          value: {
+            outcome: 'pulled',
+            merged: r.merged,
+            ...(r.backupPath ? { backupPath: tilde(home, r.backupPath) } : {}),
+            sync
+          }
+        }
+      } finally {
+        release()
       }
     },
     backupDisconnect: async () => {
@@ -1195,7 +1223,20 @@ const autoBackupTimers = new Map<
   { home: string; workspaceId: string; timer: NodeJS.Timeout }
 >()
 const backupErrors = new Map<string, string>()
-const backupInFlight = new Map<string, Promise<Awaited<ReturnType<typeof snapshot>>>>()
+const backupInFlight = new Map<string, Promise<unknown>>()
+
+/** Snapshots, restores and pulls must not concurrently change one workspace's Git index. */
+function runBackupOperation<T>(root: string, run: () => Promise<T>): Promise<T> {
+  const previous = backupInFlight.get(root)
+  const pending = (previous ? previous.catch(() => {}) : Promise.resolve()).then(run)
+  backupInFlight.set(root, pending)
+  void pending
+    .finally(() => {
+      if (backupInFlight.get(root) === pending) backupInFlight.delete(root)
+    })
+    .catch(() => {})
+  return pending
+}
 
 function recordBackupResult(root: string, result: Awaited<ReturnType<typeof snapshot>>): void {
   const error = result.ok ? result.remoteError : result.reason
@@ -1210,18 +1251,13 @@ function runSnapshot(
   workspaceId = activeWorkspaceId(home)
 ): ReturnType<typeof snapshot> {
   const root = workspaceRoot(home, workspaceId)
-  const previous = backupInFlight.get(root)
-  const pending = (previous ? previous.catch(() => {}) : Promise.resolve()).then(() => {
+  const pending = runBackupOperation(root, () => {
     W.markSelfWrite(5000)
     return snapshot(home, message, { workspaceId, auth: githubAuthForWorkspace(home, workspaceId) })
   })
-  backupInFlight.set(root, pending)
   void pending
     .then((r) => recordBackupResult(root, r))
     .catch((e) => backupErrors.set(root, String((e as Error).message)))
-    .finally(() => {
-      if (backupInFlight.get(root) === pending) backupInFlight.delete(root)
-    })
   return pending
 }
 
@@ -1274,23 +1310,35 @@ export async function snapshotOnQuit(): Promise<void> {
  * Backup screen can offer the confirmed pull. Used on app start and right after connecting a remote.
  */
 async function pullAndSync(home: string): Promise<void> {
-  if (!W.libraryState(home).ready) return
+  if (!W.libraryState(home).ready || W.libGate(home)) return
+  let release: (() => void) | undefined
   try {
-    W.markSelfWrite(8000)
     const root = libraryRoot(home)
     const origin = captureWorkspace(home)
-    const r = await pullOnStart(home, {
-      auth: githubAuthForWorkspace(home, activeWorkspaceId(home))
+    // An unconnected workspace has nothing to pull; do not block edits or queue behind its snapshots.
+    if (!(await backupStatus(home)).remoteUrl) return
+    assertWorkspaceCurrent(home, origin)
+    if (W.libGate(home)) return
+    release = beginWorkspaceRewrite(home)
+    W.markSelfWrite(8000)
+    const r = await runBackupOperation(root, () => {
+      assertWorkspaceCurrent(home, origin)
+      return pullOnStart(home, {
+        auth: githubAuthForWorkspace(home, activeWorkspaceId(home))
+      })
     })
     if (!r.ok) backupErrors.set(root, r.reason)
     else backupErrors.delete(root)
     assertWorkspaceCurrent(home, origin)
     if (r.ok && !r.skipped && r.summary) {
-      const s = W.syncNow(home, { ...process.env })
+      advanceWorkspaceRevision()
+      const s = W.syncNow(home, { ...process.env }, false, undefined, release)
       for (const w of BrowserWindow.getAllWindows()) w.webContents.send('api:syncEvent', s)
     }
   } catch {
     // Offline etc. — skip silently
+  } finally {
+    release?.()
   }
 }
 
@@ -1325,7 +1373,7 @@ export function startLibraryWatch(): void {
     unsubscribe = watchLibrary(
       root,
       () => {
-        if (W.isSelfWriteWindow()) return
+        if (W.isSelfWriteWindow() || isWorkspaceRewriting(root)) return
         if (!W.libraryState(home).ready) return
         advanceWorkspaceRevision()
         broadcast(W.syncNow(home, { ...process.env }))

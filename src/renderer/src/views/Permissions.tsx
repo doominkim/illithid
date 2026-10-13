@@ -105,6 +105,16 @@ function MatchPicker({
 /** A command has one rule: its words and whether it is exact identify it */
 const ruleKey = (r: Pick<CommandRule, 'argv' | 'exact'>): string =>
   JSON.stringify([r.argv, r.exact])
+/** A textarea may contain an exact and a prefix rule with the same words; each occurrence owns its controls. */
+function commandOccurrences(commands: string[][]): string[] {
+  const counts = new Map<string, number>()
+  return commands.map((argv) => {
+    const command = JSON.stringify(argv)
+    const occurrence = counts.get(command) ?? 0
+    counts.set(command, occurrence + 1)
+    return `${command}:${occurrence}`
+  })
+}
 /** Block first, then ask, then allow; file order within each */
 const byDecision = (rules: CommandRule[]): CommandRule[] =>
   ORDER.flatMap((d) => rules.filter((r) => r.decision === d))
@@ -690,7 +700,7 @@ function RuleForm({
   submitTestId: string
 }): React.JSX.Element {
   const { t } = useTranslation()
-  const [text, setText] = useState(commandText(initial))
+  const [text, setText] = useState(commandLine(initial.argv))
   const [decision, setDecision] = useState<PermissionDecision>(initial.decision)
   const [exact, setExact] = useState(initial.exact)
   const [group, setGroup] = useState<string | null>(initial.group ?? null)
@@ -701,12 +711,15 @@ function RuleForm({
     (r) => r.exact === exact && JSON.stringify(r.argv) === JSON.stringify(argv)
   )
   const rule: CommandRule = {
+    ...initial,
     decision,
     argv,
-    exact,
-    ...(description.trim() ? { description: description.trim() } : {}),
-    ...(group ? { group } : {})
+    exact
   }
+  if (description.trim()) rule.description = description.trim()
+  else delete rule.description
+  if (group) rule.group = group
+  else delete rule.group
   const dirty = JSON.stringify(rule) !== JSON.stringify(initial)
   const submit = async (): Promise<void> => {
     setBusy(true)
@@ -815,41 +828,46 @@ function GroupForm({
   const [description, setDescription] = useState(initial?.description ?? '')
   const [decision, setDecision] = useState<PermissionDecision>(initial?.decision ?? 'deny')
   const [text, setText] = useState(members.map((r) => commandLine(r.argv)).join('\n'))
-  // Decisions picked per line (JSON of its words); a saved rule starts with its own
+  // Saving can reorder rules by decision; keep each draft line's saved metadata with that line.
+  const [membersByLine] = useState<Record<string, CommandRule>>(() => {
+    const keys = commandOccurrences(members.map((r) => r.argv))
+    return Object.fromEntries(members.map((r, i) => [keys[i], r]))
+  })
+  // Decisions and match scopes belong to each occurrence, including rules with the same words.
   const [picks, setPicks] = useState<Record<string, PermissionDecision>>(() =>
-    Object.fromEntries(members.map((r) => [JSON.stringify(r.argv), r.decision]))
+    Object.fromEntries(Object.entries(membersByLine).map(([key, r]) => [key, r.decision]))
   )
-  // "Only this exact command" per line; a saved rule starts with its own
   const [exacts, setExacts] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(members.map((r) => [JSON.stringify(r.argv), r.exact]))
+    Object.fromEntries(Object.entries(membersByLine).map(([key, r]) => [key, r.exact]))
   )
   const [busy, setBusy] = useState(false)
 
   const trimmed = name.trim()
   const nameTaken = takenNames.includes(trimmed)
   const seen = new Set<string>()
-  const lines = text
+  const commands = text
     .split('\n')
     .map(parseCommand)
     .filter((argv) => argv.length)
-    .map((argv) => {
-      const key = JSON.stringify(argv)
-      const member = members.find((r) => JSON.stringify(r.argv) === key)
-      const exact = exacts[key] ?? false
-      const dup =
-        seen.has(key) || taken.some((r) => r.exact === exact && JSON.stringify(r.argv) === key)
-      seen.add(key)
-      const own = trimmed ? member?.description : description.trim()
-      const rule: CommandRule = {
-        decision: picks[key] ?? decision,
-        argv,
-        exact,
-        ...(own ? { description: own } : {}),
-        ...(trimmed ? { group: trimmed } : {}),
-        ...(member?.off ? { off: member.off } : {})
-      }
-      return { key, rule, dup }
-    })
+  const keys = commandOccurrences(commands)
+  const lines = commands.map((argv, i) => {
+    const key = keys[i]
+    const member = membersByLine[key]
+    const exact = exacts[key] ?? false
+    const matchKey = ruleKey({ argv, exact })
+    const dup = seen.has(matchKey) || taken.some((r) => ruleKey(r) === matchKey)
+    seen.add(matchKey)
+    const own = trimmed ? member?.description : description.trim()
+    const rule: CommandRule = {
+      decision: picks[key] ?? decision,
+      argv,
+      exact,
+      ...(own ? { description: own } : {}),
+      ...(trimmed ? { group: trimmed } : {}),
+      ...(member?.off ? { off: member.off } : {})
+    }
+    return { key, rule, dup }
+  })
   const group: RuleGroup | null = trimmed
     ? {
         name: trimmed,
@@ -858,7 +876,11 @@ function GroupForm({
       }
     : null
   const rules = lines.map((l) => l.rule)
-  const dirty = !initial || JSON.stringify([group, rules]) !== JSON.stringify([initial, members])
+  const dirty =
+    !initial ||
+    JSON.stringify(group) !== JSON.stringify(initial) ||
+    rules.length !== members.length ||
+    rules.some((rule) => !members.some((member) => JSON.stringify(rule) === JSON.stringify(member)))
   // A group keeps its name; new rules may have none
   const valid =
     (!!trimmed || !initial) && !nameTaken && lines.length > 0 && !lines.some((l) => l.dup)

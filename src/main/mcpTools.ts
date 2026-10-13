@@ -16,6 +16,7 @@ import type { SecretBackend } from '../engine/secrets'
 import {
   advanceWorkspaceRevision,
   assertWorkspaceCurrent,
+  assertWorkspaceWritable,
   captureWorkspace
 } from './workspaceGuard'
 
@@ -109,6 +110,7 @@ export async function fetchMcpTools(home: string, name: string, opts: Opts): Pro
   const origin = captureWorkspace(home)
   const definition = JSON.stringify(readMcpServer(home, name))
   const tools = await listMcpTools(home, name, opts)
+  assertWorkspaceWritable(home)
   assertWorkspaceCurrent(home, origin, false)
   if (JSON.stringify(readMcpServer(home, name)) !== definition)
     throw Object.assign(new Error('The MCP server changed while loading its tools. Try again.'), {

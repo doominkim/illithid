@@ -104,11 +104,14 @@ function useStatsLoad<T>(
   const [index, setIndex] = useState<SearchIndexView | undefined>()
   useEffect(() => {
     let alive = true
+    let readSeq = 0
     const run = (): void => {
+      const seq = ++readSeq
       load().then(
-        (value) => alive && setResult({ key: depKey, value }),
+        (value) => alive && seq === readSeq && setResult({ key: depKey, value }),
         (e) =>
           alive &&
+          seq === readSeq &&
           setResult({ key: depKey, value: null, error: String(e instanceof Error ? e.message : e) })
       )
     }

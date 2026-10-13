@@ -1,4 +1,5 @@
 import { Box, Checkbox, Group, Text } from '@mantine/core'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   name: string
@@ -32,6 +33,7 @@ export function ItemCard({
   onClick,
   testId
 }: Props): React.JSX.Element {
+  const { t } = useTranslation()
   const sw =
     switchChecked !== undefined ? (
       <Checkbox
@@ -40,6 +42,7 @@ export function ItemCard({
         checked={switchChecked}
         indeterminate={!!switchIndeterminate && !switchChecked}
         disabled={!onSwitch}
+        aria-label={t('common.toggleAllTools', { name })}
         onChange={(e) => onSwitch?.(e.currentTarget.checked)}
         onClick={(e) => e.stopPropagation()}
         data-testid="card-all-toggle"
@@ -56,7 +59,7 @@ export function ItemCard({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={(e) => {
-        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+        if (e.target === e.currentTarget && onClick && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           onClick()
         }

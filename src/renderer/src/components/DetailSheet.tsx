@@ -5,6 +5,7 @@ import { ArrowLeft, Copy, FolderOpen, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { SheetFooterContext } from './sheetFooter'
 import { platformKey } from '../lib/platform'
+import { useDraftGuard } from '../lib/dirtyDraft'
 
 interface Props {
   opened: boolean
@@ -50,6 +51,8 @@ export function DetailSheet({
   children
 }: Props): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
+  const close = (): void => guardDraft(onClose)
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   const copy = (text: string): void => {
     navigator.clipboard.writeText(text).then(
@@ -60,7 +63,7 @@ export function DetailSheet({
   return (
     <Drawer
       opened={opened}
-      onClose={onClose}
+      onClose={close}
       position="right"
       withOverlay={false}
       withCloseButton={false}
@@ -97,7 +100,7 @@ export function DetailSheet({
               variant="subtle"
               color="gray"
               size="lg"
-              onClick={onClose}
+              onClick={close}
               aria-label={t('common.back')}
               style={{ flexShrink: 0 }}
             >

@@ -44,6 +44,7 @@ import { SearchInput } from '../components/SearchInput'
 import { includesCI } from '../lib/format'
 import { runWrite } from '../lib/mutate'
 import { useNav, useNavSelect } from '../lib/nav'
+import { useDraftGuard } from '../lib/dirtyDraft'
 import { useReload } from '../lib/reload'
 import { useApi } from '../lib/useApi'
 import type { ScriptView } from '../../../shared/api'
@@ -52,11 +53,15 @@ const NEW = '__new__'
 
 function Scripts(): React.JSX.Element {
   const { t } = useTranslation()
+  const guardDraft = useDraftGuard()
   const reload = useReload()
   const { request, navigate } = useNav()
   const { data, error } = useApi('scripts', () => window.api.scripts())
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<string | null>(request.select ?? null)
+  const selectItem = (name: string): void => {
+    if (name !== selected) guardDraft(() => setSelected(name))
+  }
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [importFrom, setImportFrom] = useState<string | null>(null)
   useNavSelect(setSelected)
@@ -101,7 +106,7 @@ function Scripts(): React.JSX.Element {
             <Button
               size="xs"
               leftSection={<Plus size={13} />}
-              onClick={() => setSelected(NEW)}
+              onClick={() => selectItem(NEW)}
               data-testid="script-new"
             >
               {t('scripts.new')}
@@ -157,7 +162,7 @@ function Scripts(): React.JSX.Element {
                     </Group>
                   }
                   active={s.name === selected}
-                  onClick={() => setSelected(s.name)}
+                  onClick={() => selectItem(s.name)}
                 />
               ))}
             </ListCard>
@@ -222,7 +227,7 @@ function Scripts(): React.JSX.Element {
                 {t(`scripts.problem.${current.problem}`)}
               </Alert>
             )}
-            <Tabs key={current.name} defaultValue="preview" keepMounted={false}>
+            <Tabs key={current.name} defaultValue="preview">
               <Tabs.List mb="md">
                 <Tabs.Tab value="preview" data-testid="script-tab-preview">
                   {t('detail.source')}
@@ -625,7 +630,7 @@ function NewScriptForm({
     // A file script keeps its description in its own comment line (the starter's empty one gets it)
     const content =
       kind === 'file'
-        ? body.replace(/^# description:[ \t]*$/m, `# description: ${description.trim()}`)
+        ? body.replace(/^# description:[ \t]*$/m, () => `# description: ${description.trim()}`)
         : body
     const r = await runWrite(
       kind === 'folder'

@@ -759,12 +759,15 @@ function Sessions(): React.JSX.Element {
   const [mode, setMode] = useState<'title' | 'content'>('title')
   const [jumpTo, setJumpTo] = useState<{ index: number; nonce: number } | undefined>()
   const [found, setFound] = useState<SessionSearchResponse | null>(null)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchRetry, setSearchRetry] = useState(0)
   const index = useSearchIndex()
   const contentQ = mode === 'content' ? query.trim() : ''
   // Clear previous results immediately when the query or tool changes (kept on re-search after indexing finishes)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- drop results of the previous query at once
     setFound(null)
+    setSearchError(null)
   }, [contentQ, tool])
   // Content search: 300ms after input, and again when indexing finishes
   useEffect(() => {
@@ -774,15 +777,25 @@ function Sessions(): React.JSX.Element {
       void window.api
         .sessionSearch(contentQ, tool === ALL ? {} : { tool: tool as Session['tool'] })
         .then(
-          (r) => alive && setFound(r),
-          () => alive && setFound({ results: [], mode: 'fts', limited: false, ms: 0 })
+          (r) => {
+            if (alive) {
+              setFound(r)
+              setSearchError(null)
+            }
+          },
+          (e: unknown) => alive && setSearchError(e instanceof Error ? e.message : String(e))
         )
     }, 300)
     return () => {
       alive = false
       clearTimeout(timer)
     }
-  }, [contentQ, tool, index?.running])
+  }, [contentQ, tool, index?.running, searchRetry])
+  const retrySearch = (): void => {
+    setSearchError(null)
+    setFound(null)
+    setSearchRetry((n) => n + 1)
+  }
 
   const filtered = useMemo(() => {
     const q = mode === 'title' ? query.trim().toLowerCase() : ''
@@ -938,7 +951,9 @@ function Sessions(): React.JSX.Element {
             </Group>
           )}
           {showResults ? (
-            !found ? (
+            searchError ? (
+              <ErrorAlert message={searchError} onRetry={retrySearch} />
+            ) : !found ? (
               <Loading />
             ) : resultRows && resultRows.rows.length ? (
               <ResultList rows={resultRows.rows} selected={selected} onSelect={select} />

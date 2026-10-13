@@ -57,6 +57,12 @@ body {
   color: var(--ac-text-2);
   cursor: default;
 }
+[data-mantine-color-scheme='light'] .ac-sync[data-state='pending'] {
+  color: var(--ac-sync-pending-text);
+}
+[data-mantine-color-scheme='light'] .ac-sync[data-state='failed'] {
+  color: var(--ac-sync-failed-text);
+}
 .ac-sync-dot {
   width: 8px;
   height: 8px;

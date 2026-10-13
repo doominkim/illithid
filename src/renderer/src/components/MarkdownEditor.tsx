@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Badge, Box, Button, Group, Textarea, Text } from '@mantine/core'
 import { Save, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDirtyDraft } from '../lib/dirtyDraft'
 
 interface Props {
-  /** Current file content. Edits are reset when it changes */
+  /** Current file content. Clean drafts follow changes without overwriting newer typing */
   value: string
   onSave: (text: string) => Promise<boolean>
   /** Reason saving is unavailable (disables the button if set) */
@@ -33,20 +33,27 @@ export function MarkdownEditor({
 }: Props): React.JSX.Element {
   const { t } = useTranslation()
   const [text, setText] = useState(value)
+  const [saved, setSaved] = useState(value)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   // Take a new outside value (state from the previous render)
   const [shown, setShown] = useState(value)
   if (value !== shown) {
     setShown(value)
-    setText(value)
+    setSaved(value)
+    if (text === saved) setText(value)
   }
-  const dirty = text !== value || extraDirty
+  const dirty = text !== saved || extraDirty
   useDirtyDraft(dirty)
   const save = async (): Promise<void> => {
+    if (savingRef.current) return
+    savingRef.current = true
     setSaving(true)
+    const submitted = text
     try {
-      await onSave(text)
+      if (await onSave(submitted)) setSaved(submitted)
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -75,7 +82,7 @@ export function MarkdownEditor({
             leftSection={<Undo2 size={12} />}
             disabled={!dirty}
             onClick={() => {
-              setText(value)
+              setText(saved)
               onRevert?.()
             }}
           >

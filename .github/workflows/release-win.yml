@@ -34,6 +34,8 @@ jobs:
         run: test "v$(node -p "require('./package.json').version")" = "$TAG"
       - run: npm run build
       - run: npx electron-builder --win --x64 --publish never
+      - name: Verify packaged contents
+        run: npx tsx scripts/check-packaged-content.ts dist/win-unpacked/resources/app.asar
       - uses: actions/upload-artifact@v4
         with:
           name: setup-x64
