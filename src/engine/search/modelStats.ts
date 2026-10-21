@@ -803,8 +803,12 @@ function pricingFor(
     }
     return { pricing, daily: [], distribution: null }
   }
+  // Claude/Codex reasoning is included in output; reasoning-only metadata is not a billable sample.
   const measuredRows = rows.filter(
-    (r) => r.input + r.output + r.cacheRead + r.cacheWrite + r.reasoning > 0 || r.recorded !== null
+    (r) =>
+      r.input + r.output + r.cacheRead + r.cacheWrite > 0 ||
+      (summary.tool === 'opencode' && r.reasoning > 0) ||
+      r.recorded !== null
   )
   const costs = measuredRows.map((r) => ({
     row: r,

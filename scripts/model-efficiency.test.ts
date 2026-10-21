@@ -63,6 +63,7 @@ import {
   modelDetail
 } from '../src/engine/search/modelStats'
 import { openDb, searchIndexPath } from '../src/engine/search/sessionIndex'
+import { chartRows } from '../src/renderer/src/lib/leaderboard'
 
 test('REQ-MODEL-EFFICIENCY-3 REQ-MODEL-EFFICIENCY-4 injected catalog, per-turn tier, request distribution and daily sums', () => {
   const home = mkdtempSync(join(tmpdir(), 'illithid-efficiency-'))
@@ -208,6 +209,96 @@ test('per-turn median requires 30 measured calls, independently of completed req
     assert.equal(model.requests, 1)
     assert.equal(model.pricing?.medianPerRequest, null)
     assert.equal(model.pricing?.medianPerTurn, measuredTurns === 30 ? 0.0025 : null)
+  }
+})
+
+test('recent seven-day costs ignore Claude/Codex reasoning-only metadata without losing usage or lowering sample thresholds', () => {
+  for (const tool of ['claude', 'codex']) {
+    for (const measuredTurns of [30, 29, 0]) {
+      const home = mkdtempSync(join(tmpdir(), 'illithid-reasoning-only-'))
+      mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+      writeFileSync(join(home, '.cache/opencode/models.json'), JSON.stringify(book.providers))
+      const db = openDb(searchIndexPath(home))
+      ensureModelStats(db)
+      const counter = new ModelStatsCounter(tool)
+      for (let i = 0; i < 30; i++) {
+        const at = new Date(Date.UTC(2026, 9, 21, 10, i)).toISOString()
+        counter.prompt(at)
+        counter.turn({
+          model: 'gpt-test',
+          effort: 'high',
+          at,
+          // Each measured call costs $0.0025; reasoning is already part of output.
+          usage: {
+            input: i < measuredTurns ? 1000 : 0,
+            output: i < measuredTurns ? 500 : 0,
+            cacheRead: i < measuredTurns ? 5000 : 0,
+            cacheWrite: 0,
+            reasoning: 100
+          }
+        })
+        if (i === 29) {
+          for (let extra = 0; extra < 3; extra++) {
+            counter.turn({
+              model: 'gpt-test',
+              effort: 'high',
+              at,
+              usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 100 }
+            })
+          }
+        }
+        counter.requestEnd(new Date(Date.parse(at) + 10000).toISOString())
+      }
+      counter.write(db, 1)
+      db.close()
+
+      const range = { days: 7, now: Date.UTC(2026, 9, 21, 12) }
+      const model = modelList(home, range)![0]
+      assert.equal(model.requests, 30)
+      assert.equal(model.turns, 33)
+      assert.equal(model.tokens.reasoning, 3300)
+      assert.equal(model.tokens.output, measuredTurns * 500)
+      const expectedMedian = measuredTurns === 30 ? 0.0025 : null
+      assert.equal(model.pricing?.medianPerTurn, expectedMedian, `${tool}: ${measuredTurns}`)
+      if (measuredTurns) {
+        assert.ok(Math.abs(model.pricing!.total! - measuredTurns * 0.0025) < 1e-9)
+      } else {
+        assert.equal(model.pricing?.total, null)
+      }
+      const detail = modelDetail(home, { tool, model: 'gpt-test', effort: 'high' }, range)!
+      assert.equal(detail.summary.pricing?.medianPerTurn, expectedMedian)
+      assert.equal(detail.costDaily?.length, measuredTurns ? 1 : 0)
+      if (measuredTurns) {
+        assert.ok(Math.abs(detail.costDaily![0].cost! - measuredTurns * 0.0025) < 1e-9)
+      }
+      assert.equal(chartRows([model]).length, measuredTurns === 30 ? 1 : 0)
+      if (measuredTurns === 30) assert.equal(chartRows([model])[0].x, 0.0025)
+    }
+  }
+})
+
+test('OpenCode reasoning-only and recorded-only calls still contribute to costs', () => {
+  for (const recorded of [false, true]) {
+    const home = mkdtempSync(join(tmpdir(), 'illithid-opencode-reasoning-'))
+    mkdirSync(join(home, '.cache/opencode'), { recursive: true })
+    writeFileSync(join(home, '.cache/opencode/models.json'), JSON.stringify(book.providers))
+    const db = openDb(searchIndexPath(home))
+    ensureModelStats(db)
+    const counter = new ModelStatsCounter('opencode')
+    for (let i = 0; i < 30; i++) {
+      counter.turn({
+        model: 'gpt-test',
+        at: '2026-10-21T10:00:00Z',
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: recorded ? 0 : 1000 },
+        ...(recorded ? { cost: 0.01 } : {})
+      })
+    }
+    counter.write(db, 1)
+    db.close()
+    const model = modelList(home)![0]
+    assert.equal(model.pricing?.medianPerTurn, recorded ? 0.01 : 0.002)
+    assert.ok(Math.abs(model.pricing!.total! - (recorded ? 0.3 : 0.06)) < 1e-9)
+    assert.equal(model.pricing?.source, recorded ? 'recorded' : 'converted')
   }
 })
 
