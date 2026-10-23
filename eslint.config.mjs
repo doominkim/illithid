@@ -4,6 +4,7 @@ import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
 import eslintPluginReact from 'eslint-plugin-react'
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
+import eslintPluginRegexp from 'eslint-plugin-regexp'
 
 export default defineConfig(
   { ignores: ['**/node_modules', '**/dist', '**/out'] },
@@ -26,6 +27,14 @@ export default defineConfig(
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules
+    }
+  },
+  // Regexes run over transcripts and hook commands of unbounded size: a super-linear one freezes the main process
+  {
+    files: ['**/*.{ts,tsx,js,mjs}'],
+    plugins: { regexp: eslintPluginRegexp },
+    rules: {
+      'regexp/no-super-linear-backtracking': 'error'
     }
   },
   eslintConfigPrettier

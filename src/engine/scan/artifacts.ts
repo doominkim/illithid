@@ -230,9 +230,9 @@ function titleOf(path: string, kind: ArtifactKind, size: number): string {
   }
   const m =
     kind === 'md'
-      ? /^#[ \t]+(.+?)[ \t#]*$/m.exec(head)
+      ? /^#[ \t](.+)$/m.exec(head)
       : (/<title[^>]*>([^<]+)<\/title>/i.exec(head) ?? /<h1[^>]*>([^<]+)<\/h1>/i.exec(head))
-  const t = m?.[1]?.trim()
+  const t = (kind === 'md' ? m?.[1]?.replace(/[ \t#]+$/, '') : m?.[1])?.trim()
   return t ? t : fallback
 }
 

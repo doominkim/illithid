@@ -165,7 +165,7 @@ function parseLog(raw: string): Snapshot[] {
   for (const rec of raw.split('\x1e')) {
     const [hash, at, subject, body = ''] = rec.replace(/^\n/, '').split('\x1f')
     if (!hash || !at) continue
-    const m = new RegExp(`^${DEVICE_TRAILER}:\\s*(.+)$`, 'm').exec(body)
+    const m = new RegExp(`^${DEVICE_TRAILER}:(.+)$`, 'm').exec(body)
     const fromSubject = /\bfrom (\S+)$/.exec(subject ?? '')?.[1]
     out.push({ hash, at, message: subject ?? '', device: m?.[1]?.trim() ?? fromSubject ?? '?' })
   }

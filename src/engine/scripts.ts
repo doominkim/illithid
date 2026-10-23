@@ -58,7 +58,7 @@ export function scriptDirPath(home: string, name: string): string {
 
 /** The first `# description: …` line (empty when there is none) */
 export function scriptDescription(content: string): string {
-  const m = /^#\s*description:[ \t]*(.*)$/im.exec(content)
+  const m = /^#\s*description:(.*)$/im.exec(content)
   return m ? m[1].trim() : ''
 }
 
