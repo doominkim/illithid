@@ -1,18 +1,25 @@
 /**
- * Skill and MCP usage from local session logs, kept next to the session index (search.sqlite).
- * Only names, model ids, local dates and counts are stored — never call arguments or message text.
+ * Skill, MCP and hook usage from local session logs, kept next to the session index (search.sqlite).
+ * Only names, model ids, local dates, counts, hook outcomes and durations are stored — never call arguments, hook commands
+ * or message text.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
+import type { HookRun } from '../scan/hookRuns'
 import type { ToolCall } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
 
-export const USAGE_SCHEMA = '3'
+export const USAGE_SCHEMA = '4'
+
+export { hookName } from '../scan/hookRuns'
 
 export type UsageKind = 'skill' | 'mcp'
-/** `mcpRaw`: OpenCode names MCP tools `<server>_<tool>`; the server is matched by prefix at query time */
-type StoredKind = UsageKind | 'mcpRaw'
+/**
+ * `mcpRaw`: OpenCode names MCP tools `<server>_<tool>`; the server is matched by prefix at query time.
+ * `hook`: a hook run (Claude only) — `item` is the event, `outcome` and `ms` (summed duration) are set
+ */
+type StoredKind = UsageKind | 'mcpRaw' | 'hook'
 
 type Json = Record<string, unknown>
 
@@ -57,7 +64,9 @@ export function ensureUsage(db: DatabaseSync): boolean {
       item text not null default '',
       model text not null,
       day text not null,
-      n integer not null
+      n integer not null,
+      outcome text not null default '',
+      ms integer not null default 0
     );
     create index usage_name on usage(kind, name);
     create index usage_sid on usage(sid);
@@ -176,12 +185,20 @@ export function classify(tool: string, call: ToolCall): UsageHit[] {
   }
 }
 
+interface UsageRow {
+  kind: StoredKind
+  name: string
+  item: string
+  model: string
+  day: string
+  n: number
+  outcome: string
+  ms: number
+}
+
 /** Per-session accumulator: counts by (kind, name, model, day). Codex skills count once per turn */
 export class UsageCounter {
-  readonly rows = new Map<
-    string,
-    { kind: StoredKind; name: string; item: string; model: string; day: string; n: number }
-  >()
+  readonly rows = new Map<string, UsageRow>()
   private readonly seenTurn = new Set<string>()
 
   constructor(
@@ -201,8 +218,29 @@ export class UsageCounter {
       const key = `${kind}\u0000${name}\u0000${item}\u0000${model}\u0000${day}`
       const cur = this.rows.get(key)
       if (cur) cur.n++
-      else this.rows.set(key, { kind, name, item, model, day, n: 1 })
+      else this.rows.set(key, { kind, name, item, model, day, n: 1, outcome: '', ms: 0 })
     }
+  }
+
+  /** Counts by (hook, event, outcome, day), durations summed */
+  addHook(run: HookRun): void {
+    const day = dayOf(run.at, this.fallbackAt)
+    const key = `hook\u0000${run.name}\u0000${run.event}\u0000${run.outcome}\u0000${day}`
+    const cur = this.rows.get(key)
+    if (cur) {
+      cur.n++
+      cur.ms += run.ms
+    } else
+      this.rows.set(key, {
+        kind: 'hook',
+        name: run.name,
+        item: run.event,
+        model: '',
+        day,
+        n: 1,
+        outcome: run.outcome,
+        ms: run.ms
+      })
   }
 }
 
@@ -468,6 +506,90 @@ export function usageOf(
       byTool: sortDesc(byTool, 'tool'),
       daily
     }
+  } finally {
+    db.close()
+  }
+}
+
+export interface HookUsage {
+  name: string
+  /** Events the hook ran on, sorted */
+  events: string[]
+  runs: number
+  ok: number
+  fail: number
+  timeout: number
+  error: number
+  /** Mean duration of the recorded runs, rounded */
+  avgMs: number
+  lastDay: string
+}
+
+/**
+ * Recorded hook runs of the last `days` days, most runs first. Claude Code records a run only when the hook printed
+ * something, failed or was cancelled, so `runs` undercounts silent hooks. null while there is nothing to read yet
+ */
+export function hookUsage(
+  home: string,
+  opts: { days?: number; now?: number; dbPath?: string } = {}
+): HookUsage[] | null {
+  const keys = dailyKeysOf(opts.days ?? 30, opts.now ?? Date.now())
+  const db = openDbForRead(opts.dbPath ?? searchIndexPath(home))
+  if (!db) return null
+  try {
+    if (!tableExists(db, 'usage') || metaGet(db, 'usageSchema') !== USAGE_SCHEMA) return null
+    const rows = db
+      .prepare(
+        `select name, item, outcome, max(day) as day, sum(n) as n, sum(ms) as ms from usage
+         where kind = 'hook' and day >= ? and day <= ? group by name, item, outcome`
+      )
+      .all(keys[0], keys[keys.length - 1]) as {
+      name: string
+      item: string
+      outcome: string
+      day: string
+      n: number
+      ms: number
+    }[]
+    const by = new Map<string, HookUsage & { totalMs: number; ev: Set<string> }>()
+    for (const r of rows) {
+      let h = by.get(r.name)
+      if (!h) {
+        h = {
+          name: r.name,
+          events: [],
+          runs: 0,
+          ok: 0,
+          fail: 0,
+          timeout: 0,
+          error: 0,
+          avgMs: 0,
+          lastDay: '',
+          totalMs: 0,
+          ev: new Set()
+        }
+        by.set(r.name, h)
+      }
+      const n = Number(r.n)
+      h.runs += n
+      h.totalMs += Number(r.ms)
+      h.ev.add(r.item)
+      if (
+        r.outcome === 'ok' ||
+        r.outcome === 'fail' ||
+        r.outcome === 'timeout' ||
+        r.outcome === 'error'
+      )
+        h[r.outcome] += n
+      if (r.day > h.lastDay) h.lastDay = r.day
+    }
+    return [...by.values()]
+      .map(({ totalMs, ev, ...h }) => ({
+        ...h,
+        events: [...ev].sort(),
+        avgMs: h.runs ? Math.round(totalMs / h.runs) : 0
+      }))
+      .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name))
   } finally {
     db.close()
   }

@@ -15,6 +15,9 @@ import { createInterface } from 'node:readline'
 import fg from 'fast-glob'
 import type { ToolId } from '../toolIds'
 import { clip, isoOrUndefined, readRange } from './common'
+import { hookRunOf, type HookRun } from './hookRuns'
+
+export type { HookRun }
 
 export type TranscriptTool = ToolId
 
@@ -280,6 +283,8 @@ function num(v: unknown): number {
 export class Collector {
   /** Optional tool-call hook (usage stats) */
   onCall?: (call: ToolCall) => void
+  /** Optional hook-run hook (usage stats; Claude only — other tools don't record hook runs) */
+  onHook?: (run: HookRun) => void
   /** Optional model usage hooks (model stats) */
   stats?: StatsHooks
   messages: TranscriptMessage[] = []
@@ -434,6 +439,11 @@ export async function readClaude(path: string, c: Collector): Promise<void> {
   await eachJsonLine(path, (l) => {
     const m = l.message as Json | undefined
     const at = isoOrUndefined(l.timestamp)
+    if (l.type === 'attachment') {
+      const run = c.onHook && hookRunOf(l.attachment, at)
+      if (run) c.onHook!(run)
+      return
+    }
     if (l.type === 'user' && m?.role === 'user') {
       if (l.isMeta || l.isSidechain) return
       const raw =

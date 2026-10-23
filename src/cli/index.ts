@@ -53,6 +53,8 @@ import {
   type GitStatus,
   type StatusReport
 } from '../engine'
+import { librarySkillNames } from '../engine/targets/skillOverrides'
+import { hookUsage, usageSummaries } from '../engine/search/usage'
 
 const USAGE = `Usage: illithid <command> [options]
 
@@ -70,6 +72,8 @@ commands
   status           Summary of resource×tool state, skill links, default models, agent roster (read-only)
   artifacts        Scan plan·artifact files (count per source location + latest 10)
   sessions         Scan Claude·Codex·OpenCode sessions (count per tool + latest 10)
+  usage            Library skill calls and recorded hook runs over --days (default 30), from the session index the app
+                   builds (read-only). --unused lists only library skills with no call
   apply            Apply the source to target files (currently only works under the fixture root given by --home.
                    Applying to the real HOME is blocked until approval gate G1)
   git              Show library repo status (branch, ahead/behind, changed files, latest 5 commits)
@@ -94,7 +98,9 @@ options
   --replace <K,..> Keys to replace with \${KEY} in import --apply (omitted: all looksSecret keys, empty: no replacement)
   --library <path> Library location for init
   --git            Also run git init for init
-  --i-understand   Run rename-migrate --apply on the real HOME`
+  --i-understand   Run rename-migrate --apply on the real HOME
+  --days <n>       Period for usage (default 30)
+  --unused         usage: only library skills with no call in the period`
 
 function parseArgs(argv: string[]): {
   command?: string
@@ -111,6 +117,8 @@ function parseArgs(argv: string[]): {
   library?: string
   git: boolean
   iUnderstand: boolean
+  days?: number
+  unused: boolean
 } {
   let command: string | undefined
   let json = false
@@ -125,6 +133,8 @@ function parseArgs(argv: string[]): {
   let library: string | undefined
   let git = false
   let iUnderstand = false
+  let days: number | undefined
+  let unused = false
   const positionals: string[] = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -151,7 +161,11 @@ function parseArgs(argv: string[]): {
       if (!library) throw new Error('--library requires a path')
     } else if (a === '--git') git = true
     else if (a === '--i-understand') iUnderstand = true
-    else if (!a.startsWith('-') && !command) command = a
+    else if (a === '--unused') unused = true
+    else if (a === '--days') {
+      days = Number(argv[++i])
+      if (!Number.isInteger(days) || days < 1) throw new Error('--days requires a positive integer')
+    } else if (!a.startsWith('-') && !command) command = a
     else if (!a.startsWith('-') && (command === 'toggle' || command === 'import'))
       positionals.push(a)
     else throw new Error(`unknown argument: ${a}`)
@@ -163,6 +177,8 @@ function parseArgs(argv: string[]): {
     throw new Error('--i-understand is only for rename-migrate')
   if (replace && command !== 'import') throw new Error('--replace is only for import')
   if ((library || git) && command !== 'init') throw new Error('--library·--git are only for init')
+  if ((days !== undefined || unused) && command !== 'usage')
+    throw new Error('--days·--unused are only for usage')
   return {
     command,
     positionals,
@@ -177,7 +193,9 @@ function parseArgs(argv: string[]): {
     replace,
     library,
     git,
-    iUnderstand
+    iUnderstand,
+    days,
+    unused
   }
 }
 
@@ -418,6 +436,44 @@ function runSessions(home: string, json: boolean): number {
     console.log(`                    ${s.project ?? '-'}  ${tilde(home, s.path)}`)
   }
   return errors.length ? 2 : 0
+}
+
+function runUsage(home: string, json: boolean, days: number, unused: boolean): number {
+  const names = librarySkillNames(readSources(home))
+  const summaries = usageSummaries(home, 'skill', names, { days })
+  const hooks = hookUsage(home, { days })
+  if (!summaries || !hooks) {
+    console.log(
+      'No usage index for this version yet. Open Illithid (Sessions or Stats) once so it indexes the local session logs.'
+    )
+    return 1
+  }
+  const skills = names
+    .map((name) => ({ name, recent: summaries[name].recent }))
+    .sort((a, b) => b.recent - a.recent || a.name.localeCompare(b.name))
+  const unusedSkills = skills
+    .filter((s) => !s.recent)
+    .map((s) => s.name)
+    .sort()
+  if (json) {
+    process.stdout.write(JSON.stringify({ days, skills, unusedSkills, hooks }, null, 2) + '\n')
+    return 0
+  }
+  if (unused) {
+    console.log(`[usage] library skills with no call in ${days} days: ${unusedSkills.length}`)
+    for (const n of unusedSkills) console.log(`  ${n}`)
+    return 0
+  }
+  const width = Math.max(8, ...names.map((n) => n.length), ...hooks.map((h) => h.name.length))
+  console.log(`[usage] last ${days} days\n\nSkills`)
+  for (const s of skills) console.log(`  ${s.name.padEnd(width)} ${String(s.recent).padStart(5)}`)
+  console.log('\nHooks (runs Claude Code recorded: output, failure or cancel)')
+  if (!hooks.length) console.log('  (none)')
+  for (const h of hooks)
+    console.log(
+      `  ${h.name.padEnd(width)} ${String(h.runs).padStart(5)} runs  ok ${h.ok}  fail ${h.fail}  timeout ${h.timeout}  error ${h.error}  avg ${h.avgMs}ms  last ${h.lastDay}`
+    )
+  return 0
 }
 
 const STATE_LABEL: Record<string, string> = {
@@ -886,7 +942,9 @@ async function main(): Promise<number> {
     replace,
     library,
     git,
-    iUnderstand
+    iUnderstand,
+    days,
+    unused
   } = parseArgs(process.argv.slice(2))
   if ((only || force) && command !== 'apply') throw new Error('--only·--force are only for apply')
   if (command === 'config') return runConfig(home, json)
@@ -904,6 +962,7 @@ async function main(): Promise<number> {
   if (command === 'git') return runGit(repo ?? libraryRoot(home), json)
   if (command === 'artifacts') return runArtifacts(home, json)
   if (command === 'sessions') return runSessions(home, json)
+  if (command === 'usage') return runUsage(home, json, days ?? 30, unused)
   if (command === 'status') {
     const r = statusReport(home, process.env)
     if (json) process.stdout.write(JSON.stringify(redactStatus(r), null, 2) + '\n')
