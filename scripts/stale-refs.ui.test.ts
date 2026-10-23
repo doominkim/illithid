@@ -17,7 +17,7 @@ test(
       config,
       JSON.stringify({
         ...JSON.parse(readFileSync(config, 'utf8')),
-        toolsInUse: ['claude'],
+        toolsInUse: ['claude', 'codex'],
         updateCheck: false,
         marketEnabled: false,
         ui: { language: 'en' }
@@ -40,9 +40,11 @@ test(
     const app = await electron.launch({ args: [resolve('out/main/index.js')], env, timeout: 60000 })
     try {
       const page = await app.firstWindow()
+      // The pending count arrives after the first status read, which is slow on Windows runners
+      await page.getByTestId('rule-new').waitFor({ timeout: 60000 })
       await page
         .locator('[data-testid="sync-button"][data-state="pending"]')
-        .click({ timeout: 30000 })
+        .click({ timeout: 90000 })
       const alert = page.getByTestId('apply-preview-stale-refs')
       await alert.waitFor({ timeout: 30000 })
       const text = await alert.innerText()
