@@ -178,6 +178,22 @@ export function ApplyPreviewBody({
           </Stack>
         </Alert>
       )}
+      {(view.staleRefs?.length ?? 0) > 0 && (
+        <Alert
+          color="yellow"
+          variant="light"
+          title={t('preview.staleRefs')}
+          data-testid="apply-preview-stale-refs"
+        >
+          <Stack gap={2}>
+            {view.staleRefs!.map((r) => (
+              <Text key={`${r.file}:${r.line}:${r.name}`} size="sm">
+                {t('preview.staleRef', { file: r.file, line: r.line, name: r.name })}
+              </Text>
+            ))}
+          </Stack>
+        </Alert>
+      )}
       {(view.policies?.length ?? 0) > 0 && (
         <Box data-testid="apply-preview-policies" style={{ maxHeight: 220, overflow: 'auto' }}>
           <Text fw={600} size="sm">

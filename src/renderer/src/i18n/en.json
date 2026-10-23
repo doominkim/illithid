@@ -601,6 +601,8 @@
     },
     "libraryDirect": "Reads the library directly",
     "planChanged": "The changes were updated since you opened this. Review them again, then apply.",
+    "staleRefs": "Skill references that no longer resolve",
+    "staleRef": "{{file}} line {{line}} names `{{name}}`, which the library does not have (or this sync removes).",
     "editedIn": "Edited in {{tool}}",
     "keepEdited": "Keep this version",
     "keptEdited": "Saved to the library",

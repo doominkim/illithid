@@ -601,6 +601,8 @@
     },
     "libraryDirect": "라이브러리를 직접 읽음",
     "planChanged": "열어 둔 사이에 변경 사항이 바뀌었습니다. 다시 확인한 뒤 반영하세요.",
+    "staleRefs": "찾을 수 없는 스킬 참조",
+    "staleRef": "{{file}} {{line}}번째 줄이 라이브러리에 없거나 이번 반영으로 지워지는 `{{name}}` 스킬을 가리킵니다.",
     "editedIn": "{{tool}} 에서 수정됨",
     "keepEdited": "이 버전 유지",
     "keptEdited": "라이브러리에 저장함",
