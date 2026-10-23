@@ -1,5 +1,6 @@
 import type { GitHubLoginView } from '../engine/githubBackup'
 import type { ArtifactSourceEntry } from '../engine/scan/artifacts'
+import type { StaleSkillRef } from '../engine/staleRefs'
 export type { ArtifactSourceEntry }
 /**
  * main ↔ renderer IPC contract. Read channels + library/tool write channels.
@@ -1157,6 +1158,8 @@ export interface ApplyPreviewView {
   libraryDirect: LibraryDirectItem[]
   /** Rules edited on the tool side */
   edited: EditedRuleItem[]
+  /** Library rules, memory index and skills that name a skill the library no longer has (or the sync deletes) */
+  staleRefs?: StaleSkillRef[]
   libraryMissing?: boolean
   /** Tools in use (effective) */
   inUse: ToolId[]
