@@ -26,7 +26,7 @@ import { nearLimit } from '../lib/memoryIndex'
 import { ClaudeMemory, CodexMemory, IndexMeters } from './ToolMemory'
 
 function firstHeading(text: string): string {
-  const m = /^#{1,3}\s+(.+)$/m.exec(text)
+  const m = /^#{1,3}\s(.+)$/m.exec(text)
   if (m) return m[1].trim()
   return (
     text

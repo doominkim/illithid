@@ -34,7 +34,7 @@ import { useViewMode } from '../lib/viewMode'
 
 /** First heading (# …) or first non-empty line */
 function firstHeading(text: string): string {
-  const m = /^#{1,3}\s+(.+)$/m.exec(text)
+  const m = /^#{1,3}\s(.+)$/m.exec(text)
   if (m) return m[1].trim()
   return (
     text
