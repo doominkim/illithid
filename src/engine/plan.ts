@@ -66,7 +66,7 @@ function isPlainJson(text: string): boolean {
   }
 }
 
-type HomeOverrideTool = 'copilot' | 'grok' | 'qwen'
+type HomeOverrideTool = 'copilot' | 'grok' | 'qwen' | 'omp'
 /** Tools with a home override env var (agents.ts toolHomeOverride): skip reason and note when it points elsewhere */
 const HOME_OVERRIDE: Readonly<
   Record<HomeOverrideTool, { skip: NonNullable<FileChange['skip']>; note: string }>
@@ -82,6 +82,10 @@ const HOME_OVERRIDE: Readonly<
   qwen: {
     skip: 'qwenHomeOverride',
     note: `QWEN_HOME is set to another folder — Qwen Code doesn't read ~/.qwen, so nothing is written`
+  },
+  omp: {
+    skip: 'ompHomeOverride',
+    note: `PI_CODING_AGENT_DIR, PI_CONFIG_DIR or OMP_PROFILE moves omp's agent folder — omp doesn't read ~/.omp/agent, so nothing is written`
   }
 }
 

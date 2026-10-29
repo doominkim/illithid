@@ -768,7 +768,8 @@ const PERMISSION_TARGET: Partial<Record<ToolId, TargetId>> = {
   codex: 'codexRules',
   gemini: 'geminiPolicy',
   copilot: 'copilotHooks',
-  qwen: 'qwenPermissions'
+  qwen: 'qwenPermissions',
+  omp: 'ompPermissions'
 }
 
 export function permissions(home: string, env: Env): PermissionsData {

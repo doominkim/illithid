@@ -19,13 +19,23 @@ import {
   readGemini,
   readGrok,
   readQwen,
+  readOmp,
   readClaudeSubagentStats,
+  readOmpSubagentStats,
   readOpencodeDb,
   type OpencodeDb,
+  type StatsHooks,
+  type ToolCall,
   type TranscriptMessage
 } from '../scan/transcript'
 import { ensureModelStats, MODEL_TABLES, ModelStatsCounter } from './modelStats'
-import { claudeSubagentFiles, claudeSubagentStat, ensureUsage, UsageCounter } from './usage'
+import {
+  claudeSubagentFiles,
+  ensureUsage,
+  ompSubagentFiles,
+  subagentStat,
+  UsageCounter
+} from './usage'
 
 const SCHEMA_VERSION = '2'
 const SNIPPET_SIDE = 60
@@ -231,9 +241,15 @@ function signature(s: Session): { mtime: number; size: number } | undefined {
   }
   try {
     const st = statSync(s.path)
-    // Claude subagent transcripts live next to the session and feed usage stats: their changes count too
-    if (s.tool === 'claude') {
-      const sub = claudeSubagentStat(s.path)
+    // Claude and omp subagent transcripts live next to the session and feed usage stats: their changes count too
+    const subs =
+      s.tool === 'claude'
+        ? claudeSubagentFiles(s.path)
+        : s.tool === 'omp'
+          ? ompSubagentFiles(s.path)
+          : []
+    if (subs.length) {
+      const sub = subagentStat(subs)
       return { mtime: Math.max(Math.floor(st.mtimeMs), sub.mtime), size: st.size + sub.size }
     }
     return { mtime: Math.floor(st.mtimeMs), size: st.size }
@@ -407,33 +423,40 @@ export async function indexSessions(
         }
         const c = new Collector(sink)
         const usage = new UsageCounter(s.tool, s.updatedAt)
-        // Codex and OpenCode child sessions are subagents as a whole; Claude subagents are separate files read below
+        // Codex and OpenCode child sessions are subagents as a whole; Claude and omp subagents are separate files read below
         const models = new ModelStatsCounter(s.tool, s.updatedAt, !!s.parentId)
         c.onCall = (call) => {
           usage.add(call)
           models.call(call)
         }
         c.stats = models
+        // Claude and omp subagents are separate files next to the session: their calls and turns count as subagent rows
+        const readSubagents = async (
+          files: string[],
+          read: (path: string, onCall: (call: ToolCall) => void, stats: StatsHooks) => Promise<void>
+        ): Promise<void> => {
+          for (const f of files) {
+            models.beginSubagent()
+            try {
+              await read(
+                f,
+                (call) => {
+                  usage.add(call)
+                  models.call(call)
+                },
+                models
+              )
+            } catch {
+              // an unreadable or vanished subagent file must not fail the whole session
+            }
+            models.endSubagent()
+          }
+        }
         switch (s.tool) {
           case 'claude':
             await readClaude(s.path, c)
             models.finish()
-            for (const f of claudeSubagentFiles(s.path)) {
-              models.beginSubagent()
-              try {
-                await readClaudeSubagentStats(
-                  f,
-                  (call) => {
-                    usage.add(call)
-                    models.call(call)
-                  },
-                  models
-                )
-              } catch {
-                // an unreadable or vanished subagent file must not fail the whole session
-              }
-              models.endSubagent()
-            }
+            await readSubagents(claudeSubagentFiles(s.path), readClaudeSubagentStats)
             break
           case 'codex':
             await readCodex(s.path, c)
@@ -452,6 +475,11 @@ export async function indexSessions(
             break
           case 'qwen':
             await readQwen(s.path, c)
+            break
+          case 'omp':
+            await readOmp(s.path, c)
+            models.finish()
+            await readSubagents(ompSubagentFiles(s.path), readOmpSubagentStats)
             break
           default: {
             const never: never = s.tool

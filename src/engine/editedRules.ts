@@ -1,6 +1,6 @@
 /**
  * Rules edited on the tool side (an agent told to "change the rule" edits the copy it can see, not the library):
- * - copies: Claude, Copilot and Grok rule files the app wrote that changed since (planRuleSync `drift`)
+ * - copies: Claude, Copilot, Grok, Qwen and omp rule files the app wrote that changed since (planRuleSync `drift`)
  * - blocks: a `<!-- rules/<name> -->` section of the Codex AGENTS.md / Gemini GEMINI.md block that no longer matches the library
  *   (only when the block changed since the app last wrote it, so a library edit waiting to be applied isn't mistaken for one)
  * The next apply restores the library version; adoptEditedRule saves the tool's version into the library instead, so it reaches
@@ -35,12 +35,19 @@ const BLOCK_TARGETS: { id: 'codexAgents' | 'geminiRules'; tool: ToolId }[] = [
   { id: 'geminiRules', tool: 'gemini' }
 ]
 
-/** Copilot copies get `applyTo: "**"` added when the source has none: take it back out */
+/** Frontmatter keys copyRuleContent adds when the source has none (Copilot applyTo, omp alwaysApply): key pattern, added line */
+const ADDED_KEY: Partial<Record<ToolId, [RegExp, string]>> = {
+  copilot: [/^---\r?\n[\s\S]*?^applyTo\s*:/m, 'applyTo: "\\*\\*"'],
+  omp: [/^---\r?\n[\s\S]*?^(alwaysApply|always-apply)\s*:/m, 'alwaysApply: true']
+}
+
+/** Take the key copyRuleContent added back out of the copy */
 function uncopy(tool: ToolId, copy: string, source: string): string {
-  if (tool !== 'copilot' || /^---\r?\n[\s\S]*?^applyTo\s*:/m.test(source)) return copy
-  const added = /^---\r?\napplyTo: "\*\*"\r?\n---\r?\n\r?\n/
-  if (added.test(copy)) return copy.replace(added, '')
-  return copy.replace(/^(---\r?\n)applyTo: "\*\*"\r?\n/, '$1')
+  const added = ADDED_KEY[tool]
+  if (!added || added[0].test(source)) return copy
+  const wholeFm = new RegExp(`^---\\r?\\n${added[1]}\\r?\\n---\\r?\\n\\r?\\n`)
+  if (wholeFm.test(copy)) return copy.replace(wholeFm, '')
+  return copy.replace(new RegExp(`^(---\\r?\\n)${added[1]}\\r?\\n`), '$1')
 }
 
 /** `<!-- rules/<name> -->` sections of a rules block (name → trimmed text) */

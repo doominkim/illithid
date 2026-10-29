@@ -116,7 +116,12 @@ function Rules(): React.JSX.Element {
         const on = enabled(name, tool)
         const inj = injection[tool]
         const failure =
-          on && (tool === 'claude' || tool === 'copilot' || tool === 'grok' || tool === 'qwen')
+          on &&
+          (tool === 'claude' ||
+            tool === 'copilot' ||
+            tool === 'grok' ||
+            tool === 'qwen' ||
+            tool === 'omp')
             ? failedIn('rule', name, tool)
             : null
         if (failure)

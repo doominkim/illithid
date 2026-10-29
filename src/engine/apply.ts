@@ -41,6 +41,7 @@ export type ApplySkipReason =
   | 'copilotHomeOverride'
   | 'grokHomeOverride'
   | 'qwenHomeOverride'
+  | 'ompHomeOverride'
   | 'jsoncUnsupported'
 
 export interface ApplyResult {

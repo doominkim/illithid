@@ -17,6 +17,8 @@ import { opencodeMcp } from './opencodeMcp'
 import { opencodeRules } from './opencodeRules'
 import { opencodeSkills } from './opencodeSkills'
 import { opencodeMcpPermissions } from './opencodeMcpPermissions'
+import { ompMcp } from './ompMcp'
+import { ompPermissions } from './ompPermissions'
 import { SKILL_OVERRIDE_TARGETS } from './skillOverrides'
 
 /** The 6 default targets (run in this order). Default targets for plan() and apply() */
@@ -42,11 +44,13 @@ export const EXTRA_TARGETS: readonly TargetDef[] = [
   geminiRules,
   geminiMcp,
   qwenMcp,
+  ompMcp,
   copilotMcp,
   grokMcp,
   grokCompat,
   geminiPolicy,
   qwenPermissions,
+  ompPermissions,
   // After the targets that write the same files (settings.json, config.toml)
   ...HOOK_TARGETS,
   // Imported Codex originals leave hooks.json in the sync that writes their hook into config.toml
@@ -66,7 +70,8 @@ export const MCP_TARGET_OF: Readonly<Record<ToolId, TargetId>> = {
   gemini: 'geminiMcp',
   copilot: 'copilotMcp',
   grok: 'grokMcp',
-  qwen: 'qwenMcp'
+  qwen: 'qwenMcp',
+  omp: 'ompMcp'
 }
 
 /** MCP target id -> tool */
@@ -82,7 +87,8 @@ const MCP_TABLE: Readonly<Record<ToolId, { format: 'json' | 'toml'; key: string 
   gemini: { format: 'json', key: 'mcpServers' },
   copilot: { format: 'json', key: 'mcpServers' },
   grok: { format: 'toml', key: 'mcp_servers' },
-  qwen: { format: 'json', key: 'mcpServers' }
+  qwen: { format: 'json', key: 'mcpServers' },
+  omp: { format: 'json', key: 'mcpServers' }
 }
 
 /**

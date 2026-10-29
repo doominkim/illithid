@@ -7,6 +7,9 @@
  * GitHub Copilot = agent `model` ids from the Copilot CLI changelog and the VS Code Copilot extension bundle (2026-09-27; efforts
  * low/medium/high). Only used for agent files — the default model is not managed.
  * Qwen Code = DEFAULT_QWEN_MODEL and MAINLINE_CODER_MODEL in qwen-code v0.25.0 (2026-10-07; no effort setting).
+ * omp = `provider/model` selectors from the bundled catalog @oh-my-pi/pi-catalog 18.4.2 src/models.json (2026-10-30); efforts =
+ * the agent `thinkingLevel` values (off, auto and the THINKING_EFFORTS of pi-catalog src/effort.ts), per model its
+ * `thinking.efforts` plus off and auto.
  */
 import type { ToolId } from '../engine/agents'
 
@@ -26,6 +29,8 @@ export interface ToolModelCatalog {
 const CODEX_FULL = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
 const CODEX_MAX = ['low', 'medium', 'high', 'xhigh', 'max']
 const CODEX_XHIGH = ['low', 'medium', 'high', 'xhigh']
+const OMP_TO_MAX = ['off', 'low', 'medium', 'high', 'xhigh', 'max', 'auto']
+const OMP_TO_XHIGH = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'auto']
 
 export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
   claude: {
@@ -96,6 +101,34 @@ export const MODEL_CATALOG: Readonly<Record<ToolId, ToolModelCatalog>> = {
       { value: 'qwen3.7-max', label: 'qwen3.7-max' }
     ],
     efforts: []
+  },
+  omp: {
+    models: [
+      {
+        value: 'anthropic/claude-opus-5-5',
+        label: 'anthropic/claude-opus-5-5',
+        efforts: OMP_TO_MAX
+      },
+      {
+        value: 'anthropic/claude-sonnet-5',
+        label: 'anthropic/claude-sonnet-5',
+        efforts: OMP_TO_MAX
+      },
+      {
+        value: 'anthropic/claude-haiku-4-5',
+        label: 'anthropic/claude-haiku-4-5',
+        efforts: OMP_TO_XHIGH
+      },
+      { value: 'openai/gpt-6-sol', label: 'openai/gpt-6-sol', efforts: OMP_TO_MAX },
+      { value: 'openai/gpt-5.6', label: 'openai/gpt-5.6', efforts: OMP_TO_MAX },
+      {
+        value: 'google/gemini-3.1-pro-preview',
+        label: 'google/gemini-3.1-pro-preview',
+        efforts: ['off', 'low', 'high', 'auto']
+      },
+      { value: 'xai/grok-4.7', label: 'xai/grok-4.7', efforts: OMP_TO_XHIGH }
+    ],
+    efforts: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'auto']
   }
 }
 

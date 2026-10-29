@@ -28,6 +28,7 @@
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/copilot-dark.svg"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"></picture><br>GitHub Copilot</td>
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/grok-dark.svg"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"></picture><br>Grok CLI</td>
     <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/omp-dark.svg"><img src="docs/agents/omp.svg" width="40" height="40" alt="omp"></picture><br>omp</td>
   </tr>
 </table>
 
@@ -51,7 +52,7 @@
 
 ## 에이전트가 실행할 수 있는 명령 정하기
 
-셸 명령을 허용, 물어보기, 막기 중 하나로 한 번 정하면 Illithid가 Claude Code, Codex, Gemini CLI, GitHub Copilot, Qwen Code 에 각 툴의 형식으로 규칙을 씁니다. 관련 명령을 그룹으로 묶고, 특정 툴에서만 규칙을 끌 수 있습니다. MCP 서버도 같은 방식으로 정할 수 있습니다. 서버의 권한 탭에서 모든 도구의 기본값을 정하고 도구마다 따로 바꾸면, Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code 에 반영됩니다.
+셸 명령을 허용, 물어보기, 막기 중 하나로 한 번 정하면 Illithid가 Claude Code, Codex, Gemini CLI, GitHub Copilot, Qwen Code, omp 에 각 툴의 형식으로 규칙을 씁니다. 관련 명령을 그룹으로 묶고, 특정 툴에서만 규칙을 끌 수 있습니다. MCP 서버도 같은 방식으로 정할 수 있습니다. 서버의 권한 탭에서 모든 도구의 기본값을 정하고 도구마다 따로 바꾸면, Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code 에 반영됩니다. omp 에는 도구별 설정이 반영됩니다.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="강제 push 와 hard reset 은 막고 git status 는 허용하는 git 그룹을 4개 툴에 반영"></p>
 

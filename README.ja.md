@@ -28,6 +28,7 @@
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/copilot-dark.svg"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"></picture><br>GitHub Copilot</td>
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/grok-dark.svg"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"></picture><br>Grok CLI</td>
     <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/omp-dark.svg"><img src="docs/agents/omp.svg" width="40" height="40" alt="omp"></picture><br>omp</td>
   </tr>
 </table>
 
@@ -51,7 +52,7 @@
 
 ## エージェントが実行できるコマンドを決める
 
-シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot、Qwen Code にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。 MCP サーバーも同じように決められます。サーバーの権限タブで全ツールの既定値を決め、ツールごとに個別に変えると、Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code に反映されます。
+シェルコマンドの許可・確認・ブロックを一度決めれば、Illithid が Claude Code、Codex、Gemini CLI、GitHub Copilot、Qwen Code、omp にそれぞれの形式でルールを書き込みます。関連するコマンドをグループにまとめ、特定のツールだけでルールをオフにできます。 MCP サーバーも同じように決められます。サーバーの権限タブで全ツールの既定値を決め、ツールごとに個別に変えると、Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code に反映されます。omp にはツールごとの設定が反映されます。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="force push と hard reset をブロックし git status を許可する git グループを 4 つのツールに反映"></p>
 

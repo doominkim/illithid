@@ -8,6 +8,9 @@ import { SessionScanCache, sessionScanCachePath } from './sessionCache'
 import {
   geminiText,
   isGeminiInjected,
+  ompActiveBranch,
+  ompMessage,
+  ompUserText,
   qwenActiveChain,
   qwenUserText,
   replayGemini,
@@ -96,6 +99,9 @@ export function resumeCommand(
     case 'qwen':
       // Qwen stores sessions per project (the directory it runs in)
       return abs ? inDir(cwd!, `qwen --resume ${id}`, platform) : undefined
+    case 'omp':
+      // --resume searches the cwd's sessions first, then every project, and switches to the session's cwd
+      return `omp --resume ${id}`
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -605,6 +611,72 @@ function scanQwen(home: string): Session[] {
   return out
 }
 
+// ---------------------------------------------------------------- omp
+
+/**
+ * ~/.omp/agent/sessions/<encoded cwd>/<time>_<sessionId>.jsonl (see transcript.ts ompFile). Subagent transcripts sit one
+ * folder deeper (<session>/<AgentId>.jsonl) and only feed the parent's stats. Line 1 is the title slot omp rewrites in
+ * place (legacy files start with the header); renames are also logged as title_change entries
+ */
+function scanOmp(home: string): Session[] {
+  const root = join(home, '.omp/agent/sessions')
+  if (!existsSync(root)) return []
+  const files = fg.sync('*/*.jsonl', {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    followSymbolicLinks: false,
+    suppressErrors: true,
+    stats: true
+  })
+  const out: Session[] = []
+  for (const f of files) {
+    const size = f.stats?.size ?? 0
+    let head: Json[] = []
+    let tail: Json[] = []
+    try {
+      ;({ head, tail } = headTail(f.path, size))
+    } catch {
+      continue
+    }
+    const header = head.find((r) => r.type === 'session')
+    const name = basename(f.path, '.jsonl')
+    const id = str(header?.id) ?? name.slice(name.indexOf('_') + 1)
+    const cwd = str(header?.cwd)
+    let renamed: string | undefined
+    for (const r of head === tail ? head : [...head, ...tail])
+      if (r.type === 'title_change') renamed = str(r.title) ?? renamed
+    let first: string | undefined
+    if (!renamed)
+      for (const r of head) {
+        const m = ompMessage(r)
+        if (m && (first = ompUserText(m))) break
+      }
+    const slot = head[0]?.type === 'title' ? str(head[0].title) : undefined
+    const chain = head === tail ? ompActiveBranch(head) : undefined
+    out.push({
+      id,
+      tool: 'omp',
+      title: clip(slot ?? renamed ?? str(header?.title) ?? first ?? '', TITLE_MAX),
+      cwd,
+      project: projectOf(cwd),
+      startedAt: isoOrUndefined(header?.timestamp) ?? firstTimestamp(head),
+      updatedAt: lastTimestamp(tail) ?? f.stats?.mtime?.toISOString(),
+      ...(chain
+        ? {
+            messageCount: chain.filter((r) => {
+              const role = ompMessage(r)?.role
+              return role === 'user' || role === 'assistant'
+            }).length
+          }
+        : {}),
+      path: f.path,
+      resumeCommand: resumeCommand('omp', id, cwd)
+    })
+  }
+  return out
+}
+
 // ---------------------------------------------------------------- Entry point
 
 export interface ScanOptions {
@@ -627,7 +699,8 @@ export function scanSessions(
     // ~/.copilot/session-state format is unverified (no local samples) — not scanned yet
     copilot: () => [],
     grok: scanGrok,
-    qwen: scanQwen
+    qwen: scanQwen,
+    omp: scanOmp
   }
   const sessions: Session[] = []
   const errors: SessionScanResult['errors'] = []

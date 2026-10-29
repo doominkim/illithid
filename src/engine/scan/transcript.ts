@@ -1023,6 +1023,149 @@ export async function readQwen(path: string, c: Collector): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------- omp
+
+const OMP_ID = /^[A-Za-z0-9_-]+$/
+
+/**
+ * omp sessions: ~/.omp/agent/sessions/<encoded cwd>/<time>_<sessionId>.jsonl. Line 1 is a fixed-width title slot
+ * ({type:'title', title}; absent in legacy files), line 2 the header ({type:'session', id, timestamp, cwd}); every later entry
+ * has {type, id, parentId, timestamp}. Subagent transcripts live in <session file without .jsonl>/<AgentId>.jsonl
+ */
+export function ompFile(home: string, id: string): string | undefined {
+  const root = join(home, '.omp/agent/sessions')
+  if (!existsSync(root) || !OMP_ID.test(id)) return undefined
+  return fg.sync(`*/*_${id}.jsonl`, {
+    cwd: root,
+    absolute: true,
+    onlyFiles: true,
+    suppressErrors: true
+  })[0]
+}
+
+/**
+ * Entries on the active branch, oldest first. Entries form a tree through parentId; branching moves a leaf pointer and the
+ * next append hangs off it, so the last entry is the leaf (omp's buildSessionContext falls back to it the same way).
+ * The whole branch is kept, including what a /clear (reset_boundary) or a compaction hides from the model. Files without
+ * entry ids (pre-v2) are linear in file order
+ */
+export function ompActiveBranch(records: Json[]): Json[] {
+  const entries = records.filter((r) => r.type !== 'title' && r.type !== 'session')
+  const byId = new Map<string, Json>()
+  for (const r of entries) if (typeof r.id === 'string') byId.set(r.id, r)
+  if (!byId.size) return entries
+  let cur: Json | undefined
+  for (let i = entries.length - 1; i >= 0 && !cur; i--)
+    if (typeof entries[i].id === 'string') cur = entries[i]
+  const chain: Json[] = []
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur.id as string)) {
+    seen.add(cur.id as string)
+    chain.push(cur)
+    cur = typeof cur.parentId === 'string' ? byId.get(cur.parentId) : undefined
+  }
+  return chain.reverse()
+}
+
+/** Message of an omp `message` entry */
+export function ompMessage(r: Json): Json | undefined {
+  const m = r.type === 'message' ? r.message : undefined
+  return m && typeof m === 'object' ? (m as Json) : undefined
+}
+
+/** Text typed by the user in an omp user message (synthetic auto-continue messages excluded) */
+export function ompUserText(m: Json): string | undefined {
+  return m.role === 'user' && !m.synthetic ? userTextOf(m.content) : undefined
+}
+
+/** omp usage: input already excludes cached input; thinking tokens are part of the output */
+function ompUsage(u: Json): TurnUsage {
+  return {
+    input: num(u.input),
+    cacheRead: num(u.cacheRead),
+    cacheWrite: num(u.cacheWrite),
+    output: num(u.output),
+    reasoning: 0
+  }
+}
+
+export async function readOmp(
+  path: string,
+  c: Collector,
+  opts: { subagent?: boolean } = {}
+): Promise<void> {
+  const toolNames = new Map<string, string>()
+  // Thinking level holds until the next thinking_level_change on the branch
+  let effort: string | undefined
+  for (const r of ompActiveBranch(await readJsonLines(path))) {
+    const at = isoOrUndefined(r.timestamp)
+    if (r.type === 'thinking_level_change') {
+      effort = typeof r.thinkingLevel === 'string' && r.thinkingLevel ? r.thinkingLevel : undefined
+      continue
+    }
+    const m = ompMessage(r)
+    if (!m) continue
+    if (m.role === 'user') {
+      const text = ompUserText(m)
+      if (!text) continue
+      c.stats?.prompt(at)
+      c.push('user', text, at)
+    } else if (m.role === 'assistant') {
+      const model = typeof m.model === 'string' ? m.model : undefined
+      const content = Array.isArray(m.content)
+        ? (m.content as Json[]).filter((b) => b && typeof b === 'object')
+        : []
+      const u = m.usage as Json | undefined
+      if (c.stats && u && typeof u === 'object') {
+        const usage = ompUsage(u)
+        const cost = (u.cost as Json | undefined)?.total
+        // A process-exit placeholder (empty, zero usage) is not a model call
+        if (content.length || usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0)
+          c.stats.turn({
+            model,
+            effort,
+            at,
+            endAt: isoOrUndefined(m.completedAt),
+            usage,
+            cost: typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : undefined
+          })
+      }
+      const texts: string[] = []
+      for (const b of content) {
+        if (b.type === 'text' && typeof b.text === 'string' && b.text.trim()) texts.push(b.text)
+        else if (b.type === 'toolCall') {
+          if (texts.length) c.push('assistant', texts.splice(0).join('\n\n'), at)
+          const name = String(b.name ?? '')
+          if (typeof b.id === 'string') toolNames.set(b.id, name)
+          c.push('assistant', toolLine(name || 'tool', b.arguments), at, 'tool')
+          c.onCall?.({ name, input: b.arguments, model, at })
+        }
+      }
+      if (texts.length) c.push('assistant', texts.join('\n\n'), at)
+      if (m.stopReason === 'aborted' && !opts.subagent) c.stats?.interrupt(at)
+    } else if (m.role === 'toolResult' && m.isError === true && c.stats) {
+      const id = typeof m.toolCallId === 'string' ? m.toolCallId : undefined
+      c.stats.toolError({
+        name: typeof m.toolName === 'string' ? m.toolName : id ? toolNames.get(id) : undefined,
+        kind: toolErrorKind(toolResultText(m.content)),
+        at
+      })
+    }
+  }
+}
+
+/** Model stats and tool calls of an omp subagent transcript (its prompt is the task, not a user request) */
+export async function readOmpSubagentStats(
+  path: string,
+  onCall: (c: ToolCall) => void,
+  stats?: StatsHooks
+): Promise<void> {
+  const c = new Collector(() => {})
+  c.onCall = onCall
+  c.stats = stats
+  await readOmp(path, c, { subagent: true })
+}
+
 // ---------------------------------------------------------------- Entry point
 
 /** Transcript of a single session. Throws if the file is missing */
@@ -1067,6 +1210,12 @@ export async function readSessionTranscript(
       const f = qwenFile(home, id)
       if (!f) throw new Error('session file not found')
       await readQwen(f, c)
+      break
+    }
+    case 'omp': {
+      const f = ompFile(home, id)
+      if (!f) throw new Error('session file not found')
+      await readOmp(f, c)
       break
     }
     default: {

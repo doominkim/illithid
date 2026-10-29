@@ -261,6 +261,7 @@
     "copilotHomeOverride": "COPILOT_HOME points to another folder — {{tool}} files are not written",
     "grokHomeOverride": "GROK_HOME points to another folder — {{tool}} files are not written",
     "qwenHomeOverride": "QWEN_HOME points to another folder — {{tool}} files are not written",
+    "ompHomeOverride": "PI_CODING_AGENT_DIR, PI_CONFIG_DIR or OMP_PROFILE moves omp's folder — {{tool}} files are not written",
     "jsoncUnsupported": "opencode.jsonc has comments — {{tool}} settings are not written until they are removed",
     "why": {
       "lastSyncFailed": "Last sync failed: {{reason}}",
@@ -390,6 +391,7 @@
     },
     "titleKind": "Import {{kind}}",
     "portability": {
+      "conditionalRule": "Not always-on in omp",
       "toolOnly": "Tool-only",
       "localPath": "Local path",
       "toolSpecificTools": "Tool-specific tools",

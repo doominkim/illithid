@@ -8,12 +8,12 @@ export interface ModelMetricSupport {
 }
 
 export function modelMetricSupport(tool: string): ModelMetricSupport {
-  const measured = tool === 'claude' || tool === 'codex' || tool === 'opencode'
+  const measured = tool === 'claude' || tool === 'codex' || tool === 'opencode' || tool === 'omp'
   return {
     requests: measured,
     turns: measured,
     tokens: measured,
-    interrupts: tool === 'claude' || tool === 'codex',
+    interrupts: tool === 'claude' || tool === 'codex' || tool === 'omp',
     errors: measured
   }
 }

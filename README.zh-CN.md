@@ -28,6 +28,7 @@
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/copilot-dark.svg"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"></picture><br>GitHub Copilot</td>
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/grok-dark.svg"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"></picture><br>Grok CLI</td>
     <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/omp-dark.svg"><img src="docs/agents/omp.svg" width="40" height="40" alt="omp"></picture><br>omp</td>
   </tr>
 </table>
 
@@ -51,7 +52,7 @@
 
 ## 决定智能体可以运行哪些命令
 
-只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI、GitHub Copilot 和 Qwen Code 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。 MCP 服务器也一样：在服务器的权限标签页中为所有工具设置默认值，并单独调整某个工具，规则会应用到 Claude Code、Codex、Gemini CLI、OpenCode 和 Qwen Code。
+只需设置一次允许、询问或阻止哪些 shell 命令，Illithid 会以各自的格式为 Claude Code、Codex、Gemini CLI、GitHub Copilot、Qwen Code 和 omp 写入规则。可以把相关命令分组，也可以只在某个工具中关闭某条规则。 MCP 服务器也一样：在服务器的权限标签页中为所有工具设置默认值，并单独调整某个工具，规则会应用到 Claude Code、Codex、Gemini CLI、OpenCode 和 Qwen Code;omp 会应用按工具的单独设置。
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="一个阻止强制推送和硬重置、允许 git status 的 git 分组，应用到 4 个工具"></p>
 

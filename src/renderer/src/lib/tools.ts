@@ -13,10 +13,11 @@ export const TOOL_NAME: Record<ToolId, string> = {
   gemini: 'Gemini CLI',
   copilot: 'GitHub Copilot',
   grok: 'Grok CLI',
-  qwen: 'Qwen Code'
+  qwen: 'Qwen Code',
+  omp: 'omp'
 }
 
-/** Tool identity colors (pill and icon background). Orange, black, blue, violet, slate, teal, fuchsia to avoid clashing with status colors */
+/** Tool identity colors (pill and icon background). Orange, black, blue, violet, slate, teal, fuchsia, indigo to avoid clashing with status colors */
 export const TOOL_COLOR: Record<ToolId, string> = {
   claude: '#D97757',
   codex: '#3F3F46',
@@ -24,7 +25,8 @@ export const TOOL_COLOR: Record<ToolId, string> = {
   gemini: '#8B5CF6',
   copilot: '#64748B',
   grok: '#0F766E',
-  qwen: '#C026D3'
+  qwen: '#C026D3',
+  omp: '#4338CA'
 }
 
 /** Display state of a single tool pill */

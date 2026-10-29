@@ -22,7 +22,8 @@ const TOOL_SHORT: Record<string, string> = {
   gemini: 'Gemini',
   copilot: 'Copilot',
   grok: 'Grok',
-  qwen: 'Qwen'
+  qwen: 'Qwen',
+  omp: 'omp'
 }
 
 function ago(iso?: string): string {

@@ -7,6 +7,7 @@ import { planAll } from './plan'
 import type { SecretBackend } from './secrets'
 import {
   claudeRulesPaths,
+  COPY_RULE_TOOLS,
   copyRulesDir,
   planRuleSync,
   type CopyRuleTool,
@@ -99,7 +100,8 @@ const TARGET_OF: Partial<Record<Resource, Partial<Record<ToolId, TargetId>>>> = 
     claude: 'claudePermissions',
     codex: 'codexRules',
     gemini: 'geminiPolicy',
-    qwen: 'qwenPermissions'
+    qwen: 'qwenPermissions',
+    omp: 'ompPermissions'
   }
 }
 
@@ -131,7 +133,8 @@ function changeCell(
   if (
     c.skip === 'copilotHomeOverride' ||
     c.skip === 'grokHomeOverride' ||
-    c.skip === 'qwenHomeOverride'
+    c.skip === 'qwenHomeOverride' ||
+    c.skip === 'ompHomeOverride'
   )
     return {
       ...base,
@@ -258,7 +261,7 @@ function agentsCell(home: string, tool: ToolId, items: AgentSyncItem[] | Error):
   }
 }
 
-/** Rule copies of other tools (Copilot instructions/illithid) */
+/** Rule copies of other tools (Copilot instructions/illithid, the Grok and omp rules folders, ...) */
 function copyRulesCell(home: string, tool: CopyRuleTool, all: RuleSyncItem[] | Error): StatusCell {
   const base = { resource: 'rules' as const, tool }
   const where = tilde(home, copyRulesDir(home, tool))
@@ -352,8 +355,8 @@ export function statusReport(
           ? withSkillOverride(cell, byId.get(overrideId), sourcesError)
           : cell
       if (resource === 'rules' && tool === 'claude') cells.push(claudeRulesCell(home, ruleItems))
-      else if (resource === 'rules' && (tool === 'copilot' || tool === 'grok' || tool === 'qwen'))
-        cells.push(copyRulesCell(home, tool, ruleItems))
+      else if (resource === 'rules' && (COPY_RULE_TOOLS as readonly ToolId[]).includes(tool))
+        cells.push(copyRulesCell(home, tool as CopyRuleTool, ruleItems))
       else if (targetId) {
         cells.push(overrideOf(changeCell(resource, tool, byId.get(targetId), sourcesError)))
       } else if (resource === 'skills') {
