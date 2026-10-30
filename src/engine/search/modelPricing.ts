@@ -103,6 +103,8 @@ function resolvePrice(model: string, book: PriceBook): ResolvedPrice {
   modelsForBook.set(id, resolved)
   return resolved
 }
+/** Tools whose logs record each response's cost (OpenCode message cost, omp usage.cost.total) */
+export const RECORDED_COST_TOOLS: ReadonlySet<string> = new Set(['opencode', 'omp'])
 export function ratesFor(model: string, book: PriceBook, context = 0): Rates | null {
   const { base } = resolvePrice(model, book)
   if (!base) return null
@@ -156,7 +158,7 @@ export function convertedCost(
   const parts = tokenCost(tokens, tool, ratesFor(model, book, context))
   const converted = parts ? Object.values(parts).reduce((a, b) => a + b, 0) : null
   const useRecorded =
-    tool === 'opencode' && recorded !== null && Number.isFinite(recorded) && recorded >= 0
+    RECORDED_COST_TOOLS.has(tool) && recorded !== null && Number.isFinite(recorded) && recorded >= 0
   const total = useRecorded ? recorded : converted
   return {
     total,

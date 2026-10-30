@@ -261,6 +261,7 @@
     "copilotHomeOverride": "COPILOT_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "grokHomeOverride": "GROK_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
     "qwenHomeOverride": "QWEN_HOME が別のフォルダーを指しているため、{{tool}} のファイルは書き込みません",
+    "ompHomeOverride": "PI_CODING_AGENT_DIR・PI_CONFIG_DIR・OMP_PROFILE が omp のフォルダーを移しているため、{{tool}} のファイルは書き込みません",
     "jsoncUnsupported": "opencode.jsonc にコメントがあるため {{tool}} の設定は書き込みません — コメントを削除すると反映されます",
     "why": {
       "lastSyncFailed": "前回の同期に失敗: {{reason}}",
@@ -390,6 +391,7 @@
     },
     "titleKind": "{{kind}}を取り込む",
     "portability": {
+      "conditionalRule": "omp では常に適用されない",
       "toolOnly": "ツール専用",
       "localPath": "この端末のパス",
       "toolSpecificTools": "ツール専用ツール",

@@ -261,6 +261,7 @@
     "copilotHomeOverride": "COPILOT_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "grokHomeOverride": "GROK_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
     "qwenHomeOverride": "QWEN_HOME 指向其他文件夹，不会写入 {{tool}} 文件",
+    "ompHomeOverride": "PI_CODING_AGENT_DIR、PI_CONFIG_DIR 或 OMP_PROFILE 移动了 omp 的文件夹，不会写入 {{tool}} 文件",
     "jsoncUnsupported": "opencode.jsonc 含有注释，不会写入 {{tool}} 设置 — 删除注释后即可应用",
     "why": {
       "lastSyncFailed": "上次同步失败: {{reason}}",
@@ -390,6 +391,7 @@
     },
     "titleKind": "导入{{kind}}",
     "portability": {
+      "conditionalRule": "在 omp 中并非始终生效",
       "toolOnly": "工具专用",
       "localPath": "本机路径",
       "toolSpecificTools": "工具专用工具",

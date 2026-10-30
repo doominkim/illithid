@@ -1,7 +1,7 @@
 import type { ModelKey, ModelSummary } from '../../../shared/api'
 
 export const seriesKey = (m: ModelKey): string => `${m.tool}|${m.model}`
-const EFFORTS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+const EFFORTS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'auto']
 export const effortOrder = (effort: string): number => {
   const i = EFFORTS.indexOf(effort)
   return i < 0 ? EFFORTS.length : i

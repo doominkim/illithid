@@ -6,12 +6,13 @@ import copilotSvg from '@lobehub/icons-static-svg/icons/githubcopilot.svg?raw'
 import grokSvg from '@lobehub/icons-static-svg/icons/grok.svg?raw'
 import opencodeSvg from '@lobehub/icons-static-svg/icons/opencode.svg?raw'
 import qwenSvg from '@lobehub/icons-static-svg/icons/qwen-color.svg?raw'
+import ompSvg from '../icons/omp.svg?raw'
 import type { ToolId } from '../../../shared/api'
 
 /** Tools with icons: sync target tools + cursor for artifact attribution */
 export type IconToolId = ToolId | 'cursor'
 
-/** Real tool logos (@lobehub/icons-static-svg). Monochrome logos use currentColor and follow the theme text color */
+/** Real tool logos (@lobehub/icons-static-svg; omp from its own repo, see icons/omp.svg). Monochrome logos use currentColor and follow the theme text color */
 const SVG: Record<IconToolId, string> = {
   claude: claudeSvg,
   codex: codexSvg,
@@ -20,6 +21,7 @@ const SVG: Record<IconToolId, string> = {
   copilot: copilotSvg,
   grok: grokSvg,
   qwen: qwenSvg,
+  omp: ompSvg,
   cursor: cursorSvg
 }
 
@@ -39,6 +41,7 @@ const MARKUP: Record<IconToolId, { __html: string }> = {
   copilot: { __html: fit(SVG.copilot) },
   grok: { __html: fit(SVG.grok) },
   qwen: { __html: fit(SVG.qwen) },
+  omp: { __html: fit(SVG.omp) },
   cursor: { __html: fit(SVG.cursor) }
 }
 

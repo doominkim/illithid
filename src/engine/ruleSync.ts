@@ -233,13 +233,11 @@ function planLegacyDir(
   return { ok: true, entries, plans }
 }
 
-/** Plan (Claude copies, then Copilot and Grok copies). Read-only */
+/** Plan (Claude copies, then the copies of the other copy-rule tools). Read-only */
 export function planRuleSync(home: string, env: Env = process.env): RuleSyncItem[] {
   return [
     ...planClaudeRules(home, env),
-    ...planCopyRules(home, 'copilot', env),
-    ...planCopyRules(home, 'grok', env),
-    ...planCopyRules(home, 'qwen', env)
+    ...COPY_RULE_TOOLS.flatMap((tool) => planCopyRules(home, tool, env))
   ]
 }
 
@@ -619,13 +617,24 @@ export function restoreLegacyRulesLink(home: string, previousLink: string): bool
 // ---------------------------------------------------------------- Rule copies of other tools (Copilot)
 
 /** Tools whose rules are copied file by file. undefined (absent) = Claude, handled above */
-export type CopyRuleTool = 'copilot' | 'grok' | 'qwen'
-export const COPY_RULE_TOOLS: readonly CopyRuleTool[] = ['copilot', 'grok', 'qwen']
+export type CopyRuleTool = 'copilot' | 'grok' | 'qwen' | 'omp'
+export const COPY_RULE_TOOLS: readonly CopyRuleTool[] = ['copilot', 'grok', 'qwen', 'omp']
 
-/** Grok's copy of the memory index. ~/.grok/rules is shared with the user, so the app's file carries the app name */
+/**
+ * Tools whose rules folder is shared with the user (Grok, omp): app copies are tracked in state, the memory index copy carries
+ * the app name, and a copy edited there since the app wrote it is left alone
+ */
+const SHARED_FOLDER: Readonly<Record<CopyRuleTool, boolean>> = {
+  copilot: false,
+  grok: true,
+  qwen: false,
+  omp: true
+}
+
+/** Grok's and omp's copy of the memory index. Their rules folder is shared with the user, so the app's file carries the app name */
 export const GROK_MEMORY_RULE_FILE = 'illithid-memory.md'
 
-/** The tool's home override points elsewhere (COPILOT_HOME / GROK_HOME / QWEN_HOME): the app's folder would not be read */
+/** The tool's home override points elsewhere (COPILOT_HOME / GROK_HOME / QWEN_HOME / omp's agent dir): the app's folder would not be read */
 function copyToolOverridden(home: string, tool: CopyRuleTool, env: Env): boolean {
   return !!toolHomeOverride(home, tool, env)
 }
@@ -641,6 +650,9 @@ export function copyRulesDir(home: string, tool: CopyRuleTool): string {
     // Qwen loads ~/.qwen/rules/**/*.md recursively, so an app-owned subfolder works
     case 'qwen':
       return join(home, '.qwen/rules', CLAUDE_RULES_DIR)
+    // omp reads only *.md/*.mdc directly under ~/.omp/agent/rules — shared with the user like Grok's
+    case 'omp':
+      return join(home, '.omp/agent/rules')
   }
 }
 
@@ -650,6 +662,7 @@ export function copyRuleFile(tool: CopyRuleTool, name: string): string {
     case 'copilot':
       return name.replace(/\.md$/, '') + '.instructions.md'
     case 'grok':
+    case 'omp':
       return name === CLAUDE_MEMORY_RULE ? GROK_MEMORY_RULE_FILE : name
     case 'qwen':
       return name
@@ -658,20 +671,28 @@ export function copyRuleFile(tool: CopyRuleTool, name: string): string {
 
 /**
  * Copy content for the tool. Copilot applies an *.instructions.md automatically only if its frontmatter has applyTo (or
- * description) — without either it is attach-only — so `applyTo: "**"` is added unless the rule already sets applyTo
+ * description) — without either it is attach-only — so `applyTo: "**"` is added unless the rule already sets applyTo.
+ * omp uses a rule only when its frontmatter has alwaysApply, description or condition (rulebook buildRule), so
+ * `alwaysApply: true` is added unless the rule already sets alwaysApply
  */
 export function copyRuleContent(tool: CopyRuleTool, text: string): string {
   switch (tool) {
-    case 'copilot': {
-      const fm = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(text)
-      if (!fm) return `---\napplyTo: "**"\n---\n\n${text}`
-      if (/^applyTo\s*:/m.test(fm[1])) return text
-      return text.replace(/^---(\r?\n)/, (m, eol: string) => `${m}applyTo: "**"${eol}`)
-    }
+    case 'copilot':
+      return withFrontmatterKey(text, /^applyTo\s*:/m, 'applyTo: "**"')
+    case 'omp':
+      return withFrontmatterKey(text, /^(alwaysApply|always-apply)\s*:/m, 'alwaysApply: true')
     case 'grok':
     case 'qwen':
       return text
   }
+}
+
+/** text with `line` as the first frontmatter key, unless a key matching `has` is already there (a frontmatter is added if missing) */
+function withFrontmatterKey(text: string, has: RegExp, line: string): string {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(text)
+  if (!fm) return `---\n${line}\n---\n\n${text}`
+  if (has.test(fm[1])) return text
+  return text.replace(/^---(\r?\n)/, (m, eol: string) => `${m}${line}${eol}`)
 }
 
 /**
@@ -706,8 +727,8 @@ function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem
   for (const name of [...sources.keys()].sort()) {
     const path = join(dir, copyRuleFile(tool, name))
     const source = sources.get(name)!
-    // A library rule named like Grok's memory copy would collide with it in the shared folder
-    if (tool === 'grok' && name === GROK_MEMORY_RULE_FILE) {
+    // A library rule named like the memory copy would collide with it in the shared folder
+    if (SHARED_FOLDER[tool] && name === GROK_MEMORY_RULE_FILE) {
       items.push({ tool, name, action: 'skip', path, source, reason: 'reservedName' })
       continue
     }
@@ -761,9 +782,9 @@ function planCopyRules(home: string, tool: CopyRuleTool, env: Env): RuleSyncItem
     if (sources.has(name)) continue
     const path = join(dir, copyRuleFile(tool, name))
     const st = lstatOrNull(path)
-    // ~/.grok/rules is shared with the user: a copy edited there since the app wrote it is left alone
+    // A shared rules folder (Grok, omp): a copy edited there since the app wrote it is left alone
     if (
-      tool === 'grok' &&
+      SHARED_FOLDER[tool] &&
       st?.isFile() &&
       !st.isSymbolicLink() &&
       fileHash(path) !== managed[name].contentHash
@@ -890,9 +911,14 @@ function applyCopyRules(
     const p = pendingOf(home, state, 'rule', tool, it.name).find(
       (x) => resolve(x.path) === resolve(it.path)
     )
-    // Originals live in the tool's instructions folder, outside the app-owned one
+    // Originals live in the tool's instructions folder, outside the app-owned one. A shared folder (Grok, omp) holds
+    // originals beside the app copies: any file there but the copy itself
     const root = dirname(dir)
-    if (!isUnder(root, it.path) || isUnder(dir, it.path)) {
+    const copy = join(dir, copyRuleFile(tool, it.name))
+    if (
+      !isUnder(root, it.path) ||
+      (SHARED_FOLDER[tool] ? resolve(it.path) === copy : isUnder(dir, it.path))
+    ) {
       out(it, 'refused', { reason: 'outOfScope' })
       continue
     }
@@ -900,7 +926,6 @@ function applyCopyRules(
       out(it, 'refused', { reason: 'changedSinceCheck' })
       continue
     }
-    const copy = join(dir, copyRuleFile(tool, it.name))
     const rec = state.toolRules![tool]?.[it.name]
     const copySt = lstatOrNull(copy)
     if (

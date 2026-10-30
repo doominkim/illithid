@@ -31,6 +31,7 @@
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/copilot-dark.svg"><img src="docs/agents/copilot.svg" width="40" height="40" alt="GitHub Copilot"></picture><br>GitHub Copilot</td>
     <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/grok-dark.svg"><img src="docs/agents/grok.svg" width="40" height="40" alt="Grok CLI"></picture><br>Grok CLI</td>
     <td align="center"><img src="docs/agents/qwen.svg" width="40" height="40" alt="Qwen Code"><br>Qwen Code</td>
+    <td align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/agents/omp-dark.svg"><img src="docs/agents/omp.svg" width="40" height="40" alt="omp"></picture><br>omp</td>
   </tr>
 </table>
 
@@ -54,7 +55,7 @@ Write a hook once and it runs in Claude Code, Codex, Gemini CLI, GitHub Copilot,
 
 ## Decide which commands agents can run.
 
-Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, GitHub Copilot, and Qwen Code, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, OpenCode, and Qwen Code.
+Allow, ask for, or block shell commands once, and Illithid writes the rule for Claude Code, Codex, Gemini CLI, GitHub Copilot, Qwen Code, and omp, each in its own format. Group related commands, and turn a rule off for a single tool. MCP servers get the same choices: in a server's Permissions tab, set a default for all its tools and override single tools, applied to Claude Code, Codex, Gemini CLI, OpenCode, and Qwen Code; omp gets the per-tool choices.
 
 <p align="center"><img src="docs/demo/permissions.gif" width="960" alt="A git group that blocks force pushes and hard resets and allows git status, applied to four tools"></p>
 

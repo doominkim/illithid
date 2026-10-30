@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
 import { parse as parseToml, TomlError } from 'smol-toml'
+import { isMap, parseDocument, YAMLError } from 'yaml'
 import { tools, type ToolId } from './agents'
 import { toolInUse } from './config'
 import { sha256 } from './text'
@@ -20,11 +21,30 @@ export interface ToolModels {
   error?: string
 }
 
+type ConfigFormat = 'json' | 'toml' | 'yaml'
+
 /** Parser error messages can contain raw snippets (config files hold tokens). Keep only the position. */
-function safeParseError(e: unknown, format: 'json' | 'toml'): string {
+function safeParseError(e: unknown, format: ConfigFormat): string {
   if (e instanceof TomlError) return `TOML parse failed (line ${e.line}, column ${e.column})`
+  if (e instanceof YAMLError) {
+    const at = e.linePos?.[0]
+    return `YAML parse failed${at ? ` (line ${at.line}, column ${at.col})` : ''}`
+  }
   const pos = /position (\d+)/.exec((e as Error)?.message ?? '')
   return `${format.toUpperCase()} parse failed${pos ? ` (position ${pos[1]})` : ''}`
+}
+
+/** YAML text → plain value; the first parse error is thrown. An empty document reads as an empty mapping (omp's config.yml) */
+function parseYaml(text: string): unknown {
+  const doc = parseDocument(text)
+  if (doc.errors.length) throw doc.errors[0]
+  return doc.contents === null ? {} : (doc.toJS() as unknown)
+}
+
+function parseConfig(text: string, format: ConfigFormat): unknown {
+  if (format === 'toml') return parseToml(text)
+  if (format === 'yaml') return parseYaml(text)
+  return JSON.parse(text)
 }
 
 function toDisplay(v: unknown): string | null {
@@ -35,7 +55,7 @@ function toDisplay(v: unknown): string | null {
 /** Read the top-level object. On failure, an error string */
 export function readConfigObject(
   path: string,
-  format: 'json' | 'toml'
+  format: ConfigFormat
 ): { value: Record<string, unknown> } | { error: string } {
   if (!existsSync(path)) return { error: 'file not found' }
   let text: string
@@ -45,7 +65,7 @@ export function readConfigObject(
     return { error: `read failed: ${(e as NodeJS.ErrnoException).code ?? 'unknown'}` }
   }
   try {
-    const value = format === 'toml' ? parseToml(text) : JSON.parse(text)
+    const value = parseConfig(text, format)
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       return { error: 'top level is not an object' }
     }
@@ -55,9 +75,8 @@ export function readConfigObject(
   }
 }
 
-/** Dotted key path: JSON `model.name` = key name inside object model; TOML `models.default` = key default in table [models] */
-function keyPath(key: string, format: 'json' | 'toml'): string[] {
-  void format
+/** Dotted key path: JSON `model.name` = key name inside object model; TOML `models.default` = key default in table [models]; YAML likewise nested maps */
+function keyPath(key: string): string[] {
   return key.split('.')
 }
 
@@ -84,7 +103,7 @@ export function readModels(home: string): ToolModels[] {
       ...base,
       values: keys.map((key) => ({
         key,
-        value: toDisplay(getPath(res.value, keyPath(key, format)))
+        value: toDisplay(getPath(res.value, keyPath(key)))
       }))
     }
   })
@@ -98,7 +117,8 @@ export const MODEL_KEYS: Readonly<Record<ToolId, readonly string[]>> = {
   gemini: ['model.name'],
   copilot: [],
   grok: ['models.default'],
-  qwen: ['model.name']
+  qwen: ['model.name'],
+  omp: ['modelRoles.default']
 }
 
 export interface SetModelResult {
@@ -120,7 +140,7 @@ function setJsonKey(text: string, key: string, value: string): string {
     throw new SetModelError('top level is not an object')
   }
   const obj = res as Record<string, unknown>
-  const path = keyPath(key, 'json')
+  const path = keyPath(key)
   let cur = obj
   for (const k of path.slice(0, -1)) {
     const next = cur[k]
@@ -204,6 +224,25 @@ function setTomlTableKey(text: string, table: string, key: string, value: string
 }
 
 /**
+ * YAML: change one nested key through the Document API, so comments, key order and the other values stay as written. Missing
+ * maps are created; a parent that is not a mapping is refused
+ */
+function setYamlKey(text: string, path: string[], value: string): string {
+  const doc = parseDocument(text)
+  if (doc.contents !== null && !isMap(doc.contents))
+    throw new SetModelError('top level is not an object')
+  for (let i = 1; i < path.length; i++) {
+    const parent = doc.getIn(path.slice(0, i), true)
+    if (parent !== undefined && !isMap(parent))
+      throw new SetModelError(
+        `${path.slice(0, i).join('.')} is not an object; not changing ${path.join('.')}`
+      )
+  }
+  doc.setIn(path, value)
+  return doc.toString()
+}
+
+/**
  * Change a single model key in a tool config file. SetModelError for disallowed keys, missing file, or parse failure.
  * Before writing, parse the result to confirm all other top-level keys are unchanged; otherwise don't write.
  */
@@ -224,7 +263,7 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   if (!existsSync(path)) throw new SetModelError('config file not found')
   const before = readFileSync(path, 'utf8')
   const parse = (text: string): Record<string, unknown> => {
-    const v = format === 'toml' ? parseToml(text) : (JSON.parse(text) as unknown)
+    const v = parseConfig(text, format)
     if (v === null || typeof v !== 'object' || Array.isArray(v))
       throw new SetModelError('top level is not an object')
     return v as Record<string, unknown>
@@ -235,7 +274,7 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
   } catch (e) {
     throw new SetModelError(e instanceof SetModelError ? e.message : safeParseError(e, format))
   }
-  const kp = keyPath(key, format)
+  const kp = keyPath(key)
   const previous = toDisplay(getPath(prevObj, kp))
   const base = { tool, key, path, previous }
   if (getPath(prevObj, kp) === value) return { ...base, status: 'unchanged' }
@@ -245,7 +284,9 @@ export function setModel(home: string, tool: ToolId, key: string, value: string)
       ? kp.length === 2
         ? setTomlTableKey(before, kp[0], kp[1], value)
         : setTomlKey(before, key, value)
-      : setJsonKey(before, key, value)
+      : format === 'yaml'
+        ? setYamlKey(before, kp, value)
+        : setJsonKey(before, key, value)
   let nextObj: Record<string, unknown>
   try {
     nextObj = parse(after)

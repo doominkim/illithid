@@ -26,6 +26,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import { parse as parseToml } from 'smol-toml'
+import { parse as parseYaml } from 'yaml'
 import { agentNameOfFile, agentToolDir, agentToolPath } from './agentRender'
 import { adoptAgentFiles } from './agentSync'
 import { adoptSkillCopies } from './skillSync'
@@ -88,7 +89,8 @@ import { LEGACY_MD_MARKERS, MD_MARKERS } from './targets/codexAgents'
 import { LEGACY_RULES_MARKERS, RULES_MARKERS } from './targets/codexRules'
 import { mcpEntries, outsideBlockMulti, sha256, stripJsonComments } from './text'
 import { LEGACY_TOML_MCP_MARKERS, TOML_MCP_MARKERS } from './targets/codexMcp'
-import { GROK_MEMORY_RULE_FILE } from './ruleSync'
+import { copyRuleContent, copyRuleFile, copyRulesDir, GROK_MEMORY_RULE_FILE } from './ruleSync'
+import { parseCommand } from './permissions'
 import type { Allowlist, AllowlistEntry, McpCodexOptions, McpServer, McpSource } from './types'
 
 // ---------------------------------------------------------------- Sources
@@ -184,6 +186,12 @@ export function listImportSources(home: string): ImportSource[] {
       path: join(home, '.qwen'),
       available: toolConfigFound(home, 'qwen'),
       kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent', 'hook']
+    },
+    omp: {
+      label: 'omp (~/.omp/agent)',
+      path: join(home, '.omp/agent'),
+      available: toolConfigFound(home, 'omp'),
+      kinds: ['rule', 'permissions', 'mcp', 'skill', 'agent']
     }
   }
   const out: ImportSource[] = [
@@ -276,6 +284,8 @@ export type Portability = 'ok' | 'warn' | 'toolOnly'
  * - nameMismatch      agent's own name differs from its file name (Gemini registers the frontmatter name)
  * warn
  * - toolNotes         tool instructions/notes text (outside the app markers in ~/.gemini/GEMINI.md) — review before sharing
+ * - conditionalRule   omp rule that isn't always applied there (alwaysApply not true: a description, condition or globs trigger,
+ *                     agent scope or enabled: false) — the library delivers every rule always-on, so importing changes its meaning
  * - localPath         command/args contain an absolute path specific to this machine
  * - toolSpecificTools SKILL.md or agent instructions assume tools specific to one tool
  * - toolSpecificKeys  agent's tool-specific settings (tools, permissions, hooks, temperature, etc.) have no library equivalent and are dropped
@@ -297,6 +307,7 @@ export type PortabilityReason =
   | 'nameMismatch'
   | 'localPath'
   | 'toolNotes'
+  | 'conditionalRule'
   | 'toolSpecificTools'
   | 'toolSpecificKeys'
 
@@ -480,9 +491,9 @@ export interface ImportResult {
   warnings?: string[]
   /** mcp: keys actually substituted */
   replaced?: string[]
-  /** agent: tools whose same-name file matched the rendered output and was adopted as app-owned */
+  /** rule·skill·agent: tools whose same-name file matched what sync writes and was adopted as app-owned */
   adopted?: ToolId[]
-  /** agent: tools whose same-name file differed from the rendered output and was left as a user file (sync skips it) */
+  /** rule·skill·agent: tools whose same-name file differed from what sync writes and was left as a user file (sync skips it) */
   userOwned?: ToolId[]
   /** rule·skill·agent: tools whose imported original is switched to app-owned — the next approved sync backs it up to backups/imported and writes the app copy */
   converted?: ToolId[]
@@ -648,6 +659,7 @@ const REASON_ORDER: readonly PortabilityReason[] = [
   ...TOOL_ONLY_REASONS,
   'localPath',
   'toolNotes',
+  'conditionalRule',
   'toolSpecificTools',
   'toolSpecificKeys'
 ]
@@ -692,7 +704,8 @@ const TOOL_DIRS = [
   '.local/share/opencode',
   '.gemini',
   '.copilot',
-  '.qwen'
+  '.qwen',
+  '.omp'
 ] as const
 /** Tool plugin paths */
 const TOOL_PLUGIN_DIRS = [
@@ -701,7 +714,9 @@ const TOOL_PLUGIN_DIRS = [
   '.config/opencode/plugin',
   '.config/opencode/plugins',
   '.gemini/extensions',
-  '.qwen/extensions'
+  '.qwen/extensions',
+  '.omp/plugins',
+  '.omp/agent/extensions'
 ]
 
 function expandHome(home: string, p: string): string {
@@ -836,11 +851,17 @@ export const GEMINI_MD_RULE = 'gemini-md.md'
 export const COPILOT_MD_RULE = 'copilot-instructions.md'
 /** Rule candidate for ~/.qwen/QWEN.md (copied, never moved) */
 export const QWEN_MD_RULE = 'qwen-md.md'
+/** Rule candidate for ~/.omp/agent/AGENTS.md (copied, never moved) */
+export const OMP_AGENTS_MD_RULE = 'omp-agents-md.md'
+/** Rule candidate for ~/.omp/agent/RULES.md, omp's sticky rules (copied, never moved) */
+export const OMP_RULES_MD_RULE = 'omp-rules-md.md'
 /** Tool notes files imported as rules: copied only, all tools start off */
 const TOOL_NOTES_RULES: ReadonlySet<string> = new Set([
   GEMINI_MD_RULE,
   COPILOT_MD_RULE,
-  QWEN_MD_RULE
+  QWEN_MD_RULE,
+  OMP_AGENTS_MD_RULE,
+  OMP_RULES_MD_RULE
 ])
 
 /** Rule file verdict. name is the candidate name, path is the source file */
@@ -859,12 +880,32 @@ export function rulePortability(
   else if (name === COPILOT_MD_RULE && path === join(home, '.copilot/copilot-instructions.md'))
     r.push('toolNotes')
   else if (name === QWEN_MD_RULE && path === join(home, '.qwen/QWEN.md')) r.push('toolNotes')
+  else if (
+    (name === OMP_AGENTS_MD_RULE && path === join(home, '.omp/agent/AGENTS.md')) ||
+    (name === OMP_RULES_MD_RULE && path === join(home, '.omp/agent/RULES.md'))
+  )
+    r.push('toolNotes')
   else if (INSTRUCTION_FILES.has(base)) {
     // Global instructions in a tool config dir are tool-only; instructions elsewhere (repos, etc.) are project-scoped
     if (inAny(home, TOOL_DIRS, path)) r.push('toolInstructions')
     else r.push('projectScoped')
   }
   return judge(r)
+}
+
+/**
+ * Whether omp applies a rules/ file to every request, as library rules are: `alwaysApply: true`, not `enabled: false`, not limited
+ * to some agents. Otherwise it is a rulebook (description), a trigger (condition) or unused — conditionalRule
+ */
+function ompRuleAlwaysOn(text: string): boolean {
+  try {
+    const d = matter(text, AGENT_MATTER).data as Json
+    return (
+      (d.alwaysApply ?? d['always-apply']) === true && d.enabled !== false && d.agents === undefined
+    )
+  } catch {
+    return false
+  }
 }
 
 /** Memory file verdict */
@@ -956,7 +997,8 @@ const AGENT_KEPT: Readonly<Record<ToolId, ReadonlySet<string>>> = {
   gemini: new Set(['name', 'description', 'model', 'kind']),
   copilot: new Set(['name', 'description', 'model', 'reasoning-effort']),
   grok: new Set(['name', 'description', 'model']),
-  qwen: new Set(['name', 'description', 'model'])
+  qwen: new Set(['name', 'description', 'model']),
+  omp: new Set(['name', 'description', 'model', 'thinkingLevel', 'thinking-level', 'thinking'])
 }
 /** Keys carried over from OpenCode opencode.json `agent` inline definitions */
 const OPENCODE_INLINE_KEPT: ReadonlySet<string> = new Set([
@@ -1101,6 +1143,32 @@ function agentRaw(
         model: model === 'inherit' ? undefined : model,
         body: agentBody(m.content),
         dropped: droppedKeys(d, AGENT_KEPT.qwen),
+        reasons
+      }
+    }
+    case 'omp': {
+      const m = matter(text, AGENT_MATTER)
+      const d = structuredClone(m.data) as Json
+      // Tool and subagent limits can't be carried by the library — importing would widen what the agent may do
+      if (d.tools !== undefined || d.spawns !== undefined) reasons.push('restrictedAgent')
+      // omp registers the frontmatter name
+      const own = strOf(d.name)
+      if (own !== undefined && own !== name) reasons.push('nameMismatch')
+      // model: an ordered fallback list (array or comma string) — the library keeps one model, the first
+      const models = (
+        Array.isArray(d.model) ? d.model.map(String) : String(strOf(d.model) ?? '').split(',')
+      )
+        .map((x) => x.trim())
+        .filter(Boolean)
+      const dropped = droppedKeys(d, AGENT_KEPT.omp)
+      if (models.length > 1) dropped.push('model fallbacks')
+      return {
+        description: strOf(d.description) ?? '',
+        model: models[0],
+        // thinkingLevel values (off … max, auto) are kept as the omp effort as is
+        effort: strOf(d.thinkingLevel ?? d['thinking-level'] ?? d.thinking),
+        body: agentBody(m.content),
+        dropped,
         reasons
       }
     }
@@ -1336,34 +1404,48 @@ function agentRetirements(
 }
 
 /**
- * Imported rule: `~/.claude/rules/<name>` is replaced by the app copy (`~/.claude/rules/illithid/<name>`) on the next approved sync —
- * leaving both makes Claude read the same rule twice. Files referenced by opencode.json instructions are user paths and never moved;
- * only that instructions entry is removed by the opencodeRules target (sync adds the library path instead).
+ * Record the original at the tool's copy path (~/.grok/rules/<name>, ~/.omp/agent/rules/<name>) as the app's copy when it matches
+ * what sync would write byte for byte (copyRuleContent: as is for Grok, `alwaysApply: true` added for omp). false = left as the user's file
  */
-/** Record ~/.grok/rules/<name> as the app's copy when it matches the library rule byte for byte (Grok copies rules as they are) */
-function adoptGrokRule(home: string, name: string, path: string): void {
+function adoptToolRule(home: string, tool: 'grok' | 'omp', name: string, path: string): boolean {
   try {
     const bytes = readFileSync(path, 'utf8')
-    if (sha256(bytes) !== sha256(readRule(home, name))) return
+    if (sha256(bytes) !== sha256(copyRuleContent(tool, readRule(home, name)))) return false
     const st = readState(home)
-    if (st.error) return
+    if (st.error) return false
     const state = { ...st.state, toolRules: { ...(st.state.toolRules ?? {}) } }
-    state.toolRules.grok = {
-      ...(state.toolRules.grok ?? {}),
+    state.toolRules[tool] = {
+      ...(state.toolRules[tool] ?? {}),
       [name]: { contentHash: sha256(bytes), at: new Date().toISOString() }
     }
     writeState(home, state)
+    return true
   } catch {
     // not adopted: the next sync reports it as the user's file
+    return false
   }
 }
 
+/**
+ * Imported rule: `~/.claude/rules/<name>` is replaced by the app copy (`~/.claude/rules/illithid/<name>`) on the next approved sync —
+ * leaving both makes Claude read the same rule twice. Files referenced by opencode.json instructions are user paths and never moved;
+ * only that instructions entry is removed by the opencodeRules target (sync adds the library path instead).
+ * omp: an original at the copy path (~/.omp/agent/rules/<name>.md) is adopted when it equals the copy sync writes. When it differs —
+ * including a rule whose only difference is the missing `alwaysApply: true` that the copy adds (a conditional rule in omp) — it is
+ * kept untouched as the user's file (reported userOwned; sync skips it) rather than retired: replacing it would silently turn a
+ * conditional omp rule always-on. Originals at another path (`<name>.mdc`) would load next to the app copy, so they are retired.
+ */
 function ruleRetirements(
   home: string,
   name: string,
   v: FileVariant
-): { pending: PendingRetire[]; converted: ToolId[] } {
-  const out = { pending: [] as PendingRetire[], converted: [] as ToolId[] }
+): { pending: PendingRetire[]; converted: ToolId[]; adopted: ToolId[]; userOwned: ToolId[] } {
+  const out = {
+    pending: [] as PendingRetire[],
+    converted: [] as ToolId[],
+    adopted: [] as ToolId[],
+    userOwned: [] as ToolId[]
+  }
   const claudeRule = join(home, '.claude/rules', name)
   for (const src of v.sources) {
     if (src.origin !== 'tool') continue
@@ -1394,8 +1476,21 @@ function ruleRetirements(
       e = pendingEntry(home, 'rule', 'qwen', name, src.path)
     } else if (src.label === 'grok' && src.path === join(home, '.grok/rules', name)) {
       // The original already sits where the app copy goes (~/.grok/rules/<name>): nothing to retire — adopt it when the bytes match
-      adoptGrokRule(home, name, src.path)
+      adoptToolRule(home, 'grok', name, src.path)
       continue
+    } else if (src.label === 'omp' && dirname(src.path) === join(home, '.omp/agent/rules')) {
+      if (src.path === join(copyRulesDir(home, 'omp'), copyRuleFile('omp', name))) {
+        const tool: ToolId = 'omp'
+        const list = adoptToolRule(home, 'omp', name, src.path) ? out.adopted : out.userOwned
+        if (!list.includes(tool)) list.push(tool)
+        continue
+      }
+      try {
+        if (!lstatSync(src.path).isFile()) continue
+      } catch {
+        continue
+      }
+      e = pendingEntry(home, 'rule', 'omp', name, src.path)
     } else if (src.label === 'claude' && src.path === claudeRule) {
       try {
         if (!lstatSync(src.path).isFile()) continue
@@ -1781,6 +1876,46 @@ function convertCopilot(name: string, s: Json): Conv {
   return { server, c }
 }
 
+/**
+ * omp mcp.json mcpServers entry. type stdio (default) → command/args/env; http/sse → url/headers (sse warned); timeout is in ms.
+ * cwd and omp-only keys (auth, OAuth, request id format, instructions) have no library equivalent and are dropped with a warning —
+ * sync keeps them on the same-name entry
+ */
+function convertOmp(name: string, s: Json): Conv {
+  const c = new Converter(name)
+  let server: McpServer
+  const type = s.type ?? 'stdio'
+  if (type === 'stdio' && typeof s.command === 'string') {
+    server = { transport: 'stdio', command: s.command, args: c.args(s.args) }
+    if (isObj(s.env) && Object.keys(s.env).length)
+      server.env = Object.fromEntries(Object.entries(s.env).map(([k, v]) => [k, c.envValue(k, v)]))
+  } else if ((type === 'http' || type === 'sse') && typeof s.url === 'string') {
+    if (type === 'sse')
+      c.warnings.push(
+        'moved sse transport to http — check that the server supports streamable http'
+      )
+    server = { transport: 'http', url: c.url(s.url) }
+    if (isObj(s.headers) && Object.keys(s.headers).length)
+      server.headers = Object.fromEntries(
+        Object.entries(s.headers).map(([k, v]) => [k, c.headerValue(k, v)])
+      )
+  } else return null
+  // omp runs an env/header value starting with `!` as a shell command; elsewhere it would be the literal text
+  for (const [k, o] of [
+    ['env', s.env],
+    ['headers', s.headers]
+  ] as const)
+    if (isObj(o))
+      for (const [key, v] of Object.entries(o))
+        if (typeof v === 'string' && v.startsWith('!'))
+          c.warnings.push(`${k}.${key} is an omp shell command (!…) — other tools read it as text`)
+  if (typeof s.timeout === 'number' && s.timeout > 0) server.timeoutMs = s.timeout
+  if (s.enabled === false) c.warnings.push('was disabled in omp (enabled=false)')
+  for (const k of ['cwd', 'requestIdFormat', 'instructions', 'auth', 'oauth'])
+    if (s[k] !== undefined) c.warnings.push(`dropped ${k} (no library equivalent)`)
+  return { server, c }
+}
+
 /** Gemini settings.json (comments allowed, as Gemini reads it) → object. null if unreadable */
 function readGeminiSettings(path: string): Json | null {
   try {
@@ -2122,6 +2257,52 @@ function parseGrokPermission(perm: Json, notes: string[]): RuleLists {
     notes.push(
       `Grok CLI [permission]: ${skipped} rules can't be carried over (other tools or patterns)`
     )
+  return lists
+}
+
+/**
+ * ~/.omp/agent/config.yml bash.patterns ({match, approval}) → command rules (allow, prompt = ask, deny). omp matches the whole
+ * command and `*` is its only wildcard: "X" = that exact command, "X *" = commands starting with X; the pair of both with the same
+ * approval (what sync writes for a prefix rule) is one prefix rule. Any other `*` can't be expressed as a command rule (warned)
+ */
+function parseOmpBashPatterns(patterns: unknown[], warnings: string[]): RuleLists {
+  const lists = emptyRuleLists()
+  const decision: Record<string, Decision> = { allow: 'allow', prompt: 'ask', deny: 'deny' }
+  const rank: Record<Decision, number> = { deny: 0, ask: 1, allow: 2 }
+  const seen = new Set<string>()
+  const rules: { base: string; prefix: boolean; d: Decision }[] = []
+  let invalid = 0
+  for (const p of patterns) {
+    const d = isObj(p) && typeof p.approval === 'string' ? decision[p.approval] : undefined
+    // omp collapses whitespace runs in both pattern and command
+    const match = isObj(p) && typeof p.match === 'string' ? p.match.trim().replace(/\s+/g, ' ') : ''
+    if (!d || !match) {
+      invalid++
+      continue
+    }
+    // The first matching pattern wins in omp: a later duplicate never applies
+    if (seen.has(match)) continue
+    seen.add(match)
+    const prefix = match.endsWith(' *')
+    const base = prefix ? match.slice(0, -2) : match
+    if (base.includes('*') || !parseCommand(base).length) {
+      warnings.push(
+        `bash.patterns "${match}" can't be carried over (only a trailing " *" is a command prefix)`
+      )
+      continue
+    }
+    rules.push({ base, prefix, d })
+  }
+  if (invalid)
+    warnings.push(`bash.patterns: ${invalid} entries without a match or a known approval skipped`)
+  if (rules.some((r, i) => i > 0 && rank[r.d] < rank[rules[i - 1].d]))
+    warnings.push('omp pattern order is not kept — Illithid orders deny, ask, allow')
+  for (const r of rules) {
+    // "X" next to "X *" with the same approval is part of one prefix rule
+    if (!r.prefix && rules.some((q) => q.prefix && q.base === r.base && q.d === r.d)) continue
+    const argv = parseCommand(r.base)
+    lists[LIST_OF[r.d]].push(r.prefix ? argv : { argv, claudeExact: true })
+  }
   return lists
 }
 
@@ -2608,6 +2789,92 @@ function scanTool(found: Found, home: string, src: ImportSource): void {
       })
       break
     }
+    case 'omp': {
+      // ~/.omp/agent/rules/*.{md,mdc} (top level only) except the app's copies (state.toolRules.omp) and its memory copy
+      const rd = join(home, '.omp/agent/rules')
+      const owned = readState(home).state.toolRules?.omp ?? {}
+      if (isDir(rd))
+        for (const f of readdirSync(rd).sort()) {
+          const p = join(rd, f)
+          const m = /^(.+)\.mdc?$/.exec(f)
+          if (!m || f.startsWith('.') || f === GROK_MEMORY_RULE_FILE || !lstatSync(p).isFile())
+            continue
+          const name = `${m[1]}.md`
+          if (owned[name] && f === copyRuleFile('omp', name)) continue
+          const text = readFileSync(p, 'utf8')
+          // A file equal to what sync would write for the library rule is a copy of it, not new material
+          try {
+            if (sha256(text) === sha256(copyRuleContent('omp', readRule(home, name)))) continue
+          } catch {
+            // not in the library
+          }
+          const info = rulePortability(found.ctx, name, p)
+          addFile(
+            found.rules,
+            name,
+            p,
+            ref(p),
+            ompRuleAlwaysOn(text) ? info : judge([...info.reasons, 'conditionalRule'])
+          )
+        }
+      // ~/.omp/agent/AGENTS.md (user context file) and RULES.md (sticky rules) → tool notes
+      for (const [file, rule] of [
+        ['AGENTS.md', OMP_AGENTS_MD_RULE],
+        ['RULES.md', OMP_RULES_MD_RULE]
+      ] as const) {
+        const p = join(home, '.omp/agent', file)
+        if (existsSync(p) && lstatSync(p).isFile() && readFileSync(p, 'utf8').trim()) {
+          addFile(found.rules, rule, p, ref(p), rulePortability(found.ctx, rule, p))
+          found.notes.push(`${rule} is ~/.omp/agent/${file} — copied, the original stays`)
+        }
+      }
+      const mp = join(home, '.omp/agent/mcp.json')
+      if (existsSync(mp)) {
+        const o = readGeminiSettings(mp)
+        if (!o) found.notes.push('~/.omp/agent/mcp.json parse failed')
+        else if (isObj(o.mcpServers)) {
+          const off = Array.isArray(o.disabledServers) ? o.disabledServers : []
+          for (const [n, s] of Object.entries(o.mcpServers)) {
+            if (!isObj(s)) continue
+            const r = convertOmp(n, s)
+            if (r && off.includes(n)) r.c.warnings.push('was disabled in omp (disabledServers)')
+            addMcp(n, r, mp)
+          }
+        }
+      }
+      const cp = join(home, '.omp/agent/config.yml')
+      if (existsSync(cp)) {
+        let o: unknown
+        try {
+          o = parseYaml(readFileSync(cp, 'utf8'))
+        } catch {
+          found.notes.push('~/.omp/agent/config.yml parse failed')
+        }
+        if (isObj(o)) {
+          if (isObj(o.bash) && Array.isArray(o.bash.patterns)) {
+            const warnings: string[] = []
+            const allowlist = rulesAllowlist(parseOmpBashPatterns(o.bash.patterns, warnings), {
+              allow: [],
+              deny: []
+            })
+            if (hasRules(allowlist))
+              found.permissions.push(permissionsVariant(allowlist, ref(cp), warnings))
+            else found.notes.push(...warnings)
+          }
+          const approval = isObj(o.tools) && isObj(o.tools.approval) ? o.tools.approval : {}
+          if (Object.keys(approval).length)
+            found.notes.push(
+              `~/.omp/agent/config.yml tools.approval (${Object.keys(approval).length} tools) is not imported — MCP tool decisions are set per server in the library`
+            )
+        }
+      }
+      scanSkillDir(found, home, join(home, '.omp/agent/skills'), {
+        origin: 'tool',
+        sourceId: src.id,
+        label: tool
+      })
+      break
+    }
     default: {
       const never: never = tool
       throw new Error(`unknown tool ${String(never)}`)
@@ -2983,7 +3250,10 @@ export function applyImport(
           v.sources.some(
             (x) =>
               x.origin === 'tool' &&
-              (x.label === 'gemini' || x.label === 'copilot' || x.label === 'qwen')
+              (x.label === 'gemini' ||
+                x.label === 'copilot' ||
+                x.label === 'qwen' ||
+                x.label === 'omp')
           )
             ? toolNotesToggles(home, cand.name, v.sources)
             : sourceToggles(home, 'rules', cand.name, v.sources))
@@ -2995,6 +3265,8 @@ export function applyImport(
           status: 'imported',
           ...(trashPath ? { trashPath } : {}),
           ...(moved.converted.length ? { converted: moved.converted } : {}),
+          ...(moved.adopted.length ? { adopted: moved.adopted } : {}),
+          ...(moved.userOwned.length ? { userOwned: moved.userOwned } : {}),
           ...(warnings.length ? { warnings } : {})
         })
       } else if (cand.kind === 'memory') {

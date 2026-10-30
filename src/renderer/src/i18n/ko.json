@@ -261,6 +261,7 @@
     "copilotHomeOverride": "COPILOT_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
     "grokHomeOverride": "GROK_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
     "qwenHomeOverride": "QWEN_HOME 이 다른 폴더를 가리켜 {{tool}} 파일은 쓰지 않습니다",
+    "ompHomeOverride": "PI_CODING_AGENT_DIR·PI_CONFIG_DIR·OMP_PROFILE 이 omp 폴더를 옮겨 {{tool}} 파일은 쓰지 않습니다",
     "jsoncUnsupported": "opencode.jsonc 에 주석이 있어 {{tool}} 설정은 쓰지 않습니다 — 주석을 지우면 반영됩니다",
     "why": {
       "lastSyncFailed": "마지막 동기화 실패: {{reason}}",
@@ -390,6 +391,7 @@
     },
     "titleKind": "{{kind}} 가져오기",
     "portability": {
+      "conditionalRule": "omp 에서 항상 적용되지 않음",
       "toolOnly": "툴 전용",
       "localPath": "이 기기 경로",
       "toolSpecificTools": "툴 전용 도구",

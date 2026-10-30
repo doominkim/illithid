@@ -12,6 +12,7 @@ import {
   convertedCost,
   readPriceBook,
   ratesFor,
+  RECORDED_COST_TOOLS,
   type ConvertedCost,
   type PriceBook,
   type CostTokens
@@ -24,7 +25,7 @@ export const MIN_REQUESTS = 30
 export const MIN_TOOL_CALLS = 100
 const MIN_COST_TURNS = 30
 
-/** Tools that start a subagent (Claude, Codex, OpenCode, Qwen Code) */
+/** Tools that start a subagent (Claude, Codex, OpenCode, Qwen Code, omp) */
 const SUBAGENT_TOOLS = new Set(['Agent', 'Task', 'spawn_agent', 'task', 'agent'])
 
 const ERROR_KINDS: readonly ToolErrorKind[] = [
@@ -499,7 +500,7 @@ export class ModelStatsCounter implements StatsHooks {
 export interface ModelKey {
   tool: string
   model: string
-  /** Reasoning effort (Codex, Claude Code); '' when the log has none */
+  /** Reasoning effort (Codex, Claude Code) or thinking level (omp); '' when the log has none */
   effort: string
 }
 
@@ -547,7 +548,7 @@ export interface ModelSummary extends ModelKey {
   errors: ErrorCounts
   interrupts: number
   tokens: TokenCounts
-  /** OpenCode only (what its log records) */
+  /** OpenCode and omp only (what their logs record) */
   cost: number | null
   /** Medians; null below the sample size */
   median: {
@@ -724,7 +725,7 @@ function summaryOf(r: SumRow, requests: RequestRow[], ctx: number[]): ModelSumma
       output: Number(r.output),
       reasoning: Number(r.reasoning)
     },
-    cost: r.tool === 'opencode' ? Math.round(Number(r.cost) * 10000) / 10000 : null,
+    cost: RECORDED_COST_TOOLS.has(r.tool) ? Math.round(Number(r.cost) * 10000) / 10000 : null,
     median: {
       responseSec: med(requests.map((q) => q.dur)),
       toolsPerRequest: med(requests.map((q) => q.tools)),
@@ -818,7 +819,7 @@ function pricingFor(
     list.some((c) => c.cost[field] === null) ? null : list.reduce((a, c) => a + c.cost[field]!, 0)
   const total = costs.length ? sum(costs, 'total') : null,
     converted = costs.length ? sum(costs, 'converted') : null
-  const recorded = summary.tool === 'opencode' && rows.every((r) => r.recorded !== null)
+  const recorded = RECORDED_COST_TOOLS.has(summary.tool) && rows.every((r) => r.recorded !== null)
   const parts =
     converted === null
       ? null
@@ -879,7 +880,7 @@ function pricingFor(
           ? 'unpriced'
           : recorded
             ? 'recorded'
-            : summary.tool === 'opencode' && rows.some((r) => r.recorded !== null)
+            : RECORDED_COST_TOOLS.has(summary.tool) && rows.some((r) => r.recorded !== null)
               ? 'mixed'
               : 'converted',
       priceSource: costs[0]?.cost.priceSource ?? book.source,

@@ -7,6 +7,7 @@
  * - Copilot  ~/.copilot/agents/<name>.agent.md   frontmatter name, description, model, reasoning-effort + body
  * - Grok     ~/.grok/agents/<name>.md            frontmatter name, description, model + body (the Claude format Grok also loads)
  * - Qwen     ~/.qwen/agents/<name>.md            frontmatter name, description, model + body (Qwen mirrors the Claude format; no effort)
+ * - omp      ~/.omp/agent/agents/<name>.md       frontmatter name, description, model, thinkingLevel + body (task/discovery.ts)
  * Keys without a value are omitted (the tool's default applies). The name is the library file name.
  */
 import { join } from 'node:path'
@@ -34,6 +35,8 @@ export function agentToolDir(
       return { dir: join(home, '.grok/agents'), ext: '.md' }
     case 'qwen':
       return { dir: join(home, '.qwen/agents'), ext: '.md' }
+    case 'omp':
+      return { dir: join(home, '.omp/agent/agents'), ext: '.md' }
   }
 }
 
@@ -48,6 +51,9 @@ export function agentNameOk(tool: ToolId, name: string): boolean {
     case 'copilot':
       // Copilot: printable ASCII, not empty, not starting with `.`
       return /^[\x21-\x7e]+$/.test(name) && !name.startsWith('.')
+    case 'omp':
+      // omp reserves `main` (the top-level session) and `sub`, compared trimmed and case-insensitively (parseAgentFields)
+      return !['main', 'sub'].includes(name.trim().toLowerCase())
     default:
       return true
   }
@@ -141,6 +147,18 @@ export function renderAgent(tool: ToolId, doc: AgentDoc): string {
           ['name', doc.name],
           ['description', description],
           ['model', t.model]
+        ],
+        doc.body
+      )
+    case 'omp':
+      // omp skips an agent without a description. The library requires one when saving; a hand-written file without it
+      // gets the name, so the agent still loads. The effort is an omp thinking level (off … max, auto) as picked in the app
+      return mdDoc(
+        [
+          ['name', doc.name],
+          ['description', description || doc.name],
+          ['model', t.model],
+          ['thinkingLevel', t.effort]
         ],
         doc.body
       )

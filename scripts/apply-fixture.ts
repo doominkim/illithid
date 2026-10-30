@@ -106,6 +106,8 @@ const MODES: Record<TargetId, number> = {
   qwenMcp: 0o600, // not a default target
   qwenHooks: 0o600, // same file as qwenMcp (not a default target)
   qwenPermissions: 0o600, // same file as qwenMcp (not a default target)
+  ompMcp: 0o600, // not a default target
+  ompPermissions: 0o600, // not a default target
   copilotMcp: 0o600, // not a default target
   grokMcp: 0o600, // not a default target
   grokCompat: 0o600, // same file as grokMcp (not a default target)

@@ -265,7 +265,8 @@ export function settleRetiringTools(home: string, env: Env, secrets?: SecretBack
           c.error ||
           c.skip === 'copilotHomeOverride' ||
           c.skip === 'grokHomeOverride' ||
-          c.skip === 'qwenHomeOverride'
+          c.skip === 'qwenHomeOverride' ||
+          c.skip === 'ompHomeOverride'
       )
       .map((c) => targetTool.get(c.id) ?? ''),
     ...p.rules.filter((x) => acts(x.action)).map((x) => x.tool ?? 'claude'),

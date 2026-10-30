@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import fg from 'fast-glob'
 import type { DatabaseSync } from 'node:sqlite'
 import type { ToolCall } from '../scan/transcript'
 import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from './sessionIndex'
@@ -11,7 +12,7 @@ import { metaGet, metaSet, openDbForRead, searchIndexPath, tableExists } from '.
 export const USAGE_SCHEMA = '3'
 
 export type UsageKind = 'skill' | 'mcp'
-/** `mcpRaw`: OpenCode names MCP tools `<server>_<tool>`; the server is matched by prefix at query time */
+/** `mcpRaw`: OpenCode and omp name MCP tools `<server>_<tool>`; the server is matched by prefix at query time */
 type StoredKind = UsageKind | 'mcpRaw'
 
 type Json = Record<string, unknown>
@@ -43,6 +44,9 @@ const OPENCODE_BUILTIN = new Set([
   'invalid',
   'batch'
 ])
+/** omp skill read: skill://<name>, skill://<name>/SKILL.md, or either with a line/raw selector (other skill files don't count) */
+const OMP_SKILL_RE =
+  /^skill:\/\/([A-Za-z0-9._-]+)(?:\/SKILL\.md)?(?::(?:raw|\d[\d,+-]*|-\d+)(?::raw)?)?$/
 
 /** Create (or reset on a version change) the usage table. Returns true when it was (re)created */
 export function ensureUsage(db: DatabaseSync): boolean {
@@ -161,6 +165,24 @@ export function classify(tool: string, call: ToolCall): UsageHit[] {
       }
       return []
     }
+    case 'omp': {
+      // Skills are read as internal URLs: read {path: "skill://<name>"} (optionally /SKILL.md or a :selector) loads SKILL.md
+      if (call.name === 'read') {
+        const path = typeof input?.path === 'string' ? input.path : ''
+        const m = OMP_SKILL_RE.exec(path)
+        const n = m ? str(m[1]) : undefined
+        return n ? [{ kind: 'skill', name: n }] : []
+      }
+      // MCP tools are mcp__<server>_<tool> with ONE underscore after the sanitized server (lowercase, [^a-z0-9_]+ → _,
+      // repeated _ collapsed), so the split is unknown here: the rest is stored raw like OpenCode's and matched by server
+      // prefix at query time. Models sometimes call the Claude-style mcp__<server>__<tool>, which omp maps back; the same
+      // sanitizing gives the registered name
+      if (call.name.startsWith('mcp__')) {
+        const n = str(ompMcpKey(call.name.slice(5)))
+        return n ? [{ kind: 'mcpRaw', name: n }] : []
+      }
+      return []
+    }
     case 'grok': {
       // MCP tools are reached through use_tool with the qualified catalog key <server>__<tool>
       if (call.name === 'use_tool') {
@@ -219,11 +241,30 @@ export function claudeSubagentFiles(sessionPath: string): string[] {
   }
 }
 
-/** Sizes and latest mtime of the subagent files (part of the Claude change signature) */
-export function claudeSubagentStat(sessionPath: string): { size: number; mtime: number } {
+/**
+ * Subagent transcripts of an omp session: <session without .jsonl>/<AgentId>.jsonl, nested subagents one folder deeper
+ * (<session>/<AgentId>/<ChildId>.jsonl). The folder also holds tool output logs and <AgentId>.md/.json results
+ */
+export function ompSubagentFiles(sessionPath: string): string[] {
+  const dir = sessionPath.replace(/\.jsonl$/, '')
+  if (dir === sessionPath || !existsSync(dir)) return []
+  return fg
+    .sync('**/*.jsonl', {
+      cwd: dir,
+      absolute: true,
+      onlyFiles: true,
+      followSymbolicLinks: false,
+      suppressErrors: true,
+      deep: 4
+    })
+    .sort()
+}
+
+/** Sizes and latest mtime of a session's subagent files (part of its change signature) */
+export function subagentStat(files: string[]): { size: number; mtime: number } {
   let size = 0
   let mtime = 0
-  for (const f of claudeSubagentFiles(sessionPath)) {
+  for (const f of files) {
     try {
       const st = statSync(f)
       size += st.size
@@ -267,6 +308,15 @@ export function mcpKey(name: string): string {
   return name.replace(/[^A-Za-z0-9_]/g, '_')
 }
 
+/** omp's MCP tool-name sanitizing (mcp/tool-bridge.ts): lowercase, [^a-z0-9_]+ → _, repeated _ collapsed, edges trimmed */
+export function ompMcpKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 /**
  * Rows that belong to one skill or MCP server. usageOf filters in SQL and usageSummaries in code; both live here so the
  * list and the detail always count the same calls. SQLite LIKE is case-insensitive for ASCII, and MCP names are ASCII
@@ -282,14 +332,19 @@ function usageFilter(
       test: (r) => r.kind === 'skill' && r.name === name
     }
   const key = mcpKey(name)
-  const prefixes = [`${name}_`, `${key}_`].map((p) => p.toLowerCase())
+  const prefixes = rawPrefixes(name)
   return {
-    sql: `((kind = 'mcp' and name in (?, ?)) or (kind = 'mcpRaw' and (name like ? escape '\\' or name like ? escape '\\')))`,
-    args: [name, key, `${escLike(name)}\\_%`, `${escLike(key)}\\_%`],
+    sql: `((kind = 'mcp' and name in (?, ?)) or (kind = 'mcpRaw' and (${prefixes.map(() => `name like ? escape '\\'`).join(' or ')})))`,
+    args: [name, key, ...prefixes.map((p) => `${escLike(p)}%`)],
     test: (r) =>
       (r.kind === 'mcp' && (r.name === name || r.name === key)) ||
       (r.kind === 'mcpRaw' && prefixes.some((p) => r.name.toLowerCase().startsWith(p)))
   }
+}
+
+/** Lowercase `<server>_` prefixes of raw (mcpRaw) names: as configured, as mcpKey, and as omp sanitizes it */
+function rawPrefixes(name: string): string[] {
+  return [...new Set([name, mcpKey(name), ompMcpKey(name)].map((p) => `${p}_`.toLowerCase()))]
 }
 
 /** Tools an MCP server was called with in the local session logs, sorted ([] when there is nothing to read yet) */
@@ -302,7 +357,7 @@ export function mcpToolNames(home: string, name: string, opts: { dbPath?: string
     const rows = db
       .prepare(`select distinct kind, name, item from usage where ${f.sql}`)
       .all(...f.args) as { kind: string; name: string; item: string }[]
-    const prefixes = [`${name}_`, `${mcpKey(name)}_`].map((p) => p.toLowerCase())
+    const prefixes = rawPrefixes(name)
     const tools = new Set<string>()
     for (const r of rows.filter(f.test)) {
       if (r.kind === 'mcp' && r.item) tools.add(r.item)

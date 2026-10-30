@@ -14,7 +14,8 @@ export const TOOL_EXECUTABLES: Readonly<Record<ToolId, string>> = {
   gemini: 'gemini',
   copilot: 'copilot',
   grok: 'grok',
-  qwen: 'qwen'
+  qwen: 'qwen',
+  omp: 'omp'
 }
 
 export interface ToolDetection {
@@ -57,6 +58,8 @@ export function toolConfigFound(home: string, tool: ToolId): boolean {
       return isDir(join(home, '.grok'))
     case 'qwen':
       return isDir(join(home, '.qwen'))
+    case 'omp':
+      return isDir(join(home, '.omp/agent'))
   }
 }
 

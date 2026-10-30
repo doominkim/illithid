@@ -29,7 +29,7 @@ export interface RosterSource {
 
 export interface ModelKeys {
   path: string
-  format: 'json' | 'toml'
+  format: 'json' | 'toml' | 'yaml'
   /** Key names. For JSON, `a.b` is the nested key b inside object a. Empty = no default model setting the app manages */
   keys: string[]
 }
@@ -64,6 +64,7 @@ export function tools(home: string): ToolInfo[] {
   const geminiSettings = join(home, '.gemini/settings.json')
   const copilotMcp = join(home, '.copilot/mcp-config.json')
   const qwenSettings = join(home, '.qwen/settings.json')
+  const ompConfig = join(home, '.omp/agent/config.yml')
   return [
     {
       id: 'claude',
@@ -173,6 +174,21 @@ export function tools(home: string): ToolInfo[] {
         dirs: [join(home, '.qwen/agents')],
         ext: '.md'
       }
+    },
+    {
+      id: 'omp',
+      displayName: 'omp',
+      configFile: ompConfig,
+      // omp loads ~/.omp/agent/rules/*.{md,mdc} (not subfolders) — a folder shared with the user, app copies tracked in state.
+      // The copies carry `alwaysApply: true` (a rule without it, description or a trigger is never used). Rules go there rather
+      // than ~/.omp/agent/AGENTS.md: that file would shadow every other user-level context file (~/.agents/AGENTS.md, …)
+      rules: { kind: 'copyDir', dir: join(home, '.omp/agent/rules') },
+      skills: { kind: 'symlinkDir', dir: join(home, '.omp/agent/skills') },
+      models: { path: ompConfig, format: 'yaml', keys: ['modelRoles.default'] },
+      roster: {
+        dirs: [join(home, '.omp/agent/agents')],
+        ext: '.md'
+      }
     }
   ]
 }
@@ -217,7 +233,26 @@ export function qwenHomeOverride(
   return homeOverride(home, env.QWEN_HOME, '.qwen')
 }
 
-/** Home override of a tool that has one (COPILOT_HOME, GROK_HOME, QWEN_HOME) pointing away from the folder the app writes, else null */
+/**
+ * The omp agent folder when the environment moves it away from ~/.omp/agent (absolute path), else null. Same handling as
+ * COPILOT_HOME. Mirrors omp's own resolution (pi-utils dirs.ts): PI_CONFIG_DIR renames the root under home (default .omp);
+ * a named profile (OMP_PROFILE, or PI_PROFILE when OMP_PROFILE is unset; "default" = none) uses <root>/profiles/<name>/agent;
+ * otherwise PI_CODING_AGENT_DIR replaces <root>/agent
+ */
+export function ompHomeOverride(
+  home: string,
+  env: Record<string, string | undefined>
+): string | null {
+  const root = join(home, env.PI_CONFIG_DIR || '.omp')
+  const profile = (env.OMP_PROFILE !== undefined ? env.OMP_PROFILE : env.PI_PROFILE)?.trim()
+  const agentDir =
+    profile && profile !== 'default'
+      ? join(root, 'profiles', profile, 'agent')
+      : (homeOverride(home, env.PI_CODING_AGENT_DIR, '.omp/agent') ?? join(root, 'agent'))
+  return agentDir === join(home, '.omp/agent') ? null : agentDir
+}
+
+/** Home override of a tool that has one (COPILOT_HOME, GROK_HOME, QWEN_HOME, omp's agent folder) pointing away from the folder the app writes, else null */
 export function toolHomeOverride(
   home: string,
   id: ToolId,
@@ -226,6 +261,7 @@ export function toolHomeOverride(
   if (id === 'copilot') return copilotHomeOverride(home, env)
   if (id === 'grok') return grokHomeOverride(home, env)
   if (id === 'qwen') return qwenHomeOverride(home, env)
+  if (id === 'omp') return ompHomeOverride(home, env)
   return null
 }
 

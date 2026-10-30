@@ -14,7 +14,8 @@ export function resolveMcpUsageServer(
   if (!loggedName) return undefined
   const names = [...new Set(serverNames)].filter(Boolean)
   const key = mcpKey(loggedName)
-  if (tool === 'opencode') {
+  // OpenCode and omp store the raw `<server>_<tool>` name
+  if (tool === 'opencode' || tool === 'omp') {
     const rawKey = key.toLowerCase()
     const hasToolSuffix = (name: string): boolean => {
       const prefix = `${mcpKey(name).toLowerCase()}_`
