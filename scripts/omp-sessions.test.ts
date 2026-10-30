@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { readSessionTranscript, scanSessions } from '../src/engine'
 import { Collector, readOmp, type TurnUsage } from '../src/engine/scan/transcript'
 import { modelList } from '../src/engine/search/modelStats'
@@ -257,7 +257,8 @@ test('omp sessions are listed from ~/.omp/agent/sessions/*, without subagent tra
   assert.equal(s.updatedAt, T(18))
   // Active branch only: 3 user and 4 assistant messages (the rewound pair is not counted)
   assert.equal(s.messageCount, 7)
-  assert.equal(s.path, join(home, DIR, FILE))
+  // fast-glob returns forward slashes on Windows, like every other session scanner
+  assert.equal(resolve(s.path), join(home, DIR, FILE))
   assert.equal(s.resumeCommand, `omp --resume ${ID}`)
   // A legacy file without the title slot falls back to the first user prompt
   assert.equal(sessions.find((x) => x.id === LEGACY_ID)!.title, 'Legacy question')
