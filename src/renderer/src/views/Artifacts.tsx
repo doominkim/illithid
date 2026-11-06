@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -130,7 +130,18 @@ function Thumb({ a }: { a: Artifact }): React.JSX.Element {
   )
 }
 
-/** Card grid: thumbnail, title, session or project and time */
+/** Grid layout: smallest card width, gap between cards and rows, scroller padding (px) */
+const GRID_MIN = 132
+const GRID_GAP = 8
+const GRID_PAD = 8
+/** Card height beyond the square thumbnail: card padding, title and meta lines */
+const CARD_EXTRA = 50
+
+/**
+ * Card grid: thumbnail, title, session or project and time.
+ * Virtualized by row (only visible rows are mounted), so tens of thousands of artifacts stay responsive.
+ * Columns follow the scroller width with the same rule as `repeat(auto-fill, minmax(132px, 1fr))`.
+ */
 function ArtifactGrid({
   items,
   selected,
@@ -140,28 +151,68 @@ function ArtifactGrid({
   selected: string | null
   onSelect: (id: string) => void
 }): React.JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = (): void => setWidth(Math.max(0, el.clientWidth - 2 * GRID_PAD))
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const cols = Math.max(1, Math.floor((width + GRID_GAP) / (GRID_MIN + GRID_GAP)))
+  const cell = width ? (width - GRID_GAP * (cols - 1)) / cols : GRID_MIN
+  const v = useVirtualizer({
+    count: Math.ceil(items.length / cols),
+    getScrollElement: () => ref.current,
+    estimateSize: () => cell + CARD_EXTRA + GRID_GAP,
+    overscan: 3
+  })
+  // Row contents and heights change with the column count and card width: drop measured sizes
+  useEffect(() => v.measure(), [v, cols, cell])
   return (
     <div
-      style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 8 }}
+      ref={ref}
+      style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: GRID_PAD }}
       data-testid="artifact-grid"
     >
-      <div className="ac-thumb-grid">
-        {items.map((a) => (
-          <UnstyledButton
-            key={a.id}
-            className="ac-thumb-card"
-            data-active={a.id === selected || undefined}
-            onClick={() => onSelect(a.id)}
-            title={a.path}
+      <div style={{ height: v.getTotalSize(), position: 'relative' }}>
+        {v.getVirtualItems().map((vr) => (
+          <div
+            key={vr.key}
+            data-index={vr.index}
+            ref={v.measureElement}
+            className="ac-thumb-grid"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              paddingBottom: GRID_GAP,
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              transform: `translateY(${vr.start}px)`
+            }}
           >
-            <Thumb a={a} />
-            <Text size="xs" fw={500} truncate="end" mt={6}>
-              {a.title}
-            </Text>
-            <Text size="xs" c="dimmed" truncate="end">
-              {[a.sessionTitle ?? a.project, fmtTime(a.mtime)].filter(Boolean).join(' · ')}
-            </Text>
-          </UnstyledButton>
+            {items.slice(vr.index * cols, (vr.index + 1) * cols).map((a) => (
+              <UnstyledButton
+                key={a.id}
+                className="ac-thumb-card"
+                data-active={a.id === selected || undefined}
+                onClick={() => onSelect(a.id)}
+                title={a.path}
+              >
+                <Thumb a={a} />
+                <Text size="xs" fw={500} truncate="end" mt={6}>
+                  {a.title}
+                </Text>
+                <Text size="xs" c="dimmed" truncate="end">
+                  {[a.sessionTitle ?? a.project, fmtTime(a.mtime)].filter(Boolean).join(' · ')}
+                </Text>
+              </UnstyledButton>
+            ))}
+          </div>
         ))}
       </div>
     </div>
