@@ -21,6 +21,7 @@ import {
   type ToolId
 } from '../engine'
 import { editedRules } from '../engine/editedRules'
+import { staleSkillRefs } from '../engine/staleRefs'
 import { activePending } from '../engine/pendingRetire'
 import { readState } from '../engine/state'
 import { toolsInUse } from '../engine/config'
@@ -227,6 +228,11 @@ export function applyPreview(home: string, env: Env, secrets?: SecretBackend): A
       path: tilde(home, e.path),
       where: e.where
     })),
+    // A skill the sync deletes counts as gone already, so a rule still naming it shows up before it dangles
+    staleRefs: staleSkillRefs(
+      home,
+      p.skills.filter((s) => s.action === 'deleteCandidate').map((s) => s.name)
+    ),
     inUse,
     fingerprint: planFingerprint(p)
   }
