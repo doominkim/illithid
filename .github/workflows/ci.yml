@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS runs on the Mac Studio self-hosted runner (GitHub-hosted macOS minutes were the largest Actions cost)
+          # GitHub-hosted runners are free for public repositories; a self-hosted runner would run fork PR code on the owner's machine
           - os: macos
-            runner: [self-hosted, macOS, ARM64, illithid]
+            runner: macos-latest
           - os: windows
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
